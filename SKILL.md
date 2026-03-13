@@ -1,0 +1,208 @@
+---
+name: do-work
+description: >
+  Project management skill for the do-work system — a file-based autonomous loop
+  that turns natural-language briefs into discrete, traceable tasks (REQ files)
+  and executes them one at a time with TDD and a git commit per task.
+  Triggers on: "do-work", "intake", "capture", "verify", "run the loop",
+  "backlog", "user request", "REQ-", "UR-".
+---
+
+# do-work
+
+File-based project management: Start → Go. (Or granular: Intake → Capture → Verify → Run.)
+
+## Quick Reference
+
+| Command | What it does |
+|---------|-------------|
+| `/do-work start [brief]` | Records brief + decomposes into REQs in one shot. Includes ideate by default. Auto-installs if needed. |
+| `/do-work start [brief] --no-ideate` | Same as start, but skips the creativity review before decomposition. |
+| `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
+| `/do-work go [UR-NNN] --force` | Verifies + runs regardless of confidence score. |
+| `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs if >= 90%. |
+| `/do-work install` | Creates `do-work/` structure in current project. |
+| `/do-work intake [brief]` | Records brief verbatim as next UR file. |
+| `/do-work capture [UR-NNN]` | Decomposes a UR brief into REQ files in the backlog. |
+| `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections in a brief. |
+| `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
+| `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
+| `/do-work run` | Executes backlog: TDD loop, one REQ at a time, commit per REQ. |
+| `/do-work` | Show this help. |
+
+---
+
+## Agent files
+
+Detailed instructions for each phase live in separate files. Read the referenced file and follow it exactly.
+
+- [agents/start.md](agents/start.md) — Orchestrator: intake + ideate + capture
+- [agents/go.md](agents/go.md) — Orchestrator: verify + conditional run
+- [agents/intake.md](agents/intake.md) — Records brief verbatim as next UR file
+- [agents/ideate.md](agents/ideate.md) — Surfaces assumptions, risks, and connections
+- [agents/capture.md](agents/capture.md) — Decomposes brief into REQ files
+- [agents/verify.md](agents/verify.md) — Scores REQ coverage against brief
+- [agents/run.md](agents/run.md) — Executes backlog with TDD loop
+
+---
+
+## Project Root Detection
+
+At the start of every subcommand:
+
+```bash
+git rev-parse --show-toplevel
+```
+
+If this fails (not a git repo), use the current working directory.
+All references below use `{project}` to mean this resolved root.
+
+---
+
+## File Naming
+
+- User requests: `UR-001`, `UR-002`, ... (zero-padded to 3 digits)
+- Feature requests: `REQ-001-short-slug.md`, `REQ-002-short-slug.md`, ...
+- Slugs are lowercase kebab-case, max 5 words
+
+## Commit Convention
+
+```
+feat(REQ-NNN): short title
+
+REQ: do-work/archive/REQ-NNN-slug.md
+UR: do-work/user-requests/UR-NNN/input.md
+Output: path/to/primary/output
+```
+
+---
+
+## Subcommand Instructions
+
+### No subcommand
+
+Print the Quick Reference table and stop.
+
+---
+
+### install
+
+Create the do-work folder structure. Idempotent — safe to run multiple times.
+
+1. Detect `{project}`.
+2. Create directories if they do not already exist:
+   - `{project}/do-work/user-requests/`
+   - `{project}/do-work/working/`
+   - `{project}/do-work/archive/`
+3. Report what was created vs already existed. Example:
+
+```
+do-work installed at /path/to/project/do-work/
+
+Created:
+  do-work/user-requests/
+  do-work/working/
+  do-work/archive/
+
+Ready. Run `/do-work start` to record your first brief.
+```
+
+If already installed, report "Already installed." and stop.
+
+---
+
+### start [brief] [--no-ideate]
+
+Record a brief and decompose it into REQ files in one shot. Ideate runs by default.
+
+1. Detect `{project}`.
+2. Check if `{project}/do-work/` exists. If not, run install automatically first, then continue.
+3. Determine the brief:
+   - If text was provided after `start`, use it as the brief.
+   - If not, ask the user to paste their brief and wait.
+4. Note whether `--no-ideate` is present in the arguments.
+5. Read [agents/start.md](agents/start.md) in full.
+6. Follow the start agent instructions exactly. Ideate runs by default unless `--no-ideate` was present.
+
+---
+
+### go [UR-NNN] [--force] [--auto-fix]
+
+Verify REQ coverage and conditionally execute the backlog.
+
+1. Detect `{project}`.
+2. Determine the UR:
+   - If `UR-NNN` was provided, use it.
+   - If not, list `{project}/do-work/user-requests/` and ask which UR to verify against.
+3. Note whether `--force` or `--auto-fix` are present in the arguments.
+4. Read [agents/go.md](agents/go.md) in full.
+5. Follow the go agent instructions exactly. Pass through any flags.
+
+---
+
+### intake [brief]
+
+Record a natural-language brief as the next UR file. Never skip to planning or implementation.
+
+1. Detect `{project}`.
+2. Check if `{project}/do-work/` exists. If not, run install automatically first, then continue.
+3. Determine the brief:
+   - If text was provided after `intake`, use it as the brief.
+   - If not, ask the user to paste their brief and wait.
+4. Read [agents/intake.md](agents/intake.md) in full.
+5. Follow the intake agent instructions exactly.
+
+---
+
+### capture [UR-NNN]
+
+Decompose a UR brief into discrete REQ files in the backlog.
+
+1. Detect `{project}`.
+2. Determine the UR:
+   - If `UR-NNN` was provided, use it.
+   - If not, list `{project}/do-work/user-requests/` and ask which UR to capture.
+3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+4. Read [agents/capture.md](agents/capture.md) in full.
+5. Follow the capture agent instructions exactly.
+
+---
+
+### ideate [UR-NNN]
+
+Surface assumptions, risks, and connections in a brief before decomposition.
+
+1. Detect `{project}`.
+2. Determine the UR:
+   - If `UR-NNN` was provided, use it.
+   - If not, list `{project}/do-work/user-requests/` and ask which UR to review.
+3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+4. Read [agents/ideate.md](agents/ideate.md) in full.
+5. Follow the ideate agent instructions exactly.
+
+---
+
+### verify [UR-NNN] [--auto-fix]
+
+Score REQ coverage against the original brief. List gaps and issues.
+
+1. Detect `{project}`.
+2. Determine the UR:
+   - If `UR-NNN` was provided, use it.
+   - If not, list `{project}/do-work/user-requests/` and ask which UR to verify against.
+3. Note whether `--auto-fix` is present in the arguments.
+4. Read [agents/verify.md](agents/verify.md) in full.
+5. Follow the verify agent instructions. If `--auto-fix` was present, follow the auto-fix section.
+
+---
+
+### run
+
+Execute the backlog autonomously — one REQ at a time — until empty or a stopper is hit.
+
+1. Detect `{project}`.
+2. Pre-flight checks:
+   - If a REQ file exists in `{project}/do-work/working/`, report it and ask the user: resume or abort?
+   - If no `REQ-NNN-*.md` files exist in `{project}/do-work/` (backlog root), report "Backlog is empty." and stop.
+3. Read [agents/run.md](agents/run.md) in full.
+4. Follow the run agent instructions exactly.
