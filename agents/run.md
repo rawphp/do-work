@@ -136,10 +136,17 @@ mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/archive/REQ-NNN-s
 
 ### Step 6: Commit
 
-Stage all changed files and commit:
+Stage the changed implementation files **and** the REQ file deletion, then commit:
 
 ```bash
-git add -A
+# Stage implementation changes (specific files you modified)
+git add path/to/changed/files...
+
+# Stage the REQ deletion from the backlog root (the mv to archive/ leaves
+# a tracked-file deletion that MUST be committed — archive/ is gitignored
+# so only the deletion side needs staging)
+git add {project}/do-work/REQ-NNN-slug.md
+
 git commit -m "feat(REQ-NNN): short title
 
 REQ: {project}/do-work/archive/REQ-NNN-slug.md
@@ -150,6 +157,7 @@ Output: path/to/primary/output"
 **Commit rules:**
 - Subject line: `feat(REQ-NNN): [title from REQ]` (max 72 chars)
 - Body: REQ path, UR path, primary output path
+- **Always stage the REQ file path** so its deletion from the backlog is committed (not left as a stale staged change)
 - Never commit with failing tests
 - Never use `--no-verify`
 
