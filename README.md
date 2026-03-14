@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | ba
 ### Or clone manually
 
 ```bash
-git clone git@github.com:rawphp/do-work.git ~/.claude/skills/do-work
+git clone https://github.com/rawphp/do-work.git ~/.claude/skills/do-work
 ```
 
 That's it. Claude Code picks up the `/do-work` slash command automatically.
