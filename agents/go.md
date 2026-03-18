@@ -51,9 +51,19 @@ Pass it the project do-work path.
 
 Let the run agent execute until the backlog is empty or a stopper is hit.
 
-### 4. Report
+### 4. Run Log (if configured)
 
-After the run completes (or if stopped at Step 2), output:
+After the run completes successfully (backlog empty, no stoppers):
+
+1. Check config: if `config.log.enabled` is `false`, skip this step silently.
+2. Check config: if `config.log.platforms` is empty, skip this step silently.
+3. If both conditions pass, read and follow [log.md](log.md) in full.
+
+If the run was stopped early (stopper hit), skip the log step — only log after a clean run.
+
+### 5. Report
+
+After the run and optional log complete (or if stopped at Step 2), output:
 
 ```
 Go complete for UR-NNN

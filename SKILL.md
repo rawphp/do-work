@@ -28,6 +28,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
 | `/do-work run` | Executes backlog: TDD loop, one REQ at a time, commit per REQ. |
+| `/do-work log` | Generates build-in-public draft posts for configured platforms. |
 | `/do-work` | Show this help. |
 
 ---
@@ -43,6 +44,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/capture.md](agents/capture.md) — Decomposes brief into REQ files
 - [agents/verify.md](agents/verify.md) — Scores REQ coverage against brief
 - [agents/run.md](agents/run.md) — Executes backlog with TDD loop
+- [agents/log.md](agents/log.md) — Generates build-in-public draft posts
 - [agents/config.md](agents/config.md) — Reusable config loading instructions
 
 ---
@@ -225,3 +227,13 @@ Execute the backlog autonomously — one REQ at a time — until empty or a stop
    - If no `REQ-NNN-*.md` files exist in `{project}/do-work/` (backlog root), report "Backlog is empty." and stop.
 3. Read [agents/run.md](agents/run.md) in full.
 4. Follow the run agent instructions exactly.
+
+---
+
+### log
+
+Generate build-in-public draft posts for configured social media platforms.
+
+1. Detect `{project}`.
+2. Read [agents/log.md](agents/log.md) in full.
+3. Follow the log agent instructions exactly.
