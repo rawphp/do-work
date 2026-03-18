@@ -155,6 +155,58 @@ log:
 
 ---
 
+## Build in Public (Log)
+
+The log feature generates draft social media posts based on work you've completed — so you can share progress without writing posts from scratch.
+
+### How it works
+
+1. Scans `do-work/archive/` for REQs completed since the last log entry
+2. Generates multiple draft posts per configured platform (different angles, not minor rewrites)
+3. Presents all drafts for you to review
+4. You pick one per platform — the selection is recorded in `do-work/logs/log-history.yml` so the same work isn't re-prompted
+
+### Usage
+
+Run it manually:
+
+```
+/do-work log
+```
+
+Or let it run automatically — `/do-work go` triggers the log step after a clean run (all REQs executed, no stoppers).
+
+### Supported platforms
+
+| Platform | Format |
+|----------|--------|
+| **X** | 280-char tweets. Threads if content exceeds one tweet. |
+| **LinkedIn** | 1-3 short paragraphs, professional tone, ~1300 chars. |
+
+### Configuration
+
+Set platforms in `do-work/config.yml`:
+
+```yaml
+log:
+  enabled: true
+  platforms: [x, linkedin]
+  drafts_per_platform: 2
+```
+
+### Disabling the log
+
+If you don't want build-in-public posts, set `log.enabled: false` in your project's `do-work/config.yml`:
+
+```yaml
+log:
+  enabled: false
+```
+
+The log step will be skipped entirely — both for `/do-work log` and the automatic step after `/do-work go`.
+
+---
+
 ## Commit Convention
 
 Each completed REQ produces a commit:
