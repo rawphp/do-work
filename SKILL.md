@@ -43,6 +43,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/capture.md](agents/capture.md) — Decomposes brief into REQ files
 - [agents/verify.md](agents/verify.md) — Scores REQ coverage against brief
 - [agents/run.md](agents/run.md) — Executes backlog with TDD loop
+- [agents/config.md](agents/config.md) — Reusable config loading instructions
 
 ---
 
@@ -94,7 +95,23 @@ Create the do-work folder structure. Idempotent — safe to run multiple times.
    - `{project}/do-work/user-requests/`
    - `{project}/do-work/working/`
    - `{project}/do-work/archive/`
-3. Report what was created vs already existed. Example:
+   - `{project}/do-work/logs/`
+3. Create `{project}/do-work/config.yml` if it does not already exist, using the default template below:
+
+```yaml
+# do-work configuration
+# Edit this file to customize agent behavior.
+
+project:
+  name: ""
+
+log:
+  enabled: true
+  platforms: []          # e.g. [x, linkedin]
+  drafts_per_platform: 2
+```
+
+4. Report what was created vs already existed. Example:
 
 ```
 do-work installed at /path/to/project/do-work/
@@ -103,6 +120,8 @@ Created:
   do-work/user-requests/
   do-work/working/
   do-work/archive/
+  do-work/logs/
+  do-work/config.yml
 
 Ready. Run `/do-work start` to record your first brief.
 ```
