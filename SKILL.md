@@ -60,6 +60,8 @@ git rev-parse --show-toplevel
 If this fails (not a git repo), use the current working directory.
 All references below use `{project}` to mean this resolved root.
 
+**Critical: skill directory is read-only at runtime.** The skill is loaded from `~/.claude/skills/do-work/` — this is a separate git clone. NEVER edit files, stage changes, or commit inside the skills directory. All edits and commits MUST happen in `{project}`. If a REQ targets agent files (e.g. `agents/log.md`), edit them at `{project}/agents/log.md`, not at the skill clone path.
+
 ---
 
 ## File Naming

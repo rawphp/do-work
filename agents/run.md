@@ -28,6 +28,7 @@ Before starting the loop:
    - If one exists, check if it's stale (no recent changes). If stale, ask the user whether to resume or abort it.
 2. Confirm the backlog is not empty. If empty, stop and report.
 3. Confirm you are on the correct git branch.
+4. Confirm your working directory is `{project}` (the user's repo), NOT the skill clone at `~/.claude/skills/do-work/`. All file edits and git commits must happen in `{project}`. If you are in the skills directory, `cd` to `{project}` before proceeding.
 
 ---
 
