@@ -131,6 +131,30 @@ Everything is auditable — the brief, decomposed tasks, and outputs all live in
 
 ---
 
+## Configuration
+
+Each project gets a `do-work/config.yml` file, auto-created on first `/do-work start` or `/do-work install`. Edit it to customize agent behavior.
+
+```yaml
+# do-work configuration
+project:
+  name: "my-project"
+
+log:
+  enabled: true
+  platforms: [x, linkedin]
+  drafts_per_platform: 2
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `project.name` | string | `""` | Project display name |
+| `log.enabled` | boolean | `true` | Whether the log step runs after `/do-work go` |
+| `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin]`) |
+| `log.drafts_per_platform` | integer | `2` | Number of draft variations to generate per platform |
+
+---
+
 ## Commit Convention
 
 Each completed REQ produces a commit:
