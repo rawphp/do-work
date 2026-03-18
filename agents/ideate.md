@@ -20,6 +20,10 @@ You may also be invoked by the Start agent when the `--creative` flag is set.
 
 ## Steps
 
+### 0. Load Config
+
+Read and follow the **Load Config** section of [config.md](config.md).
+
 ### 1. Read the brief
 
 Read `UR-NNN/input.md` in full.

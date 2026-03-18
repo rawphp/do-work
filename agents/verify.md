@@ -17,6 +17,10 @@ UR-001               ←  brief to verify against
 
 ## Steps
 
+### 0. Load Config
+
+Read and follow the **Load Config** section of [config.md](config.md).
+
 ### 1. Read the brief
 
 Read `{project}/do-work/user-requests/UR-NNN/input.md` in full.

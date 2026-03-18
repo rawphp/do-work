@@ -14,21 +14,25 @@ You will be given:
 
 ## Steps
 
-### 0. Check if the user is referencing an existing UR
+### 0. Load Config
+
+Read and follow the **Load Config** section of [config.md](config.md).
+
+### 1. Check if the user is referencing an existing UR
 
 If the brief explicitly references an existing UR (e.g. "update UR-003", "add to UR-003", "modify UR-003"):
 - Read `{project}/do-work/user-requests/UR-NNN/input.md`
 - If **Status: intake** (Capture has not been run yet):
   - Ask the user: "UR-NNN already exists and has not been captured yet. Do you want to overwrite its input.md with this new brief?"
-  - If yes: overwrite input.md with the new brief, keeping the same UR number. Go to Step 4.
-  - If no: treat this as a new UR and continue to Step 1.
-- If Status is anything other than `intake`, treat this as a new UR and continue to Step 1.
+  - If yes: overwrite input.md with the new brief, keeping the same UR number. Go to Step 5.
+  - If no: treat this as a new UR and continue to Step 2.
+- If Status is anything other than `intake`, treat this as a new UR and continue to Step 2.
 
-Otherwise, continue to Step 1.
+Otherwise, continue to Step 2.
 
 ---
 
-### 1. Find the next UR number
+### 2. Find the next UR number
 
 Use the Glob tool to list all folders matching:
   `{project}/do-work/user-requests/UR-*/`
@@ -40,13 +44,13 @@ If no UR folders exist yet, use `UR-001`.
 
 > Example: folders UR-001, UR-002, UR-004 exist → next is UR-005.
 
-### 2. Create the UR folder
+### 3. Create the UR folder
 
 ```bash
 mkdir -p {project}/do-work/user-requests/UR-NNN/assets
 ```
 
-### 3. Write input.md
+### 4. Write input.md
 
 Write the user's message verbatim to:
 
@@ -67,7 +71,7 @@ Use this format exactly:
 [The user's message, verbatim. Do not summarise, rephrase, or interpret it.]
 ```
 
-### 4. Stop and report
+### 5. Stop and report
 
 Output:
 

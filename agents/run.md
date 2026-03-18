@@ -14,6 +14,12 @@ You will be given a project do-work path:
 
 ---
 
+## Load Config
+
+Read and follow the **Load Config** section of [config.md](config.md).
+
+---
+
 ## Pre-flight Check
 
 Before starting the loop:

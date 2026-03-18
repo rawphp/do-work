@@ -18,6 +18,10 @@ You will be given:
 
 ## Steps
 
+### 0. Load Config
+
+Read and follow the **Load Config** section of [config.md](config.md). Keep the loaded config in context — sub-agents will load config independently but the orchestrator should also have it available.
+
 ### 1. Run Intake
 
 Read and follow [intake.md](intake.md) in full.
