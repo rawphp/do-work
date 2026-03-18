@@ -66,6 +66,7 @@ Flags:
 | `/do-work verify [UR-NNN]` | Scores REQ coverage (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
 | `/do-work run` | Executes backlog: TDD loop, one REQ at a time. |
+| `/do-work log` | Generates build-in-public draft posts for configured platforms. |
 | `/do-work` | Show help. |
 
 ---
@@ -96,7 +97,9 @@ do-work/
 │   ├── ideate.md         ← surfaces assumptions & risks
 │   ├── capture.md        ← decomposes into REQ files
 │   ├── verify.md         ← scores coverage
-│   └── run.md            ← TDD execution loop
+│   ├── run.md            ← TDD execution loop
+│   ├── log.md            ← build-in-public draft posts
+│   └── config.md         ← reusable config loading
 ├── install.sh
 └── README.md
 ```
@@ -110,6 +113,7 @@ When you run `/do-work start` in a project, it creates:
 ```
 your-project/
 └── do-work/
+    ├── config.yml               ← project configuration
     ├── user-requests/
     │   └── UR-001/
     │       ├── input.md         ← your original brief
@@ -117,6 +121,7 @@ your-project/
     │       └── assets/          ← supporting files
     ├── working/                 ← current REQ in flight
     ├── archive/                 ← completed REQs
+    ├── logs/                    ← build-in-public log drafts
     └── REQ-001-slug.md          ← backlog tasks
         REQ-002-slug.md
         ...
