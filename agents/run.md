@@ -143,16 +143,23 @@ mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/archive/REQ-NNN-s
 
 ### Step 6: Commit
 
-Stage the changed implementation files **and** the REQ file deletion, then commit:
+Stage the changed implementation files, the archived REQ, and all do-work metadata, then commit:
 
 ```bash
 # Stage implementation changes (specific files you modified)
 git add path/to/changed/files...
 
-# Stage the REQ deletion from the backlog root (the mv to archive/ leaves
-# a tracked-file deletion that MUST be committed — archive/ is gitignored
-# so only the deletion side needs staging)
+# Stage the REQ deletion from the backlog root (the mv created a deletion)
 git add {project}/do-work/REQ-NNN-slug.md
+
+# Stage the archived REQ file
+git add {project}/do-work/archive/REQ-NNN-slug.md
+
+# Stage the UR directory (input.md, ideate.md, assets) if not yet committed
+git add {project}/do-work/user-requests/UR-NNN/
+
+# Stage any log files created during this session
+git add {project}/do-work/logs/ 2>/dev/null || true
 
 git commit -m "feat(REQ-NNN): short title
 
@@ -164,7 +171,10 @@ Output: path/to/primary/output"
 **Commit rules:**
 - Subject line: `feat(REQ-NNN): [title from REQ]` (max 72 chars)
 - Body: REQ path, UR path, primary output path
-- **Always stage the REQ file path** so its deletion from the backlog is committed (not left as a stale staged change)
+- **Always stage the REQ file path** so its deletion from the backlog is committed
+- **Always stage the archived REQ** so it is tracked in git history
+- **Always stage the UR directory** so user requests are committed alongside the work they produced
+- **Stage logs if present** — the `|| true` prevents failure if the directory is empty
 - Never commit with failing tests
 - Never use `--no-verify`
 
