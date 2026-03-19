@@ -109,7 +109,25 @@ Each step must be typed. Use the right type for the task:
 - **New pages/components:** Include `build` + `ui` steps minimum.
 - Steps must be specific enough that a pass/fail verdict is unambiguous — "looks good" is not a valid expected outcome.
 
-### 5. Report
+### 5. Commit the backlog
+
+Stage and commit all newly created REQ files (and the ideate.md file if it exists) so the backlog is tracked in git from decomposition.
+
+If the project is not a git repo, skip this step silently.
+
+```bash
+# Stage all new REQ files in the backlog root
+git add {project}/do-work/REQ-*.md
+
+# Stage ideate.md if it was created by the ideate agent
+git add {project}/do-work/user-requests/UR-NNN/ideate.md 2>/dev/null || true
+
+git commit -m "chore(UR-NNN): decompose into N REQs"
+```
+
+Replace `N` with the actual number of REQ files written.
+
+### 6. Report
 
 After writing all REQ files, output a summary:
 
