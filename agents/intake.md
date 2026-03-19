@@ -71,7 +71,18 @@ Use this format exactly:
 [The user's message, verbatim. Do not summarise, rephrase, or interpret it.]
 ```
 
-### 5. Stop and report
+### 5. Commit the UR
+
+Stage and commit the new UR directory so it is tracked in git from the moment it's recorded.
+
+If the project is not a git repo, skip this step silently.
+
+```bash
+git add {project}/do-work/user-requests/UR-NNN/
+git commit -m "chore(UR-NNN): record user request"
+```
+
+### 6. Stop and report
 
 Output:
 
