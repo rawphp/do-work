@@ -141,6 +141,12 @@ Move the REQ to `archive/`:
 mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/archive/REQ-NNN-slug.md
 ```
 
+Confirm the archive file exists, then defensively remove any leftover working/ copy (guards against agents that use Write instead of `mv`):
+
+```bash
+rm -f {project}/do-work/working/REQ-NNN-slug.md
+```
+
 ### Step 6: Commit
 
 Stage the changed implementation files, the archived REQ, and all do-work metadata, then commit:
@@ -154,6 +160,9 @@ git add {project}/do-work/REQ-NNN-slug.md
 
 # Stage the archived REQ file
 git add {project}/do-work/archive/REQ-NNN-slug.md
+
+# Stage the working/ deletion (the mv/rm removed it from working/)
+git add {project}/do-work/working/REQ-NNN-slug.md
 
 # Stage the UR directory (input.md, ideate.md, assets) if not yet committed
 git add {project}/do-work/user-requests/UR-NNN/
@@ -173,6 +182,7 @@ Output: path/to/primary/output"
 - Body: REQ path, UR path, primary output path
 - **Always stage the REQ file path** so its deletion from the backlog is committed
 - **Always stage the archived REQ** so it is tracked in git history
+- **Always stage the working/ REQ path** so its deletion from working/ is committed (prevents stale files leaking across commits)
 - **Always stage the UR directory** so user requests are committed alongside the work they produced
 - **Stage logs if present** — the `|| true` prevents failure if the directory is empty
 - Never commit with failing tests
