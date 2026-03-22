@@ -149,9 +149,9 @@ git commit -m "chore(UR-NNN): decompose into N REQs"
 
 Replace `N` with the actual number of REQ files written.
 
-### 6. Report
+### 6. Report and prompt
 
-After writing all REQ files, output a summary:
+After writing all REQ files, output the completion report:
 
 ```
 Capture complete for UR-NNN
@@ -162,10 +162,9 @@ REQs written:
   ...
 
 Total: N tasks in backlog
-Next step: run verify to check coverage, or run the loop to start executing.
 ```
 
-### 6b. Next-step prompt (conditional)
+**Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
 
@@ -175,7 +174,7 @@ Present an `AskUserQuestion` with these options:
 2. **"Run Go"** — Skip to verify + run in one shot
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: skip this step entirely.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output "Next step: run verify to check coverage, or run the loop to start executing." and stop.
 
 ---
 
