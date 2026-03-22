@@ -30,17 +30,24 @@ Read `{project}/do-work/logs/log-history.yml` if it exists.
 - If the file exists with entries, find the most recent entry's `last_req_archived` value. This is the "high water mark" — only work after this REQ matters.
 - If the file does not exist or is empty, treat all archived REQs as new (cold start).
 
-### 2. Gather completed work
+### 2. Gather completed work (deep)
 
 Read all REQ files in `{project}/do-work/archive/` that are newer than the high water mark.
 
+If no new work exists since the last log, output: "Nothing new to log since LOG-NNN." and stop.
+
 For each REQ, extract:
 - REQ number and title
-- Task summary
+- Task summary and context
 - Key outputs
 - The associated git commit message (use `git log --oneline --grep="REQ-NNN"`)
 
-If no new work exists since the last log, output: "Nothing new to log since LOG-NNN." and stop.
+Then gather deeper source material — this is what makes posts feel human, not like changelogs:
+
+- **Original brief:** Read `{project}/do-work/user-requests/UR-NNN/input.md` for the user's own words and intent
+- **Ideate observations:** Read `{project}/do-work/user-requests/UR-NNN/ideate.md` if it exists — this contains the risks, assumptions, and connections that make good story material
+- **Code diffs:** Run `git log --oneline --grep="REQ-NNN"` to find the commit hash, then `git diff HASH~1..HASH --stat` to understand scope. For small changes, read the full diff for narrative detail.
+- **The story arc:** Identify what problem existed, what was tried, what surprised, and what changed — this is the raw material for all 10 approaches
 
 ### 3. Determine LOG number
 
@@ -66,75 +73,93 @@ mkdir -p {project}/do-work/logs/LOG-NNN/drafts/
 
 ### 5. Generate drafts
 
-For each platform in `config.log.platforms`, generate `config.log.drafts_per_platform` draft posts.
+For each platform in `config.log.platforms`, generate **one draft per approach** (10 drafts total per platform).
 
 **Audience & voice tuning:** If `config.log.audience` is set, frame posts for that audience — use their language, reference their pain points, and emphasize what they'd find valuable. If `config.log.voice` is set, match that writing style throughout. If either is empty, default to a general builder/developer audience with a casual, direct voice.
 
-#### Platform: X (Twitter)
+#### Platform rules
 
-- **Max length:** 280 characters per post
-- **Tone:** Punchy, direct, conversational — write like you're texting a smart friend, not filing a report
-- **Format:** Single tweet if possible. If content exceeds 280 chars, use thread format (multiple numbered files: `x-draft-1-thread.md` with `---` separating tweets)
+Each platform has formatting constraints that **every draft must respect, regardless of approach:**
+
+**X (Twitter):**
+- **Max length:** 280 characters per post (hard limit — count before saving)
+- **Thread format:** If the approach's typical length suggests a thread, use multiple tweets separated by `---`, each under 280 chars
 - **Hashtags:** Optional, max 2, only if genuinely relevant
-- **Focus:** One key insight or achievement per draft, not a comprehensive summary
 
-**Engagement angles** — each draft in a batch MUST use a different angle:
-
-| Angle | What it does | Example framing |
-|-------|-------------|-----------------|
-| **Question** | Asks the audience something genuine — invites replies | "What's the one thing you'd automate first in your dev workflow?" |
-| **Lesson learned** | Shares a hard-won insight from the work | "I spent 3 hours debugging X. Turns out the fix was one line." |
-| **Hot take** | Makes a bold, slightly provocative claim | "Most CI pipelines are theater. Here's what actually catches bugs." |
-| **Vulnerability** | Admits a struggle, mistake, or uncertainty | "I almost shipped this without tests. Here's what stopped me." |
-| **Behind the scenes** | Shows the messy reality of building | "Here's what my terminal looked like at 2am while debugging this." |
-
-When generating multiple drafts, never repeat the same angle. Pick the angles that best fit the completed work.
-
-**Hook patterns** — the first line MUST use one of these patterns. Never open with a status update.
-
-| Pattern | Example |
-|---------|---------|
-| **Provocative question** | "Why do most dev tools fail at the thing they promise?" |
-| **Counterintuitive claim** | "The best code I wrote today was zero lines." |
-| **Specific number** | "4 files. 12 minutes. One autonomous loop." |
-| **Confession** | "I almost mass-deleted my backlog last night." |
-| **Bold prediction** | "In 2 years, nobody will write deploy scripts by hand." |
-
-Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/x-{approach-slug}-draft.md`
-
-Approach slugs are kebab-case identifiers derived from the approach name (e.g. `curiosity-gap`, `teaching-moment`, `confession`, `provocation`, `behind-the-curtain`, `philosophy`, `tease`, `connection`, `entertainment`, `informer`).
-
-#### Platform: LinkedIn
-
+**LinkedIn:**
 - **Max length:** 1300 characters (soft limit for optimal engagement)
-- **Tone:** Professional but authentic, first-person — write like a founder talking to peers, not a press release
-- **Format:** 1-3 short paragraphs. Can include bullet points. Start with a hook line.
-- **No hashtags** unless the user has explicitly requested them in the brief
-- **Focus:** What was built, why it matters, what was learned
+- **Format:** 1-3 short paragraphs. Can include bullet points.
+- **No hashtags** unless the user has explicitly requested them
 
-**Engagement angles** — each draft in a batch MUST use a different angle:
+#### The 10 approaches
 
-| Angle | What it does | Example framing |
-|-------|-------------|-----------------|
-| **Contrarian insight** | Challenges conventional wisdom with evidence from the work | "Everyone says start with an MVP. I did the opposite — here's why." |
-| **Story arc** | Narrates a problem → struggle → resolution from the build | "Last week I hit a wall. The feature I was building kept breaking in ways I didn't expect..." |
-| **Framework/mental model** | Distills the work into a reusable principle others can apply | "I've been using a 3-step rule for deciding what to automate. Here's how it works." |
-| **Vulnerable admission** | Shares what went wrong or what you almost got wrong | "I nearly shipped a feature that would have broken in production. Here's the near-miss." |
-| **Data/proof point** | Leads with a concrete metric or result from the work | "3 REQs. 3 commits. Zero manual QA. Here's what an autonomous dev loop actually looks like." |
+Generate one draft per approach. Each approach has a different primary value that determines what the post optimizes for. Use the deep source material from Step 2 — the original brief, the ideate observations, the code diffs — not just REQ titles.
 
-When generating multiple drafts, never repeat the same angle. Pick the angles that best fit the completed work.
+**Approach 1: The Curiosity Gap** — Slug: `curiosity-gap`
+- **Primary value:** Curiosity | **Priority:** Curiosity → Entertain → Inform
+- **Tone:** Intriguing, slightly mysterious, withheld
+- **Typical length:** 1-2 tweets (under 200 chars ideal)
+- **Structure:** Open a question or paradox. Don't answer it fully. The work is evidence, not the point.
 
-**Hook patterns** — the first line MUST use one of these patterns. Never open with a status update.
+**Approach 2: The Teaching Moment** — Slug: `teaching-moment`
+- **Primary value:** Teach | **Priority:** Teach → Inform → Connect
+- **Tone:** Direct, instructive, peer-to-peer
+- **Typical length:** Thread (3-5 tweets) or 280 chars with a principle
+- **Structure:** State a transferable lesson. Explain why with evidence. The reader should gain something even if they never visit the project.
 
-| Pattern | Example |
-|---------|---------|
-| **Challenge a norm** | "Everyone says ship fast. But what if shipping slow is the real advantage?" |
-| **Open a loop** | "I built something last week that made me rethink how I work." |
-| **Lead with a result** | "3 features shipped. Zero bugs in production. Here's the system." |
-| **Admit a mistake** | "I've been building wrong for months. Last week I finally saw it." |
-| **State a principle** | "The best automation isn't the one that saves time — it's the one you forget exists." |
+**Approach 3: The Confession** — Slug: `confession`
+- **Primary value:** Confess | **Priority:** Confess → Connect → Curiosity
+- **Tone:** Raw, honest, self-deprecating but not self-pitying
+- **Typical length:** 1-2 tweets, punchy
+- **Structure:** Admit something embarrassing or surprising. No spin. The vulnerability creates connection.
 
-Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/linkedin-{approach-slug}-draft.md`
+**Approach 4: The Provocation** — Slug: `provocation`
+- **Primary value:** Provoke | **Priority:** Provoke → Curiosity → Teach
+- **Tone:** Bold, slightly contrarian, argumentative
+- **Typical length:** Single tweet (often shorter than 280 chars)
+- **Structure:** Make a claim most would disagree with at first glance. The work is the evidence, the claim is the star.
+
+**Approach 5: The Behind-the-Curtain** — Slug: `behind-the-curtain`
+- **Primary value:** Demonstrate | **Priority:** Demonstrate → Curiosity → Inform
+- **Tone:** Show-don't-tell, observational, documentary
+- **Typical length:** Thread (2-4 tweets) or single tweet
+- **Structure:** Describe what actually happened — terminal output, unexpected behavior, the moment of realization. No abstraction.
+
+**Approach 6: The Philosophy** — Slug: `philosophy`
+- **Primary value:** Philosophize | **Priority:** Philosophize → Teach → Connect
+- **Tone:** Reflective, measured, slightly abstract
+- **Typical length:** 280 chars or 2-tweet thread
+- **Structure:** Extract a broader principle about building, tools, or work. The work is a jumping-off point, not the destination.
+
+**Approach 7: The Tease** — Slug: `tease`
+- **Primary value:** Tease | **Priority:** Tease → Curiosity → Entertain
+- **Tone:** Casual, forward-looking, understated
+- **Typical length:** Under 140 chars
+- **Structure:** Hint at what changed without explaining. Brevity signals confidence.
+
+**Approach 8: The Connection** — Slug: `connection`
+- **Primary value:** Connect | **Priority:** Connect → Confess → Inform
+- **Tone:** Warm, conversational, inviting dialogue
+- **Typical length:** 1-2 tweets ending with a genuine question
+- **Structure:** Share something, then ask the reader about their experience. The question must be genuine, not rhetorical.
+
+**Approach 9: The Entertainment** — Slug: `entertainment`
+- **Primary value:** Entertain | **Priority:** Entertain → Curiosity → Confess
+- **Tone:** Funny, self-aware, irreverent
+- **Typical length:** Single tweet, under 200 chars ideal
+- **Structure:** Find the absurd angle. Lean into the irony. The humor makes technical content palatable.
+
+**Approach 10: The Informer** — Slug: `informer`
+- **Primary value:** Inform | **Priority:** Inform → Demonstrate → Teach
+- **Tone:** Clear, factual, no-nonsense
+- **Typical length:** 280 chars or short thread
+- **Structure:** State what changed, why, what's different. No hook, no angle. Anti-marketing. Trusts clarity.
+
+#### File naming
+
+Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/{platform}-{approach-slug}-draft.md`
+
+Examples: `x-curiosity-gap-draft.md`, `linkedin-confession-draft.md`
 
 #### Banned openers
 
@@ -149,7 +174,7 @@ Never start a draft with any of these patterns — they signal "status update" a
 - "We just released..."
 - "Proud to say..."
 
-If a draft starts with any of these, rewrite the opener using a hook pattern from the platform's table above.
+If a draft starts with any of these, rewrite the opener.
 
 #### Draft file format
 
@@ -228,7 +253,7 @@ Output: "Skipped. Log history updated — these REQs won't be re-prompted."
 - Never auto-post to any platform — only generate drafts for the user to review
 - Never modify archived REQ files
 - Always respect platform character limits — truncate or restructure, never exceed
-- Each draft MUST use a different engagement angle from the platform's angle table — not minor word variations of the same angle
+- Each draft MUST use a different approach — never generate two drafts from the same approach
 - The log-history.yml high water mark must always advance, even on skip — this prevents re-prompting for the same work
 - If the user selects multiple drafts (one per platform), record each as a separate entry in log-history.yml
 - Ground every post in real work — but lead with the human angle (the question, the struggle, the insight), not a dry list of deliverables
