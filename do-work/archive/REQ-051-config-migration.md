@@ -1,7 +1,7 @@
 # REQ-051: Auto-migrate config.yml with missing keys on load
 
 **UR:** UR-013
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-22
 
 ## Task
@@ -14,12 +14,12 @@ When new config keys are added to the do-work system (e.g. `next_steps.enabled`)
 
 ## Acceptance Criteria
 
-- [ ] Config loader compares existing config.yml against the default template during Load Config
-- [ ] Missing top-level sections (e.g. entire `next_steps:` block) are appended to config.yml with default values and inline comments
-- [ ] Existing values are never overwritten — the merge is additive-only
-- [ ] Missing keys within an existing section (e.g. `log.batch_size` added to an existing `log:` block) are appended to that section
-- [ ] If no keys are missing, the file is not touched (no unnecessary writes or commits)
-- [ ] The loader reports what was added (e.g. "Config updated: added next_steps section") when migration occurs
+- [x] Config loader compares existing config.yml against the default template during Load Config
+- [x] Missing top-level sections (e.g. entire `next_steps:` block) are appended to config.yml with default values and inline comments
+- [x] Existing values are never overwritten — the merge is additive-only
+- [x] Missing keys within an existing section (e.g. `log.batch_size` added to an existing `log:` block) are appended to that section
+- [x] If no keys are missing, the file is not touched (no unnecessary writes or commits)
+- [x] The loader reports what was added (e.g. "Config updated: added next_steps section") when migration occurs
 
 ## Verification Steps
 
@@ -31,3 +31,7 @@ When new config keys are added to the do-work system (e.g. `next_steps.enabled`)
    - Expected: Explicit instruction to preserve existing values and only add missing keys
 3. **test** Confirm the instructions specify a no-op when no keys are missing
    - Expected: Instruction to skip file write if config is already complete
+
+## Outputs
+
+- agents/config.md — Updated Load Config with step 4 (migrate missing keys) and step 5 (merged context)

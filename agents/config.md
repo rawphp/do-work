@@ -31,9 +31,17 @@ next_steps:
   enabled: false         # when true, agents present next-step options via AskUserQuestion after each phase
 ```
 
-4. If the file exists but is missing keys, use the defaults above for any missing values
+4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`) and each key within those sections:
 
-**Never fail or stop because of a missing or incomplete config.** If config creation fails for any reason, proceed with in-memory defaults.
+   - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
+   - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section.
+   - **Never overwrite existing values.** If a key exists in the file, keep the user's value regardless of what the default says.
+   - If **no keys are missing**, do not write to the file. Skip this step silently.
+   - If keys were added, report: `Config updated: added [list of added keys/sections]`
+
+5. Keep the final merged values (file values + defaults for anything still missing) in context for subsequent steps.
+
+**Never fail or stop because of a missing or incomplete config.** If config creation or migration fails for any reason, proceed with in-memory defaults.
 
 ---
 
