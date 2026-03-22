@@ -1,7 +1,7 @@
 # REQ-057: Merge Next-Step Prompt into Intake Report
 
 **UR:** UR-015
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -18,11 +18,15 @@ The `next_steps.enabled` config is `true` but AskUserQuestion prompts aren't bei
 
 ## Acceptance Criteria
 
-- [ ] `agents/intake.md` step 6 contains both the text report AND the AskUserQuestion logic in a single step
-- [ ] The separate "6b" subsection heading no longer exists
-- [ ] The conditional check (`next_steps.enabled` + standalone detection) remains intact within step 6
-- [ ] The "Stop here" instruction is repositioned AFTER the AskUserQuestion (or removed, since the AskUserQuestion naturally blocks further action)
-- [ ] The AskUserQuestion options remain: "Run Capture", "Edit the brief", "Skip"
+- [x] `agents/intake.md` step 6 contains both the text report AND the AskUserQuestion logic in a single step
+- [x] The separate "6b" subsection heading no longer exists
+- [x] The conditional check (`next_steps.enabled` + standalone detection) remains intact within step 6
+- [x] The "Stop here" instruction is repositioned AFTER the AskUserQuestion (or removed, since the AskUserQuestion naturally blocks further action)
+- [x] The AskUserQuestion options remain: "Run Capture", "Edit the brief", "Skip"
+
+## Outputs
+
+- agents/intake.md — Merged step 6b into step 6 "Report and prompt"
 
 ## Verification Steps
 

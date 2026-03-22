@@ -82,23 +82,17 @@ git add {project}/do-work/user-requests/UR-NNN/
 git commit -m "chore(UR-NNN): record user request"
 ```
 
-### 6. Stop and report
+### 6. Report and prompt
 
-Output:
+Output the completion report:
 
 ```
 Intake complete.
 
 Recorded: {project}/do-work/user-requests/UR-NNN/input.md
-
-Next steps:
-- Review the recorded brief — edit input.md directly if anything needs clarifying
-- Run Capture: "Run capture for {project}/do-work/user-requests/UR-NNN/"
 ```
 
-**Stop here.** Do not run Capture. Do not plan. Do not execute anything else.
-
-### 6b. Next-step prompt (conditional)
+**Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
 
@@ -108,7 +102,15 @@ Present an `AskUserQuestion` with these options:
 2. **"Edit the brief"** — Open input.md for review before capturing
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: skip this step entirely. Output the plain-text report only.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output the following static text instead and stop:
+
+```
+Next steps:
+- Review the recorded brief — edit input.md directly if anything needs clarifying
+- Run Capture: "Run capture for {project}/do-work/user-requests/UR-NNN/"
+```
+
+**Do not run Capture. Do not plan. Do not execute anything beyond the report and prompt.**
 
 ---
 
