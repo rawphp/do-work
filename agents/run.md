@@ -226,10 +226,34 @@ Go back to Step 1 and claim the next REQ.
 
 ## When the Backlog is Empty
 
+### Final test suite run
+
+Before reporting completion, run the project's full test suite as a safety net to catch cross-REQ interaction failures.
+
+1. Determine the test suite command:
+   - If `config.test.suite_command` is set and non-empty, use it
+   - If not configured, try common defaults in order: `npm test`, `npx vitest run`, `./vendor/bin/pest`
+   - For each candidate, check if the runner exists (e.g. `which npx`, `test -f vendor/bin/pest`) before executing
+   - If no test runner is found, log "No test suite configured or detected — skipping full suite run" and skip to the completion report
+
+2. Run the test suite command
+
+3. If all tests pass, proceed to the completion report
+
+4. If any tests fail:
+   - Identify the likely responsible REQ by comparing each failing test file path against the `git diff --name-only` of each REQ's commit in this loop (use `git log --oneline` to find the commits, then `git diff-tree --no-commit-id --name-only -r <hash>` for each)
+   - Report which REQ likely caused the failure
+   - Attempt to fix the implementation
+   - Re-run the full suite to confirm the fix
+   - If the fix fails after 3 attempts, stop and report the failure to the user
+
+### Completion report
+
 ```
 Do Work loop complete.
 
 Processed: N REQs
+Full suite: [passed / skipped — no test runner found]
 All outputs committed.
 Archive: {project}/do-work/archive/
 

@@ -27,6 +27,9 @@ log:
   audience: ""           # e.g. "indie hackers", "enterprise devs", "startup founders"
   voice: ""              # e.g. "casual and direct", "thoughtful and technical"
 
+test:
+  suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
+
 next_steps:
   enabled: false         # when true, agents present next-step options via AskUserQuestion after each phase
 ```
@@ -56,4 +59,5 @@ next_steps:
 | `log.batch_size` | integer | `2` | Drafts to show per batch in the AskUserQuestion selection prompt. Default 2 because AskUserQuestion has a 4-option limit: `batch_size` drafts + "More approaches" + "Skip" must fit in 4 slots. Max 2 for non-final batches; final batch can show up to 3 (replacing "More" with a draft). |
 | `log.audience` | string | `""` | Target audience for log posts (e.g. "indie hackers", "enterprise devs"). Shapes framing and references. |
 | `log.voice` | string | `""` | Writing style for log posts (e.g. "casual and direct", "thoughtful and technical"). Shapes tone and word choice. |
+| `test.suite_command` | string | `""` | Full test suite command to run at end of the do-work loop (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, the run agent attempts common defaults. |
 | `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase completes. When false or missing, agents report as they do today without prompting. |
