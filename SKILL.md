@@ -86,17 +86,7 @@ Output: path/to/primary/output
 
 ### No subcommand
 
-Print the Quick Reference table, then print the following suggestions block:
-
-```
-Suggested next steps:
-  /do-work start "describe your feature or task"  — Record a new brief and decompose into tasks
-  /do-work go UR-NNN                               — Verify and run tasks for a specific request
-  /do-work run                                      — Execute the current backlog
-  /do-work log                                      — Generate build-in-public posts from recent work
-```
-
-Stop after printing both sections.
+Print the Quick Reference table, then read and follow [agents/help.md](agents/help.md) to display contextual suggestions.
 
 ---
 

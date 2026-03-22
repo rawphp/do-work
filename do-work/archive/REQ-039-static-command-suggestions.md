@@ -35,4 +35,5 @@ The user reported that typing `/do-work` with no arguments gives no suggestions 
 
 ## Outputs
 
-- SKILL.md — Updated "No subcommand" section with 4 suggested next steps
+- agents/help.md — New help agent with static fallback suggestions and contextual state-aware logic
+- SKILL.md — Minimal update: "No subcommand" section delegates to agents/help.md

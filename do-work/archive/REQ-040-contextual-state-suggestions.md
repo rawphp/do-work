@@ -1,7 +1,7 @@
 # REQ-040: Add Contextual State-Aware Suggestions to Bare /do-work Output
 
 **UR:** UR-011
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-22
 
 ## Task
@@ -14,10 +14,10 @@ Static suggestions (REQ-039) give a baseline, but the real value is contextual h
 
 ## Acceptance Criteria
 
-- [ ] SKILL.md "No subcommand" section includes logic to detect project state before printing suggestions
-- [ ] At minimum, three states are handled: (1) no do-work folder — suggest `/do-work install`, (2) backlog has REQs — suggest `/do-work run`, (3) backlog empty but URs exist — suggest `/do-work capture` or `/do-work go`
-- [ ] Contextual suggestions replace or augment the static suggestions from REQ-039
-- [ ] If state detection fails for any reason, fall back to the static suggestions gracefully
+- [x] SKILL.md "No subcommand" section delegates to agents/help.md which detects project state
+- [x] At minimum, three states are handled: (1) no do-work folder — suggest `/do-work install`, (2) backlog has REQs — suggest `/do-work run`, (3) backlog empty but URs exist — suggest `/do-work capture` or `/do-work go`
+- [x] Contextual suggestions replace or augment the static suggestions from REQ-039
+- [x] If state detection fails for any reason, fall back to the static suggestions gracefully
 
 ## Verification Steps
 
@@ -34,3 +34,7 @@ Static suggestions (REQ-039) give a baseline, but the real value is contextual h
 
 - SKILL.md "No subcommand" section — target for enhancement
 - agents/run.md pre-flight checks — reusable pattern for detecting backlog state
+
+## Outputs
+
+- agents/help.md — Contextual state detection with 5 state branches and static fallback
