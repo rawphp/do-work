@@ -218,6 +218,18 @@ Next steps:
 - Run verify if a new UR has been added
 ```
 
+### Next-step prompt (conditional — backlog empty)
+
+If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
+
+Present an `AskUserQuestion` with these options:
+
+1. **"Start new work"** — Run intake for a new UR
+2. **"Review outputs"** — List archived REQs and their output paths
+3. **"Skip"** — End the interaction
+
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip this step entirely.
+
 ---
 
 ## Stopping Rules
@@ -231,6 +243,18 @@ Stop and wait for user input if:
 | Task requires external credentials or access not available | Stop, flag what's needed |
 | Acceptance criteria are ambiguous and cannot be interpreted | Stop, ask for clarification |
 | A change would affect files outside the REQ's stated scope | Stop, confirm with user |
+
+### Next-step prompt (conditional — stopper hit)
+
+If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
+
+After reporting the stopper, present an `AskUserQuestion` with these options:
+
+1. **"Show blocker details"** — Display the full failure context
+2. **"Retry current REQ"** — Resume from where it stopped
+3. **"Skip"** — End the interaction
+
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip this step entirely.
 
 ---
 

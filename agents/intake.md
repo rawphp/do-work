@@ -98,6 +98,18 @@ Next steps:
 
 **Stop here.** Do not run Capture. Do not plan. Do not execute anything else.
 
+### 6b. Next-step prompt (conditional)
+
+If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
+
+Present an `AskUserQuestion` with these options:
+
+1. **"Run Capture"** — Proceed to capture for UR-NNN
+2. **"Edit the brief"** — Open input.md for review before capturing
+3. **"Skip"** — End the interaction
+
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: skip this step entirely. Output the plain-text report only.
+
 ---
 
 ## Rules

@@ -74,6 +74,20 @@ Run: [N REQs processed / stopped at verify — score below 90%]
 Archive: {project}/do-work/archive/
 ```
 
+### 5b. Next-step prompt (conditional)
+
+If `config.next_steps.enabled` is `true`:
+
+Present an `AskUserQuestion` with these options:
+
+1. **"Start new work"** — Run intake for a new UR
+2. **"Review archive"** — List completed REQs and outputs
+3. **"Skip"** — End the interaction
+
+The go agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (verify, run, log) must suppress their own AskUserQuestion prompts when running inside go.
+
+If `config.next_steps.enabled` is `false` or missing: skip this step entirely.
+
 ---
 
 ## Rules

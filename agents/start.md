@@ -71,6 +71,20 @@ Total: N tasks in backlog
 Next step: "do-work go {project} UR-NNN" to verify and run.
 ```
 
+### 4b. Next-step prompt (conditional)
+
+If `config.next_steps.enabled` is `true`:
+
+Present an `AskUserQuestion` with these options:
+
+1. **"Run Go"** — Proceed to verify and execute the backlog
+2. **"Run Verify only"** — Check coverage without executing
+3. **"Skip"** — End the interaction
+
+The start agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (intake, ideate, capture) must suppress their own AskUserQuestion prompts when running inside start.
+
+If `config.next_steps.enabled` is `false` or missing: skip this step entirely.
+
 ---
 
 ## Rules

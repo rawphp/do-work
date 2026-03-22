@@ -90,6 +90,24 @@ Recommendation: [Approved — run the loop / Fix gaps first — re-run capture /
 - Missing = 0 points
 - Score = (points / total requirements) × 100, rounded to nearest integer
 
+### 5b. Next-step prompt (conditional)
+
+If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
+
+Present an `AskUserQuestion` with score-dependent options:
+
+**Score >= 90%:**
+1. **"Run the loop"** — Proceed to run agent
+2. **"Review REQs"** — Inspect backlog before running
+3. **"Skip"** — End the interaction
+
+**Score < 90%:**
+1. **"Auto-fix gaps"** — Re-run verify with --auto-fix
+2. **"Re-run Capture"** — Go back to capture to fill gaps
+3. **"Skip"** — End the interaction
+
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip this step entirely.
+
 ### 6. Auto-fix (optional)
 
 If invoked with `--auto-fix`, after producing the report:

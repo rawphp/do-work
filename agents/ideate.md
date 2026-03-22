@@ -114,6 +114,18 @@ Key observations:
 The review file is available for the Capture agent to reference during decomposition.
 ```
 
+### 5b. Next-step prompt (conditional)
+
+If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
+
+Present an `AskUserQuestion` with these options:
+
+1. **"Run Capture"** — Decompose the brief into tasks
+2. **"Edit the brief"** — Review input.md before capturing
+3. **"Skip"** — End the interaction
+
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: skip this step entirely.
+
 ---
 
 ## Rules

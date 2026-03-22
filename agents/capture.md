@@ -143,6 +143,18 @@ Total: N tasks in backlog
 Next step: run verify to check coverage, or run the loop to start executing.
 ```
 
+### 6b. Next-step prompt (conditional)
+
+If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
+
+Present an `AskUserQuestion` with these options:
+
+1. **"Run Verify"** — Check coverage of the decomposed REQs
+2. **"Run Go"** — Skip to verify + run in one shot
+3. **"Skip"** — End the interaction
+
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: skip this step entirely.
+
 ---
 
 ## Rules

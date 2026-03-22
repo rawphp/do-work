@@ -328,3 +328,19 @@ Output: "Skipped. Log history updated — these REQs won't be re-prompted."
 - If the user selects multiple drafts (one per platform), record each as a separate entry in log-history.yml
 - Ground every post in real work — but lead with the human angle (the question, the struggle, the insight), not a dry list of deliverables
 - When reading log-history.yml for scoring, treat entries without an `approach` field as `approach: unknown` — do not fail or skip them
+
+---
+
+## Next-step prompt (conditional)
+
+After the draft selection/skip is recorded and log-history.yml is updated:
+
+If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
+
+Present an `AskUserQuestion` with these options:
+
+1. **"Start new work"** — Run intake for a new UR
+2. **"View archive"** — List completed REQs and outputs
+3. **"Skip"** — End the interaction
+
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip this step entirely.
