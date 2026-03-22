@@ -197,7 +197,7 @@ Each draft file should contain only the post content — no metadata, no instruc
 
 ### 6. Present drafts in batches
 
-Present drafts **in ranked order** from Step 4b, using batches of `config.log.batch_size` (default: 3).
+Present drafts **in ranked order** from Step 4b, using batches of `config.log.batch_size` (default: 2).
 
 Show a ranking header once at the start:
 
@@ -207,11 +207,27 @@ Ranked by selection history (N total data points)
 Saved to: {project}/do-work/logs/LOG-NNN/drafts/
 ```
 
+#### Mandatory option structure
+
+**Every AskUserQuestion call MUST use exactly 4 options.** This is not optional — it is the consistent interface the user expects every time. The structure is:
+
+| Slot | Non-final batch | Final batch |
+|------|----------------|-------------|
+| Option 1 | Draft approach A | Draft approach A |
+| Option 2 | Draft approach B | Draft approach B |
+| Option 3 | "More approaches" | Draft approach C |
+| Option 4 | "Skip" | "Skip" |
+
+- **Draft options** show the approach name as the label and the full draft content as the `preview`
+- **"More approaches"** advances to the next batch (only present when unshown approaches remain)
+- **"Skip"** is always the last option — records a skip and stops the log flow
+- **"Other"** (built into AskUserQuestion) serves as **"Discuss this"** — see below
+
 #### Batch loop
 
 For each platform in `config.log.platforms`, repeat:
 
-1. **Take the next batch:** Slice the next `batch_size` approaches from the ranked list (skip any already shown in previous batches).
+1. **Take the next batch:** Slice the next `batch_size` approaches from the ranked list (skip any already shown in previous batches). On the final batch, take up to 3 approaches (since "More approaches" is replaced by a 3rd draft).
 
 2. **Display the batch:** Output each draft's content as text so the user can read them:
 
@@ -223,17 +239,26 @@ For each platform in `config.log.platforms`, repeat:
 
    #2 — Entertainment:
    [full draft content]
-
-   #3 — Confession:
-   [full draft content]
    ```
 
-3. **Prompt with AskUserQuestion:** Use the `AskUserQuestion` tool with:
-   - One option per draft in the batch, using the approach name as the label and the draft content as the `preview`
-   - A "More approaches" option if unshown approaches remain
-   - The user can always select "Other" (built into the tool) to type "skip"
+3. **Prompt with AskUserQuestion:** Use the `AskUserQuestion` tool with exactly 4 options.
 
-   Example for a batch of 3 with more remaining:
+   Example for a non-final batch (more approaches remain):
+   ```
+   options:
+     - label: "Curiosity Gap"
+       description: "Short, mysterious — opens a question without answering it"
+       preview: "[full draft text]"
+     - label: "Entertainment"
+       description: "Funny, self-aware — finds the absurd angle"
+       preview: "[full draft text]"
+     - label: "More approaches"
+       description: "Show the next batch of drafts from different approaches"
+     - label: "Skip"
+       description: "Skip this log — won't be re-prompted for these REQs"
+   ```
+
+   Example for the final batch (no more approaches remain):
    ```
    options:
      - label: "Curiosity Gap"
@@ -245,17 +270,15 @@ For each platform in `config.log.platforms`, repeat:
      - label: "Confession"
        description: "Raw, honest — admits something embarrassing"
        preview: "[full draft text]"
-     - label: "More approaches"
-       description: "Show the next batch of drafts from different approaches"
+     - label: "Skip"
+       description: "Skip this log — won't be re-prompted for these REQs"
    ```
 
 4. **Handle the response:**
    - **User selects a draft:** Go to Step 7 (record selection) with the selected approach.
    - **User selects "More approaches":** Loop back to step 1 with the next batch.
-   - **User selects "Other" and types "skip":** Go to Step 7 (record skip).
-   - **All approaches exhausted:** On the final batch, omit the "More approaches" option. If the batch has ≤ 3 drafts, show them directly. If the user doesn't pick any and there are no more to show, prompt: "All 10 approaches shown. Select one above or type 'skip'."
-
-If `batch_size` ≥ total approaches, show all in one batch (no "More" option needed).
+   - **User selects "Skip":** Go to Step 7 (record skip).
+   - **User selects "Other" (Discuss this):** The user wants to discuss the drafts. Respond conversationally to whatever they typed — answer questions, explain approach differences, suggest edits, etc. After the discussion, re-present the same batch with the same AskUserQuestion options so they can make a selection.
 
 ### 7. Record selection
 
