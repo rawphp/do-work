@@ -195,38 +195,73 @@ If a draft starts with any of these, rewrite the opener.
 
 Each draft file should contain only the post content — no metadata, no instructions, just the text the user would copy-paste to post.
 
-### 6. Present drafts
+### 6. Present drafts in batches
 
-Present drafts **in ranked order** from Step 4b. Show a ranking header:
+Present drafts **in ranked order** from Step 4b, using batches of `config.log.batch_size` (default: 3).
+
+Show a ranking header once at the start:
 
 ```
 Log drafts generated for LOG-NNN
 Ranked by selection history (N total data points)
-```
-
-Output all generated drafts, grouped by platform, ordered by rank:
-
-```
-Platform: X
-───────────
-#1 — Curiosity Gap (x-curiosity-gap-draft.md):
-[content]
-
-#2 — Entertainment (x-entertainment-draft.md):
-[content]
-
-...
-
 Saved to: {project}/do-work/logs/LOG-NNN/drafts/
 ```
 
-### 7. Record selection
+#### Batch loop
 
-Wait for the user to respond with their selection.
+For each platform in `config.log.platforms`, repeat:
+
+1. **Take the next batch:** Slice the next `batch_size` approaches from the ranked list (skip any already shown in previous batches).
+
+2. **Display the batch:** Output each draft's content as text so the user can read them:
+
+   ```
+   Platform: X — Batch N
+   ─────────────────────
+   #1 — Curiosity Gap:
+   [full draft content]
+
+   #2 — Entertainment:
+   [full draft content]
+
+   #3 — Confession:
+   [full draft content]
+   ```
+
+3. **Prompt with AskUserQuestion:** Use the `AskUserQuestion` tool with:
+   - One option per draft in the batch, using the approach name as the label and the draft content as the `preview`
+   - A "More approaches" option if unshown approaches remain
+   - The user can always select "Other" (built into the tool) to type "skip"
+
+   Example for a batch of 3 with more remaining:
+   ```
+   options:
+     - label: "Curiosity Gap"
+       description: "Short, mysterious — opens a question without answering it"
+       preview: "[full draft text]"
+     - label: "Entertainment"
+       description: "Funny, self-aware — finds the absurd angle"
+       preview: "[full draft text]"
+     - label: "Confession"
+       description: "Raw, honest — admits something embarrassing"
+       preview: "[full draft text]"
+     - label: "More approaches"
+       description: "Show the next batch of drafts from different approaches"
+   ```
+
+4. **Handle the response:**
+   - **User selects a draft:** Go to Step 7 (record selection) with the selected approach.
+   - **User selects "More approaches":** Loop back to step 1 with the next batch.
+   - **User selects "Other" and types "skip":** Go to Step 7 (record skip).
+   - **All approaches exhausted:** On the final batch, omit the "More approaches" option. If the batch has ≤ 3 drafts, show them directly. If the user doesn't pick any and there are no more to show, prompt: "All 10 approaches shown. Select one above or type 'skip'."
+
+If `batch_size` ≥ total approaches, show all in one batch (no "More" option needed).
+
+### 7. Record selection
 
 **If the user selects a draft:**
 
-For each selection, append an entry to `{project}/do-work/logs/log-history.yml`:
+Append an entry to `{project}/do-work/logs/log-history.yml`:
 
 ```yaml
 - log_id: LOG-NNN
@@ -243,7 +278,7 @@ If the file doesn't exist yet, create it with the entry.
 
 Output: "Recorded: [draft_file] for [platform]. Log history updated."
 
-**If the user types "skip":**
+**If the user skips:**
 
 Append a skip entry to log-history.yml:
 
