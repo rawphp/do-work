@@ -100,7 +100,9 @@ When generating multiple drafts, never repeat the same angle. Pick the angles th
 | **Confession** | "I almost mass-deleted my backlog last night." |
 | **Bold prediction** | "In 2 years, nobody will write deploy scripts by hand." |
 
-Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/x-draft-N.md`
+Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/x-{approach-slug}-draft.md`
+
+Approach slugs are kebab-case identifiers derived from the approach name (e.g. `curiosity-gap`, `teaching-moment`, `confession`, `provocation`, `behind-the-curtain`, `philosophy`, `tease`, `connection`, `entertainment`, `informer`).
 
 #### Platform: LinkedIn
 
@@ -132,7 +134,7 @@ When generating multiple drafts, never repeat the same angle. Pick the angles th
 | **Admit a mistake** | "I've been building wrong for months. Last week I finally saw it." |
 | **State a principle** | "The best automation isn't the one that saves time — it's the one you forget exists." |
 
-Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/linkedin-draft-N.md`
+Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/linkedin-{approach-slug}-draft.md`
 
 #### Banned openers
 
@@ -191,11 +193,14 @@ For each selection, append an entry to `{project}/do-work/logs/log-history.yml`:
 
 ```yaml
 - log_id: LOG-NNN
-  draft_file: x-draft-2.md
+  draft_file: x-curiosity-gap-draft.md
   platform: x
+  approach: curiosity-gap
   selected_at: "YYYY-MM-DDTHH:MM:SS"
   last_req_archived: REQ-NNN
 ```
+
+The `approach` field uses the kebab-case slug of the approach that produced the selected draft. This enables scoring and ranking of approaches over time.
 
 If the file doesn't exist yet, create it with the entry.
 
@@ -209,6 +214,7 @@ Append a skip entry to log-history.yml:
 - log_id: LOG-NNN
   draft_file: skipped
   platform: all
+  approach: skipped
   selected_at: "YYYY-MM-DDTHH:MM:SS"
   last_req_archived: REQ-NNN
 ```
@@ -226,3 +232,4 @@ Output: "Skipped. Log history updated — these REQs won't be re-prompted."
 - The log-history.yml high water mark must always advance, even on skip — this prevents re-prompting for the same work
 - If the user selects multiple drafts (one per platform), record each as a separate entry in log-history.yml
 - Ground every post in real work — but lead with the human angle (the question, the struggle, the insight), not a dry list of deliverables
+- When reading log-history.yml for scoring, treat entries without an `approach` field as `approach: unknown` — do not fail or skip them
