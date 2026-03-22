@@ -1,7 +1,7 @@
 # REQ-052: Add Affected-Tests Check Per REQ
 
 **UR:** UR-014
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -19,12 +19,16 @@ The do-work pipeline has a 30-40% failure rate where REQ implementations pass th
 
 ## Acceptance Criteria
 
-- [ ] `agents/run.md` contains a new step 4c-ii (or renumbered equivalent) titled "Run affected tests" between current 4c and 4d
-- [ ] The step describes running `git diff --name-only` to get changed files
-- [ ] The step describes mapping changed files to test files using common naming conventions (e.g. `src/Foo.php` → `tests/FooTest.php`, `src/foo.ts` → `src/foo.test.ts` or `tests/foo.spec.ts`)
-- [ ] The step instructs the agent to run discovered test files and fix failures before proceeding
-- [ ] The step degrades gracefully: if no test files are found for changed files, log "No affected tests found" and continue
-- [ ] The step does not re-run tests already executed in step 4c (the REQ's own TDD tests)
+- [x] `agents/run.md` contains a new step 4c-ii (or renumbered equivalent) titled "Run affected tests" between current 4c and 4d
+- [x] The step describes running `git diff --name-only` to get changed files
+- [x] The step describes mapping changed files to test files using common naming conventions (e.g. `src/Foo.php` → `tests/FooTest.php`, `src/foo.ts` → `src/foo.test.ts` or `tests/foo.spec.ts`)
+- [x] The step instructs the agent to run discovered test files and fix failures before proceeding
+- [x] The step degrades gracefully: if no test files are found for changed files, log "No affected tests found" and continue
+- [x] The step does not re-run tests already executed in step 4c (the REQ's own TDD tests)
+
+## Outputs
+
+- agents/run.md — Added step 4c-ii "Run affected tests" with test mapping table and graceful degradation
 
 ## Verification Steps
 

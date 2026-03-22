@@ -95,6 +95,26 @@ If tests fail, fix the implementation — not the tests — unless the test itse
 
 **Do not proceed to commit with failing tests. This is a hard stop.**
 
+#### 4c-ii. Run affected tests
+
+After the REQ's own TDD tests pass, check whether the implementation broke any existing tests in the project by running tests related to changed files.
+
+1. Run `git diff --name-only` to list all files modified by this REQ's implementation
+2. For each changed file, look for related test files using common naming conventions:
+
+| Source file pattern | Test file candidates |
+|---|---|
+| `src/Foo.php` | `tests/FooTest.php`, `tests/Unit/FooTest.php`, `tests/Feature/FooTest.php` |
+| `app/Models/Foo.php` | `tests/Unit/Models/FooTest.php`, `tests/Feature/Models/FooTest.php` |
+| `src/foo.ts` | `src/foo.test.ts`, `src/foo.spec.ts`, `__tests__/foo.test.ts`, `tests/foo.spec.ts` |
+| `src/components/Foo.vue` | `src/components/Foo.test.ts`, `tests/components/Foo.spec.ts` |
+
+3. Exclude test files that were already run in step 4c (the REQ's own TDD tests) to avoid re-running them
+4. If related test files are found, run them using the project's test runner
+5. If any fail, fix the implementation (not the tests) and re-run until green
+
+**Graceful degradation:** If no related test files are found for any changed file (common for markdown, config, or documentation changes), log "No affected tests found — skipping" and continue to step 4d. Do not treat this as a failure.
+
 #### 4d. Check acceptance criteria
 
 Review each acceptance criteria item in the REQ. Mark each `- [x]` as you verify it.
