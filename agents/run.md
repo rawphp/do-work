@@ -58,9 +58,23 @@ Read the full REQ file. Understand:
 - The acceptance criteria
 - Any referenced assets
 
-### Step 3: Read the original brief (for context)
+### Step 3: Read context (brief + prior REQ outputs)
 
 Read `{project}/do-work/user-requests/{UR-NNN}/input.md` referenced in the REQ.
+
+Then read all previously completed REQs from the same UR to understand what has already been built:
+
+1. Scan `{project}/do-work/archive/` for REQ files whose `**UR:**` field matches the current UR (e.g. `UR-014`)
+2. For each prior archived REQ from this UR, extract:
+   - **Task title** (from the `# REQ-NNN:` heading)
+   - **Files created/modified** (from the `## Outputs` section)
+   - **One-line summary** of what was built (derived from the task description)
+3. Keep this context available during Step 4 — when implementing, check that you are not:
+   - Overwriting files that a prior REQ created
+   - Re-implementing logic that a prior REQ already built
+   - Contradicting decisions made in a prior REQ
+
+If this is the first REQ in the UR (no prior archived REQs found), skip this substep and proceed with just the brief.
 
 ### Step 4: Execute — TDD first
 

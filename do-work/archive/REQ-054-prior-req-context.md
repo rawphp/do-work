@@ -1,7 +1,7 @@
 # REQ-054: Feed Previous REQ Context to Current REQ
 
 **UR:** UR-014
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -21,11 +21,15 @@ Without context on prior REQ implementations, REQ-003 might overwrite a file REQ
 
 ## Acceptance Criteria
 
-- [ ] `agents/run.md` Step 3 instructs the agent to read all archived REQ files from the same UR (matching the `**UR:** UR-NNN` field)
-- [ ] The step specifies extracting: task title, files from `## Outputs`, and a one-line summary
-- [ ] The step instructs the agent to keep this context available during Step 4 (implementation) to avoid contradictions
-- [ ] The step handles the first REQ in a UR gracefully (no prior REQs to read — just skip)
-- [ ] The step does not instruct the agent to modify archived REQs
+- [x] `agents/run.md` Step 3 instructs the agent to read all archived REQ files from the same UR (matching the `**UR:** UR-NNN` field)
+- [x] The step specifies extracting: task title, files from `## Outputs`, and a one-line summary
+- [x] The step instructs the agent to keep this context available during Step 4 (implementation) to avoid contradictions
+- [x] The step handles the first REQ in a UR gracefully (no prior REQs to read — just skip)
+- [x] The step does not instruct the agent to modify archived REQs
+
+## Outputs
+
+- agents/run.md — Expanded Step 3 to read prior archived REQs from the same UR for context
 
 ## Verification Steps
 
