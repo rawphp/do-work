@@ -144,6 +144,15 @@ log:
   enabled: true
   platforms: [x, linkedin]
   drafts_per_platform: 2
+  batch_size: 2
+  audience: ""
+  voice: ""
+
+test:
+  suite_command: ""
+
+next_steps:
+  enabled: false
 ```
 
 | Key | Type | Default | Description |
@@ -152,6 +161,11 @@ log:
 | `log.enabled` | boolean | `true` | Whether the log step runs after `/do-work go` |
 | `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin]`) |
 | `log.drafts_per_platform` | integer | `2` | Number of draft variations to generate per platform |
+| `log.batch_size` | integer | `2` | Drafts to show per batch in the selection prompt (max 2 for non-final batches, 3 for final) |
+| `log.audience` | string | `""` | Target audience for log posts (e.g. `"indie hackers"`, `"enterprise devs"`) |
+| `log.voice` | string | `""` | Writing style for log posts (e.g. `"casual and direct"`, `"thoughtful and technical"`) |
+| `test.suite_command` | string | `""` | Full test suite command (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, common defaults are attempted. |
+| `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase |
 
 ---
 
