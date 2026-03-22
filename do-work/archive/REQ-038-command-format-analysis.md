@@ -1,7 +1,7 @@
 # REQ-038: Command Format Pros/Cons Analysis
 
 **UR:** UR-010
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-22
 
 ## Task
@@ -19,11 +19,11 @@ The user is considering whether to change `/do-work start` to `/do-work:start` o
 
 ## Acceptance Criteria
 
-- [ ] Analysis document written to `do-work/user-requests/UR-010/analysis.md`
-- [ ] All three options evaluated with clear pros/cons
-- [ ] Claude Code Skill tool behavior documented (how colons are interpreted)
-- [ ] Migration impact assessed (what files/docs reference the current format)
-- [ ] Clear recommendation with rationale
+- [x] Analysis document written to `do-work/user-requests/UR-010/analysis.md`
+- [x] All three options evaluated with clear pros/cons
+- [x] Claude Code Skill tool behavior documented (how colons are interpreted)
+- [x] Migration impact assessed (what files/docs reference the current format)
+- [x] Clear recommendation with rationale
 
 ## Verification Steps
 
@@ -31,3 +31,7 @@ The user is considering whether to change `/do-work start` to `/do-work:start` o
 
 1. **runtime** Read `do-work/user-requests/UR-010/analysis.md` and confirm it contains sections for all three options, pros/cons for each, and a recommendation section
    - Expected: Document exists with structured analysis covering all three options
+
+## Outputs
+
+- do-work/user-requests/UR-010/analysis.md — Command format pros/cons analysis with recommendation
