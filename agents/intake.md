@@ -96,7 +96,7 @@ Recorded: {project}/do-work/user-requests/UR-NNN/input.md
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Run Capture"** — Proceed to capture for UR-NNN
 2. **"Edit the brief"** — Open input.md for review before capturing

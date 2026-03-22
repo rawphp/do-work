@@ -278,7 +278,7 @@ Archive: {project}/do-work/archive/
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Start new work"** — Run intake for a new UR
 2. **"Review outputs"** — List archived REQs and their output paths
@@ -304,7 +304,7 @@ Stop and wait for user input if:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Show blocker details"** — Display the full failure context
 2. **"Retry current REQ"** — Resume from where it stopped

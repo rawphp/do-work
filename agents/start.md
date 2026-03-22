@@ -74,7 +74,7 @@ Total: N tasks in backlog
 
 If `config.next_steps.enabled` is `true`:
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Run Go"** — Proceed to verify and execute the backlog
 2. **"Run Verify only"** — Check coverage without executing

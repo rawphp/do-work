@@ -337,7 +337,7 @@ After the draft selection/skip is recorded and log-history.yml is updated:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Start new work"** — Run intake for a new UR
 2. **"View archive"** — List completed REQs and outputs

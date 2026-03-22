@@ -168,7 +168,7 @@ Total: N tasks in backlog
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Run Verify"** — Check coverage of the decomposed REQs
 2. **"Run Go"** — Skip to verify + run in one shot

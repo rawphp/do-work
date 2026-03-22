@@ -108,7 +108,7 @@ Recommendation: [Approved — run the loop / Fix gaps first — re-run capture /
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
-Present an `AskUserQuestion` with score-dependent options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with score-dependent options:
 
 **Score >= 90%:**
 1. **"Run the loop"** — Proceed to run agent

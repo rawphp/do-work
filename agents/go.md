@@ -78,7 +78,7 @@ Archive: {project}/do-work/archive/
 
 If `config.next_steps.enabled` is `true`:
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Start new work"** — Run intake for a new UR
 2. **"Review archive"** — List completed REQs and outputs

@@ -116,7 +116,7 @@ Key observations:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
 
-Present an `AskUserQuestion` with these options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
 1. **"Run Capture"** — Decompose the brief into tasks
 2. **"Edit the brief"** — Review input.md before capturing
