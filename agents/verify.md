@@ -104,7 +104,7 @@ Recommendation: [Approved — run the loop / Fix gaps first — re-run capture /
 - Missing = 0 points
 - Score = (points / total requirements) × 100, rounded to nearest integer
 
-### 5b. Next-step prompt (conditional)
+**Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
@@ -120,7 +120,7 @@ Present an `AskUserQuestion` with score-dependent options:
 2. **"Re-run Capture"** — Go back to capture to fill gaps
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip this step entirely.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip the AskUserQuestion and stop.
 
 ### 6. Auto-fix (optional)
 

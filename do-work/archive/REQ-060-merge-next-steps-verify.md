@@ -1,7 +1,7 @@
 # REQ-060: Merge Next-Step Prompt into Verify Report
 
 **UR:** UR-015
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -16,10 +16,14 @@ Same structural issue as all other agents — the `Nb` pattern splits report fro
 
 ## Acceptance Criteria
 
-- [ ] `agents/verify.md` step 5 contains both the text report AND the AskUserQuestion logic in a single step
-- [ ] The separate "5b" subsection heading no longer exists
-- [ ] The conditional check (`next_steps.enabled` + standalone detection) remains intact within step 5
-- [ ] The score-dependent AskUserQuestion options remain (>= 90%: "Run the loop" / "Review REQs" / "Skip"; < 90%: "Auto-fix gaps" / "Re-run Capture" / "Skip")
+- [x] `agents/verify.md` step 5 contains both the text report AND the AskUserQuestion logic in a single step
+- [x] The separate "5b" subsection heading no longer exists
+- [x] The conditional check (`next_steps.enabled` + standalone detection) remains intact within step 5
+- [x] The score-dependent AskUserQuestion options remain (>= 90%: "Run the loop" / "Review REQs" / "Skip"; < 90%: "Auto-fix gaps" / "Re-run Capture" / "Skip")
+
+## Outputs
+
+- agents/verify.md — Merged step 5b into step 5, AskUserQuestion now inline after report
 
 ## Verification Steps
 
