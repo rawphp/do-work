@@ -61,9 +61,9 @@ After the run completes successfully (backlog empty, no stoppers):
 
 If the run was stopped early (stopper hit), skip the log step — only log after a clean run.
 
-### 5. Report
+### 5. Report and prompt
 
-After the run and optional log complete (or if stopped at Step 2), output:
+After the run and optional log complete (or if stopped at Step 2), output the completion report:
 
 ```
 Go complete for UR-NNN
@@ -74,7 +74,7 @@ Run: [N REQs processed / stopped at verify — score below 90%]
 Archive: {project}/do-work/archive/
 ```
 
-### 5b. Next-step prompt (conditional)
+**Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true`:
 
@@ -86,7 +86,7 @@ Present an `AskUserQuestion` with these options:
 
 The go agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (verify, run, log) must suppress their own AskUserQuestion prompts when running inside go.
 
-If `config.next_steps.enabled` is `false` or missing: skip this step entirely.
+If `config.next_steps.enabled` is `false` or missing: skip the AskUserQuestion and stop.
 
 ---
 

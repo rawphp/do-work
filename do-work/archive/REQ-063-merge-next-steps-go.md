@@ -1,7 +1,7 @@
 # REQ-063: Merge Next-Step Prompt into Go Report
 
 **UR:** UR-015
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -16,10 +16,14 @@ Go is a top-level orchestrator so it never suppresses — the AskUserQuestion sh
 
 ## Acceptance Criteria
 
-- [ ] `agents/go.md` step 5 contains both the text report AND the AskUserQuestion logic in a single step
-- [ ] The separate "5b" subsection heading no longer exists
-- [ ] The conditional check (`next_steps.enabled`) remains intact within step 5
-- [ ] The AskUserQuestion options remain: "Start new work", "Review archive", "Skip"
+- [x] `agents/go.md` step 5 contains both the text report AND the AskUserQuestion logic in a single step
+- [x] The separate "5b" subsection heading no longer exists
+- [x] The conditional check (`next_steps.enabled`) remains intact within step 5
+- [x] The AskUserQuestion options remain: "Start new work", "Review archive", "Skip"
+
+## Outputs
+
+- agents/go.md — Merged step 5b into step 5 "Report and prompt"
 
 ## Verification Steps
 
