@@ -1,7 +1,7 @@
 # REQ-056: Verify Ideate Observations in Capture Output
 
 **UR:** UR-014
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -21,13 +21,17 @@ Ideate flags risks like "this assumes a database column that doesn't exist" or "
 
 ## Acceptance Criteria
 
-- [ ] `agents/verify.md` contains a new step (before or within Step 3) that reads `ideate.md` if it exists for the UR
-- [ ] The step extracts Challenger risks and Connector overlaps specifically
-- [ ] The step checks each observation against REQ files for coverage (mentioned in Task, Context, or Acceptance Criteria)
-- [ ] Unaddressed observations appear in the verify report under "Unaddressed Ideate Flags" in the Issues section
-- [ ] Each unaddressed flag reduces the confidence score by 5 points, capped at -20 total deduction
-- [ ] If `ideate.md` does not exist, the step is skipped silently
-- [ ] The step does not modify any REQ files or `ideate.md`
+- [x] `agents/verify.md` contains a new step (before or within Step 3) that reads `ideate.md` if it exists for the UR
+- [x] The step extracts Challenger risks and Connector overlaps specifically
+- [x] The step checks each observation against REQ files for coverage (mentioned in Task, Context, or Acceptance Criteria)
+- [x] Unaddressed observations appear in the verify report under "Unaddressed Ideate Flags" in the Issues section
+- [x] Each unaddressed flag reduces the confidence score by 5 points, capped at -20 total deduction
+- [x] If `ideate.md` does not exist, the step is skipped silently
+- [x] The step does not modify any REQ files or `ideate.md`
+
+## Outputs
+
+- agents/verify.md — Added step 2b "Check ideate observation coverage" and "Unaddressed Ideate Flags" issue type
 
 ## Verification Steps
 

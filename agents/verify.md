@@ -33,6 +33,19 @@ Scan the backlog root for `REQ-NNN-*.md` files.
 
 Also scan `working/` and `archive/` — include those in coverage, mark them as already in-flight or done.
 
+### 2b. Check ideate observation coverage
+
+If `{project}/do-work/user-requests/UR-NNN/ideate.md` exists:
+
+1. Read `ideate.md` in full
+2. Extract all observations from the **Challenger — Risks & Edge Cases** and **Connector — Links & Reuse** sections
+3. For each Challenger risk and Connector overlap, check whether at least one REQ addresses it — look in the REQ's `## Task`, `## Context`, or `## Acceptance Criteria` sections for evidence that the observation was considered
+4. Track unaddressed observations for reporting in Step 4
+
+**Score impact:** Each unaddressed ideate flag reduces the confidence score by 5 points, capped at a maximum deduction of -20 points total. This is advisory — unaddressed flags do not block the pipeline.
+
+If `ideate.md` does not exist for this UR, skip this step silently.
+
 ### 3. Analyse coverage
 
 For each meaningful requirement in the brief, determine whether it is:
@@ -49,6 +62,7 @@ Also check for:
 - **Scope creep** — REQs that address things not in the brief
 - **Ordering issues** — REQs with implicit dependencies but no clear ordering (lower numbers should come first)
 - **Vague acceptance criteria** — criteria that can't be verified
+- **Unaddressed Ideate Flags** — Challenger risks or Connector overlaps from `ideate.md` (Step 2b) that no REQ addresses. List each unaddressed observation. Each reduces the confidence score by 5 points (capped at -20 total deduction).
 
 ### 5. Produce the report
 
