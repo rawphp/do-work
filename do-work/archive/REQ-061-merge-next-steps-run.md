@@ -1,7 +1,7 @@
 # REQ-061: Merge Next-Step Prompts into Run Report Sections
 
 **UR:** UR-015
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -19,11 +19,15 @@ Same structural issue as all other agents — separate subsections for next-step
 
 ## Acceptance Criteria
 
-- [ ] `agents/run.md` "Completion report" section contains the AskUserQuestion for backlog-empty as its final action
-- [ ] `agents/run.md` Stopping Rules section contains the AskUserQuestion for stopper-hit as its final action
-- [ ] Neither "Next-step prompt (conditional" heading exists as a separate subsection
-- [ ] The conditional checks (`next_steps.enabled` + standalone detection) remain intact
-- [ ] AskUserQuestion options remain unchanged for both cases
+- [x] `agents/run.md` "Completion report" section contains the AskUserQuestion for backlog-empty as its final action
+- [x] `agents/run.md` Stopping Rules section contains the AskUserQuestion for stopper-hit as its final action
+- [x] Neither "Next-step prompt (conditional" heading exists as a separate subsection
+- [x] The conditional checks (`next_steps.enabled` + standalone detection) remain intact
+- [x] AskUserQuestion options remain unchanged for both cases
+
+## Outputs
+
+- agents/run.md — Merged both next-step prompts into their parent sections
 
 ## Verification Steps
 

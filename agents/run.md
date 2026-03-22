@@ -261,7 +261,9 @@ Before reporting completion, run the project's full test suite as a safety net t
    - Re-run the full suite to confirm the fix
    - If the fix fails after 3 attempts, stop and report the failure to the user
 
-### Completion report
+### Completion report and prompt
+
+Output the completion report:
 
 ```
 Do Work loop complete.
@@ -270,13 +272,9 @@ Processed: N REQs
 Full suite: [passed / skipped — no test runner found]
 All outputs committed.
 Archive: {project}/do-work/archive/
-
-Next steps:
-- Review outputs in the project folder
-- Run verify if a new UR has been added
 ```
 
-### Next-step prompt (conditional — backlog empty)
+**Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
@@ -286,7 +284,7 @@ Present an `AskUserQuestion` with these options:
 2. **"Review outputs"** — List archived REQs and their output paths
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip this step entirely.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip the AskUserQuestion and stop.
 
 ---
 
@@ -302,17 +300,17 @@ Stop and wait for user input if:
 | Acceptance criteria are ambiguous and cannot be interpreted | Stop, ask for clarification |
 | A change would affect files outside the REQ's stated scope | Stop, confirm with user |
 
-### Next-step prompt (conditional — stopper hit)
+**After reporting a stopper**, immediately check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
-After reporting the stopper, present an `AskUserQuestion` with these options:
+Present an `AskUserQuestion` with these options:
 
 1. **"Show blocker details"** — Display the full failure context
 2. **"Retry current REQ"** — Resume from where it stopped
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip this step entirely.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip the AskUserQuestion and stop.
 
 ---
 
