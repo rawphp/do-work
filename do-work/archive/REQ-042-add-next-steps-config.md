@@ -1,7 +1,7 @@
 # REQ-042: Add next_steps config toggle
 
 **UR:** UR-012
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-22
 
 ## Task
@@ -14,9 +14,14 @@ The user wants an on/off switch in config for presenting next steps using AskUse
 
 ## Acceptance Criteria
 
-- [ ] `config.yml` default template includes `next_steps.enabled: false`
-- [ ] `agents/config.md` schema reference table includes `next_steps.enabled` with type boolean, default `false`, and description
-- [ ] Config loader handles missing `next_steps` section gracefully (defaults to `false`)
+- [x] `config.yml` default template includes `next_steps.enabled: false`
+- [x] `agents/config.md` schema reference table includes `next_steps.enabled` with type boolean, default `false`, and description
+- [x] Config loader handles missing `next_steps` section gracefully (defaults to `false`)
+
+## Outputs
+
+- agents/config.md — Added `next_steps.enabled` to default template and schema reference
+- do-work/config.yml — Added `next_steps.enabled: false`
 
 ## Verification Steps
 
