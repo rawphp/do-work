@@ -99,9 +99,9 @@ Use this format exactly:
 [2-3 sentences: the most important things to consider before decomposing this brief into tasks.]
 ```
 
-### 5. Report
+### 5. Report and prompt
 
-Output:
+Output the completion report:
 
 ```
 Ideate complete for UR-NNN.
@@ -110,11 +110,9 @@ Written: {project}/do-work/user-requests/UR-NNN/ideate.md
 
 Key observations:
 - [top 1-3 observations, one line each]
-
-The review file is available for the Capture agent to reference during decomposition.
 ```
 
-### 5b. Next-step prompt (conditional)
+**Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
 
@@ -124,7 +122,7 @@ Present an `AskUserQuestion` with these options:
 2. **"Edit the brief"** — Review input.md before capturing
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: skip this step entirely.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output "The review file is available for the Capture agent to reference during decomposition." and stop.
 
 ---
 
