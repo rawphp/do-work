@@ -1,7 +1,7 @@
 # REQ-039: Add Static Command Suggestions to Bare /do-work Output
 
 **UR:** UR-011
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-22
 
 ## Task
@@ -14,11 +14,11 @@ The user reported that typing `/do-work` with no arguments gives no suggestions 
 
 ## Acceptance Criteria
 
-- [ ] SKILL.md "No subcommand" section updated to include a "Suggested next steps" block
-- [ ] The block contains 3-4 concrete example commands (e.g., `/do-work start "your brief here"`, `/do-work run`, `/do-work go UR-001`)
-- [ ] Each suggestion includes a one-line description of when to use it
-- [ ] The suggestions appear as part of the bare `/do-work` output, visually distinct from the Quick Reference table
-- [ ] Existing Quick Reference table remains unchanged
+- [x] SKILL.md "No subcommand" section updated to include a "Suggested next steps" block
+- [x] The block contains 3-4 concrete example commands (e.g., `/do-work start "your brief here"`, `/do-work run`, `/do-work go UR-001`)
+- [x] Each suggestion includes a one-line description of when to use it
+- [x] The suggestions appear as part of the bare `/do-work` output, visually distinct from the Quick Reference table
+- [x] Existing Quick Reference table remains unchanged
 
 ## Verification Steps
 
@@ -32,3 +32,7 @@ The user reported that typing `/do-work` with no arguments gives no suggestions 
 ## Assets
 
 - SKILL.md lines 87-89 — current "No subcommand" section
+
+## Outputs
+
+- SKILL.md — Updated "No subcommand" section with 4 suggested next steps
