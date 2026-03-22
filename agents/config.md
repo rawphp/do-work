@@ -23,6 +23,7 @@ log:
   enabled: true
   platforms: []          # e.g. [x, linkedin]
   drafts_per_platform: 2
+  batch_size: 3            # how many drafts to show per batch in the selection prompt
   audience: ""           # e.g. "indie hackers", "enterprise devs", "startup founders"
   voice: ""              # e.g. "casual and direct", "thoughtful and technical"
 ```
@@ -41,5 +42,6 @@ log:
 | `log.enabled` | boolean | `true` | Whether the log step runs after Go |
 | `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin]`) |
 | `log.drafts_per_platform` | integer | `2` | Number of draft posts to generate per platform |
+| `log.batch_size` | integer | `3` | How many drafts to show per batch in the AskUserQuestion selection prompt. Max 3 (fits 3 drafts + 1 "More" option in AskUserQuestion's 4-option limit). |
 | `log.audience` | string | `""` | Target audience for log posts (e.g. "indie hackers", "enterprise devs"). Shapes framing and references. |
 | `log.voice` | string | `""` | Writing style for log posts (e.g. "casual and direct", "thoughtful and technical"). Shapes tone and word choice. |
