@@ -52,9 +52,9 @@ Pass it the UR folder path from Step 1.
 
 If ideate was run in Step 2, the Capture agent should read `ideate.md` alongside `input.md` when decomposing — treating the observations as additional context (not as requirements to blindly follow).
 
-### 4. Report
+### 4. Report and prompt
 
-Output a combined summary:
+Output the combined summary:
 
 ```
 Start complete for UR-NNN
@@ -68,10 +68,9 @@ REQs written:
   ...
 
 Total: N tasks in backlog
-Next step: "do-work go {project} UR-NNN" to verify and run.
 ```
 
-### 4b. Next-step prompt (conditional)
+**Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true`:
 
@@ -83,7 +82,7 @@ Present an `AskUserQuestion` with these options:
 
 The start agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (intake, ideate, capture) must suppress their own AskUserQuestion prompts when running inside start.
 
-If `config.next_steps.enabled` is `false` or missing: skip this step entirely.
+If `config.next_steps.enabled` is `false` or missing: output `Next step: "do-work go UR-NNN" to verify and run.` and stop.
 
 ---
 
