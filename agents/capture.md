@@ -109,6 +109,28 @@ Each step must be typed. Use the right type for the task:
 - **New pages/components:** Include `build` + `ui` steps minimum.
 - Steps must be specific enough that a pass/fail verdict is unambiguous — "looks good" is not a valid expected outcome.
 
+### 4b. Check acceptance criteria quality
+
+After writing all REQ files, review each REQ's acceptance criteria for specificity. This is a self-correction step — fix issues inline before committing.
+
+**Scan each criterion for vague qualifiers used without concrete definitions:**
+
+| Vague qualifier | Flagged? | Example |
+|---|---|---|
+| "correctly" | Only if no measurable outcome follows | "correctly handles input" — flagged. "correctly returns HTTP 200 with JSON body" — not flagged. |
+| "properly" | Only if no measurable outcome follows | "properly validates" — flagged. "properly returns 422 with field-level errors" — not flagged. |
+| "as expected" | Always, unless the expectation is defined in the same criterion | "behaves as expected" — flagged. |
+| "works" | Only if standalone | "works with the API" — flagged. "works by returning a 201 status" — not flagged. |
+| "handles" | Only if no specific behavior follows | "handles errors" — flagged. "handles 404 by showing a not-found page" — not flagged. |
+
+**For each flagged criterion:**
+1. Rewrite it to include a specific, verifiable outcome (expected input → expected output or state change)
+2. Update the REQ file in place — rewrite the criterion directly, then continue
+
+**Do not** ask the user for clarification — infer the concrete outcome from the task description and context. If you genuinely cannot determine a specific outcome, add a `[NEEDS CLARIFICATION]` prefix to the criterion.
+
+This step does not block the pipeline or require user intervention — it is immediate self-correction before commit.
+
 ### 5. Commit the backlog
 
 Stage and commit all newly created REQ files (and the ideate.md file if it exists) so the backlog is tracked in git from decomposition.

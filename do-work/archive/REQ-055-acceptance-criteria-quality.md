@@ -1,7 +1,7 @@
 # REQ-055: Add Acceptance Criteria Quality Check to Capture
 
 **UR:** UR-014
-**Status:** backlog
+**Status:** done
 **Created:** 2026-03-23
 
 ## Task
@@ -23,11 +23,15 @@ Weak acceptance criteria produce weak implementations that pass weak tests. "Use
 
 ## Acceptance Criteria
 
-- [ ] `agents/capture.md` contains a new step (between current Steps 4 and 5) titled "Check acceptance criteria quality" or similar
-- [ ] The step lists specific vague-qualifier keywords to scan for: "correctly", "properly", "as expected", "works", "handles"
-- [ ] The step requires checking context — a criterion containing "correctly" paired with a concrete definition (e.g. "correctly returns HTTP 200") is NOT flagged
-- [ ] The step instructs the agent to rewrite any flagged criteria inline before proceeding
-- [ ] The step does not block the pipeline or require user intervention — it is a self-correction
+- [x] `agents/capture.md` contains a new step (between current Steps 4 and 5) titled "Check acceptance criteria quality" or similar
+- [x] The step lists specific vague-qualifier keywords to scan for: "correctly", "properly", "as expected", "works", "handles"
+- [x] The step requires checking context — a criterion containing "correctly" paired with a concrete definition (e.g. "correctly returns HTTP 200") is NOT flagged
+- [x] The step instructs the agent to rewrite any flagged criteria inline before proceeding
+- [x] The step does not block the pipeline or require user intervention — it is a self-correction
+
+## Outputs
+
+- agents/capture.md — Added step 4b "Check acceptance criteria quality" with vague-qualifier table and self-correction instructions
 
 ## Verification Steps
 
