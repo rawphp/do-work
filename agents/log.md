@@ -71,6 +71,21 @@ If both sources are empty, use `LOG-001`.
 mkdir -p {project}/do-work/logs/LOG-NNN/drafts/
 ```
 
+### 4b. Rank approaches
+
+Read `{project}/do-work/logs/log-history.yml`. For each entry that has an `approach` field (entries without it are `unknown` — ignore them for ranking), count how many times each approach slug was selected.
+
+**Ranking algorithm:**
+
+1. **Count selections** per approach slug across all entries (excluding `skipped` and `unknown`)
+2. **Sort descending** by selection count — most-selected approaches first
+3. **Randomize under-sampled approaches:** Any approach with fewer than 3 data points gets placed in a randomly shuffled tier below the established approaches
+4. **Cold start (0 total data points):** Randomize the entire list
+
+The ranked list determines the order in which drafts are presented in Step 6. All 10 approaches are still generated — ranking only affects presentation order.
+
+Count the total number of non-skip, non-unknown data points. This is `N` in the ranking header shown to the user.
+
 ### 5. Generate drafts
 
 For each platform in `config.log.platforms`, generate **one draft per approach** (10 drafts total per platform).
@@ -182,30 +197,27 @@ Each draft file should contain only the post content — no metadata, no instruc
 
 ### 6. Present drafts
 
-Output all generated drafts, grouped by platform, with clear labels:
+Present drafts **in ranked order** from Step 4b. Show a ranking header:
 
 ```
 Log drafts generated for LOG-NNN
+Ranked by selection history (N total data points)
+```
 
+Output all generated drafts, grouped by platform, ordered by rank:
+
+```
 Platform: X
 ───────────
-Draft 1 (x-draft-1.md):
+#1 — Curiosity Gap (x-curiosity-gap-draft.md):
 [content]
 
-Draft 2 (x-draft-2.md):
+#2 — Entertainment (x-entertainment-draft.md):
 [content]
 
-Platform: LinkedIn
-──────────────────
-Draft 1 (linkedin-draft-1.md):
-[content]
-
-Draft 2 (linkedin-draft-2.md):
-[content]
+...
 
 Saved to: {project}/do-work/logs/LOG-NNN/drafts/
-
-Select a draft per platform to record, or type "skip" to skip logging.
 ```
 
 ### 7. Record selection
