@@ -25,7 +25,10 @@ Read and follow the **Load Config** section of [config.md](config.md).
 Before starting the loop:
 
 1. Confirm there are no REQs in `working/` (another run may be in progress)
-   - If one exists, check if it's stale (no recent changes). If stale, ask the user whether to resume or abort it.
+   - If one exists, check its staleness: run `git log -1 --format="%ci" -- {project}/do-work/working/` to find the last commit touching working/. If the last commit is more than 24 hours ago, OR if there is no commit touching working/ at all, it is stale.
+   - If stale, ask the user: "REQ-NNN is in working/ but appears stale (last activity: [date]). Resume (continue implementation from where it stopped) or abort (move it back to backlog with Status: backlog)?"
+   - If "abort": move the REQ file from `working/` back to the backlog root (`{project}/do-work/`), reset its `**Status:**` field to `backlog`, and continue to the next step.
+   - If "resume": keep the REQ in `working/` and proceed to Step 2 (Read the REQ) for that REQ.
 2. Confirm the backlog is not empty. If empty, stop and report.
 3. Confirm you are on the correct git branch.
 4. Confirm your working directory is `{project}` (the user's repo), NOT the skill clone at `~/.claude/skills/do-work/`. All file edits and git commits must happen in `{project}`. If you are in the skills directory, `cd` to `{project}` before proceeding.
@@ -90,8 +93,12 @@ Before writing any implementation code:
 4. Do not proceed to implementation until you have at least one failing test
 
 If the task is not code (e.g. writing a document, generating a file, drafting copy):
-- Write a verification step or checklist that can be run after completion
-- This replaces the test in non-code contexts
+- Write a concrete verification checklist with at least 2 items, each following this format:
+  - **Check:** [what to verify — e.g., "file exists at path X", "document contains section Y", "word count is between N and M"]
+  - **How:** [exact command or action — e.g., `test -f path/to/file`, `grep -c "## Section" file.md`, `wc -w < file.md`]
+  - **Expected:** [specific pass condition — e.g., "exit code 0", "output >= 1", "count between 500 and 2000"]
+- Run the checklist items before proceeding. If any fail, treat them as failing tests — fix the content and re-check.
+- This replaces automated tests in non-code contexts but follows the same red-green discipline: define what "done" looks like before creating the content.
 
 #### 4b. Implement
 

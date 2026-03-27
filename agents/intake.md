@@ -21,6 +21,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 ### 1. Check if the user is referencing an existing UR
 
 If the brief explicitly references an existing UR (e.g. "update UR-003", "add to UR-003", "modify UR-003"):
+- Check if `{project}/do-work/user-requests/UR-NNN/` exists. If the directory does not exist, report: "UR-NNN does not exist. Creating a new UR instead." and continue to Step 2.
 - Read `{project}/do-work/user-requests/UR-NNN/input.md`
 - If **Status: intake** (Capture has not been run yet):
   - Ask the user: "UR-NNN already exists and has not been captured yet. Do you want to overwrite its input.md with this new brief?"
@@ -70,6 +71,17 @@ Use this format exactly:
 
 [The user's message, verbatim. Do not summarise, rephrase, or interpret it.]
 ```
+
+### 4b. Verify the recording
+
+After writing input.md, verify the file was recorded correctly:
+
+1. Read back `{project}/do-work/user-requests/UR-NNN/input.md`
+2. Confirm the `**Status:**` field is `intake`
+3. Confirm the `**Received:**` date matches today's date
+4. Confirm the `## Request` section contains the user's original message (not a summary or paraphrase)
+
+If any check fails, fix the file before proceeding. This is the intake agent's equivalent of TDD's verify-green step — confirm the output matches the spec before committing.
 
 ### 5. Commit the UR
 

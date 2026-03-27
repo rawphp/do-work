@@ -61,7 +61,8 @@ Also check for:
 - **Duplicates** — two REQs describing the same work
 - **Scope creep** — REQs that address things not in the brief
 - **Ordering issues** — REQs with implicit dependencies but no clear ordering (lower numbers should come first)
-- **Vague acceptance criteria** — criteria that can't be verified
+- **Vague acceptance criteria** — criteria that can't be verified (apply capture.md's vague-qualifier scan: "correctly", "properly", "as expected", "works", "handles" without specific outcomes)
+- **Missing verification steps** — REQs without typed verification steps (test/build/runtime/ui) are not TDD-ready and will block the Run agent
 - **Unaddressed Ideate Flags** — Challenger risks or Connector overlaps from `ideate.md` (Step 2b) that no REQ addresses. List each unaddressed observation. Each reduces the confidence score by 5 points (capped at -20 total deduction).
 
 ### 5. Produce the report
@@ -126,10 +127,15 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 If invoked with `--auto-fix`, after producing the report:
 
-1. Write new REQ files for each missing requirement
-2. Update partially-covered REQs to expand their scope or acceptance criteria
+1. Write new REQ files for each missing requirement, following the exact REQ template from capture.md. Each auto-fixed REQ MUST include:
+   - At least 2 acceptance criteria with specific, verifiable outcomes (no vague qualifiers per capture.md's 4b quality check)
+   - At least 1 typed verification step (test, build, runtime, or ui) with an Expected outcome — these are what the Run agent uses for TDD verification
+   - Run capture.md's Step 4b quality check on each auto-fixed REQ before committing
+2. Update partially-covered REQs to expand their scope or acceptance criteria. A partial REQ is "expanded enough" when every sub-requirement it addresses has at least one acceptance criterion with a specific, verifiable outcome.
 3. Merge or remove duplicate REQs (keeping the higher-quality one)
-4. Report what was changed
+4. Before writing new REQs, check `{project}/do-work/working/` — never create a REQ with a number that conflicts with a REQ currently in working/. Use the next available number after the highest existing REQ across backlog, working, and archive.
+5. Commit auto-fix changes: `git add {project}/do-work/REQ-*.md && git commit -m "chore(UR-NNN): auto-fix N gaps"`
+6. Report what was changed
 
 ---
 

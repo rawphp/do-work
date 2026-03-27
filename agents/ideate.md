@@ -34,7 +34,7 @@ Read every file in `UR-NNN/assets/` if it exists.
 
 Scan the project folder for existing code, REQs in the archive, and any documentation that gives you context on what already exists.
 
-Spend no more than a few minutes on this — enough to ground your observations, not to audit the whole codebase.
+Read at most 10 files (excluding node_modules, vendor, and build artifacts). Stop scanning after you have enough context to ground your observations — do not audit the whole codebase.
 
 ### 3. Apply the three modes
 
@@ -129,7 +129,7 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 ## Rules
 
 - Never modify `input.md` — your output goes to a separate file
-- Every observation must cite specific reasoning — no vague "have you considered X?"
+- Every observation must include: (1) what the risk or assumption is, (2) a concrete scenario where it would cause a problem, and (3) which part of the brief triggers the concern. Observations missing any of these three elements must be rewritten before saving.
 - Only surface high-confidence observations. Queue uncertain ones under a "Lower confidence" subheading if you include them at all.
 - Be concise. One insight per bullet. Don't bundle.
 - Do not decompose the brief into tasks — that is Capture's job

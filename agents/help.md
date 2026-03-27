@@ -47,6 +47,11 @@ Suggested next steps:
 
 **If REQs exist in the backlog:**
 
+Before suggesting, scan the backlog REQs for TDD readiness:
+- Read each `REQ-NNN-*.md` in the backlog root
+- Check if each has a `## Verification Steps` section with at least one typed step (test/build/runtime/ui)
+- If any REQ lacks verification steps, add a warning line before the suggestions: `Warning: N REQ(s) missing verification steps — run /do-work verify UR-NNN --auto-fix to add them before executing.`
+
 ```
 Suggested next steps:
   /do-work run                                      — Execute the N tasks in the backlog

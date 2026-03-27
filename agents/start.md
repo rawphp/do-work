@@ -32,6 +32,8 @@ Execute all intake steps: find next UR number, create the folder, write `input.m
 
 Note the UR number created (e.g. `UR-003`) — you will need it for the next steps.
 
+**Number conflict guard:** Intake scans existing UR folders and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002). This prevents conflicts with deleted or moved items.
+
 ### 2. Run Ideate (default — skip with `--no-ideate`)
 
 Unless the `--no-ideate` flag was specified:
@@ -83,6 +85,18 @@ If `config.next_steps.enabled` is `true`:
 The start agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (intake, ideate, capture) must suppress their own AskUserQuestion prompts when running inside start.
 
 If `config.next_steps.enabled` is `false` or missing: output `Next step: "do-work go UR-NNN" to verify and run.` and stop.
+
+---
+
+## Error Recovery
+
+If any sub-agent (Intake, Ideate, or Capture) fails mid-flow:
+
+1. **Intake fails:** Stop immediately. Report the error. The UR was not created — no cleanup needed.
+2. **Ideate fails:** Log the failure ("Ideate failed: [error]. Proceeding without ideate observations."). Continue to Capture as if `--no-ideate` was specified. Do not block the pipeline for an advisory step.
+3. **Capture fails:** Stop immediately. Report the error. The UR exists but has no REQs — the user can re-run `/do-work capture UR-NNN` manually.
+
+In all cases, never leave partial state without reporting it. If a UR was created but Capture failed, tell the user the UR number so they can resume.
 
 ---
 

@@ -36,16 +36,46 @@ If no REQs exist yet, start at `REQ-001`.
 
 ### 3. Decompose the brief
 
-Break the brief into the smallest discrete tasks that can each be:
-- Executed independently (no dependency on another REQ completing first)
-- Completed and committed on their own
-- Verified against clear acceptance criteria
+Break the brief into discrete tasks. A task is the right size when it meets ALL three criteria:
+1. **Single commit:** It can be implemented and committed in one git commit (typically touching 1-5 files)
+2. **Independent:** It does not require another uncommitted REQ to be complete first (read-only dependencies on existing code are fine)
+3. **Testable:** At least one automated test or typed verification step can confirm it works
 
 **Rules:**
 - One REQ = one discrete change or deliverable
 - Do not bundle unrelated concerns into a single REQ
 - If a task has a clear dependency chain, order the REQ numbers to reflect it (lower numbers first)
-- Prefer more, smaller REQs over fewer, larger ones
+- Each REQ must address exactly one user-visible behavior change or one internal component. If a REQ description contains the word "and" joining two unrelated outcomes, split it into two REQs. When in doubt, split.
+
+### 3b. Verify full coverage before writing
+
+Before writing any REQ files, build a requirement-to-REQ mapping to confirm every distinct requirement in the brief is covered:
+
+1. List every distinct requirement from the brief (a requirement is a user-visible behavior, data flow, or constraint). Number them R1, R2, R3, etc.
+2. For each planned REQ, note which requirement(s) it addresses.
+3. Check: does every R-number appear in at least one REQ? If any R-number is unmapped, create a REQ for it.
+
+**Example:**
+```
+Brief: "Contact form with name, email, message. Submissions emailed to sales@example.com and stored in DB. Show success message."
+
+R1: Form UI (name, email, message fields)
+R2: Form validation
+R3: Store submissions in database
+R4: Email submissions to sales@example.com
+R5: Show success message after submission
+
+Planned REQs:
+  REQ-001 form-ui → R1
+  REQ-002 form-validation → R2
+  REQ-003 store-submissions → R3
+  REQ-004 email-submissions → R4
+  REQ-005 success-message → R5
+
+All R-numbers mapped. ✓
+```
+
+If you discover a requirement that was missed, add a REQ for it before proceeding. Do not write REQ files until the mapping is complete.
 
 ### 4. Write REQ files
 

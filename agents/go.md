@@ -24,6 +24,12 @@ You will be given:
 
 Read and follow the **Load Config** section of [config.md](config.md). Keep the loaded config in context — sub-agents will load config independently but the orchestrator needs it for the conditional log step.
 
+### 0b. Validate UR exists
+
+Before delegating to any sub-agent, confirm the UR directory exists:
+- Check if `{project}/do-work/user-requests/UR-NNN/input.md` exists
+- If it does not exist, report: "UR-NNN not found at {project}/do-work/user-requests/UR-NNN/. Check the UR number and try again." and stop.
+
 ### 1. Run Verify
 
 Read and follow [verify.md](verify.md) in full.
