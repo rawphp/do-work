@@ -134,10 +134,23 @@ If invoked with `--auto-fix`, after producing the report:
 2. Update partially-covered REQs to expand their scope or acceptance criteria. A partial REQ is "expanded enough" when every sub-requirement it addresses has at least one acceptance criterion with a specific, verifiable outcome.
 3. Merge or remove duplicate REQs (keeping the higher-quality one)
 4. Before writing new REQs, check `{project}/do-work/working/` — never create a REQ with a number that conflicts with a REQ currently in working/. Use the next available number after the highest existing REQ across backlog, working, and archive.
-5. Commit auto-fix changes: `git add {project}/do-work/REQ-*.md && git commit -m "chore(UR-NNN): auto-fix N gaps"`
-6. Report what was changed
+5. **Re-score after auto-fix.** Re-run Steps 1-5 (read brief, read all REQs including new ones, analyse coverage, check issues, produce report) to compute the new confidence score. This is mandatory — do not assume auto-fix achieved 100%.
+6. Commit auto-fix changes: `git add {project}/do-work/REQ-*.md && git commit -m "chore(UR-NNN): auto-fix N gaps"`
+7. Report what was changed, including the **before and after confidence scores**:
+   ```
+   Auto-fix complete for UR-NNN
+   Before: NN% → After: NN%
+   Added: REQ-NNN-slug, REQ-NNN-slug
+   Updated: REQ-NNN-slug (expanded criteria)
+   ```
 
 ---
+
+## Error Recovery
+
+- **REQ file is malformed** (missing `## Task`, `## Acceptance Criteria`, or `**UR:**` field): Include it in the report as an issue: `"REQ-NNN-slug.md is malformed: missing {section}."` Count it as a gap in coverage (0 points). If `--auto-fix` is set, rewrite the REQ to include the missing sections using content inferred from the task title and brief.
+- **Brief (input.md) not found**: Stop and report: `"UR-NNN/input.md not found at {path}. Cannot verify without a brief."` Do not produce a partial report.
+- **No REQ files found anywhere** (backlog, working, archive all empty): Report confidence 0% with recommendation: `"No REQs found. Run /do-work capture UR-NNN first."`
 
 ## Rules
 

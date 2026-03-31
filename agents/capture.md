@@ -208,6 +208,13 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 ---
 
+## Error Recovery
+
+- **REQ file write fails** (permissions, disk): Stop and report: `"Failed to write REQ-NNN-slug.md: {error}. N of M REQs were written successfully."` Do not commit partial REQ sets — the user should fix the issue and re-run capture.
+- **Brief is empty or unreadable**: Stop and report: `"input.md is empty or unreadable at {path}. Run intake first."` Do not attempt to decompose an empty brief.
+- **REQ number conflict**: If `REQ-NNN-slug.md` already exists in backlog, working, or archive, increment the number and retry. Log: `"REQ-NNN already exists — using REQ-{NNN+1} instead."`
+- **Git commit fails**: Report the error but do NOT stop the pipeline. The REQ files are already written — the user can commit manually. Output: `"REQ files written but git commit failed: {error}. Files are in the backlog — commit manually."`
+
 ## Rules
 
 - Never modify the original `input.md`

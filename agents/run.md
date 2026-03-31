@@ -25,10 +25,16 @@ Read and follow the **Load Config** section of [config.md](config.md).
 Before starting the loop:
 
 1. Confirm there are no REQs in `working/` (another run may be in progress)
-   - If one exists, check its staleness: run `git log -1 --format="%ci" -- {project}/do-work/working/` to find the last commit touching working/. If the last commit is more than 24 hours ago, OR if there is no commit touching working/ at all, it is stale.
-   - If stale, ask the user: "REQ-NNN is in working/ but appears stale (last activity: [date]). Resume (continue implementation from where it stopped) or abort (move it back to backlog with Status: backlog)?"
-   - If "abort": move the REQ file from `working/` back to the backlog root (`{project}/do-work/`), reset its `**Status:**` field to `backlog`, and continue to the next step.
-   - If "resume": keep the REQ in `working/` and proceed to Step 2 (Read the REQ) for that REQ.
+   - Use Glob to check: `{project}/do-work/working/REQ-*.md`
+   - If one exists, check its staleness:
+     ```bash
+     git log -1 --format="%ci" -- {project}/do-work/working/
+     ```
+     A REQ is **stale** if: the last commit touching working/ is more than 24 hours ago, OR if git returns no output (no commit has ever touched working/).
+   - If stale, ask the user: `"REQ-NNN is in working/ but appears stale (last activity: {date}). Resume or abort?"`
+     - **Abort**: Move the REQ file back to backlog root: `mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/REQ-NNN-slug.md`. Reset its `**Status:**` field to `backlog`. Continue to check 2.
+     - **Resume**: Keep the REQ in `working/` and skip directly to Step 2 (Read the REQ) for that REQ — do NOT claim a new REQ from the backlog.
+   - If NOT stale (recent activity), stop: `"REQ-NNN is actively in progress (last activity: {date}). Another run may be active. Aborting to prevent conflicts."`
 2. Confirm the backlog is not empty. If empty, stop and report.
 3. Confirm you are on the correct git branch.
 4. Confirm your working directory is `{project}` (the user's repo), NOT the skill clone at `~/.claude/skills/do-work/`. All file edits and git commits must happen in `{project}`. If you are in the skills directory, `cd` to `{project}` before proceeding.
@@ -92,13 +98,24 @@ Before writing any implementation code:
 3. Run the tests — confirm they **fail** (red)
 4. Do not proceed to implementation until you have at least one failing test
 
-If the task is not code (e.g. writing a document, generating a file, drafting copy):
-- Write a concrete verification checklist with at least 2 items, each following this format:
-  - **Check:** [what to verify — e.g., "file exists at path X", "document contains section Y", "word count is between N and M"]
-  - **How:** [exact command or action — e.g., `test -f path/to/file`, `grep -c "## Section" file.md`, `wc -w < file.md`]
-  - **Expected:** [specific pass condition — e.g., "exit code 0", "output >= 1", "count between 500 and 2000"]
-- Run the checklist items before proceeding. If any fail, treat them as failing tests — fix the content and re-check.
-- This replaces automated tests in non-code contexts but follows the same red-green discipline: define what "done" looks like before creating the content.
+**If the task is not code** (e.g. writing a document, generating a file, drafting copy), the TDD discipline still applies — use a verification checklist instead of test files:
+
+1. Write a verification checklist with **at least 2 items**, each using this exact format:
+
+```markdown
+## Pre-Implementation Checks (must FAIL before implementation)
+
+| # | Check | Command | Expected (FAIL) | Expected (PASS) |
+|---|-------|---------|-----------------|-----------------|
+| 1 | File exists at {path} | `test -f {path} && echo PASS \|\| echo FAIL` | FAIL | PASS |
+| 2 | Document contains {section} | `grep -c "## {section}" {path}` | 0 | >= 1 |
+```
+
+2. Run every check command. ALL must return the FAIL condition (confirming the content doesn't exist yet). If any check already passes, the red-green discipline is broken — investigate before proceeding.
+
+3. After implementation (Step 4b), re-run every check. ALL must return the PASS condition.
+
+4. **This is not optional.** Non-code tasks follow the same hard stop as code tasks: do not proceed to commit until all checks pass. The checklist IS the test suite for non-code work.
 
 #### 4b. Implement
 

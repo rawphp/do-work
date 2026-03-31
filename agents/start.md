@@ -92,9 +92,9 @@ If `config.next_steps.enabled` is `false` or missing: output `Next step: "do-wor
 
 If any sub-agent (Intake, Ideate, or Capture) fails mid-flow:
 
-1. **Intake fails:** Stop immediately. Report the error. The UR was not created — no cleanup needed.
-2. **Ideate fails:** Log the failure ("Ideate failed: [error]. Proceeding without ideate observations."). Continue to Capture as if `--no-ideate` was specified. Do not block the pipeline for an advisory step.
-3. **Capture fails:** Stop immediately. Report the error. The UR exists but has no REQs — the user can re-run `/do-work capture UR-NNN` manually.
+1. **Intake fails:** Stop immediately. Report the exact error. The UR was not created — no cleanup needed. Output: `"Start failed at intake: {error}. No UR was created."`
+2. **Ideate fails:** Output the failure to the user: `"Ideate failed: {error}. Proceeding without ideate observations."` Continue to Capture as if `--no-ideate` was specified. Do not block the pipeline for an advisory step. Do not write a partial `ideate.md` — if the file was partially written, delete it before continuing.
+3. **Capture fails:** Stop immediately. Report the exact error and the UR number so the user can resume. Output: `"Start failed at capture: {error}. UR-NNN was created but has no REQs. Resume with: /do-work capture UR-NNN"`
 
 In all cases, never leave partial state without reporting it. If a UR was created but Capture failed, tell the user the UR number so they can resume.
 
