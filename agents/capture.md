@@ -26,6 +26,8 @@ Read `UR-NNN/input.md` in full.
 
 Read every file in `UR-NNN/assets/` if it exists.
 
+Read `UR-NNN/ideate.md` if it exists. Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If the file does not exist (e.g. the user ran `--no-ideate` or capture is running standalone), continue without it.
+
 ### 2. Determine the next REQ number
 
 Scan the backlog root (`{project}/do-work/`) for existing `REQ-NNN-*.md` files and the `archive/` folder.
@@ -40,6 +42,12 @@ Break the brief into discrete tasks. A task is the right size when it meets ALL 
 1. **Single commit:** It can be implemented and committed in one git commit (typically touching 1-5 files)
 2. **Independent:** It does not require another uncommitted REQ to be complete first (read-only dependencies on existing code are fine)
 3. **Testable:** At least one automated test or typed verification step can confirm it works
+
+**Using ideate observations during decomposition:**
+
+If `ideate.md` was loaded in Step 1, use its observations as advisory context when deciding how to split and scope REQs:
+- **Connector** observations (reuse opportunities, overlaps with existing work) help you identify when a REQ should reference or reuse an existing component rather than building from scratch. Note these in the REQ's Context section.
+- **Challenger** observations (edge cases, failure modes) help you identify acceptance criteria that might otherwise be missed. Include a Challenger edge case as an acceptance criterion only when it directly applies to the specific REQ — do not blanket-add every Challenger observation to every REQ.
 
 **Rules:**
 - One REQ = one discrete change or deliverable
@@ -100,12 +108,13 @@ Use this format exactly:
 
 ## Context
 
-[Relevant excerpt or summary from the original brief that explains why this task exists.]
+[Relevant excerpt or summary from the original brief that explains why this task exists. If ideate.md flagged Connector observations (reuse opportunities, overlaps with existing work) relevant to this REQ, incorporate them here.]
 
 ## Acceptance Criteria
 
 - [ ] [Specific, verifiable outcome]
 - [ ] [Another specific outcome]
+[If ideate.md flagged a Challenger edge case that directly applies to this REQ, include it as an acceptance criterion.]
 
 ## Verification Steps
 
