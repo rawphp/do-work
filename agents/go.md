@@ -57,17 +57,30 @@ Pass it the project do-work path.
 
 Let the run agent execute until the backlog is empty or a stopper is hit.
 
-### 4. Run Log (if configured)
+### 4. MANDATORY — Log Check
 
-After the run completes successfully (backlog empty, no stoppers):
+> **STOP. Do not skip this step. Do not jump to the report.**
+>
+> You MUST evaluate the log conditions below before proceeding to Step 5. Read each condition, determine the outcome, and follow the corresponding action. This is a checkpoint, not a suggestion.
 
-1. Check config: if `config.log.enabled` is `false`, skip this step silently.
-2. Check config: if `config.log.platforms` is empty, skip this step silently.
-3. If both conditions pass, read and follow [log.md](log.md) in full.
+**If the run was stopped early (stopper hit), set `log_outcome` to "skipped — stopper hit" and proceed to Step 5.**
 
-If the run was stopped early (stopper hit), skip the log step — only log after a clean run.
+Otherwise, evaluate both config conditions:
+
+1. Is `config.log.enabled` set to `true`?
+2. Is `config.log.platforms` non-empty (at least one platform listed)?
+
+| Condition | Action |
+|-----------|--------|
+| Both true | Read and follow [log.md](log.md) in full. Set `log_outcome` to "completed". |
+| `log.enabled` is `false` | Set `log_outcome` to "skipped — logging disabled". |
+| `log.platforms` is empty | Set `log_outcome` to "skipped — no platforms configured". |
+
+**You must set `log_outcome` to one of the values above before continuing. Step 5 requires it.**
 
 ### 5. Report and prompt
+
+**Prerequisite: Step 4 must have been evaluated. If `log_outcome` is not set, go back to Step 4.**
 
 After the run and optional log complete (or if stopped at Step 2), output the completion report:
 
