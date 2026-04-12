@@ -49,6 +49,22 @@ Capture the confidence score from the verify report.
 | Score < 90% and `--auto-fix` specified | Run verify with `--auto-fix` (which creates missing REQs and re-scores internally). Read the new score from verify's report. If now >= 90%, continue to Step 3. If still < 90% after auto-fix, stop: "Auto-fix raised score from NN% to NN%, but still below 90%. Manual review needed." Do NOT auto-fix more than once — one pass only. |
 | Score < 90% | Stop. Output the verify report and recommend: "Score is NN%. Review gaps above, then either fix manually and re-run, or use `--auto-fix`." |
 
+### 2b. Run Audit (always-on)
+
+If execution will proceed (score >= 90%, or `--force` was used, or `--auto-fix` raised the score above threshold):
+
+Read and follow [audit.md](audit.md) in full.
+
+Pass it the project do-work path and UR reference.
+
+The audit agent will interrogate each REQ's quality, auto-fix soft spots, and produce a change report. This is a sharpening pass — it does not block the run regardless of what it finds.
+
+**Do not re-run verify after audit.** Audit only sharpens precision (criteria specificity, error paths) — it does not change scope or coverage, so the verify score remains valid.
+
+If execution will NOT proceed (score < 90% and no `--force`/`--auto-fix`), skip this step — audit only runs when work is about to begin.
+
+Capture the audit outcome for the completion report: number of fixes applied, or "clean" if no fixes, or "skipped" if audit did not run.
+
 ### 3. Run
 
 Read and follow [run.md](run.md) in full.
@@ -88,6 +104,7 @@ After the run and optional log complete (or if stopped at Step 2), output the co
 Go complete for UR-NNN
 
 Verify: NN% confidence
+Audit: [N fixes applied / clean / skipped]
 Run: [N REQs processed / stopped at verify — score below 90%]
 
 Archive: {project}/do-work/archive/
