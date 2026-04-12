@@ -12,7 +12,9 @@ You will be given:
 
 1. A project do-work path: `{project}/do-work/`
 2. The user's message or brief
-3. Optional flag: `--no-ideate` (skip ideate before capture)
+3. Optional flags:
+   - `--no-ideate` (skip ideate before capture)
+   - `--grill` (run interactive questioning after intake, before ideate)
 
 ---
 
@@ -33,6 +35,18 @@ Execute all intake steps: find next UR number, create the folder, write `input.m
 Note the UR number created (e.g. `UR-003`) — you will need it for the next steps.
 
 **Number conflict guard:** Intake scans existing UR folders and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002). This prevents conflicts with deleted or moved items.
+
+### 1b. Run Question (opt-in — requires `--grill`)
+
+If the `--grill` flag was specified:
+
+Read and follow [question.md](question.md) in full.
+
+Pass it the UR folder path from Step 1. The question agent will ask the user clarifying questions one at a time and append a `## Clarifications` section to `input.md`.
+
+**Do not stop after questioning.** The start agent continues to ideate (or capture if `--no-ideate`).
+
+If `--grill` was not specified, skip this step entirely.
 
 ### 2. Run Ideate (default — skip with `--no-ideate`)
 
@@ -62,6 +76,7 @@ Output the combined summary:
 Start complete for UR-NNN
 
 Intake: {project}/do-work/user-requests/UR-NNN/input.md
+Question: [yes/no]
 Ideate: [yes/no]
 
 REQs written:
@@ -82,7 +97,7 @@ If `config.next_steps.enabled` is `true`:
 2. **"Run Verify only"** — Check coverage without executing
 3. **"Skip"** — End the interaction
 
-The start agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (intake, ideate, capture) must suppress their own AskUserQuestion prompts when running inside start.
+The start agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (intake, question, ideate, capture) must suppress their own AskUserQuestion prompts when running inside start.
 
 If `config.next_steps.enabled` is `false` or missing: output `Next step: "do-work go UR-NNN" to verify and run.` and stop.
 
@@ -93,8 +108,9 @@ If `config.next_steps.enabled` is `false` or missing: output `Next step: "do-wor
 If any sub-agent (Intake, Ideate, or Capture) fails mid-flow:
 
 1. **Intake fails:** Stop immediately. Report the exact error. The UR was not created — no cleanup needed. Output: `"Start failed at intake: {error}. No UR was created."`
-2. **Ideate fails:** Output the failure to the user: `"Ideate failed: {error}. Proceeding without ideate observations."` Continue to Capture as if `--no-ideate` was specified. Do not block the pipeline for an advisory step. Do not write a partial `ideate.md` — if the file was partially written, delete it before continuing.
-3. **Capture fails:** Stop immediately. Report the exact error and the UR number so the user can resume. Output: `"Start failed at capture: {error}. UR-NNN was created but has no REQs. Resume with: /do-work capture UR-NNN"`
+2. **Question fails:** Output the failure to the user: `"Question failed: {error}. Proceeding without clarifications."` Continue to Ideate (or Capture if `--no-ideate`). Do not block the pipeline for an advisory step.
+3. **Ideate fails:** Output the failure to the user: `"Ideate failed: {error}. Proceeding without ideate observations."` Continue to Capture as if `--no-ideate` was specified. Do not block the pipeline for an advisory step. Do not write a partial `ideate.md` — if the file was partially written, delete it before continuing.
+4. **Capture fails:** Stop immediately. Report the exact error and the UR number so the user can resume. Output: `"Start failed at capture: {error}. UR-NNN was created but has no REQs. Resume with: /do-work capture UR-NNN"`
 
 In all cases, never leave partial state without reporting it. If a UR was created but Capture failed, tell the user the UR number so they can resume.
 
