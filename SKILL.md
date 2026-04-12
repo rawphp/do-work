@@ -5,7 +5,7 @@ description: >
   that turns natural-language briefs into discrete, traceable tasks (REQ files)
   and executes them one at a time with TDD and a git commit per task.
   Triggers on: "do-work", "intake", "capture", "verify", "run the loop",
-  "backlog", "user request", "REQ-", "UR-".
+  "backlog", "user request", "REQ-", "UR-", "question", "audit", "grill".
 ---
 
 # do-work
@@ -18,12 +18,15 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 |---------|-------------|
 | `/do-work start [brief]` | Records brief + decomposes into REQs in one shot. Includes ideate by default. Auto-installs if needed. |
 | `/do-work start [brief] --no-ideate` | Same as start, but skips the creativity review before decomposition. |
+| `/do-work start [brief] --grill` | Same as start, but runs interactive questioning before ideate. |
 | `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of confidence score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs if >= 90%. |
 | `/do-work install` | Creates `do-work/` structure in current project. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR brief into REQ files in the backlog. |
+| `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
+| `/do-work audit [UR-NNN]` | Interrogates REQ quality — auto-fixes soft spots, reports changes. |
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections in a brief. |
 | `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
@@ -40,6 +43,8 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/start.md](agents/start.md) — Orchestrator: intake + ideate + capture
 - [agents/go.md](agents/go.md) — Orchestrator: verify + conditional run
 - [agents/intake.md](agents/intake.md) — Records brief verbatim as next UR file
+- [agents/question.md](agents/question.md) — Interactive brief questioning
+- [agents/audit.md](agents/audit.md) — Autonomous REQ quality audit
 - [agents/ideate.md](agents/ideate.md) — Surfaces assumptions, risks, and connections
 - [agents/capture.md](agents/capture.md) — Decomposes brief into REQ files
 - [agents/verify.md](agents/verify.md) — Scores REQ coverage against brief
@@ -134,18 +139,18 @@ If already installed, report "Already installed." and stop.
 
 ---
 
-### start [brief] [--no-ideate]
+### start [brief] [--no-ideate] [--grill]
 
-Record a brief and decompose it into REQ files in one shot. Ideate runs by default.
+Record a brief and decompose it into REQ files in one shot. Ideate runs by default. Use `--grill` to run interactive questioning before ideate.
 
 1. Detect `{project}`.
 2. Check if `{project}/do-work/` exists. If not, run install automatically first, then continue.
 3. Determine the brief:
    - If text was provided after `start`, use it as the brief.
    - If not, ask the user to paste their brief and wait.
-4. Note whether `--no-ideate` is present in the arguments.
+4. Note whether `--no-ideate` or `--grill` are present in the arguments.
 5. Read [agents/start.md](agents/start.md) in full.
-6. Follow the start agent instructions exactly. Ideate runs by default unless `--no-ideate` was present.
+6. Follow the start agent instructions exactly. Ideate runs by default unless `--no-ideate` was present. Question runs only if `--grill` was present.
 
 ---
 
@@ -202,6 +207,34 @@ Surface assumptions, risks, and connections in a brief before decomposition.
 3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
 4. Read [agents/ideate.md](agents/ideate.md) in full.
 5. Follow the ideate agent instructions exactly.
+
+---
+
+### question [UR-NNN]
+
+Grill the user about their brief — extract assumptions, gaps, and constraints through one-at-a-time questioning.
+
+1. Detect `{project}`.
+2. Determine the UR:
+   - If `UR-NNN` was provided, use it.
+   - If not, list `{project}/do-work/user-requests/` and ask which UR to question.
+3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+4. Read [agents/question.md](agents/question.md) in full.
+5. Follow the question agent instructions exactly.
+
+---
+
+### audit [UR-NNN]
+
+Interrogate REQ quality for a given UR — auto-fix soft spots and report changes.
+
+1. Detect `{project}`.
+2. Determine the UR:
+   - If `UR-NNN` was provided, use it.
+   - If not, list `{project}/do-work/user-requests/` and ask which UR to audit.
+3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+4. Read [agents/audit.md](agents/audit.md) in full.
+5. Follow the audit agent instructions exactly.
 
 ---
 
