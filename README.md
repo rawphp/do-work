@@ -34,7 +34,7 @@ That's it. Claude Code picks up the `/do-work` slash command automatically.
 
 This records your brief, runs a creative review (ideate), and decomposes it into REQ files — all in one shot.
 
-Add `--no-ideate` to skip the creative review.
+Add `--no-ideate` to skip the creative review. Add `--grill` to run interactive questioning before ideate — this grills you about your brief to extract assumptions, gaps, and constraints.
 
 ### Step 2 — Go
 
@@ -56,12 +56,15 @@ Flags:
 |---------|-------------|
 | `/do-work start [brief]` | Records brief + decomposes into REQs. Includes ideate by default. |
 | `/do-work start [brief] --no-ideate` | Same, but skips the creative review. |
+| `/do-work start [brief] --grill` | Same, but runs interactive questioning before ideate. |
 | `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs. |
 | `/do-work install` | Creates `do-work/` folder structure in current project. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR into REQ files. |
+| `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
+| `/do-work audit [UR-NNN]` | Interrogates REQ quality — auto-fixes soft spots, reports changes. |
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections. |
 | `/do-work verify [UR-NNN]` | Scores REQ coverage (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
@@ -74,12 +77,14 @@ Flags:
 ## How It Works
 
 1. **Intake** — Your brief is recorded verbatim as `UR-NNN/input.md`
-2. **Ideate** — Surfaces assumptions, risks, and connections before decomposition
-3. **Capture** — Breaks the brief into discrete `REQ-NNN-slug.md` task files
-4. **Verify** — Scores REQ coverage against the original brief (0-100%)
-5. **Run** — Executes each REQ with TDD: failing test first, implement, verify, commit
+2. **Question** *(opt-in)* — Grills you about your brief one question at a time, extracting implicit assumptions and missing constraints. Appends clarifications to `input.md`.
+3. **Ideate** — Surfaces assumptions, risks, and connections before decomposition
+4. **Capture** — Breaks the brief into discrete `REQ-NNN-slug.md` task files
+5. **Verify** — Scores REQ coverage against the original brief (0-100%)
+6. **Audit** *(always-on)* — Interrogates every REQ's acceptance criteria, auto-fixes vague spots, reports what changed
+7. **Run** — Executes each REQ with TDD: failing test first, implement, verify, commit
 
-`start` = intake + ideate + capture. `go` = verify + run.
+`start` = intake + [question] + ideate + capture. `go` = verify + audit + run.
 
 ---
 
@@ -94,6 +99,8 @@ do-work/
 │   ├── start.md          ← orchestrator: intake + ideate + capture
 │   ├── go.md             ← orchestrator: verify + run
 │   ├── intake.md         ← records brief verbatim
+│   ├── question.md       ← interactive brief questioning (opt-in)
+│   ├── audit.md          ← autonomous REQ quality audit (always-on)
 │   ├── ideate.md         ← surfaces assumptions & risks
 │   ├── capture.md        ← decomposes into REQ files
 │   ├── verify.md         ← scores coverage
