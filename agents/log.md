@@ -96,7 +96,7 @@ For each platform in `config.log.platforms`, generate **one draft per approach**
 
 Each platform has formatting constraints that **every draft must respect, regardless of approach.**
 
-**Character ceiling (all platforms):** Before saving any draft, check `config.log.max_chars[platform]` and ensure the draft's character count is at or below that value. If `config.log.max_chars` is missing or the platform is not listed, fall back to these defaults: `x: 280`, `linkedin: 1300`. The ceiling is a hard limit — enforcement is handled in **Step 5b** below.
+**Character ceiling (all platforms):** Before saving any draft, check `config.log.max_chars[platform]` and ensure the draft's character count is at or below that value. If `config.log.max_chars` is missing or the platform is not listed, fall back to these defaults: `x: 280`, `blog: 500`, `linkedin: 1300`. The ceiling is a hard limit — enforcement is handled in **Step 5b** below.
 
 **X (Twitter):**
 - **Max length:** `config.log.max_chars.x` (default 280) characters per post — hard limit, enforced in Step 5b
@@ -107,6 +107,12 @@ Each platform has formatting constraints that **every draft must respect, regard
 - **Max length:** `config.log.max_chars.linkedin` (default 1300) characters — enforced in Step 5b
 - **Format:** 1-3 short paragraphs. Can include bullet points.
 - **No hashtags** unless the user has explicitly requested them
+
+**Blog:**
+- **Max length:** `config.log.max_chars.blog` (default 500) characters — enforced in Step 5b. Assumes a personal-blog microblog/log-stream entry; override in config for long-form posts.
+- **Format:** 1-3 short paragraphs or a single tight idea. Plain prose — no markdown headings in the body, no lists unless the content truly demands one. The entry should read naturally in a timeline, not like a structured article.
+- **Links:** Inline and sparing — at most one link per entry, and only if it adds real context. Never expand URLs into full citations.
+- **No hashtags.** Personal blogs don't use them the same way social networks do; omit entirely.
 
 #### The 10 approaches
 
@@ -201,7 +207,7 @@ Each draft file should contain only the post content — no metadata, no instruc
 
 **This step runs for every draft before it is written to disk.** Do not skip it.
 
-For each generated draft, let `limit = config.log.max_chars[platform]` (fall back to defaults `x: 280`, `linkedin: 1300` if the key or platform is missing). Let `len = character count of the draft`. Then:
+For each generated draft, let `limit = config.log.max_chars[platform]` (fall back to defaults `x: 280`, `blog: 500`, `linkedin: 1300` if the key or platform is missing). Let `len = character count of the draft`. Then:
 
 1. **If `len <= limit`:** write the draft as-is.
 2. **If `len > limit`:** rewrite the draft once, targeting at or under `limit` while preserving the approach's intent and tone. Recount.
@@ -337,7 +343,7 @@ Output: "Skipped. Log history updated — these REQs won't be re-prompted."
 
 - Never auto-post to any platform — only generate drafts for the user to review
 - Never modify archived REQ files
-- Always respect `config.log.max_chars[platform]` — enforce it per Step 5b before writing any draft. Fall back to defaults (`x: 280`, `linkedin: 1300`) when the key is unset. Never save a draft whose character count exceeds the ceiling.
+- Always respect `config.log.max_chars[platform]` — enforce it per Step 5b before writing any draft. Fall back to defaults (`x: 280`, `blog: 500`, `linkedin: 1300`) when the key is unset. Never save a draft whose character count exceeds the ceiling.
 - Each draft MUST use a different approach — never generate two drafts from the same approach
 - The log-history.yml high water mark must always advance, even on skip — this prevents re-prompting for the same work
 - If the user selects multiple drafts (one per platform), record each as a separate entry in log-history.yml

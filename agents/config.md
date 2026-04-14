@@ -28,6 +28,7 @@ log:
   voice: ""              # e.g. "casual and direct", "thoughtful and technical"
   max_chars:             # per-platform character ceiling the log agent must keep each draft under
     x: 280
+    blog: 500
     linkedin: 1300
 
 test:
@@ -62,6 +63,6 @@ next_steps:
 | `log.batch_size` | integer | `2` | Drafts to show per batch in the AskUserQuestion selection prompt. Default 2 because AskUserQuestion has a 4-option limit: `batch_size` drafts + "More approaches" + "Skip" must fit in 4 slots. Max 2 for non-final batches; final batch can show up to 3 (replacing "More" with a draft). |
 | `log.audience` | string | `""` | Target audience for log posts (e.g. "indie hackers", "enterprise devs"). Shapes framing and references. |
 | `log.voice` | string | `""` | Writing style for log posts (e.g. "casual and direct", "thoughtful and technical"). Shapes tone and word choice. |
-| `log.max_chars` | map | `{x: 280, linkedin: 1300}` | Per-platform character ceiling the log agent must keep each draft under. Keys are platform slugs (`x`, `linkedin`, etc.); values are integer char limits. Missing platforms fall back to the defaults shown here. |
+| `log.max_chars` | map | `{x: 280, blog: 500, linkedin: 1300}` | Per-platform character ceiling the log agent must keep each draft under. Keys are platform slugs (`x`, `blog`, `linkedin`, etc.); values are integer char limits. Missing platforms fall back to the defaults shown here. |
 | `test.suite_command` | string | `""` | Full test suite command to run at end of the do-work loop (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, the run agent attempts common defaults. |
 | `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase completes. When false or missing, agents report as they do today without prompting. |
