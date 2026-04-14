@@ -26,6 +26,9 @@ log:
   batch_size: 2            # drafts per batch (2 drafts + More + Skip = 4 options in AskUserQuestion)
   audience: ""           # e.g. "indie hackers", "enterprise devs", "startup founders"
   voice: ""              # e.g. "casual and direct", "thoughtful and technical"
+  max_chars:             # per-platform character ceiling the log agent must keep each draft under
+    x: 280
+    linkedin: 1300
 
 test:
   suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
@@ -37,8 +40,8 @@ next_steps:
 4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`) and each key within those sections:
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
-   - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section.
-   - **Never overwrite existing values.** If a key exists in the file, keep the user's value regardless of what the default says.
+   - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
+   - **Never overwrite existing values.** If a key exists in the file, keep the user's value regardless of what the default says. For nested maps, treat presence of the parent key as "existing" — if `log.max_chars:` is present, do not overwrite any of its entries or add missing platform entries, even if the default template has more.
    - If **no keys are missing**, do not write to the file. Skip this step silently.
    - If keys were added, report: `Config updated: added [list of added keys/sections]`
 
@@ -59,5 +62,6 @@ next_steps:
 | `log.batch_size` | integer | `2` | Drafts to show per batch in the AskUserQuestion selection prompt. Default 2 because AskUserQuestion has a 4-option limit: `batch_size` drafts + "More approaches" + "Skip" must fit in 4 slots. Max 2 for non-final batches; final batch can show up to 3 (replacing "More" with a draft). |
 | `log.audience` | string | `""` | Target audience for log posts (e.g. "indie hackers", "enterprise devs"). Shapes framing and references. |
 | `log.voice` | string | `""` | Writing style for log posts (e.g. "casual and direct", "thoughtful and technical"). Shapes tone and word choice. |
+| `log.max_chars` | map | `{x: 280, linkedin: 1300}` | Per-platform character ceiling the log agent must keep each draft under. Keys are platform slugs (`x`, `linkedin`, etc.); values are integer char limits. Missing platforms fall back to the defaults shown here. |
 | `test.suite_command` | string | `""` | Full test suite command to run at end of the do-work loop (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, the run agent attempts common defaults. |
 | `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase completes. When false or missing, agents report as they do today without prompting. |
