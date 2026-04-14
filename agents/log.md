@@ -94,15 +94,17 @@ For each platform in `config.log.platforms`, generate **one draft per approach**
 
 #### Platform rules
 
-Each platform has formatting constraints that **every draft must respect, regardless of approach:**
+Each platform has formatting constraints that **every draft must respect, regardless of approach.**
+
+**Character ceiling (all platforms):** Before saving any draft, check `config.log.max_chars[platform]` and ensure the draft's character count is at or below that value. If `config.log.max_chars` is missing or the platform is not listed, fall back to these defaults: `x: 280`, `linkedin: 1300`. The ceiling is a hard limit — enforcement is handled in **Step 5b** below.
 
 **X (Twitter):**
-- **Max length:** 280 characters per post (hard limit — count before saving)
-- **Thread format:** If the approach's typical length suggests a thread, use multiple tweets separated by `---`, each under 280 chars
+- **Max length:** `config.log.max_chars.x` (default 280) characters per post — hard limit, enforced in Step 5b
+- **Thread format:** If the approach's typical length suggests a thread, use multiple tweets separated by `---`, each under the same limit
 - **Hashtags:** Optional, max 2, only if genuinely relevant
 
 **LinkedIn:**
-- **Max length:** 1300 characters (soft limit for optimal engagement)
+- **Max length:** `config.log.max_chars.linkedin` (default 1300) characters — enforced in Step 5b
 - **Format:** 1-3 short paragraphs. Can include bullet points.
 - **No hashtags** unless the user has explicitly requested them
 
@@ -194,6 +196,19 @@ If a draft starts with any of these, rewrite the opener.
 #### Draft file format
 
 Each draft file should contain only the post content — no metadata, no instructions, just the text the user would copy-paste to post.
+
+### 5b. Enforce character ceiling
+
+**This step runs for every draft before it is written to disk.** Do not skip it.
+
+For each generated draft, let `limit = config.log.max_chars[platform]` (fall back to defaults `x: 280`, `linkedin: 1300` if the key or platform is missing). Let `len = character count of the draft`. Then:
+
+1. **If `len <= limit`:** write the draft as-is.
+2. **If `len > limit`:** rewrite the draft once, targeting at or under `limit` while preserving the approach's intent and tone. Recount.
+3. **If the rewrite still has `len > limit`:** truncate at the last sentence boundary (`.`, `?`, `!`, or line break) whose position is `<= limit`. Save the truncated draft.
+4. **If no sentence boundary fits under the cap** (e.g. one unbroken run of text longer than `limit`): hard-truncate at `limit - 1` characters and append `…` (a single ellipsis character) so the final string length equals `limit`. Save the result.
+
+Under no circumstances save a draft whose character count exceeds `limit`. This is a hard rule — the file count on disk must always be under the ceiling.
 
 ### 6. Present drafts in batches
 
@@ -322,7 +337,7 @@ Output: "Skipped. Log history updated — these REQs won't be re-prompted."
 
 - Never auto-post to any platform — only generate drafts for the user to review
 - Never modify archived REQ files
-- Always respect platform character limits — truncate or restructure, never exceed
+- Always respect `config.log.max_chars[platform]` — enforce it per Step 5b before writing any draft. Fall back to defaults (`x: 280`, `linkedin: 1300`) when the key is unset. Never save a draft whose character count exceeds the ceiling.
 - Each draft MUST use a different approach — never generate two drafts from the same approach
 - The log-history.yml high water mark must always advance, even on skip — this prevents re-prompting for the same work
 - If the user selects multiple drafts (one per platform), record each as a separate entry in log-history.yml
