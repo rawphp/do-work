@@ -154,6 +154,10 @@ log:
   batch_size: 2
   audience: ""
   voice: ""
+  max_chars:
+    x: 280
+    blog: 500
+    linkedin: 1300
 
 test:
   suite_command: ""
@@ -166,11 +170,12 @@ next_steps:
 |-----|------|---------|-------------|
 | `project.name` | string | `""` | Project display name |
 | `log.enabled` | boolean | `true` | Whether the log step runs after `/do-work go` |
-| `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin]`) |
+| `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin, blog]`) |
 | `log.drafts_per_platform` | integer | `2` | Number of draft variations to generate per platform |
 | `log.batch_size` | integer | `2` | Drafts to show per batch in the selection prompt (max 2 for non-final batches, 3 for final) |
 | `log.audience` | string | `""` | Target audience for log posts (e.g. `"indie hackers"`, `"enterprise devs"`) |
 | `log.voice` | string | `""` | Writing style for log posts (e.g. `"casual and direct"`, `"thoughtful and technical"`) |
+| `log.max_chars` | map | `{x: 280, blog: 500, linkedin: 1300}` | Per-platform character ceiling the log agent enforces on every draft. Keys are platform slugs; values are integer char limits. Drafts exceeding the ceiling are rewritten, then truncated if still over. |
 | `test.suite_command` | string | `""` | Full test suite command (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, common defaults are attempted. |
 | `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase |
 
@@ -203,6 +208,11 @@ Or let it run automatically — `/do-work go` triggers the log step after a clea
 |----------|--------|
 | **X** | 280-char tweets. Threads if content exceeds one tweet. |
 | **LinkedIn** | 1-3 short paragraphs, professional tone, ~1300 chars. |
+| **Blog** | 1-3 short paragraphs or a single tight idea, ~500 chars default. Plain prose, no markdown headings in the body. No hashtags. Inline links, used sparingly. |
+
+### Length enforcement
+
+Every draft is hard-capped at `log.max_chars[platform]` before being written to disk. If a generated draft exceeds the ceiling, the agent rewrites it once; if it still exceeds, it truncates at the last sentence boundary that fits, falling back to a hard character truncation with an ellipsis if no boundary is available. The ceiling is mechanical, not aspirational — you can tune it per platform in `do-work/config.yml`.
 
 ### Configuration
 
@@ -211,8 +221,12 @@ Set platforms in `do-work/config.yml`:
 ```yaml
 log:
   enabled: true
-  platforms: [x, linkedin]
+  platforms: [x, linkedin, blog]
   drafts_per_platform: 2
+  max_chars:
+    x: 280
+    blog: 500
+    linkedin: 1300
 ```
 
 ### Disabling the log
