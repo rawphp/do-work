@@ -154,7 +154,8 @@ Each step must be typed. Use the right type for the task:
 **Rules for writing verification steps:**
 
 - **Bug fixes:** Step 1 must reproduce the original bug path and confirm it no longer occurs. Do not skip this.
-- **UI changes:** Always include at least one `ui` step (navigate + snapshot + assert element present).
+- **User-visible acceptance criteria → `ui` step required.** If any acceptance criterion in the REQ describes user-visible behaviour, the REQ must include at least one `ui` verification step. Trigger on any of these concrete phrases in the criteria (checklist, not judgement call): `user sees`, `page shows`, `page renders`, `button is clickable`, `form displays`, `element is visible`, `message appears`, `toast appears`, `error appears`, `navigates to`, or any other phrase describing what a person sees or does on screen. If none of these phrases appear in the acceptance criteria, no `ui` step is required — this is the explicit "no phantom UI" escape for purely backend REQs (config keys, internal APIs with no caller, CLI-only changes).
+- **UI changes:** Always include at least one `ui` step (navigate + snapshot + assert element present). This is the same rule as above, restated for REQs whose title/task is explicitly a UI change — both rules must hold.
 - **API/backend changes:** Include a `runtime` step hitting the actual endpoint and checking the response.
 - **Pure refactors:** `test` steps only are sufficient if behaviour is unchanged.
 - **New pages/components:** Include `build` + `ui` steps minimum.
