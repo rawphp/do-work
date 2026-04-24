@@ -78,6 +78,23 @@ Does this REQ's description and criteria trace back to something in the brief? C
 
 **Flag only.** Do not auto-fix alignment issues — flag them for review.
 
+#### Dimension 6: UI verification step coverage
+
+Does the REQ include a `ui` verification step whenever its acceptance criteria describe user-visible behaviour? This is the defence-in-depth check that catches what capture slipped through.
+
+Scan the REQ's `## Acceptance Criteria` block for user-visible behaviour keywords — use the exact same list defined in `agents/capture.md` Step 4's "Rules for writing verification steps" (the "User-visible acceptance criteria → `ui` step required" rule): `user sees`, `page shows`, `page renders`, `button is clickable`, `form displays`, `element is visible`, `message appears`, `toast appears`, `error appears`, `navigates to`, or any other phrase describing what a person sees or does on screen. **Keep this list in sync with capture.md — if you edit one, edit the other.**
+
+Then check the REQ's `## Verification Steps` block for any step of type `ui`.
+
+- If user-visible keywords appear in the acceptance criteria **and** a `ui` verification step is present → pass, no action.
+- If user-visible keywords appear **and no `ui` step is present** → the REQ is missing required verification.
+- If no user-visible keywords appear → no `ui` step is required (this is the "no phantom UI" escape).
+
+**Auto-fix vs flag decision:**
+
+- **Auto-fix** when the missing `ui` step can be inferred unambiguously from a specific acceptance criterion — translate the criterion into a concrete navigate + assert step. Example: criterion `user sees a success toast after form submit` → add `ui` step `Navigate to /form, submit valid data, assert toast with text "Success" is visible`. The inferred step must include: target URL or route, the action taken, and a specific element/text to assert.
+- **Flag** when the criteria describe user-visible behaviour but the target route, action, or assertion cannot be inferred without guessing — do not fabricate a step. Report `[FLAG] REQ-NNN has user-visible acceptance criteria but no ui verification step; target route/action unclear — add manually.`
+
 ### 4. Apply fixes
 
 For each REQ, apply auto-fixes inline:
@@ -85,6 +102,7 @@ For each REQ, apply auto-fixes inline:
 - Rewrite vague acceptance criteria (Dimension 1)
 - Add missing error path criteria (Dimension 2)
 - Add dependency annotations (Dimension 4)
+- Add missing `ui` verification step when unambiguously inferrable (Dimension 6)
 
 **Do NOT:**
 - Delete REQs
