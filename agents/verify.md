@@ -46,6 +46,18 @@ If `{project}/do-work/user-requests/UR-NNN/ideate.md` exists:
 
 If `ideate.md` does not exist for this UR, skip this step silently.
 
+## Milestone mode adjustment
+
+If `{project}/do-work/state/active-milestone.md` exists, you are scoring coverage of the **active milestone only**, not the whole UR.
+
+- Read the active milestone identifier (e.g. `M1`).
+- Locate the `#### M<n>` section in `UR-NNN/input.md`.
+- The "brief" for scoring purposes is the active milestone's `**User-value delivered:**`, `**Deploy artifact:**`, `**Deploy gate:**`, and `**High-level REQs:**` items.
+- Score REQ coverage against this milestone scope only. Do not flag missing REQs for future milestones — those are not in scope yet.
+- The verification report must explicitly state: "Verifying coverage for milestone M<n> only. Coverage of future milestones is not in scope."
+
+If `active-milestone.md` does NOT exist, behave exactly as the existing verify flow (score against the whole UR).
+
 ### 3. Analyse coverage
 
 For each meaningful requirement in the brief, determine whether it is:
