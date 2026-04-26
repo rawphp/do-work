@@ -28,13 +28,45 @@ Read every file in `UR-NNN/assets/` if it exists.
 
 Read `UR-NNN/ideate.md` if it exists. Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If the file does not exist (e.g. the user ran `--no-ideate` or capture is running standalone), continue without it.
 
+### 1b. Detect milestone mode
+
+Inspect the brief (`UR-NNN/input.md`) for the milestone-mode trigger. Milestone mode is active if BOTH:
+
+1. The frontmatter or body contains the marker `source: /saas-thesis handoff`.
+2. The body contains a `### Milestones` heading with at least one `#### M1` (or higher) subheading.
+
+If both conditions are met, you are in **milestone mode**. Set a flag and continue. Otherwise behave exactly as the existing capture flow (skip to Step 2 unchanged).
+
+When in milestone mode:
+
+- Identify the **active milestone**. Read `{project}/do-work/state/active-milestone.md` if it exists. If it does not exist, the active milestone is `M1`.
+- Decompose ONLY the active milestone, not the whole brief.
+- REQ filenames are prefixed with the milestone: `REQ-M<n>-<NNN>-<slug>.md` (e.g. `REQ-M1-001-add-stt-endpoint.md`).
+- The R-mapping (Step 3b) is built against ONLY the active milestone's user-value, deploy gate, and high-level REQs — not the full bridge.
+- After writing REQs for this milestone, write/update `{project}/do-work/state/active-milestone.md` to contain just the milestone identifier (e.g. `M1`).
+- Write/update `{project}/do-work/state/milestones.md` with a checklist of all milestones in the bridge:
+
+  ```markdown
+  # Milestones
+
+  - [x] M1 — <name> — captured
+  - [ ] M2 — <name> — pending
+  - [ ] M3 — <name> — pending
+  ```
+
+  Mark the active milestone as `captured` once REQ files are written. Other statuses: `pending` (not yet captured), `captured` (REQs written), `running` (run loop active), `deployed` (deploy gate passed).
+
 ### 2. Determine the next REQ number
 
-Scan the backlog root (`{project}/do-work/`) for existing `REQ-NNN-*.md` files and the `archive/` folder.
+If **milestone mode** (from Step 1b):
+- Scan for existing `REQ-M<n>-<NNN>-*.md` files matching the active milestone in both backlog root and `archive/`.
+- Find the highest number for this milestone. New REQ = highest + 1, zero-padded to 3 digits.
+- If no REQs for this milestone exist yet, start at `REQ-M<n>-001`.
 
-Find the highest existing REQ number. Start from the next one.
-
-If no REQs exist yet, start at `REQ-001`.
+If **not in milestone mode**:
+- Scan the backlog root and `archive/` for existing `REQ-NNN-*.md` files (no milestone prefix).
+- Find the highest existing REQ number. Start from the next one. (Existing behavior — unchanged.)
+- If no REQs exist yet, start at `REQ-001`.
 
 ### 3. Decompose the brief
 
