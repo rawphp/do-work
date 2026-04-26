@@ -256,6 +256,37 @@ Output: path/to/primary/output"
 Remaining in backlog: N
 ```
 
+### Step 7b: Milestone deploy-gate check (milestone mode only)
+
+If `{project}/do-work/state/active-milestone.md` exists (milestone mode):
+
+1. After committing a REQ, scan the backlog root for any remaining `REQ-M<active>-*.md` files.
+2. If any remain, continue the loop normally.
+3. If NONE remain (all REQs for the active milestone are in `archive/`):
+   - Read the deploy gate text for the active milestone from `{project}/do-work/user-requests/UR-NNN/input.md`. The deploy gate is the line beginning `**Deploy gate:**` under the active milestone's `#### M<n>` heading.
+   - Halt the loop and print:
+
+     ```
+     Milestone M<n> REQs complete.
+
+     Deploy gate: <gate text verbatim>
+
+     Has the deploy gate been satisfied? (y/n)
+     ```
+
+   - Wait for user input.
+   - On **y**:
+     - Update `{project}/do-work/state/milestones.md` to mark M<n> as `deployed`.
+     - Ask: "Begin capture for the next milestone? (y/n)"
+       - On **y**: identify the next pending milestone (lowest M<n+1> with status `pending` in milestones.md). Update `active-milestone.md` to that milestone. Print: "Run `/do-work capture UR-NNN` to decompose milestone M<n+1>." Exit.
+       - On **n**: Exit cleanly. The user can return later.
+   - On **n**:
+     - Ask: "What needs to change? Describe the gap." Capture the user's description.
+     - Print: "Run `/do-work capture UR-NNN` to add new REQs for the gap, or edit the UR's milestone definition." Exit.
+   - **Sign-off is non-delegable.** The agent must NOT auto-confirm the deploy gate. The agent must NOT attempt to deploy or test deployment itself.
+
+If `{project}/do-work/state/active-milestone.md` does NOT exist (non-milestone mode), behave exactly as the existing run loop (continue until backlog empty).
+
 ### Step 8: Loop
 
 Go back to Step 1 and claim the next REQ.
