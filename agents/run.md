@@ -249,27 +249,35 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 ## Stopping Rules
 
-Stop and wait for user input if:
+Workers cannot pause and ask the user — they have no interaction surface. Every stopper must surface to the user **through the orchestrator**, never inline from the worker. The worker emits `status: stopped` with a structured `reason`; the orchestrator decides what to show the user.
 
-| Situation | Action |
-|-----------|--------|
-| Tests cannot be made to pass after genuine attempts | Stop, report the blocker, do not commit |
-| A REQ has dependencies on another REQ not yet complete | Reorder and note the dependency |
-| Task requires external credentials or access not available | Stop, flag what's needed |
-| Acceptance criteria are ambiguous and cannot be interpreted | Stop, ask for clarification |
-| A change would affect files outside the REQ's stated scope | Stop, confirm with user |
+### Stopper category → worker `reason` enum
 
-**After reporting a stopper**, immediately check whether to present next-step options:
+| Situation | Worker emits `reason` |
+|-----------|----------------------|
+| Tests cannot be made to pass after 3 attempts | `tests-failing` |
+| Verification steps fail after 3 attempts | `verification-failing` |
+| A REQ has unmet dependencies on another REQ not yet complete | `dependency-missing` |
+| Task requires external credentials or access not available | `missing-creds` |
+| Acceptance criteria are ambiguous and cannot be interpreted | `ambiguous-criteria` |
+| A change would affect files outside the REQ's stated scope | `scope-creep` |
+| Any other unrecoverable error | `unknown-error` |
+
+The worker captures relevant details in the report's `details` field. The worker does not retry beyond what's defined in [agents/run-worker.md](run-worker.md) and never asks the user a question — it exits with the structured report.
+
+### Orchestrator handles user interaction
+
+When the worker returns `status: stopped`, the orchestrator surfaces the stopper to the user. Recover the REQ from `working/` if it was not archived, then:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
 **Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
-1. **"Show blocker details"** — Display the full failure context
-2. **"Retry current REQ"** — Resume from where it stopped
+1. **"Show blocker details"** — Display the worker's `details` field and any captured output
+2. **"Retry current REQ"** — Re-dispatch the worker for the same REQ (fresh subagent session)
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip the AskUserQuestion and stop.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: print the stopper and the worker's `details` field, then stop. Do not loop, do not silently retry, do not auto-resolve.
 
 ---
 
