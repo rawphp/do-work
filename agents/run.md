@@ -93,192 +93,62 @@ Update the file's `**Status:**` field from `backlog` to `in-progress`.
 
 Announce: `Starting REQ-NNN: [title]`
 
-### Step 2: Read the REQ
+### Step 2: Dispatch the worker subagent
 
-Read the full REQ file. Understand:
-- The task
-- The context
-- The acceptance criteria
-- Any referenced assets
+Read all of [agents/run-worker.md](run-worker.md) — that is the worker's full instruction set. You will pass it inline to the dispatched subagent.
 
-### Step 3: Read context (brief + prior REQ outputs)
+Determine `subagent_type` using the rules in `## REQ Classification` above. Default to `general-purpose`.
 
-Read `{project}/do-work/user-requests/{UR-NNN}/input.md` referenced in the REQ.
+Identify the **prior-REQ archived paths** for the same UR — these provide the worker context about what has already been built:
 
-Then read all previously completed REQs from the same UR to understand what has already been built:
+1. Read the REQ's `**UR:**` field
+2. Glob `{project}/do-work/archive/REQ-*.md`
+3. For each archived REQ, read its `**UR:**` field and keep only those matching the current UR
+4. Pass the resulting absolute paths to the worker
 
-1. Scan `{project}/do-work/archive/` for REQ files whose `**UR:**` field matches the current UR (e.g. `UR-014`)
-2. For each prior archived REQ from this UR, extract:
-   - **Task title** (from the `# REQ-NNN:` heading)
-   - **Files created/modified** (from the `## Outputs` section)
-   - **One-line summary** of what was built (derived from the task description)
-3. Keep this context available during Step 4 — when implementing, check that you are not:
-   - Overwriting files that a prior REQ created
-   - Re-implementing logic that a prior REQ already built
-   - Contradicting decisions made in a prior REQ
+Dispatch via the `Agent` tool. Pass the worker the **three inputs only** — REQ path, UR path, prior-REQ paths — plus the run-worker.md instructions inline:
 
-If this is the first REQ in the UR (no prior archived REQs found), skip this substep and proceed with just the brief.
+```
+Agent(
+  description: "Run worker for REQ-NNN",
+  subagent_type: <classified type>,
+  prompt: """
+You are the Run Worker. Follow the instructions below exactly. Do not search beyond the inputs given.
 
-### Step 4: Execute — TDD first
+<inputs>
+REQ: {absolute path to working/REQ-NNN-slug.md}
+UR:  {absolute path to user-requests/UR-NNN/input.md}
+Prior REQs from this UR (may be empty):
+  - {absolute path}
+  - {absolute path}
+</inputs>
 
-**This is mandatory. No exceptions.**
+<instructions>
+{full contents of agents/run-worker.md verbatim}
+</instructions>
 
-#### 4a. Write failing tests first
-
-Before writing any implementation code:
-
-1. Identify what tests will prove the acceptance criteria are met
-2. Write those tests (unit, integration, or e2e as appropriate)
-3. Run the tests — confirm they **fail** (red)
-4. Do not proceed to implementation until you have at least one failing test
-
-**If the task is not code** (e.g. writing a document, generating a file, drafting copy), the TDD discipline still applies — use a verification checklist instead of test files:
-
-1. Write a verification checklist with **at least 2 items**, each using this exact format:
-
-```markdown
-## Pre-Implementation Checks (must FAIL before implementation)
-
-| # | Check | Command | Expected (FAIL) | Expected (PASS) |
-|---|-------|---------|-----------------|-----------------|
-| 1 | File exists at {path} | `test -f {path} && echo PASS \|\| echo FAIL` | FAIL | PASS |
-| 2 | Document contains {section} | `grep -c "## {section}" {path}` | 0 | >= 1 |
+Return your structured YAML report as your final message. Nothing else.
+"""
+)
 ```
 
-2. Run every check command. ALL must return the FAIL condition (confirming the content doesn't exist yet). If any check already passes, the red-green discipline is broken — investigate before proceeding.
+The worker performs read REQ → read context → TDD red → implement → verify green → run affected tests → check acceptance criteria → execute verification steps → archive → commit, all in its own session. The orchestrator does not execute these steps inline.
 
-3. After implementation (Step 4b), re-run every check. ALL must return the PASS condition.
+The worker's stdout does not stream back to the orchestrator — only its final structured report is visible. Do not poll, do not babysit. Wait for the dispatch to return.
 
-4. **This is not optional.** Non-code tasks follow the same hard stop as code tasks: do not proceed to commit until all checks pass. The checklist IS the test suite for non-code work.
+### Step 3: Process the worker report
 
-#### 4b. Implement
+The worker's final message is a fenced YAML block matching the schema defined in [agents/run-worker.md](run-worker.md) `## Return Report`. Parse it. Branch on `status`:
 
-Write the minimum code or content to make the tests pass.
-
-- Keep changes focused — only touch what the REQ requires
-- Do not refactor unrelated code
-- Do not add features not in the acceptance criteria
-
-#### 4c. Verify green
-
-Run the tests. All must pass.
-
-If tests fail, fix the implementation — not the tests — unless the test itself is genuinely wrong.
-
-**Do not proceed to commit with failing tests. This is a hard stop.**
-
-#### 4c-ii. Run affected tests
-
-After the REQ's own TDD tests pass, check whether the implementation broke any existing tests in the project by running tests related to changed files.
-
-1. Run `git diff --name-only` to list all files modified by this REQ's implementation
-2. For each changed file, look for related test files using common naming conventions:
-
-| Source file pattern | Test file candidates |
+| `status` | Action |
 |---|---|
-| `src/Foo.php` | `tests/FooTest.php`, `tests/Unit/FooTest.php`, `tests/Feature/FooTest.php` |
-| `app/Models/Foo.php` | `tests/Unit/Models/FooTest.php`, `tests/Feature/Models/FooTest.php` |
-| `src/foo.ts` | `src/foo.test.ts`, `src/foo.spec.ts`, `__tests__/foo.test.ts`, `tests/foo.spec.ts` |
-| `src/components/Foo.vue` | `src/components/Foo.test.ts`, `tests/components/Foo.spec.ts` |
+| `done` | Capture `commit` hash and `outputs` for the progress line. Continue to Step 7. |
+| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`). Recover the REQ from `working/` if the worker did not archive it, then handle per `## Stopping Rules`. Do not proceed to Step 7. |
+| `failed` | The worker crashed before completing. Treat as `stopped` with `reason: unknown-error`. |
 
-3. Exclude test files that were already run in step 4c (the REQ's own TDD tests) to avoid re-running them
-4. If related test files are found, run them using the project's test runner
-5. If any fail, fix the implementation (not the tests) and re-run until green
+If the worker's report is missing or unparseable, treat as `status: failed` with `reason: unknown-error` and surface the raw output to the user.
 
-**Graceful degradation:** If no related test files are found for any changed file (common for markdown, config, or documentation changes), log "No affected tests found — skipping" and continue to step 4d. Do not treat this as a failure.
-
-#### 4d. Check acceptance criteria
-
-Review each acceptance criteria item in the REQ. Mark each `- [x]` as you verify it.
-
-Update the REQ file with the checked criteria.
-
-#### 4e. Execute verification steps
-
-Read `## Verification Steps` from the REQ. Execute each step in order:
-
-| Type | How to execute |
-|------|---------------|
-| `test` | Bash: run the specified test command, check exit code 0 |
-| `build` | Bash: run the build command, check exit code 0 and no errors |
-| `runtime` | Bash: ensure the dev server is running (start in background if not, wait for it to be healthy), run the command, compare output to the expected value |
-| `ui` | Playwright: navigate to the specified URL, take a snapshot, confirm the specified element/text is present |
-
-Record the result of each step: pass/fail + actual output or screenshot.
-
-**If all steps pass:** proceed to Step 5.
-
-**If any step fails:**
-1. Report clearly: which step failed, expected vs actual output/screenshot
-2. Increment a retry counter for this REQ
-3. If retry count < 3: go back to Step 4b (implement) with the failure details as context — fix the root cause, not the test
-4. If retry count reaches 3: **hard stop** — output all failure details and wait for the user
-
-### Step 5: Archive the REQ
-
-Update the REQ's `**Status:**` field to `done`.
-
-Add an `## Outputs` section at the end of the REQ:
-
-```markdown
-## Outputs
-
-- [path/to/primary/output] — [one-line description]
-- [path/to/test/file] — tests
-```
-
-Move the REQ to `archive/`:
-
-```bash
-mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/archive/REQ-NNN-slug.md
-```
-
-Confirm the archive file exists, then defensively remove any leftover working/ copy (guards against agents that use Write instead of `mv`):
-
-```bash
-rm -f {project}/do-work/working/REQ-NNN-slug.md
-```
-
-### Step 6: Commit
-
-Stage the changed implementation files, the archived REQ, and all do-work metadata, then commit:
-
-```bash
-# Stage implementation changes (specific files you modified)
-git add path/to/changed/files...
-
-# Stage the REQ deletion from the backlog root (the mv created a deletion)
-git add {project}/do-work/REQ-NNN-slug.md
-
-# Stage the archived REQ file
-git add {project}/do-work/archive/REQ-NNN-slug.md
-
-# Stage the working/ deletion (the mv/rm removed it from working/)
-git add {project}/do-work/working/REQ-NNN-slug.md
-
-# Stage the UR directory (input.md, ideate.md, assets) if not yet committed
-git add {project}/do-work/user-requests/UR-NNN/
-
-# Stage any log files created during this session
-git add {project}/do-work/logs/ 2>/dev/null || true
-
-git commit -m "feat(REQ-NNN): short title
-
-REQ: {project}/do-work/archive/REQ-NNN-slug.md
-UR: {project}/do-work/user-requests/UR-NNN/input.md
-Output: path/to/primary/output"
-```
-
-**Commit rules:**
-- Subject line: `feat(REQ-NNN): [title from REQ]` (max 72 chars)
-- Body: REQ path, UR path, primary output path
-- **Always stage the REQ file path** so its deletion from the backlog is committed
-- **Always stage the archived REQ** so it is tracked in git history
-- **Always stage the working/ REQ path** so its deletion from working/ is committed (prevents stale files leaking across commits)
-- **Always stage the UR directory** so user requests are committed alongside the work they produced
-- **Stage logs if present** — the `|| true` prevents failure if the directory is empty
-- Never commit with failing tests
-- Never use `--no-verify`
+The worker also reports `milestone_complete` (boolean) and `milestone` (id when true). Step 7b uses these.
 
 ### Step 7: Report progress
 
