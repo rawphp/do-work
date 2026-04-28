@@ -162,11 +162,13 @@ Remaining in backlog: N
 
 ### Step 7b: Milestone deploy-gate check (milestone mode only)
 
+The deploy-gate prompt is **owned by the orchestrator, not the worker**. The worker has no user-interaction surface and is explicitly forbidden from auto-confirming any gate. The orchestrator decides when to surface the gate to the user, based on the worker's structured report.
+
 If `{project}/do-work/state/active-milestone.md` exists (milestone mode):
 
-1. After committing a REQ, scan the backlog root for any remaining `REQ-M<active>-*.md` files.
-2. If any remain, continue the loop normally.
-3. If NONE remain (all REQs for the active milestone are in `archive/`):
+1. Read `milestone_complete` from the worker's most recent return report.
+2. If `milestone_complete` is `false`, continue the loop normally — claim the next REQ.
+3. If `milestone_complete` is `true`:
    - Read the deploy gate text for the active milestone from `{project}/do-work/user-requests/UR-NNN/input.md`. The deploy gate is the line beginning `**Deploy gate:**` under the active milestone's `#### M<n>` heading.
    - Halt the loop and print:
 
@@ -187,9 +189,9 @@ If `{project}/do-work/state/active-milestone.md` exists (milestone mode):
    - On **n**:
      - Ask: "What needs to change? Describe the gap." Capture the user's description.
      - Print: "Run `/do-work capture UR-NNN` to add new REQs for the gap, or edit the UR's milestone definition." Exit.
-   - **Sign-off is non-delegable.** The agent must NOT auto-confirm the deploy gate. The agent must NOT attempt to deploy or test deployment itself.
+   - **Sign-off is non-delegable.** The orchestrator must NOT auto-confirm the deploy gate. The orchestrator must NOT attempt to deploy or test deployment itself. The worker is also forbidden from these actions (see [agents/run-worker.md](run-worker.md)).
 
-If `{project}/do-work/state/active-milestone.md` does NOT exist (non-milestone mode), behave exactly as the existing run loop (continue until backlog empty).
+If `{project}/do-work/state/active-milestone.md` does NOT exist (non-milestone mode), the worker always reports `milestone_complete: false` and the orchestrator simply continues until the backlog is empty.
 
 ### Step 8: Loop
 
