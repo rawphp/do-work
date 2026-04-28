@@ -41,6 +41,40 @@ Before starting the loop:
 
 ---
 
+## REQ Classification
+
+Before dispatching a worker for a REQ, classify the REQ to pick the most appropriate `subagent_type` for the `Agent` tool. Classification is a heuristic over signals already in the REQ — there is no explicit field to read.
+
+### Signals → subagent_type
+
+Scan the REQ's `## Task`, `## Context`, `## Acceptance Criteria`, and `## Verification Steps` for the following signals (first match wins, top to bottom):
+
+| Signal in REQ | subagent_type |
+|---|---|
+| Verification Steps reference `pest`, `phpunit`, `vitest`, `playwright`, or `npx test` AND the REQ task is "write tests" / "improve coverage" / "test X" | `laravel-test-expert` |
+| File paths under `app/`, `resources/`, `routes/`, or task mentions `Laravel`, `Eloquent`, `Vue`, `Inertia`, `Pinia` | `laravel-vue-architect` |
+| Acceptance criteria contain phrases like `user sees`, `page renders`, `form displays`, `responsive`, `mobile`, `layout`, `CSS`, `Tailwind`, `UX`, `accessibility` | `saas-ux-designer` |
+| Task is a new feature spanning multiple layers (controller + view + model) and no specialist above matches | `feature-dev:code-architect` |
+| Task is "find code", "search for X", "where is Y defined", or pure exploration | `Explore` |
+| Task is a code review or "review the implementation against the plan" | `feature-dev:code-reviewer` |
+| Anything else (markdown edits, agent file edits, skill edits, config tweaks, scripting, generic refactors) | `general-purpose` |
+
+### Fallback rule
+
+When no signal matches with confidence, **fall back to `general-purpose` silently**. Never block, never ask the user, never stop the loop on classification ambiguity. The cost of picking `general-purpose` for a specialist task is small; the cost of stalling the loop is large.
+
+### Logging
+
+Include the chosen `subagent_type` in the per-REQ progress line so the user can see routing decisions:
+
+```
+Starting REQ-NNN [type=laravel-vue-architect]: [title]
+```
+
+This is the only "progress" signal the orchestrator emits before the worker returns — the worker runs in a separate session and its output does not stream back. Plan accordingly.
+
+---
+
 ## The Loop
 
 Repeat until the backlog is empty:
