@@ -56,9 +56,15 @@ Read and follow [ideate.md](ideate.md) in full.
 
 Pass it the UR folder path from Step 1.
 
-After the review is written, read `{project}/do-work/user-requests/UR-NNN/ideate.md` — keep its observations in context for Step 3.
+Ideate now ends with a mandatory interactive gate (Grill / Continue / Stop). Honor the gate's outcome:
 
-If `--no-ideate` was specified, skip this step entirely.
+- **Grill** chosen by user → ideate.md will already have invoked question.md inline. Continue to Step 3 (Run Capture) when ideate returns.
+- **Continue** chosen by user (or empty input default) → Continue to Step 3 (Run Capture) when ideate returns.
+- **Stop** chosen by user → **Halt the start orchestrator.** Do not run Capture. Output: `Start halted at ideate gate — revise UR-NNN/input.md and re-run start.` Return.
+
+After ideate returns (and unless Stop was chosen), read `{project}/do-work/user-requests/UR-NNN/ideate.md` — keep its observations in context for Step 3.
+
+If `--no-ideate` was specified, skip this step entirely (no gate runs).
 
 ### 3. Run Capture
 
