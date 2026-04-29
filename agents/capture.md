@@ -68,6 +68,30 @@ If **not in milestone mode**:
 - Find the highest existing REQ number. Start from the next one. (Existing behavior — unchanged.)
 - If no REQs exist yet, start at `REQ-001`.
 
+### 2b. Classify the brief
+
+Classify the brief into one of three classes. Read `input.md`'s body and apply these signals top-to-bottom; first match wins:
+
+| Signal in brief | Class |
+|---|---|
+| Words "bug", "fix", "broken", "regression", "crash", "error in", "doesn't work", "stops working", combined with a reference to existing behaviour | `bug-fix` |
+| Words "refactor", "rename", "tidy", "cleanup", "extract", "move to", with no new user-facing behaviour described | `other` (refactor) |
+| Words "document", "docs", "readme", "changelog", with no code change described | `other` (docs) |
+| Words "config", "setting", "env var", "tweak X to Y", with no new code paths | `other` (config) |
+| Anything else, including any brief describing user-facing behaviour, screens, endpoints, commands, or new functionality | `feature` |
+
+Record the chosen class. Capture's downstream behaviour:
+
+- **`bug-fix`** — Skip the layer-coverage prompt (Step 4c). Skip the integration question pass (Step 6). Each REQ for this brief should set `**Layer:** none` unless the bug spans a declared layer in a non-trivial way.
+- **`feature`** — Run the layer-coverage prompt (Step 4c) and integration question pass (Step 6). Default class for anything user-facing.
+- **`other`** — Ask the user once: "Treat this as bug-fix-style minimal capture, or feature-style full-stack capture?" via `AskUserQuestion`. Record the user's answer as the effective class.
+
+Hold the class in context — it gates Step 4c and Step 6, and gets written to UR frontmatter in Step 7.
+
+**Disambiguation rule.** If a brief mentions BOTH bug-fix language AND new feature language ("fix X and add Y"), classify as `feature` and treat the bug part as one of the REQs. The layer-coverage and integration checks are net-positive even when overlaid on a bug fix.
+
+**Drift note for maintainers.** This is a parallel heuristic to `run.md`'s subagent-dispatch heuristic — they answer different questions (capture: bug-fix-vs-feature for layer-coverage gating; run: which subagent_type to dispatch) but use overlapping signals. Future changes to one should consider whether the other needs the same change.
+
 ### 3. Decompose the brief
 
 Break the brief into discrete tasks. A task is the right size when it meets ALL three criteria:
