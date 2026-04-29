@@ -473,7 +473,7 @@ A re-run that produces no new REQs and no new layer decisions is otherwise a no-
 
 ### 7. Commit the backlog
 
-Stage and commit all newly created REQ files (and the ideate.md file if it exists) so the backlog is tracked in git from decomposition.
+Stage and commit the newly created REQ files, the updated UR `input.md`, and the ideate.md file if it exists.
 
 If the project is not a git repo, skip this step silently.
 
@@ -481,28 +481,36 @@ If the project is not a git repo, skip this step silently.
 # Stage all new REQ files in the backlog root
 git add {project}/do-work/REQ-*.md
 
+# Stage the updated UR input.md (frontmatter + summary block changes)
+git add {project}/do-work/user-requests/UR-NNN/input.md
+
 # Stage ideate.md if it was created by the ideate agent
 git add {project}/do-work/user-requests/UR-NNN/ideate.md 2>/dev/null || true
 
-git commit -m "chore(UR-NNN): decompose into N REQs"
+git commit -m "chore(UR-NNN): capture decomposition + state"
 ```
 
-Replace `N` with the actual number of REQ files written.
+Replace `UR-NNN` with the actual UR identifier. The commit includes new REQ files, the updated `input.md` (frontmatter + summary block), and any newly written `## Integration` blocks within REQs.
 
 ### 8. Report and prompt
 
-After writing all REQ files, output the completion report:
+After writing all REQ files and frontmatter, output the completion report:
 
 ```
 Capture complete for UR-NNN
 
+Classification: <classification>
+Layers in scope: <list, or "(none)">
+Layer decisions: <"<layer>: no" entries, or "(none — all covered)">
+
 REQs written:
-  REQ-001-slug.md — Short title
-  REQ-002-slug.md — Short title
+  REQ-NNN-slug.md — Short title — layer: <layer> — integration: <confidence>
   ...
 
 Total: N tasks in backlog
 ```
+
+The user reads this to confirm capture's decisions match the brief. Detail-level review can use the `## Capture summary` block in `input.md`.
 
 **Then, immediately after the report**, check whether to present next-step options:
 
