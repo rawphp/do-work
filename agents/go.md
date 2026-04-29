@@ -15,6 +15,7 @@ You will be given:
 3. Optional flags:
    - `--force` — skip the confidence threshold, run regardless of score
    - `--auto-fix` — pass through to verify, auto-fix gaps before checking the threshold
+   - `--no-layers` (skip layer-coverage check for this invocation only — passed through to any capture re-runs triggered by --auto-fix)
 
 ---
 
@@ -38,6 +39,8 @@ Pass it the project do-work path and UR reference.
 
 If `--auto-fix` was specified, invoke verify with its `--auto-fix` mode.
 
+If `--no-layers` was specified on this go invocation, thread it through to verify so any capture re-runs triggered by `--auto-fix` also receive `--no-layers`.
+
 Capture the confidence score from the verify report.
 
 ### 2. Evaluate the score
@@ -46,7 +49,7 @@ Capture the confidence score from the verify report.
 |-----------|--------|
 | Score >= 90% | Announce "Confidence NN% — proceeding to run." and continue to Step 3. |
 | Score < 90% and `--force` specified | Announce "Confidence NN% (below 90%) — force flag set, proceeding anyway." and continue to Step 3. |
-| Score < 90% and `--auto-fix` specified | Run verify with `--auto-fix` (which creates missing REQs and re-scores internally). Read the new score from verify's report. If now >= 90%, continue to Step 3. If still < 90% after auto-fix, stop: "Auto-fix raised score from NN% to NN%, but still below 90%. Manual review needed." Do NOT auto-fix more than once — one pass only. |
+| Score < 90% and `--auto-fix` specified | Run verify with `--auto-fix` (which creates missing REQs and re-scores internally). If `--no-layers` was set on this go invocation, pass it through to verify so capture re-runs skip the layer-coverage check. Read the new score from verify's report. If now >= 90%, continue to Step 3. If still < 90% after auto-fix, stop: "Auto-fix raised score from NN% to NN%, but still below 90%. Manual review needed." Do NOT auto-fix more than once — one pass only. |
 | Score < 90% | Stop. Output the verify report and recommend: "Score is NN%. Review gaps above, then either fix manually and re-run, or use `--auto-fix`." |
 
 ### 2b. Run Audit (always-on)
