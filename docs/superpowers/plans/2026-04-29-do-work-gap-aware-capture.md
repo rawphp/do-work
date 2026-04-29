@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown agent files (no code), YAML frontmatter, shell verification commands. The do-work system itself is the runtime — there is no test framework for agent files in this codebase, so verification is structural (file content checks, agent-output assertions on synthetic URs).
 
+**Acknowledged tradeoff:** This refactor materially increases per-capture token spend. Capture now runs eleven sequential steps; the integration-question pass requires file Read and grep verification on every cited reference; verify with `--auto-fix` can re-trigger that exploration. The smoke test (Task 27) is the gauge for whether the increase is acceptable in practice — if it's not, the capture/wire split (deferred from spec) is the natural mitigation.
+
 **Spec:** `docs/superpowers/specs/2026-04-29-do-work-gap-aware-capture-design.md`
 
 ---
@@ -352,6 +354,8 @@ Record the chosen class. Capture's downstream behaviour:
 Hold the class in context — it gates Step 4c and Step 6, and gets written to UR frontmatter in Step 7.
 
 **Disambiguation rule.** If a brief mentions BOTH bug-fix language AND new feature language ("fix X and add Y"), classify as `feature` and treat the bug part as one of the REQs. The layer-coverage and integration checks are net-positive even when overlaid on a bug fix.
+
+**Drift note for maintainers.** This is a parallel heuristic to `run.md`'s subagent-dispatch heuristic — they answer different questions (capture: bug-fix-vs-feature for layer-coverage gating; run: which subagent_type to dispatch) but use overlapping signals. Future changes to one should consider whether the other needs the same change.
 ```
 
 - [ ] **Step 3: Verify**
@@ -572,12 +576,12 @@ Is "{layer}" needed for this UR?
 
 Options:
 1. **"Yes — generate REQ(s)"** — Ask follow-ups, then write the missing REQ(s)
-2. **"No — record decision and skip"** — Record `layer_decisions: { <layer>: no }` in UR frontmatter (Task 13 step)
+2. **"No — record decision and skip"** — Hold `layer_decisions[<layer>] = no` in context; the frontmatter write happens later in Step 6b.
 3. **"Unsure — show typical work"** — Show 2-3 example REQ titles for this layer for this brief; loop back to the same prompt
 
 **Yes path follow-ups:** ask the user (one at a time, through plain prompts) for: which screens/routes/commands the layer should cover, what the layer's piece of the work looks like in plain language. Then generate one or more REQs tagged with the layer, following the Step 4 template, and append them to the backlog. Re-run Step 4b's quality check on the new REQ(s).
 
-**No path:** record the decision in working state. The actual frontmatter write happens in Step 7 (Task 13). For now, hold `layer_decisions[<layer>] = no` in context.
+**No path:** record the decision in working state. The actual frontmatter write happens later in Step 6b. For now, hold `layer_decisions[<layer>] = no` in context.
 
 **Loop:** after each layer is resolved (yes or no), continue to the next uncovered layer until none remain.
 
@@ -725,7 +729,23 @@ Format:
 
 `integration_confidence: n/a` for any REQ with `**Layer:** none` (bug-fix or pure-refactor REQs that don't run the integration pass).
 
-**Idempotency on re-run:** If a `## Capture summary` heading already exists in the body, replace the entire block (the heading and both tables) in place. Do not append a second summary. Detect by searching for `^## Capture summary` (start-of-line) and replacing through the next blank line that follows the second table. The verbatim brief in `## Request` must never be modified.
+**Idempotency on re-run:** wrap the summary block in HTML comment fences so re-runs can replace it deterministically without depending on table shape:
+
+```markdown
+<!-- capture-summary-start -->
+## Capture summary (YYYY-MM-DD)
+
+| Item | Value |
+|---|---|
+| ... | ... |
+
+| REQ | Layer | Integration confidence |
+|---|---|---|
+| ... | ... | ... |
+<!-- capture-summary-end -->
+```
+
+On re-run: if both fence comments are present, replace everything from `<!-- capture-summary-start -->` through `<!-- capture-summary-end -->` (inclusive). If only one fence is present (corrupted state), repair by inserting the missing fence at the closest plausible boundary. If neither fence is present (first capture run, or legacy edited state), insert a fresh fenced block immediately after the YAML frontmatter close and before the `## Request` heading. The verbatim brief in `## Request` must never be modified.
 
 **Frontmatter is canonical.** This summary block is a regeneratable view. The authoritative state lives in the YAML frontmatter (Step 7). Edits made by hand to this block will be overwritten on the next capture run.
 ```
@@ -798,6 +818,8 @@ acknowledged_partials: []       # REQ ids the user has reviewed and waved throug
 - `acknowledged_partials` — preserved verbatim. Never modified by capture.
 
 A re-run that produces no new REQs and no new layer decisions is otherwise a no-op except for refreshing the summary block timestamp (Step 6).
+
+**Side effect of re-deriving `layers_in_scope`:** adding new layers to `do-work/config.yml` months later will trigger layer-coverage prompts on any UR that gets re-captured under the new config — even URs that pre-date the new layer. This is by design (current config is treated as authoritative), but worth knowing before broadening the layer list. The user resolves these by recording `layer_decisions: { newlayer: no }` for old URs that don't need the new layer.
 ```
 
 - [ ] **Step 3: Verify**
@@ -849,10 +871,10 @@ git add {project}/do-work/user-requests/UR-NNN/input.md
 # Stage ideate.md if it was created by the ideate agent
 git add {project}/do-work/user-requests/UR-NNN/ideate.md 2>/dev/null || true
 
-git commit -m "chore(UR-NNN): decompose into N REQs"
+git commit -m "chore(UR-NNN): capture decomposition + state"
 ```
 
-Replace `N` with the actual number of REQ files written.
+Replace `UR-NNN` with the actual UR identifier. The commit includes new REQ files, the updated `input.md` (frontmatter + summary block), and any newly written `## Integration` blocks within REQs.
 ```
 
 - [ ] **Step 3: Edit Step 8 (Report and prompt)**
@@ -1182,7 +1204,7 @@ Find the "Legacy UR detection" block added in Task 3. Append immediately after i
 - `reqs` (list of `{ id, layer, integration_confidence }` records)
 - `acknowledged_partials` (list of REQ ids)
 
-If any of these fields is missing from a non-legacy UR's frontmatter, treat it as if the field is empty (e.g. `layer_decisions: {}`, `reqs: []`). This keeps verify lenient against partial state.
+If any of these fields is missing from a non-legacy UR's frontmatter, treat it as if the field is empty (e.g. `layer_decisions: {}`, `reqs: []`, `acknowledged_partials: []`, `open_gaps: []`). This keeps verify lenient against partial state.
 
 Hold all parsed values in context for Steps 4b, 4c, 4d below.
 ```
@@ -1368,6 +1390,10 @@ Find `### 6. Auto-fix (optional)` in verify.md. Insert a new sub-section after i
 - **Partial-confidence gap:** **Not auto-fixed.** Auto-fix would just re-run the same exploration and likely produce the same partial result. Surface to user with the resolution options listed in Step 4d.
 
 These actions run after item 1 (write missing REQs from missing brief requirements) and before item 5 (re-score). Re-scoring is mandatory and includes the new checks (4b, 4c, 4d).
+
+**Scoped re-runs must refresh state.** When auto-fix re-invokes capture's Step 4c or Step 5 for a single layer or REQ, it MUST also re-run Step 6 (Capture summary) and Step 6b (UR frontmatter) afterwards. Otherwise the frontmatter `reqs:` list and the summary block fall out of sync with the actual REQ files. Treat the scoped re-run as: `Step 4c (or 5) for the affected target → Step 6 → Step 6b → return`.
+
+**Bail-out rule.** verify-with-auto-fix performs **at most one auto-fix attempt per gap per invocation**. If a gap remains after one auto-fix pass (e.g. the user said "No" to a layer-coverage prompt and that's now recorded as a decision rather than a gap, OR the partial-confidence couldn't be upgraded), surface the residual gap to the user and stop. Do not loop. Each verify invocation is one user command — re-running verify gives the next attempt.
 ```
 
 - [ ] **Step 3: Verify**
@@ -1588,12 +1614,12 @@ git commit -m "chore(do-work): dogfood — declare do-work's own layers"
 
 ---
 
-## Task 27: Run a synthetic UR through the new pipeline (dogfood, part 2)
+## Task 27: Smoke-test the new pipeline against a synthetic UR (dogfood, part 2)
 
 **Files:**
-- Create: `do-work/user-requests/UR-dogfood-001/input.md` (test artifact — may be deleted after verification)
+- Create (temporary): `do-work/user-requests/UR-dogfood-001/input.md` plus any REQ files generated. **Cleanup is the default** at the end of this task.
 
-This task validates the refactor end-to-end against do-work's own codebase. It is NOT a test in the unit-test sense — it's an integration verification.
+**This task is a smoke test, not assertive verification.** It exercises the new pipeline end-to-end and surfaces structural issues (e.g. agent files contain wrong cross-references, frontmatter doesn't get written, summary block format is wrong). It does NOT verify semantic correctness — whether capture's chosen layer for a REQ is right, whether the integration-block answers genuinely match the brief, whether confidence ratings are honest. That kind of validation only comes from running the pipeline against a genuine UR after this lands. Treat Task 27 as the final structural check before declaring the refactor functional, not as the regression suite.
 
 - [ ] **Step 1: Define expected end-state**
 
@@ -1668,28 +1694,37 @@ The verify report should include:
 - An Integration block check confirming each new-surface REQ has the section.
 - A confidence score that's not artificially low (no false-positive gaps from the refactor).
 
-- [ ] **Step 7: Decide: keep the dogfood UR or remove it**
+- [ ] **Step 7: Cleanup (default)**
 
-If the run looks good, leave the UR in place as documentation of the dogfood. If it looks rough or noisy, remove the UR and the generated REQ files:
+Remove the synthetic UR and the REQ files it generated. The smoke test was for structural validation, not for shipping the dogfood UR as production state.
 
 ```bash
-# Optional cleanup
+# Identify REQ files generated by this dogfood run (they reference UR-dogfood-001)
+grep -l "UR-dogfood-001" do-work/REQ-*.md 2>/dev/null
+
+# Remove them carefully (review the list first)
+for f in $(grep -l "UR-dogfood-001" do-work/REQ-*.md 2>/dev/null); do
+  rm "$f"
+done
+
+# Remove the dogfood UR directory
 rm -rf do-work/user-requests/UR-dogfood-001/
-rm do-work/REQ-*.md  # only the ones from this dogfood — be careful
 ```
 
-- [ ] **Step 8: Commit (if keeping the dogfood UR)**
+If you want to keep the dogfood UR as documentation, skip the cleanup and commit instead:
 
 ```bash
 git add do-work/
-git commit -m "test(do-work): dogfood UR validates gap-aware capture pipeline"
+git commit -m "test(do-work): dogfood UR — gap-aware capture smoke test artifact"
 ```
 
-If the dogfood UR is removed, no commit needed for this task.
+But cleanup is the default — keeping experimental URs in the production tree creates noise.
 
-- [ ] **Step 9: If the dogfood run revealed bugs in earlier tasks**
+- [ ] **Step 8: If the smoke test revealed bugs in earlier tasks**
 
-Stop and fix the underlying agent file before continuing. Re-run capture/verify until the dogfood produces correct output. Do not paper over a real bug by editing the synthetic UR.
+Stop and fix the underlying agent file before continuing. Re-run capture/verify until the smoke test produces correct output. Do not paper over a real bug by editing the synthetic UR.
+
+The cleanup in Step 7 makes this safe — every smoke test run starts from a clean tree, so re-running is trivial.
 
 ---
 
@@ -1702,12 +1737,12 @@ Stop and fix the underlying agent file before continuing. Re-run capture/verify 
 
 Walk the spec's "Success criteria" section and confirm each:
 
-- A full-stack feature brief produces REQs covering each declared layer (or records explicit "no") — verified by Task 27 dogfood.
-- Every feature REQ that adds new surface has `## Integration` with concrete file references — verified by Task 21 verify check + Task 27 dogfood.
+- A full-stack feature brief produces REQs covering each declared layer (or records explicit "no") — structurally exercised by Task 27 smoke test; semantic correctness will be validated by the first genuine UR run after this lands.
+- Every feature REQ that adds new surface has `## Integration` with concrete file references — verified structurally by Task 21 verify check + Task 27 smoke test.
 - Ideate stops being write-only — verified by Task 14 gate.
-- Bug-fix briefs not slowed down — verified by Task 9's classification gating.
+- Bug-fix briefs not slowed down — verified by Task 6's classification gating (Task 9 was incorrect — that's the layer-coverage prompt; Task 6 is the classifier).
 - Verify never misfires on stacks it doesn't understand — verified by reading layer/REQ tags, not vocabulary (Task 19-22).
-- do-work dogfoods on itself — verified by Task 26-27.
+- do-work dogfoods on itself — config in Task 26; smoke test in Task 27. Real validation comes from the next genuine UR.
 - No new commands, no new artifact types — verified structurally; no new agent files were created.
 
 - [ ] **Step 2: Walk the open questions list and confirm decisions are recorded**
