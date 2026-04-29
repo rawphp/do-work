@@ -168,6 +168,16 @@ Use this format exactly:
 1. **[test|build|runtime|ui]** [exact command or action]
    - Expected: [what success looks like — be specific]
 
+## Integration
+
+> Required for REQs that add new surface (any layer except `none`). Omit for bug-fix REQs and pure-refactor / test-only REQs.
+
+**Reachability:** [How does the user (or caller) actually reach this? Nav entry, menu item, route, parent component, command name, API consumer, scheduled job trigger, library entry point. Cite a concrete file path or symbol.]
+
+**Data dependencies:** [What existing data, state, or models does this read or write? Cite a file path or symbol.]
+
+**Service dependencies:** [What existing services, modules, or internal APIs does this depend on or extend? Cite a file path or symbol.]
+
 ## Assets
 
 - [path/to/asset] — [description] (omit section if none)
@@ -180,6 +190,16 @@ Use this format exactly:
 A REQ has exactly one layer. If a REQ feels like it spans multiple layers, that is a signal to split it into two REQs — capture must split rather than concatenate. The two REQs share the same UR and may reference each other in their bodies.
 
 Capture decides the layer when it writes each REQ. If capture is unsure which layer a REQ belongs to, it asks the user at generation time rather than guessing.
+
+### Integration block rules
+
+The Integration block is the load-bearing check that catches "feature built but never wired in" failures. Three rules:
+
+1. **Required for new-surface REQs.** Any REQ whose `**Layer:**` is not `none` must have a non-empty Integration block answering all three sub-questions. "New surface" means the REQ creates something callable or visible from outside its own code — a new page, route, component, command, public function, endpoint, scheduled job, library export.
+
+2. **Modifications don't count.** Renaming a button, tightening validation, fixing a return type — these don't add new surface. Such REQs should set `**Layer:** none` and may omit the Integration block.
+
+3. **References must be checkable.** Each cited file path or symbol must actually exist in the codebase. Capture verifies this before declaring "high confidence" (see Step 6 below).
 
 ### Writing effective Verification Steps
 
