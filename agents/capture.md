@@ -151,39 +151,41 @@ Before writing any REQ files, build a requirement-to-REQ mapping to confirm ever
 
 **Defining frontend.** For the purposes of this mapping, "frontend" means any UI component, page or route, form or input, user-facing state (loading / empty / error / success), styling, or client-side validation — anything a user directly sees or interacts with in a browser or client app. Backend-leaning briefs (config keys, internal refactors, CLI commands, API-only endpoints with no caller) often genuinely have no frontend — the layer check below lets you declare that explicitly instead of silently dropping UI work.
 
-1. List every distinct requirement from the brief (a requirement is a user-visible behavior, data flow, or constraint). Number them R1, R2, R3, etc. **Tag each R-number with exactly one layer:**
-   - `backend` — server-side logic, data, APIs, jobs, config, internal tooling with no UI surface
-   - `frontend` — UI, pages, forms, client-side state, styling (per the definition above)
-   - `both` — a single requirement that inherently spans both layers (e.g. form validation that runs client-side and server-side)
-   - `none` — meta or process requirements that produce no code (e.g. "document the decision")
-2. **Frontend scope decision.** After tagging, check whether any R-number carries a `frontend` or `both` tag:
-   - If **yes**, continue — frontend work is enumerated and will be decomposed into REQs.
-   - If **no**, record a one-line "no frontend needed" justification explaining why (e.g. `no frontend needed — this UR edits instruction markdown only`, or `no frontend needed — internal CLI tool with no UI surface`). Do not proceed to write REQ files until the justification is recorded in the mapping. This forces the agent to decide explicitly rather than silently drop UI work.
-3. For each planned REQ, note which requirement(s) it addresses.
-4. Check: does every R-number appear in at least one REQ? **Additionally, does every R-number tagged `frontend` or `both` map to at least one REQ?** If any R-number is unmapped — especially a frontend-tagged one — create a REQ for it.
+1. List every distinct requirement from the brief (a requirement is a user-visible behavior, data flow, or constraint). Number them R1, R2, R3, etc. **Tag each R-number with exactly one value from this list:**
+   - One of the project's declared layers (read from `layers_in_scope` in context — e.g. `frontend`, `backend`, `commands`, `core`, `output`).
+   - `none` — meta or process requirements that produce no code (e.g. "document the decision"), OR pure refactor/test-only changes with no new surface.
 
-**Example:**
+   If a requirement seems to need two layers (e.g. form validation that inherently runs client-side and server-side), split it into two R-numbers (`R2a` client validation, `R2b` server validation), each tagged with one layer. The "both" tag is gone.
+2. **Layer scope decision.** After tagging, for each layer in `layers_in_scope`, check whether any R-number carries that layer's tag:
+   - If **yes** for every layer in scope, continue — every layer is enumerated and will be decomposed into REQs.
+   - If **no** for any layer in scope, you have a gap. Either (a) you missed a requirement and need to add R-numbers for that layer, or (b) the brief genuinely doesn't touch that layer in this UR. The Step 4c layer-coverage prompt (introduced in Task 9) will surface this — for now, proceed to Step 4 and let the prompt drive the decision.
+3. For each planned REQ, note which requirement(s) it addresses.
+4. Check: does every R-number appear in at least one REQ? If any R-number is unmapped, create a REQ for it.
+
+**Example** (project with `layers: [frontend, backend]`):
+
 ```
 Brief: "Contact form with name, email, message. Submissions emailed to sales@example.com and stored in DB. Show success message."
 
-R1: Form UI (name, email, message fields)              [frontend]
-R2: Form validation                                     [both]
-R3: Store submissions in database                       [backend]
-R4: Email submissions to sales@example.com              [backend]
-R5: Show success message after submission               [frontend]
+R1:  Form UI (name, email, message fields)              [frontend]
+R2a: Form validation — client side                       [frontend]
+R2b: Form validation — server side                       [backend]
+R3:  Store submissions in database                       [backend]
+R4:  Email submissions to sales@example.com              [backend]
+R5:  Show success message after submission               [frontend]
 
-Frontend scope: R1, R2, R5 carry frontend or both tags — no "no frontend needed" justification required.
+All declared layers covered: frontend (R1, R2a, R5), backend (R2b, R3, R4). ✓
 
 Planned REQs:
-  REQ-001 form-ui → R1
-  REQ-002 form-validation → R2
-  REQ-003 store-submissions → R3
-  REQ-004 email-submissions → R4
-  REQ-005 success-message → R5
-
-All R-numbers mapped. ✓
-All frontend R-numbers mapped. ✓
+  REQ-001 form-ui              → R1   layer: frontend
+  REQ-002 client-validation    → R2a  layer: frontend
+  REQ-003 server-validation    → R2b  layer: backend
+  REQ-004 store-submissions    → R3   layer: backend
+  REQ-005 email-submissions    → R4   layer: backend
+  REQ-006 success-message      → R5   layer: frontend
 ```
+
+For projects with `layers: [agents, commands, templates]` (do-work itself), tags would be `agents`, `commands`, `templates`, or `none` — same machinery, different vocabulary.
 
 If you discover a requirement that was missed, add a REQ for it before proceeding. Do not write REQ files until the mapping is complete.
 
@@ -194,6 +196,8 @@ For each task, write a file to the backlog root:
 ```
 {project}/do-work/REQ-NNN-short-slug.md
 ```
+
+**Every REQ must carry a `**Layer:**` field.** Set it from the R-number's tag (Step 3b). If multiple R-numbers map to the same REQ, they must all share the same tag — otherwise split the REQ. Bug-fix briefs (classification from Step 2b) write `**Layer:** none` on every REQ.
 
 Use this format exactly:
 
