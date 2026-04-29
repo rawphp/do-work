@@ -1555,6 +1555,114 @@ git commit -m "docs(do-work): changelog entry for gap-aware capture"
 
 ---
 
+## Task 25b: Update README.md
+
+**Files:**
+- Modify: `README.md`
+
+- [ ] **Step 1: Define expected end-state**
+
+After this task, `README.md` no longer mentions `--grill`. It documents `--no-layers`, the `layers:` config field, the `layer:` REQ field, and the Integration block requirement. The "How It Works" section reflects the new pipeline (no separate Question step; the ideate gate handles grilling). The Configuration section's YAML and table include the `layers:` field.
+
+- [ ] **Step 2: Update the Quick Start `--grill` mention**
+
+Find the paragraph in Quick Start that says "Add `--no-ideate` to skip the creative review. Add `--grill` to run interactive questioning before ideate — this grills you about your brief to extract assumptions, gaps, and constraints." Replace with:
+
+```markdown
+Add `--no-ideate` to skip the creative review. Add `--no-layers` to skip layer-coverage checks for this UR (records the choice in UR state for audit).
+
+Ideate now ends with an interactive gate — after surfacing gaps, it asks whether you want to be **grilled** with one-at-a-time questions, **continue** to capture as-is, or **stop** to revise the brief yourself.
+```
+
+- [ ] **Step 3: Update the All Commands table**
+
+Find the table. Replace the row for `--grill` and add `--no-layers` rows. Specifically:
+
+- Delete the `/do-work start [brief] --grill` row.
+- Replace it with: `| /do-work start [brief] --no-layers | Same as start, but skips layer-coverage checks (records `layers_in_scope: []` for this UR). |`
+- Add a `/do-work go [UR-NNN] --no-layers` row near the existing go rows.
+
+- [ ] **Step 4: Update the "How It Works" section**
+
+Replace the numbered list and footer line with:
+
+```markdown
+1. **Intake** — Your brief is recorded as `UR-NNN/input.md` (with YAML frontmatter for capture state)
+2. **Ideate** — Surfaces assumptions, risks, and connections; ends with an interactive gate (Grill / Continue / Stop)
+3. **Capture** — Classifies the brief (bug-fix vs feature), assigns each REQ to one of the project's declared layers, prompts on uncovered layers, and writes an `## Integration` block on every new-surface REQ with codebase-verified file references
+4. **Verify** — Scores REQ coverage against the original brief, plus three structural checks: layer coverage, Integration block presence, and partial-confidence acknowledgement
+5. **Audit** *(always-on)* — Interrogates every REQ's acceptance criteria, auto-fixes vague spots, reports what changed
+6. **Run** — Executes each REQ with TDD: failing test first, implement, verify, commit
+
+`start` = intake + ideate (with gate) + capture. `go` = verify + audit + run.
+```
+
+- [ ] **Step 5: Update the Skill Structure file tree**
+
+The tree currently lists agents in the order intake/question/audit/ideate/capture. The order is cosmetic but the `question.md` line still belongs (the agent file isn't deleted, only the `--grill` flag is removed). Leave the tree as-is unless it's gone stale on something else.
+
+- [ ] **Step 6: Add `layers:` to the Configuration YAML example**
+
+Find the `# do-work configuration` YAML block. Add an entry above `log:`:
+
+```yaml
+# Project layers — capture and verify use these to gap-check briefs.
+# Examples: [frontend, backend], [commands, core, output],
+#           [public_api, internal], [agents, commands, templates].
+# Empty list = opt out of layer-coverage checks (feature briefs will
+# halt until either a list is declared or --no-layers is passed).
+layers: []
+```
+
+- [ ] **Step 7: Add the `layers` row to the Configuration table**
+
+Find the schema reference table. Add this row immediately after `project.name`:
+
+```markdown
+| `layers` | list of strings | `[]` | Project's declared layers for gap-aware capture. Capture and verify check that REQs cover each declared layer. Empty = opt out (feature briefs will halt until declared or `--no-layers` is passed). |
+```
+
+- [ ] **Step 8: Add a "Layers and Integration" subsection**
+
+Immediately after the Configuration section (before "Build in Public (Log)"), insert:
+
+```markdown
+## Layers and Integration
+
+Feature briefs frequently produce REQs that miss the frontend, miss the wiring, or both. do-work's gap-aware capture prevents this by enforcing two structural checks.
+
+**Declared layers.** Each project declares its layers in `do-work/config.yml` — `[frontend, backend]` for a web app, `[commands, core, output]` for a CLI, whatever fits your stack. Capture tags each REQ with one of the declared layers (or `none` for bug-fixes / pure refactors). If a brief looks full-stack but capture didn't write a REQ for a declared layer, you're prompted: *"Project has layer X, no REQ covers it. Needed?"* Yes generates the missing REQ; No records the decision so verify doesn't keep flagging it.
+
+**Integration block.** Every feature REQ that adds new surface (a new page, route, command, endpoint, etc.) must have an `## Integration` section answering three questions, with concrete file references:
+- **Reachability** — How does the user/caller reach this?
+- **Data dependencies** — What existing data does it read or write?
+- **Service dependencies** — What existing services or modules does it extend?
+
+Capture inspects the codebase to draft the answers, verifies cited files actually exist before claiming high confidence, and asks you when it can't tell. Verify enforces the block on every new-surface REQ.
+
+**Skip per-UR with `--no-layers`** when the checks don't apply (e.g. internal one-shot scripts). The choice is recorded in UR state, so it's auditable.
+```
+
+- [ ] **Step 9: Verify**
+
+```bash
+grep -n "grill" README.md         # should be empty (or a comment about removal only)
+grep -n "no-layers" README.md     # should appear in Quick Start, table, and Layers section
+grep -n "## Layers and Integration" README.md
+grep -n "^layers:" README.md
+```
+
+Expected: zero `grill` mentions; multiple `no-layers` mentions; new section heading present; YAML field present.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add README.md
+git commit -m "docs(do-work): update README for gap-aware capture"
+```
+
+---
+
 ## Task 26: Declare do-work's own layers (dogfood, part 1)
 
 **Files:**
