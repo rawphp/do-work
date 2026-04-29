@@ -231,15 +231,19 @@ After capture runs, capture prepends a one-shot summary block to the UR body (ab
 
 This is the visibility surface. The user reviews this, not the REQs themselves, to know whether capture got it right.
 
+**Frontmatter is canonical for state.** The summary block is a regeneratable view: capture re-runs rebuild it from the frontmatter `reqs:` list and the REQ files. Edits made by hand to the summary block will be overwritten on the next capture run; meaningful edits should go into the frontmatter or the REQ files themselves.
+
 ### Verify gets two new checks
 
-Verify already scores REQ coverage 0–100% against the brief. Two additional pass/fail checks layer on top.
+Verify already scores REQ coverage 0–100% against the brief. Three additional pass/fail checks layer on top.
 
 1. **Layer-coverage check.** Read `layers_in_scope` from the UR's frontmatter — this is the per-UR record of which layers capture considered. (Not the global config; the UR's own snapshot, so `--no-layers` and bug-fix paths propagate correctly.) For each layer in `layers_in_scope`, confirm at least one REQ has `layer:` matching it — OR `layer_decisions[<layer>] == no` is set. Anything else is a gap. If `layers_in_scope` is empty, this check is a no-op.
 
 2. **Integration block check.** Every feature-class REQ that adds new surface must have a non-empty `## Integration` block with all three sub-questions answered. Missing or empty → gap. (Pure refactor / rename / test-only REQs are exempt; bug-fix REQs are exempt.)
 
-3. **Partial-confidence check.** A REQ recorded with `integration_confidence: partial` in UR state is treated as a gap unless its id appears in `acknowledged_partials:`. The user acknowledges by editing UR frontmatter directly. This stops partial-confidence REQs from silently slipping through to run, while still letting the user proceed when the gap has been reviewed.
+3. **Partial-confidence check.** A REQ recorded with `integration_confidence: partial` in UR state is treated as a gap unless its id appears in `acknowledged_partials:`. This stops partial-confidence REQs from silently slipping through to run, while still letting the user proceed when the gap has been reviewed.
+
+   *Acknowledgement UX, v1:* the user edits UR frontmatter directly to add the REQ id to `acknowledged_partials`. This is a known papercut. *Intended next iteration:* when verify flags a partial-confidence REQ, it offers an inline prompt — `(1) Resolve — re-run integration question, (2) Acknowledge — wave through, (3) Skip — leave gap` — and option 2 writes the ack automatically. Tracked as a follow-up; not in scope for this spec, but called out so the manual edit isn't permanent.
 
 **No vocabulary check.** The previous spec's check ("acceptance criteria phrased in frontend terms") is dropped. With `layer:` tagging, capture is the source of truth for which layer a REQ belongs to; verify doesn't second-guess by sniffing keywords.
 
@@ -282,13 +286,14 @@ Bug-fix and pure-refactor REQs may omit the Integration section.
 - Document the `layers:` config field and how to declare it per project.
 - Document the `layer:` field as required REQ frontmatter.
 - Document the Integration block as a required REQ section for feature-class REQs that add new surface.
+- Document the `--no-layers` flag on `start` (and on any other entry point that triggers capture).
 
 ### Idempotency: re-running capture on an existing UR
 
 Capture is re-runnable. Re-running on a UR with existing frontmatter follows these rules:
 
 - `classification` — preserved. Re-classification requires a separate command (out of scope for this spec).
-- `layers_in_scope` — re-read from current config on each run. If the project's `layers:` has changed since the last capture, the new list takes effect.
+- `layers_in_scope` — on each capture run, re-derived from current config and written to UR frontmatter. Verify reads the persisted snapshot, which reflects the *last* capture run, not necessarily current config. See "Config drift" below.
 - `layer_decisions` — preserved. Past "no" decisions stay until the user explicitly clears them by editing frontmatter. Capture does not re-prompt for layers the user already opted out of.
 - `open_gaps` — overwritten if ideate is re-invoked in the same run; otherwise preserved.
 - `reqs:` list — merged. Entries matched by REQ id are preserved; new REQs from this run are appended; entries pointing at REQ files that no longer exist are dropped.
@@ -297,6 +302,22 @@ Capture is re-runnable. Re-running on a UR with existing frontmatter follows the
 - The verbatim brief body — never modified. Read-only after intake.
 
 A capture re-run that detects no changes (same config, same REQ files, same decisions) is a no-op except for refreshing the summary block timestamp.
+
+### Config drift and late layer additions
+
+Two behaviours worth naming explicitly so they don't surface as bug reports:
+
+- **Config drift.** If the user runs capture, edits `layers:` in config, then runs verify without re-capturing, verify reads the old `layers_in_scope` snapshot from UR frontmatter and passes against it. This is correct — verify checks what capture decided — but it means edits to `layers:` are not retroactive. Re-run capture on the UR to apply.
+
+- **Late layer additions.** Re-running capture on a UR months after `layers:` has grown will surface opt-out prompts for layers irrelevant to the original brief (e.g. a year-old UR re-captured after the project added a `mobile` layer). This is the correct behaviour — capture treats every declared layer as a real coverage question — but the user should expect to record `layer_decisions: { mobile: no }` for old URs that pre-date the new layer.
+
+### Acknowledged tradeoffs
+
+This design materially increases capture's cost. Capture now runs eleven sequential steps; the integration-question pass requires file Read and grep verification on every cited reference; verify with `--auto-fix` can re-trigger that exploration. A capture invocation under this design will use more tokens and clock-time than today's.
+
+The exchange is gap-coverage guarantees: features that today silently ship half-complete will instead halt at capture or verify. The cost is paid where it's most visible (during planning) rather than where it hurts most (after a half-shipped feature ships).
+
+If implementation finds capture's cost prohibitive in practice, the capture/wire split listed in open questions is the natural mitigation: extracting the integration-question + codebase-exploration block into a separate agent lets the user defer that pass until they explicitly ask for it.
 
 ## Files affected
 
@@ -307,7 +328,8 @@ A capture re-run that detects no changes (same config, same REQ files, same deci
 | `agents/verify.md` | Replace check vocabulary with frontmatter reads; add layer-coverage check + integration-block check; drop the keyword-sniffing check; extend `--auto-fix` |
 | `agents/run.md` | Reuse classification heuristic (no behavior change, just shared source) |
 | `agents/install` step (in `SKILL.md`) | Write `layers: []` (empty placeholder + explanatory comment) into new config; do not auto-populate |
-| `agents/start.md` | Remove `--grill` handling |
+| `agents/start.md` | Remove `--grill` handling; accept new `--no-layers` flag and pass it through to capture |
+| `agents/go.md` | Accept `--no-layers` flag if `go` is the entry point that triggered capture re-run |
 | REQ template (wherever it lives) | Add required `layer:` frontmatter field; add required `## Integration` section for new-surface feature REQs |
 | UR template / `intake.md` | Switch to YAML frontmatter on `input.md`; preserve the verbatim brief in the body |
 | `do-work/config.yml` template | Add `layers:` field with comment explaining declaration |
