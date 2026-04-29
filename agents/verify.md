@@ -130,6 +130,24 @@ For all other URs (`feature` or `other-as-feature`), iterate through `reqs:` in 
 
 4. Auto-fix integration: an Integration block gap with `--auto-fix` triggers a re-invocation of capture's Step 5 (Integration question pass) scoped to that single REQ.
 
+### 4d. Partial-confidence check
+
+This check is skipped for legacy URs and for `bug-fix` / `other-as-bug-fix` classifications.
+
+For all other URs, iterate through `reqs:` in the frontmatter:
+
+1. For each REQ where `integration_confidence == partial`:
+   - If the REQ id appears in `acknowledged_partials`, treat as resolved — no flag.
+   - Otherwise, flag as partial-confidence gap.
+
+2. List each partial-confidence gap with the REQ id. Each gap reduces the confidence score by 3 points (capped at -15 total).
+
+3. **Auto-fix does NOT auto-resolve partials.** Re-running the integration question on the same codebase typically produces the same partial result. The user must either:
+   - Edit the REQ's `## Integration` block manually to upgrade to high confidence, then capture's idempotent re-run will pick up the improvement, OR
+   - Add the REQ id to `acknowledged_partials` in UR frontmatter to wave the gap through.
+
+   **v1 limitation noted in spec:** the user edits frontmatter directly. A richer "(1) Resolve / (2) Acknowledge / (3) Skip" prompt is scoped as a follow-up; not in this plan.
+
 ### 5. Produce the report
 
 Output to console (do not write to file unless asked):
