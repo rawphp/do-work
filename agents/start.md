@@ -58,7 +58,9 @@ If `--no-ideate` was specified, skip this step entirely (no gate runs).
 
 Read and follow [capture.md](capture.md) in full.
 
-Pass it the UR folder path from Step 1.
+Pass it:
+- The UR folder path from Step 1
+- The `--no-layers` flag if it was set on the start invocation (capture reads it in its Step 2c)
 
 If ideate was run in Step 2, the Capture agent should read `ideate.md` alongside `input.md` when decomposing — treating the observations as additional context (not as requirements to blindly follow).
 
