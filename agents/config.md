@@ -19,6 +19,13 @@ At the start of execution, after detecting the project root:
 project:
   name: ""
 
+# Declare your project's layers, e.g. [frontend, backend] for a web app,
+# [commands, core, output] for a CLI, [agents, commands, templates] for do-work.
+# Capture and verify use this list to gap-check briefs. Leave empty to
+# opt out of layer-coverage checks (capture will halt feature briefs
+# until either a layer list is declared or --no-layers is passed).
+layers: []
+
 log:
   enabled: true
   platforms: []          # e.g. [x, linkedin]
@@ -57,6 +64,7 @@ next_steps:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `project.name` | string | `""` | Project display name |
+| `layers` | list of strings | `[]` | Project's declared layers for gap-aware capture. Capture and verify check that REQs cover each declared layer. Empty = opt out (feature briefs will halt until declared or `--no-layers` is passed). |
 | `log.enabled` | boolean | `true` | Whether the log step runs after Go |
 | `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin]`) |
 | `log.drafts_per_platform` | integer | `2` | Number of draft posts to generate per platform |
