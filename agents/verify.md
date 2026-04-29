@@ -111,6 +111,25 @@ For all other URs:
 
 3. Auto-fix integration: a layer-coverage gap with `--auto-fix` triggers a re-invocation of capture's Step 4c (layer-coverage prompt) scoped to that single layer.
 
+### 4c. Integration block check
+
+This check is skipped for:
+- Legacy URs.
+- URs whose `classification` is `bug-fix` or `other-as-bug-fix`.
+
+For all other URs (`feature` or `other-as-feature`), iterate through `reqs:` in the frontmatter:
+
+1. Skip any REQ with `layer: none` — those don't require an Integration block.
+
+2. For each remaining REQ, open its file and check for the `## Integration` section.
+   - If the section is missing → flag as gap.
+   - If the section is present but any of the three sub-question lines (`**Reachability:**`, `**Data dependencies:**`, `**Service dependencies:**`) is missing or empty → flag as gap.
+   - If all three are present and non-empty → covered.
+
+3. List each Integration block gap with the REQ id and which sub-questions are missing. Each gap reduces the confidence score by 5 points (capped at -25 total).
+
+4. Auto-fix integration: an Integration block gap with `--auto-fix` triggers a re-invocation of capture's Step 5 (Integration question pass) scoped to that single REQ.
+
 ### 5. Produce the report
 
 Output to console (do not write to file unless asked):
