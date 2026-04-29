@@ -214,6 +214,30 @@ If invoked with `--auto-fix`, after producing the report:
    - At least 2 acceptance criteria with specific, verifiable outcomes (no vague qualifiers per capture.md's 4b quality check)
    - At least 1 typed verification step (test, build, runtime, or ui) with an Expected outcome — these are what the Run agent uses for TDD verification
    - Run capture.md's Step 4b quality check on each auto-fixed REQ before committing
+
+**New auto-fix actions (gap-aware capture):**
+
+- **Layer-coverage gap:** Re-invoke capture's Step 4c (Layer-coverage prompt) scoped to the missing layer. The prompt asks the user yes/no/unsure; if yes, capture writes the missing REQ(s) and re-runs Step 4b (acceptance criteria quality) and Step 5 (Integration question) on them.
+
+- **Integration block gap:** Re-invoke capture's Step 5 (Integration question pass) scoped to the single affected REQ. Capture inspects the codebase, drafts answers, and asks the user for any partial sub-questions. The REQ is updated in place.
+
+- **Partial-confidence gap:** **Not auto-fixed.** Auto-fix would just re-run the same exploration and likely produce the same partial result. Surface to user with the resolution options listed in Step 4d.
+
+These actions run after item 1 (write missing REQs from missing brief requirements) and before item 5 (re-score). Re-scoring is mandatory and includes the new checks (4b, 4c, 4d).
+
+**Scoped re-runs must refresh state.** When auto-fix re-invokes capture's Step 4c or Step 5 for a single layer or REQ, it MUST also re-run Step 6 (Capture summary) and Step 6b (UR frontmatter) afterwards. Otherwise the frontmatter `reqs:` list and the summary block fall out of sync with the actual REQ files. Treat the scoped re-run as: `Step 4c (or 5) for the affected target → Step 6 → Step 6b → return`.
+
+**Bail-out rule.** verify-with-auto-fix performs **at most one auto-fix attempt per gap per invocation**. If a gap remains after one auto-fix pass, surface the residual gap to the user and stop. Do not loop. Each verify invocation is one user command — re-running verify gives the next attempt.
+
+The two residual cases this rule actually covers:
+
+- **(a)** User said "Yes" to a layer-coverage prompt, capture wrote a new REQ, but the integration pass on that new REQ came back `partial` — a fresh partial-confidence gap now exists. Surface it; do not auto-re-run the integration pass on the just-created REQ in the same invocation.
+- **(b)** An Integration block re-run for an existing REQ still cannot reach "high" confidence after re-exploring the codebase (the agent's references either don't exist or remain vague). Record whatever was found, surface the residual gap, stop.
+
+Cases that do **not** reach the bail-out rule:
+- User said "No" to a layer-coverage prompt — `layer_decisions[<layer>]: no` is recorded; verify's check 4b reads it and doesn't flag the gap on next run.
+- Partial-confidence is never auto-fixed in the first place (per the bullet above); it's surfaced directly to the user, no bail-out needed.
+
 2. Update partially-covered REQs to expand their scope or acceptance criteria. A partial REQ is "expanded enough" when every sub-requirement it addresses has at least one acceptance criterion with a specific, verifiable outcome.
 3. Merge or remove duplicate REQs (keeping the higher-quality one)
 4. Before writing new REQs, check `{project}/do-work/working/` — never create a REQ with a number that conflicts with a REQ currently in working/. Use the next available number after the highest existing REQ across backlog, working, and archive.
