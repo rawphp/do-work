@@ -145,6 +145,7 @@ Use this format exactly:
 **UR:** UR-NNN
 **Status:** backlog
 **Created:** YYYY-MM-DD
+**Layer:** <one of the project's declared layers, or `none` for bug-fix / pure refactor / test-only>
 
 ## Task
 
@@ -171,6 +172,14 @@ Use this format exactly:
 
 - [path/to/asset] — [description] (omit section if none)
 ```
+
+**The `**Layer:**` field is required.** Its value must be one of:
+- A layer name from `do-work/config.yml`'s `layers:` list, OR
+- The literal `none` for bug-fix REQs, pure refactor REQs (no new surface), or test-only REQs.
+
+A REQ has exactly one layer. If a REQ feels like it spans multiple layers, that is a signal to split it into two REQs — capture must split rather than concatenate. The two REQs share the same UR and may reference each other in their bodies.
+
+Capture decides the layer when it writes each REQ. If capture is unsure which layer a REQ belongs to, it asks the user at generation time rather than guessing.
 
 ### Writing effective Verification Steps
 
