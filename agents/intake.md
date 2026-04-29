@@ -23,7 +23,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 If the brief explicitly references an existing UR (e.g. "update UR-003", "add to UR-003", "modify UR-003"):
 - Check if `{project}/do-work/user-requests/UR-NNN/` exists. If the directory does not exist, report: "UR-NNN does not exist. Creating a new UR instead." and continue to Step 2.
 - Read `{project}/do-work/user-requests/UR-NNN/input.md`
-- If **Status: intake** (Capture has not been run yet):
+- If **status: intake** (in YAML frontmatter — Capture has not been run yet):
   - Ask the user: "UR-NNN already exists and has not been captured yet. Do you want to overwrite its input.md with this new brief?"
   - If yes: overwrite input.md with the new brief, keeping the same UR number. Go to Step 5.
   - If no: treat this as a new UR and continue to Step 2.
@@ -62,10 +62,13 @@ Write the user's message verbatim to:
 Use this format exactly:
 
 ```markdown
-# UR-NNN: User Request
+---
+ur: UR-NNN
+received: YYYY-MM-DD
+status: intake
+---
 
-**Received:** YYYY-MM-DD
-**Status:** intake
+# UR-NNN: User Request
 
 ## Request
 
@@ -77,9 +80,11 @@ Use this format exactly:
 After writing input.md, verify the file was recorded correctly:
 
 1. Read back `{project}/do-work/user-requests/UR-NNN/input.md`
-2. Confirm the `**Status:**` field is `intake`
-3. Confirm the `**Received:**` date matches today's date
-4. Confirm the `## Request` section contains the user's original message (not a summary or paraphrase)
+2. Confirm the file begins with `---` and parses as a YAML frontmatter block
+3. Confirm `status: intake` appears in the frontmatter
+4. Confirm `received:` matches today's date
+5. Confirm `ur:` matches the UR number you assigned
+6. Confirm the `## Request` section in the body contains the user's original message (not a summary or paraphrase)
 
 If any check fails, fix the file before proceeding. This is the intake agent's equivalent of TDD's verify-green step — confirm the output matches the spec before committing.
 
