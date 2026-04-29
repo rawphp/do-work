@@ -92,6 +92,40 @@ Hold the class in context — it gates Step 4c and Step 6, and gets written to U
 
 **Drift note for maintainers.** This is a parallel heuristic to `run.md`'s subagent-dispatch heuristic — they answer different questions (capture: bug-fix-vs-feature for layer-coverage gating; run: which subagent_type to dispatch) but use overlapping signals. Future changes to one should consider whether the other needs the same change.
 
+### 2c. Read declared layers and check fail-closed condition
+
+Pull `layers:` from the config loaded in Step 0. Also note whether the invocation was passed `--no-layers` (the start.md or go.md orchestrator passes this through).
+
+Decision table:
+
+| Class | `layers:` | `--no-layers` flag | Action |
+|---|---|---|---|
+| `bug-fix` | any | any | Proceed. `layers_in_scope: []` will be recorded in UR frontmatter; no layer-coverage prompt fires. |
+| `feature` | non-empty | not passed | Proceed. `layers_in_scope` = the configured `layers:` list. |
+| `feature` | non-empty | passed | Proceed. `layers_in_scope: []` recorded in UR frontmatter (deliberate user opt-out for this UR only); no layer-coverage prompt fires. |
+| `feature` | empty or missing | not passed | **Halt.** Output the error below. Do not write any REQs. |
+| `feature` | empty or missing | passed | Proceed. `layers_in_scope: []` recorded in UR frontmatter. |
+| `other` (effective `feature`) | empty or missing | not passed | **Halt** as above. |
+
+**Halt error message:**
+
+```
+Capture halted: project has not declared layers in do-work/config.yml.
+
+This is a feature-class brief, and gap-aware capture requires either:
+  (1) declare your project's layers in do-work/config.yml, e.g.
+      layers: [frontend, backend]
+      and re-run capture, OR
+  (2) pass --no-layers on the start or go invocation to skip
+      layer-coverage checks for this UR only.
+
+Layer-coverage checks prevent features from silently shipping with
+the frontend or wiring missed. Disable them per-UR with --no-layers
+when they don't apply (e.g. internal CLI scripts).
+```
+
+Hold `layers_in_scope` (the per-UR list) in context for downstream steps.
+
 ### 3. Decompose the brief
 
 Break the brief into discrete tasks. A task is the right size when it meets ALL three criteria:
