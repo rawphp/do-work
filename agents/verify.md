@@ -93,6 +93,24 @@ Also check for:
 - **Missing verification steps** — REQs without typed verification steps (test/build/runtime/ui) are not TDD-ready and will block the Run agent
 - **Unaddressed Ideate Flags** — Challenger risks or Connector overlaps from `ideate.md` (Step 2b) that no REQ addresses. List each unaddressed observation. Each reduces the confidence score by 5 points (capped at -20 total deduction).
 
+### 4b. Layer-coverage check
+
+This check is skipped for:
+- Legacy URs (no frontmatter — flagged in Step 1).
+- URs with empty `layers_in_scope` (bug-fix briefs, or `--no-layers` invocations).
+
+For all other URs:
+
+1. For each layer in `layers_in_scope` (from frontmatter):
+   - Scan all REQs in this UR (by `**UR:** UR-NNN`) for any with `**Layer:** <layer>`.
+   - If at least one REQ matches, the layer is covered.
+   - If no REQ matches, check `layer_decisions[<layer>]`. If it equals `no`, the gap is acknowledged — not flagged.
+   - Otherwise, this is a layer-coverage gap.
+
+2. List each layer-coverage gap. Each gap reduces the confidence score by 10 points (capped at -30 total deduction across all layer-coverage gaps).
+
+3. Auto-fix integration: a layer-coverage gap with `--auto-fix` triggers a re-invocation of capture's Step 4c (layer-coverage prompt) scoped to that single layer.
+
 ### 5. Produce the report
 
 Output to console (do not write to file unless asked):
