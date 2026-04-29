@@ -99,7 +99,7 @@ Use this format exactly:
 [2-3 sentences: the most important things to consider before decomposing this brief into tasks.]
 ```
 
-### 5. Report and prompt
+### 5. Report and prompt — interactive gate
 
 Output the completion report:
 
@@ -108,21 +108,34 @@ Ideate complete for UR-NNN.
 
 Written: {project}/do-work/user-requests/UR-NNN/ideate.md
 
-Key observations:
-- [top 1-3 observations, one line each]
+Gaps surfaced:
+- [gap 1, one line]
+- [gap 2, one line]
+- ...
 ```
 
-**Then, immediately after the report**, check whether to present next-step options:
+Compile the gaps from the Explorer "Assumptions & Perspectives" and Challenger "Risks & Edge Cases" sections of the just-written ideate.md — pick the top 3-5, one line each.
 
-If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the start agent):
+**Then, regardless of `config.next_steps.enabled` setting, present the gate via `AskUserQuestion`:**
 
-**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
+Question: `How would you like to proceed?`
 
-1. **"Run Capture"** — Decompose the brief into tasks
-2. **"Edit the brief"** — Review input.md before capturing
-3. **"Skip"** — End the interaction
+Options:
+1. **"Grill me"** — Run interactive Q&A on the surfaced gaps before capture
+2. **"Continue"** — Proceed to capture as-is, gaps recorded
+3. **"Stop"** — Halt — let me revise input.md, then re-run
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output "The review file is available for the Capture agent to reference during decomposition." and stop.
+(`AskUserQuestion` exposes 3 options; this fits within the 4-option limit.)
+
+**Empty user input picks option 2 (Continue).** This is the documented default. Other unrecognised input gets a one-line clarification and a re-prompt.
+
+**Behaviour per option:**
+
+- **(1) Grill me:** Read and follow [question.md](question.md) in full, scoped to the gaps just listed. After question.md returns, control flows back here — automatically continue to capture (do not re-show this gate).
+- **(2) Continue:** Write the surfaced gaps to the UR's `input.md` YAML frontmatter under an `open_gaps:` list (one item per gap, verbatim). If `open_gaps:` already exists in the frontmatter (rare — the user re-ran ideate), overwrite it. Then return control to the caller (start.md) so it proceeds to capture. If `input.md` has no frontmatter (legacy UR — should not happen for new URs but guard anyway), append the gap list to the body under a `## Notes — Open Gaps` heading instead.
+- **(3) Stop:** Output `Halted by user — revise {project}/do-work/user-requests/UR-NNN/input.md and re-run`. Return control to the caller; the caller must NOT proceed to capture.
+
+**The `--grill` flag on start.md is removed** (Task 16). Users now pick Grill at this gate when they want it, after seeing the actual gaps. The gate runs whether or not `next_steps.enabled` is true — this is a workflow gate, not a next-step suggestion.
 
 ---
 
