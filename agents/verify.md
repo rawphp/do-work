@@ -31,7 +31,17 @@ Read every file in `UR-NNN/assets/` if present.
 - Run all pre-existing checks (coverage scoring, ideate observation tracking, vague-criteria scan).
 - **Skip** the new layer-coverage check, integration-block check, and partial-confidence check (Steps 4b-4d below). Legacy URs continue to behave exactly as they did before this refactor.
 
-For non-legacy URs, also read and parse the YAML frontmatter — keep `classification`, `layers_in_scope`, `layer_decisions`, `reqs`, and `acknowledged_partials` in context for later steps.
+**Frontmatter parse for non-legacy URs.** For URs that begin with a `---` block, parse the YAML frontmatter and extract:
+
+- `classification` (one of: bug-fix, feature, other-as-feature, other-as-bug-fix)
+- `layers_in_scope` (list of layer names, possibly empty)
+- `layer_decisions` (map of `<layer>: no` entries)
+- `reqs` (list of `{ id, layer, integration_confidence }` records)
+- `acknowledged_partials` (list of REQ ids)
+
+If any of these fields is missing from a non-legacy UR's frontmatter, treat it as if the field is empty (e.g. `layer_decisions: {}`, `reqs: []`, `acknowledged_partials: []`, `open_gaps: []`). This keeps verify lenient against partial state.
+
+Hold all parsed values in context for Steps 4b, 4c, 4d below.
 
 ### 2. Read all REQ files
 
