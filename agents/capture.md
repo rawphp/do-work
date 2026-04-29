@@ -428,7 +428,48 @@ Format:
 
 On re-run: if both fence comments are present, replace everything from `<!-- capture-summary-start -->` through `<!-- capture-summary-end -->` (inclusive). If only one fence is present (corrupted state), repair by inserting the missing fence at the closest plausible boundary. If neither fence is present (first capture run, or legacy edited state), insert a fresh fenced block immediately after the YAML frontmatter close and before the `## Request` heading. The verbatim brief in `## Request` must never be modified.
 
-**Frontmatter is canonical.** This summary block is a regeneratable view. The authoritative state lives in the YAML frontmatter (Step 7). Edits made by hand to this block will be overwritten on the next capture run.
+**Frontmatter is canonical.** This summary block is a regeneratable view. The authoritative state lives in the YAML frontmatter (Step 6b). Edits made by hand to this block will be overwritten on the next capture run.
+
+### 6b. Write UR frontmatter
+
+Update `input.md`'s YAML frontmatter (the block between the first two `---` lines) to record capture's decisions. The frontmatter must end up looking like:
+
+```yaml
+---
+ur: UR-NNN
+received: YYYY-MM-DD
+status: captured                # was: intake
+classification: <bug-fix | feature | other-as-feature | other-as-bug-fix>
+layers_in_scope: [<comma-separated layers, or empty list>]
+layer_decisions: {}             # populated only when the user said "no" to a layer
+reqs:
+  - { id: REQ-NNN, layer: <layer or none>, integration_confidence: <high | partial | low | n/a> }
+  - ...
+acknowledged_partials: []       # REQ ids the user has reviewed and waved through
+---
+```
+
+**Field rules:**
+
+- `status` flips from `intake` to `captured`. (If a future re-capture revisits a UR with `status: captured`, leave it as `captured`.)
+- `classification` is from Step 2b.
+- `layers_in_scope` is the per-UR snapshot from Step 2c. May be empty for bug-fix briefs or `--no-layers` invocations.
+- `layer_decisions` only contains entries for layers the user explicitly opted out of in Step 4c. Layers with REQs covering them do not appear here.
+- `reqs` is a list of every REQ in this UR (matched by `**UR:** UR-NNN` in the REQ files, including REQs in working/ or archive/ that belong to this UR).
+- `acknowledged_partials` is preserved from the existing frontmatter on re-run; never reset by capture.
+- `open_gaps` is preserved from the existing frontmatter (ideate writes it, capture leaves it alone). If absent, it's not added by capture.
+
+**Idempotency on re-run** (capture invoked on a UR that already has `status: captured`):
+
+- `classification` — preserved from existing frontmatter; not re-derived.
+- `layers_in_scope` — re-derived from current config and Step 2c logic; the new value overwrites the old. (This means edits to `layers:` propagate when capture re-runs.)
+- `layer_decisions` — preserved entries are kept; new "no" answers in this run merge in. Capture does not re-prompt for layers where `layer_decisions[<layer>] == no`.
+- `reqs` — rebuilt from scratch by scanning REQ files in backlog/working/archive matching this UR. New REQs from this run are included; deleted REQ entries are dropped.
+- `acknowledged_partials` — preserved verbatim. Never modified by capture.
+
+A re-run that produces no new REQs and no new layer decisions is otherwise a no-op except for refreshing the summary block timestamp (Step 6).
+
+**Side effect of re-deriving `layers_in_scope`:** adding new layers to `do-work/config.yml` months later will trigger layer-coverage prompts on any UR that gets re-captured under the new config — even URs that pre-date the new layer. This is by design (current config is treated as authoritative), but worth knowing before broadening the layer list. The user resolves these by recording `layer_decisions: { newlayer: no }` for old URs that don't need the new layer.
 
 ### 7. Commit the backlog
 
