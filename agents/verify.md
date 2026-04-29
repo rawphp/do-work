@@ -27,6 +27,12 @@ Read `{project}/do-work/user-requests/UR-NNN/input.md` in full.
 
 Read every file in `UR-NNN/assets/` if present.
 
+**Legacy UR detection.** Read the first 10 lines of `input.md`. If they do not begin with a `---` line followed by a YAML frontmatter block ending in `---`, this UR predates the gap-aware capture refactor. Mark it as legacy. Verify will:
+- Run all pre-existing checks (coverage scoring, ideate observation tracking, vague-criteria scan).
+- **Skip** the new layer-coverage check, integration-block check, and partial-confidence check (Steps 4b-4d below). Legacy URs continue to behave exactly as they did before this refactor.
+
+For non-legacy URs, also read and parse the YAML frontmatter — keep `classification`, `layers_in_scope`, `layer_decisions`, `reqs`, and `acknowledged_partials` in context for later steps.
+
 ### 2. Read all REQ files
 
 Scan the backlog root for `REQ-NNN-*.md` files.
