@@ -386,6 +386,50 @@ For each qualifying REQ in scope, fill the `## Integration` block by answering t
 
 **No-fabrication rule.** Capture must not invent file paths, symbols, or service names to satisfy the high-confidence bar. Better to record `partial` and surface the gap than to ship a confident-looking but bogus reference. The verification grep/read step is the guardrail.
 
+### 6. Write capture summary to UR body
+
+Prepend (or replace, on re-run — see Step 7 idempotency rules) a summary block to `input.md`'s body, immediately after the YAML frontmatter close (`---`) and before the `## Request` heading.
+
+Format:
+
+```markdown
+## Capture summary (YYYY-MM-DD)
+
+| Item | Value |
+|---|---|
+| Classification | <bug-fix | feature | other-as-feature | other-as-bug-fix> |
+| Layers in scope | <comma-separated list, or "(none — --no-layers)" or "(none — bug-fix)"> |
+| Layer decisions | <comma-separated "<layer>: no" entries, or "(none — all covered)"> |
+| REQs generated | <count> |
+
+| REQ | Layer | Integration confidence |
+|---|---|---|
+| REQ-NNN | <layer> | <high | partial | low | n/a> |
+| ...        |        |        |
+```
+
+`integration_confidence: n/a` for any REQ with `**Layer:** none` (bug-fix or pure-refactor REQs that don't run the integration pass).
+
+**Idempotency on re-run:** wrap the summary block in HTML comment fences so re-runs can replace it deterministically without depending on table shape:
+
+```markdown
+<!-- capture-summary-start -->
+## Capture summary (YYYY-MM-DD)
+
+| Item | Value |
+|---|---|
+| ... | ... |
+
+| REQ | Layer | Integration confidence |
+|---|---|---|
+| ... | ... | ... |
+<!-- capture-summary-end -->
+```
+
+On re-run: if both fence comments are present, replace everything from `<!-- capture-summary-start -->` through `<!-- capture-summary-end -->` (inclusive). If only one fence is present (corrupted state), repair by inserting the missing fence at the closest plausible boundary. If neither fence is present (first capture run, or legacy edited state), insert a fresh fenced block immediately after the YAML frontmatter close and before the `## Request` heading. The verbatim brief in `## Request` must never be modified.
+
+**Frontmatter is canonical.** This summary block is a regeneratable view. The authoritative state lives in the YAML frontmatter (Step 7). Edits made by hand to this block will be overwritten on the next capture run.
+
 ### 7. Commit the backlog
 
 Stage and commit all newly created REQ files (and the ideate.md file if it exists) so the backlog is tracked in git from decomposition.
