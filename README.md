@@ -34,7 +34,9 @@ That's it. Claude Code picks up the `/do-work` slash command automatically.
 
 This records your brief, runs a creative review (ideate), and decomposes it into REQ files — all in one shot.
 
-Add `--no-ideate` to skip the creative review. Add `--grill` to run interactive questioning before ideate — this grills you about your brief to extract assumptions, gaps, and constraints.
+Add `--no-ideate` to skip the creative review. Add `--no-layers` to skip layer-coverage checks for this UR (records the choice in UR state for audit).
+
+Ideate now ends with an interactive gate — after surfacing gaps, it asks whether you want to be **grilled** with one-at-a-time questions, **continue** to capture as-is, or **stop** to revise the brief yourself.
 
 ### Step 2 — Go
 
@@ -56,10 +58,11 @@ Flags:
 |---------|-------------|
 | `/do-work start [brief]` | Records brief + decomposes into REQs. Includes ideate by default. |
 | `/do-work start [brief] --no-ideate` | Same, but skips the creative review. |
-| `/do-work start [brief] --grill` | Same, but runs interactive questioning before ideate. |
+| `/do-work start [brief] --no-layers` | Same as start, but skips layer-coverage checks (records `layers_in_scope: []` for this UR). |
 | `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs. |
+| `/do-work go [UR-NNN] --no-layers` | Verifies + runs, but skips layer-coverage checks for this UR. |
 | `/do-work install` | Creates `do-work/` folder structure in current project. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR into REQ files. |
@@ -76,15 +79,14 @@ Flags:
 
 ## How It Works
 
-1. **Intake** — Your brief is recorded verbatim as `UR-NNN/input.md`
-2. **Question** *(opt-in)* — Grills you about your brief one question at a time, extracting implicit assumptions and missing constraints. Appends clarifications to `input.md`.
-3. **Ideate** — Surfaces assumptions, risks, and connections before decomposition
-4. **Capture** — Breaks the brief into discrete `REQ-NNN-slug.md` task files
-5. **Verify** — Scores REQ coverage against the original brief (0-100%)
-6. **Audit** *(always-on)* — Interrogates every REQ's acceptance criteria, auto-fixes vague spots, reports what changed
-7. **Run** — Executes each REQ with TDD: failing test first, implement, verify, commit
+1. **Intake** — Your brief is recorded as `UR-NNN/input.md` (with YAML frontmatter for capture state)
+2. **Ideate** — Surfaces assumptions, risks, and connections; ends with an interactive gate (Grill / Continue / Stop)
+3. **Capture** — Classifies the brief (bug-fix vs feature), assigns each REQ to one of the project's declared layers, prompts on uncovered layers, and writes an `## Integration` block on every new-surface REQ with codebase-verified file references
+4. **Verify** — Scores REQ coverage against the original brief, plus three structural checks: layer coverage, Integration block presence, and partial-confidence acknowledgement
+5. **Audit** *(always-on)* — Interrogates every REQ's acceptance criteria, auto-fixes vague spots, reports what changed
+6. **Run** — Executes each REQ with TDD: failing test first, implement, verify, commit
 
-`start` = intake + [question] + ideate + capture. `go` = verify + audit + run.
+`start` = intake + ideate (with gate) + capture. `go` = verify + audit + run.
 
 ---
 
@@ -147,6 +149,13 @@ Each project gets a `do-work/config.yml` file, auto-created on first `/do-work s
 project:
   name: "my-project"
 
+# Project layers — capture and verify use these to gap-check briefs.
+# Examples: [frontend, backend], [commands, core, output],
+#           [public_api, internal], [agents, commands, templates].
+# Empty list = opt out of layer-coverage checks (feature briefs will
+# halt until either a list is declared or --no-layers is passed).
+layers: []
+
 log:
   enabled: true
   platforms: [x, linkedin]
@@ -169,6 +178,7 @@ next_steps:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `project.name` | string | `""` | Project display name |
+| `layers` | list of strings | `[]` | Project's declared layers for gap-aware capture. Capture and verify check that REQs cover each declared layer. Empty = opt out (feature briefs will halt until declared or `--no-layers` is passed). |
 | `log.enabled` | boolean | `true` | Whether the log step runs after `/do-work go` |
 | `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin, blog]`) |
 | `log.drafts_per_platform` | integer | `2` | Number of draft variations to generate per platform |
@@ -178,6 +188,23 @@ next_steps:
 | `log.max_chars` | map | `{x: 280, blog: 500, linkedin: 1300}` | Per-platform character ceiling the log agent enforces on every draft. Keys are platform slugs; values are integer char limits. Drafts exceeding the ceiling are rewritten, then truncated if still over. |
 | `test.suite_command` | string | `""` | Full test suite command (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, common defaults are attempted. |
 | `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase |
+
+---
+
+## Layers and Integration
+
+Feature briefs frequently produce REQs that miss the frontend, miss the wiring, or both. do-work's gap-aware capture prevents this by enforcing two structural checks.
+
+**Declared layers.** Each project declares its layers in `do-work/config.yml` — `[frontend, backend]` for a web app, `[commands, core, output]` for a CLI, whatever fits your stack. Capture tags each REQ with one of the declared layers (or `none` for bug-fixes / pure refactors). If a brief looks full-stack but capture didn't write a REQ for a declared layer, you're prompted: *"Project has layer X, no REQ covers it. Needed?"* Yes generates the missing REQ; No records the decision so verify doesn't keep flagging it.
+
+**Integration block.** Every feature REQ that adds new surface (a new page, route, command, endpoint, etc.) must have an `## Integration` section answering three questions, with concrete file references:
+- **Reachability** — How does the user/caller reach this?
+- **Data dependencies** — What existing data does it read or write?
+- **Service dependencies** — What existing services or modules does it extend?
+
+Capture inspects the codebase to draft the answers, verifies cited files actually exist before claiming high confidence, and asks you when it can't tell. Verify enforces the block on every new-surface REQ.
+
+**Skip per-UR with `--no-layers`** when the checks don't apply (e.g. internal one-shot scripts). The choice is recorded in UR state, so it's auditable.
 
 ---
 
