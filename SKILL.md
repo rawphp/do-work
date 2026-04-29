@@ -5,7 +5,7 @@ description: >
   that turns natural-language briefs into discrete, traceable tasks (REQ files)
   and executes them one at a time with TDD and a git commit per task.
   Triggers on: "do-work", "intake", "capture", "verify", "run the loop",
-  "backlog", "user request", "REQ-", "UR-", "question", "audit", "grill".
+  "backlog", "user request", "REQ-", "UR-", "question", "audit".
 ---
 
 # do-work
@@ -18,10 +18,11 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 |---------|-------------|
 | `/do-work start [brief]` | Records brief + decomposes into REQs in one shot. Includes ideate by default. Auto-installs if needed. |
 | `/do-work start [brief] --no-ideate` | Same as start, but skips the creativity review before decomposition. |
-| `/do-work start [brief] --grill` | Same as start, but runs interactive questioning before ideate. |
+| `/do-work start [brief] --no-layers` | Same as start, but skips layer-coverage checks for this UR (records `layers_in_scope: []`). |
 | `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of confidence score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs if >= 90%. |
+| `/do-work go [UR-NNN] --no-layers` | Verify + run, skipping layer-coverage checks for this UR. |
 | `/do-work install` | Creates `do-work/` structure in current project. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR brief into REQ files in the backlog. |
@@ -95,6 +96,29 @@ When a UR file contains both:
 
 Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that do not match the trigger continue to behave as before. The `/saas-thesis` skill produces UR files with the correct shape for handoff.
 
+## Layers
+
+do-work uses project-declared layers to gap-check feature briefs. Declare your project's layers once in `do-work/config.yml`:
+
+```yaml
+layers: [frontend, backend]   # web app
+# layers: [commands, core, output]            # CLI tool
+# layers: [public_api, internal]              # library / SDK
+# layers: [agents, commands, templates]       # do-work itself
+```
+
+Capture and verify use this list to enforce that REQs cover every declared layer for `feature`-class briefs (or surface explicit "no" decisions). Empty `layers:` opts out — feature briefs will halt until layers are declared or `--no-layers` is passed.
+
+Every REQ written by capture carries a `**Layer:**` field naming one of the declared layers, or `none` for bug-fix / pure-refactor / test-only REQs.
+
+Feature REQs that add new surface (anything callable or visible from outside their own code) include an `## Integration` section answering three sub-questions:
+
+- **Reachability** — How does the user (or caller) reach this?
+- **Data dependencies** — What existing data does this read or write?
+- **Service dependencies** — What existing services or modules does this extend?
+
+Capture inspects the codebase to draft answers and verifies each cited file/symbol exists before claiming high confidence. Verify enforces the Integration block on every non-`none` feature REQ.
+
 ## Commit Convention
 
 ```
@@ -159,18 +183,18 @@ If already installed, report "Already installed." and stop.
 
 ---
 
-### start [brief] [--no-ideate] [--grill]
+### start [brief] [--no-ideate] [--no-layers]
 
-Record a brief and decompose it into REQ files in one shot. Ideate runs by default. Use `--grill` to run interactive questioning before ideate.
+Record a brief and decompose it into REQ files in one shot. Ideate runs by default and ends with an interactive gate (Grill / Continue / Stop).
 
 1. Detect `{project}`.
 2. Check if `{project}/do-work/` exists. If not, run install automatically first, then continue.
 3. Determine the brief:
    - If text was provided after `start`, use it as the brief.
    - If not, ask the user to paste their brief and wait.
-4. Note whether `--no-ideate` or `--grill` are present in the arguments.
+4. Note whether `--no-ideate` or `--no-layers` are present in the arguments.
 5. Read [agents/start.md](agents/start.md) in full.
-6. Follow the start agent instructions exactly. Ideate runs by default unless `--no-ideate` was present. Question runs only if `--grill` was present.
+6. Follow the start agent instructions exactly. Ideate runs by default unless `--no-ideate` was present. Pass `--no-layers` through to capture if present.
 
 ---
 
