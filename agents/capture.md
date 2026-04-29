@@ -338,7 +338,55 @@ Options:
 
 **Prompt input convention.** The layer-coverage gate uses `AskUserQuestion` regardless of `config.next_steps.enabled` — this is a workflow gate, not a next-step suggestion. Empty user input picks option 2 ("No — record decision and skip"). This is the only safe default; option 1 would silently generate REQs the user hasn't endorsed.
 
-### 5. Commit the backlog
+### 5. Integration question pass
+
+This pass runs only for `feature`-class briefs and only on REQs whose `**Layer:**` is not `none`. Bug-fix briefs and `none`-layer REQs skip it.
+
+**Scope contract.** If invoked with a specific REQ id as scope (e.g. by `verify --auto-fix` for a single Integration block gap), this pass runs against only that REQ. If invoked without a scope (the normal capture flow), iterate every qualifying REQ in the UR. Steps 6 and 6b must run after this pass regardless of scope so the summary block and frontmatter stay in sync.
+
+For each qualifying REQ in scope, fill the `## Integration` block by answering three sub-questions, citing concrete file paths or symbols.
+
+**The three sub-questions:**
+
+1. **Reachability** — How does the user (or caller) actually reach this? Nav entry, menu item, route, parent component, command name, API consumer, scheduled job trigger, library entry point.
+2. **Data dependencies** — What existing data, state, or models does this read or write?
+3. **Service dependencies** — What existing services, modules, or internal APIs does this depend on or extend?
+
+**Procedure per REQ:**
+
+1. Inspect the codebase to draft answers. Read routes files, nav components, command registries, existing service classes, library exports, models — whatever is relevant given the REQ's `**Layer:**`. Use `Glob`, `Grep`, and `Read`. Do not search the whole repo; bound by the REQ's task description.
+
+2. Rate confidence per sub-question:
+   - **High** — you have a concrete file path or symbol reference, AND that file/symbol exists.
+   - **Partial** — you have a candidate but cannot verify it exists, OR your reference is vague (a directory not a file, a concept not a symbol).
+   - **Low** — you cannot answer from the codebase at all.
+
+3. **Verify high-confidence references before accepting them.** For each cited file path, run `test -f <path>` or `Read` the file (limit 1 line) — if the file does not exist, downgrade to partial. For each cited symbol, `grep -rn "<symbol>"` in the relevant directory — if no match, downgrade to partial. "High" must mean checked, not felt.
+
+4. Aggregate confidence per REQ:
+   - **High overall** — all three sub-questions rated high (and verified).
+   - **Partial** — any sub-question is partial (after verification).
+   - **Low** — at least two sub-questions are low.
+
+5. **High overall:** Write the `## Integration` block into the REQ, replacing the placeholder template's bracketed text with the verified answers. Each answer cites a concrete file path or symbol.
+
+6. **Partial:** Write what's known. For each partial sub-question, ask the user via `AskUserQuestion` with up to 3 candidate answers from the codebase exploration plus a "Tell me directly" option. Replace the partial answer with the user's choice. Re-rate; if all three are now high, the REQ is high overall.
+
+7. **Low:** Write a placeholder block listing what was checked, then ask the user directly via `AskUserQuestion`:
+   ```
+   Cannot answer integration sub-questions from codebase exploration.
+   Checked: <files/dirs that were read>
+   Found: <what was found, or "nothing relevant">
+
+   How would you like to proceed?
+   ```
+   Options: (1) "I'll answer inline" — collect three free-text answers, (2) "Mark this REQ low confidence and continue", (3) "Skip this REQ — I'll fill it in manually later".
+
+8. Record the per-REQ aggregate confidence (`high` / `partial` / `low`) in working state. The frontmatter `reqs:` list (Step 7 below) will carry this as `integration_confidence: <value>`.
+
+**No-fabrication rule.** Capture must not invent file paths, symbols, or service names to satisfy the high-confidence bar. Better to record `partial` and surface the gap than to ship a confident-looking but bogus reference. The verification grep/read step is the guardrail.
+
+### 7. Commit the backlog
 
 Stage and commit all newly created REQ files (and the ideate.md file if it exists) so the backlog is tracked in git from decomposition.
 
@@ -356,7 +404,7 @@ git commit -m "chore(UR-NNN): decompose into N REQs"
 
 Replace `N` with the actual number of REQ files written.
 
-### 6. Report and prompt
+### 8. Report and prompt
 
 After writing all REQ files, output the completion report:
 
