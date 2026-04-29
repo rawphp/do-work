@@ -306,6 +306,38 @@ After writing all REQ files, review each REQ's acceptance criteria for specifici
 
 This step does not block the pipeline or require user intervention — it is immediate self-correction before commit.
 
+### 4c. Layer-coverage prompt
+
+This pass runs only for `feature`-class briefs (or `other` briefs the user opted up to feature-style). Bug-fix briefs skip this entire step.
+
+Build the coverage matrix:
+1. For each layer in `layers_in_scope`, scan all REQs just written in Step 4 and count how many have `**Layer:** <name>` matching it.
+2. List the layers with zero coverage.
+
+If `layers_in_scope` is empty (`--no-layers` was passed, or this is a bug-fix), this step is a no-op. Skip it.
+
+For each uncovered layer, present this prompt via `AskUserQuestion`:
+
+```
+Project declares layer "{layer}", but no REQ covers it.
+Brief: "{one-sentence summary of input.md's first paragraph}"
+
+Is "{layer}" needed for this UR?
+```
+
+Options:
+1. **"Yes — generate REQ(s)"** — Ask follow-ups, then write the missing REQ(s)
+2. **"No — record decision and skip"** — Hold `layer_decisions[<layer>] = no` in context; the frontmatter write happens later in Step 6b.
+3. **"Unsure — show typical work"** — Show 2-3 example REQ titles for this layer for this brief; loop back to the same prompt
+
+**Yes path follow-ups:** ask the user (one at a time, through plain prompts) for: which screens/routes/commands the layer should cover, what the layer's piece of the work looks like in plain language. Then generate one or more REQs tagged with the layer, following the Step 4 template, and append them to the backlog. Re-run Step 4b's quality check on the new REQ(s).
+
+**No path:** record the decision in working state. The actual frontmatter write happens later in Step 6b. For now, hold `layer_decisions[<layer>] = no` in context.
+
+**Loop:** after each layer is resolved (yes or no), continue to the next uncovered layer until none remain.
+
+**Prompt input convention.** The layer-coverage gate uses `AskUserQuestion` regardless of `config.next_steps.enabled` — this is a workflow gate, not a next-step suggestion. Empty user input picks option 2 ("No — record decision and skip"). This is the only safe default; option 1 would silently generate REQs the user hasn't endorsed.
+
 ### 5. Commit the backlog
 
 Stage and commit all newly created REQ files (and the ideate.md file if it exists) so the backlog is tracked in git from decomposition.
