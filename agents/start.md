@@ -14,7 +14,7 @@ You will be given:
 2. The user's message or brief
 3. Optional flags:
    - `--no-ideate` (skip ideate before capture)
-   - `--grill` (run interactive questioning after intake, before ideate)
+   - `--no-layers` (skip layer-coverage check for this invocation only — passed through to capture)
 
 ---
 
@@ -35,18 +35,6 @@ Execute all intake steps: find next UR number, create the folder, write `input.m
 Note the UR number created (e.g. `UR-003`) — you will need it for the next steps.
 
 **Number conflict guard:** Intake scans existing UR folders and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002). This prevents conflicts with deleted or moved items.
-
-### 1b. Run Question (opt-in — requires `--grill`)
-
-If the `--grill` flag was specified:
-
-Read and follow [question.md](question.md) in full.
-
-Pass it the UR folder path from Step 1. The question agent will ask the user clarifying questions one at a time and append a `## Clarifications` section to `input.md`.
-
-**Do not stop after questioning.** The start agent continues to ideate (or capture if `--no-ideate`).
-
-If `--grill` was not specified, skip this step entirely.
 
 ### 2. Run Ideate (default — skip with `--no-ideate`)
 
@@ -82,7 +70,6 @@ Output the combined summary:
 Start complete for UR-NNN
 
 Intake: {project}/do-work/user-requests/UR-NNN/input.md
-Question: [yes/no]
 Ideate: [yes/no]
 
 REQs written:
