@@ -159,15 +159,11 @@ rm -f {project}/do-work/working/REQ-NNN-slug.md
 
 You commit the REQ yourself. Do not return to the orchestrator and ask it to commit — the orchestrator only reads your report.
 
-Stage the changed implementation files, the archived REQ, and all do-work metadata:
+Stage the changed implementation files plus every do-work/ change in one sweep. The sweep is defensive: it catches the backlog deletion, the archive create, the working/ deletion, UR directory updates, logs, and anything else under do-work/ this REQ touched, without relying on remembering each specific path.
 
 ```bash
-git add path/to/changed/files...
-git add {project}/do-work/REQ-NNN-slug.md             # backlog deletion
-git add {project}/do-work/archive/REQ-NNN-slug.md     # archived REQ
-git add {project}/do-work/working/REQ-NNN-slug.md     # working/ deletion
-git add {project}/do-work/user-requests/UR-NNN/       # UR directory if untracked
-git add {project}/do-work/logs/ 2>/dev/null || true   # logs if present
+git add -A {project}/do-work/                         # sweep all do-work changes
+git add path/to/changed/implementation/files...       # implementation files outside do-work/
 
 git commit -m "feat(REQ-NNN): short title
 
