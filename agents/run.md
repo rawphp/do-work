@@ -57,7 +57,9 @@ Scan the REQ's `## Task`, `## Context`, `## Acceptance Criteria`, and `## Verifi
 | Task is a new feature spanning multiple layers (controller + view + model) and no specialist above matches | `feature-dev:code-architect` |
 | Task is "find code", "search for X", "where is Y defined", or pure exploration | `Explore` |
 | Task is a code review or "review the implementation against the plan" | `feature-dev:code-reviewer` |
-| Anything else (markdown edits, agent file edits, skill edits, config tweaks, scripting, generic refactors) | `general-purpose` |
+| File paths under `~/.claude/skills/`, `~/.claude/agents/`, `do-work/agents/`, OR task mentions "skill", "agent file", "SKILL.md", "slash command", "trigger description" | `skill-author` |
+| File imports `anthropic`, `@anthropic-ai/sdk`, `openai`, or a vector DB client (pinecone, qdrant, weaviate, chroma, pgvector); OR task mentions "prompt", "eval", "RAG", "embeddings", "tool use", "function calling", "LLM", or "agent loop" | `llm-app-engineer` |
+| Anything else (markdown edits, config tweaks, scripting, generic refactors) | `general-purpose` |
 
 ### Fallback rule
 
@@ -72,6 +74,33 @@ Starting REQ-NNN [type=laravel-vue-architect]: [title]
 ```
 
 This is the only "progress" signal the orchestrator emits before the worker returns — the worker runs in a separate session and its output does not stream back. Plan accordingly.
+
+---
+
+## Model Selection
+
+After classifying `subagent_type`, pick a `model` for the dispatch. Default to `sonnet` to save tokens. Escalate to `opus` only when the REQ shows signals of genuine difficulty.
+
+### Signals → model
+
+Scan the REQ's `## Task`, `## Context`, and `## Acceptance Criteria` (top to bottom; first match wins):
+
+| Signal in REQ | model |
+|---|---|
+| REQ has a previous `status: stopped` attempt recorded in its body (retry after Sonnet failed) | `opus` |
+| Task touches 4+ distinct files, OR spans 3+ layers (e.g. controller + model + view + test) | `opus` |
+| Task introduces new architecture: new service, new abstraction, new module boundary, schema design, or "design X" | `opus` |
+| Task involves debugging across layers, race conditions, concurrency, or performance investigation | `opus` |
+| `subagent_type` is `feature-dev:code-architect` or `feature-dev:code-reviewer` | `opus` |
+| Anything else: single-file edits, doc/markdown updates, agent/skill/config edits, mechanical refactors, scoped bug fixes, test additions, exploration | `sonnet` |
+
+### Fallback rule
+
+When in doubt, **default to `sonnet`**. The worker's stopping-rules already catch failures: if Sonnet can't make tests pass after 3 attempts, it returns `status: stopped` and the orchestrator's retry path picks `opus` automatically (signal #1 above).
+
+### Logging
+
+The chosen `model` appears in the per-REQ announce line alongside `subagent_type` (see Step 1).
 
 ---
 
@@ -91,13 +120,14 @@ mv {project}/do-work/REQ-NNN-slug.md {project}/do-work/working/REQ-NNN-slug.md
 
 Update the file's `**Status:**` field from `backlog` to `in-progress`.
 
-Announce: `Starting REQ-NNN: [title]`
+Announce: `Starting REQ-NNN [type=<subagent_type>, model=<model>]: [title]`
 
 ### Step 2: Dispatch the worker subagent
 
 Read all of [agents/run-worker.md](run-worker.md) — that is the worker's full instruction set. You will pass it inline to the dispatched subagent.
 
 Determine `subagent_type` using the rules in `## REQ Classification` above. Default to `general-purpose`.
+Determine `model` using the rules in `## Model Selection` above. Default to `sonnet`.
 
 Identify the **prior-REQ archived paths** for the same UR — these provide the worker context about what has already been built:
 
@@ -112,6 +142,7 @@ Dispatch via the `Agent` tool. Pass the worker the **three inputs only** — REQ
 Agent(
   description: "Run worker for REQ-NNN",
   subagent_type: <classified type>,
+  model: <selected model>,
   prompt: """
 You are the Run Worker. Follow the instructions below exactly. Do not search beyond the inputs given.
 
