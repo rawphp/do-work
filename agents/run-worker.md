@@ -32,9 +32,62 @@ After reading the REQ (Step 1) and before starting TDD (Step 3), evaluate the fo
 
 **`same-branch`** — operate directly in the orchestrator's checkout, on whatever branch it is currently on (typically `main`).
 
-**`worktree`** — follow REQ-117's workflow (git worktree on its own branch, merge back when done).
+**`worktree`** — follow `## Worktree Workflow` below (git worktree on its own branch, merge back when done).
 
 Record the chosen mode in the `isolation:` field of your Return Report.
+
+---
+
+## Worktree Workflow
+
+Used when `## Isolation Mode` resolves to `worktree`. Execute these steps in order before proceeding to the normal `## Steps`.
+
+### W1. Record the base branch
+
+```bash
+git rev-parse --abbrev-ref HEAD
+```
+
+Record the output as `<base-branch>` (typically `main`). All subsequent merge and teardown steps reference this value.
+
+### W2. Create the worktree + feature branch
+
+```bash
+git worktree add {project}/.worktrees/req-NNN -b req/REQ-NNN <base-branch>
+```
+
+- Worktree path: `{project}/.worktrees/req-NNN` (where `NNN` is the REQ number, e.g. `req-117`).
+- Branch name: `req/REQ-NNN` (e.g. `req/REQ-117`).
+
+### W3. REQ file visibility
+
+The REQ file in `{project}/do-work/working/REQ-NNN-slug.md` is immediately visible from the worktree because `git worktree` shares the repository's object database and tracked index. No physical copy or move is required.
+
+### W4. Work inside the worktree
+
+`cd` into `{project}/.worktrees/req-NNN` before starting TDD. All edits and commits from `## Steps` Step 3 through Step 8 happen inside this directory.
+
+### W5. Commit on the feature branch
+
+The Step 8 commit (`feat(REQ-NNN): ...`) lands on `req/REQ-NNN` inside the worktree. This is the normal `## Steps` Step 8 commit, executed from within the worktree directory. Proceed to W6 after the commit succeeds.
+
+### W6. Merge back to `<base-branch>`
+
+```bash
+cd {project}                                            # back to the orchestrator's checkout
+git merge --no-ff req/REQ-NNN -m "merge(REQ-NNN): integrate"
+```
+
+If the merge has text-level conflicts, apply the upcoming `## Concurrent-Conflict Retry` section's wait-and-retry policy (landed by REQ-118): pull `<base-branch>`, retry the merge after backoff, up to **5 attempts**. If the 5th attempt fails, return `status: stopped`, `reason: concurrent-conflict`, with `details` listing the conflicting paths. Do NOT auto-resolve conflicts.
+
+### W7. Tear down the worktree
+
+```bash
+git worktree remove {project}/.worktrees/req-NNN
+git branch -d req/REQ-NNN                               # safe delete; refuses if not merged
+```
+
+Do **not** force-delete the branch (`-D` is forbidden). If `git branch -d` refuses because the branch was not fully merged, leave the branch as-is and surface the situation in the Return Report as a partial-completion stopper (`status: stopped`, `reason: unknown-error`, `details` describing the unmerged branch).
 
 ---
 
@@ -179,6 +232,10 @@ rm -f {project}/do-work/working/REQ-NNN-slug.md
 
 You commit the REQ yourself. Do not return to the orchestrator and ask it to commit — the orchestrator only reads your report.
 
+**`worktree` mode:** run the commit from inside `{project}/.worktrees/req-NNN` (the worktree directory). After this commit succeeds, proceed to `## Worktree Workflow` W6 (merge back) and W7 (teardown). The commit hash you capture for the Return Report is this feature-branch commit.
+
+**`same-branch` mode:** run the commit from the orchestrator's checkout as before.
+
 Stage the changed implementation files plus every do-work/ change in one sweep. The sweep is defensive: it catches the backlog deletion, the archive create, the working/ deletion, UR directory updates, logs, and anything else under do-work/ this REQ touched, without relying on remembering each specific path.
 
 ```bash
@@ -251,3 +308,4 @@ Field rules:
 - **You cannot ask the user questions.** You have no user-interaction surface. Every blocker exits as a `status: stopped` report with a structured `reason`. The orchestrator surfaces user-facing prompts on your behalf.
 - **Stay in scope.** If the REQ would require changes outside its stated scope, return `status: stopped` with `reason: scope-creep`.
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.
+- **Worktree teardown is mandatory.** Workers in `worktree` mode must `git worktree remove` and `git branch -d` after a successful merge — failing to do so leaks worktree state across runs.
