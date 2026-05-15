@@ -76,20 +76,55 @@ The stamp is a filesystem-visible, human-readable contract. Archived REQs do not
 
 Before starting the loop:
 
-1. Confirm there are no REQs in `working/` (another run may be in progress)
-   - Use Glob to check: `{project}/do-work/working/REQ-*.md`
-   - If one exists, check its staleness:
-     ```bash
-     git log -1 --format="%ci" -- {project}/do-work/working/
-     ```
-     A REQ is **stale** if: the last commit touching working/ is more than 24 hours ago, OR if git returns no output (no commit has ever touched working/).
-   - If stale, ask the user: `"REQ-NNN is in working/ but appears stale (last activity: {date}). Resume or abort?"`
-     - **Abort**: Move the REQ file back to backlog root: `mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/REQ-NNN-slug.md`. Reset its `**Status:**` field to `backlog`. Continue to check 2.
-     - **Resume**: Keep the REQ in `working/` and skip directly to Step 2 (Read the REQ) for that REQ — do NOT claim a new REQ from the backlog.
-   - If NOT stale (recent activity), stop: `"REQ-NNN is actively in progress (last activity: {date}). Another run may be active. Aborting to prevent conflicts."`
-2. Confirm the backlog is not empty. If empty, stop and report.
-3. Confirm you are on the correct git branch.
-4. Confirm your working directory is `{project}` (the user's repo), NOT the skill clone at `~/.claude/skills/do-work/`. All file edits and git commits must happen in `{project}`. If you are in the skills directory, `cd` to `{project}` before proceeding.
+### 1. Branch and working-directory checks
+
+- Confirm you are on the correct git branch.
+- Confirm your working directory is `{project}` (the user's repo), NOT the skill clone at `~/.claude/skills/do-work/`. All file edits and git commits must happen in `{project}`. If you are in the skills directory, `cd` to `{project}` before proceeding.
+
+### 2. Resolve agent id
+
+Compute `AGENT_ID` per `## Agent Identity`:
+
+```bash
+AGENT_ID="$(hostname).$$"
+```
+
+### 3. Scan and classify working/ slots
+
+Glob `{project}/do-work/working/REQ-*.md`. For each file found, read its ownership stamp (the `<!-- claimed-start --> … <!-- claimed-end -->` block) and classify the slot into one of three buckets:
+
+| Bucket | Condition | Action |
+|---|---|---|
+| **`mine`** | `**Claimed by:**` in the stamp matches `AGENT_ID` | Resume this REQ — skip the claim step and jump directly to worker dispatch for it |
+| **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND `git log -1 --format=%ci -- <file>` is < 24 h ago | Silently ignore — another live orchestrator owns it |
+| **`stale`** | No ownership stamp present (legacy leftover), OR stamp present but `git log -1 --format=%ci -- <file>` is ≥ 24 h ago | Collect into the stale list |
+
+Check staleness per-slot:
+
+```bash
+git log -1 --format="%ci" -- {project}/do-work/working/REQ-NNN-slug.md
+```
+
+A slot is **stale** if the command returns no output (file was never committed) or the returned timestamp is ≥ 24 h ago.
+
+### 4. Handle stale slots
+
+If one or more stale slots are found, **prompt the user once** (batch all stale slots into a single message — do NOT prompt per slot):
+
+```
+N stale REQ(s) found in working/:
+  - REQ-NNN (claimed by <agent-id-or-unknown>, last activity <date>)
+  - ...
+These appear abandoned. Reclaim into this run, return to backlog, or abort?
+```
+
+- **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
+- **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ.
+- **Abort:** Exit pre-flight and halt this orchestrator.
+
+### 5. Backlog emptiness check
+
+After handling stale slots, if the backlog root has no `REQ-*.md` files AND there are no `mine` slots to resume, fall through to `## When the Backlog is Empty`.
 
 ---
 
