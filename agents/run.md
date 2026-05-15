@@ -20,6 +20,58 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ---
 
+## Agent Identity
+
+Each `/do-work run` process derives a stable `hostname.pid` identifier once at startup and reuses it for the lifetime of that run loop.
+
+### ID derivation
+
+```bash
+AGENT_ID="$(hostname).$$"
+# Example result: mbp-tom.42137
+```
+
+- `hostname` — machine name, distinguishes agents on different machines sharing a repo
+- `$$` — the shell PID of the current `/do-work run` process, unique per process on the same machine
+- The combined string is computed **once** when the orchestrator starts and stored in the shell variable `AGENT_ID`
+
+### Ownership stamp format
+
+When the orchestrator claims a REQ into `working/`, it inserts the following block at the top of the REQ file, immediately under the `# REQ-NNN:` heading and before the existing `**UR:** ...` field:
+
+```markdown
+<!-- claimed-start -->
+**Claimed by:** <agent-id>
+**Claimed at:** <ISO-8601 UTC>
+<!-- claimed-end -->
+```
+
+Example of a claimed REQ header:
+
+```markdown
+# REQ-115: Pre-flight concurrent-slot check
+
+<!-- claimed-start -->
+**Claimed by:** mbp-tom.42137
+**Claimed at:** 2026-05-15T14:03:22Z
+<!-- claimed-end -->
+
+**UR:** UR-025
+**Status:** in-progress
+```
+
+### Stamp lifecycle
+
+| Phase | Actor | Action |
+|---|---|---|
+| Claim time | Orchestrator (REQ-114) | Inserts `<!-- claimed-start … claimed-end -->` block after claiming the file into `working/` |
+| Pre-flight | Sibling orchestrators (REQ-115) | Read `working/REQ-*.md` files; parse the block to attribute each slot to its owning agent |
+| Archive time | Worker (this file) | Strips the `<!-- claimed-start … claimed-end -->` block before moving the file to `archive/` |
+
+The stamp is a filesystem-visible, human-readable contract. Archived REQs do not retain ownership metadata — only the git commit message records which agent committed the change.
+
+---
+
 ## Pre-flight Check
 
 Before starting the loop:
