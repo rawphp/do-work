@@ -162,17 +162,51 @@ Repeat until the backlog is empty:
 
 ### Step 1: Claim the next REQ
 
-Find the `REQ-NNN-slug.md` in the backlog root with the lowest number.
-
-Move it to `working/`:
+**Compute your agent-id** using the rule in `## Agent Identity`:
 
 ```bash
-mv {project}/do-work/REQ-NNN-slug.md {project}/do-work/working/REQ-NNN-slug.md
+AGENT_ID="$(hostname).$$"
 ```
 
-Update the file's `**Status:**` field from `backlog` to `in-progress`.
+**Iterate the backlog in ascending order.** Glob `{project}/do-work/REQ-*.md`, sort by filename (ascending). For each candidate `REQ-NNN-slug.md`:
 
-Announce: `Starting REQ-NNN [type=<subagent_type>, model=<model>]: [title]`
+1. **Attempt the atomic claim:**
+
+   ```bash
+   git mv {project}/do-work/REQ-NNN-slug.md {project}/do-work/working/REQ-NNN-slug.md
+   ```
+
+   - **Success** — this orchestrator owns the slot. Break out of the iteration and continue below.
+   - **Failure: source path no longer exists** (`did not match any files` / non-zero exit because the file is gone) — a sibling orchestrator won the race. Log: `Claim lost: REQ-NNN (taken by another agent)`. Continue to the next candidate.
+   - **Failure: any other reason** (e.g. `index.lock` held) — retry up to 3 times with backoff (1 s, 2 s, 4 s). On the 4th consecutive failure for this same REQ, log the error and skip that REQ (continue to the next candidate). Do not block the loop on a single problematic REQ.
+
+2. If iteration finishes with no successful claim, the backlog is empty for this orchestrator — fall through to `## When the Backlog is Empty`.
+
+**After a successful claim:**
+
+3. **Write the ownership stamp** into the claimed REQ file. Per the format defined in `## Agent Identity`, insert the block immediately under the `# REQ-NNN:` heading and before the existing `**UR:** ...` field. Use ISO-8601 UTC for `**Claimed at:**`:
+
+   ```markdown
+   <!-- claimed-start -->
+   **Claimed by:** <agent-id>
+   **Claimed at:** <ISO-8601 UTC>
+   <!-- claimed-end -->
+   ```
+
+4. **Update `**Status:**`** from `backlog` to `in-progress`.
+
+5. **Stage and commit** the stamped REQ file to make the claim visible to sibling orchestrators:
+
+   ```bash
+   git add {project}/do-work/working/REQ-NNN-slug.md
+   git commit -m "chore(REQ-NNN): claim by <agent-id>"
+   ```
+
+6. **Announce:**
+
+   ```
+   [<agent-id>] Starting REQ-NNN [type=<subagent_type>, model=<model>]: [title]
+   ```
 
 ### Step 2: Dispatch the worker subagent
 
