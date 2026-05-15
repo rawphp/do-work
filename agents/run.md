@@ -240,7 +240,7 @@ AGENT_ID="$(hostname).$$"
 6. **Announce:**
 
    ```
-   [<agent-id>] Starting REQ-NNN [type=<subagent_type>, model=<model>]: [title]
+   [<agent-id>] Starting REQ-NNN [type=<subagent_type>, model=<model>, isolation=<mode>]: [title]
    ```
 
 ### Step 2: Dispatch the worker subagent

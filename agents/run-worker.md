@@ -18,6 +18,26 @@ Treat these as your full context. Do not search for additional REQs, do not load
 
 ---
 
+## Isolation Mode
+
+After reading the REQ (Step 1) and before starting TDD (Step 3), evaluate the following heuristic to determine your working location for this REQ. Apply rules top-to-bottom; first match wins.
+
+| Signal in REQ | Mode |
+|---|---|
+| `**Layer:** none` (docs / pure refactor / test-only) | `same-branch` |
+| REQ task description matches any of: `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, `restructure` | `worktree` |
+| REQ `## Integration` block lists ≥ 3 distinct service dependencies | `worktree` |
+| REQ acceptance criteria total > 6 items, OR the REQ touches > 5 files in a documented `## Files` block | `worktree` |
+| Anything else | `same-branch` |
+
+**`same-branch`** — operate directly in the orchestrator's checkout, on whatever branch it is currently on (typically `main`).
+
+**`worktree`** — follow REQ-117's workflow (git worktree on its own branch, merge back when done).
+
+Record the chosen mode in the `isolation:` field of your Return Report.
+
+---
+
 ## Steps
 
 ### 1. Read the REQ
@@ -204,6 +224,7 @@ reason: ""              # required when status is "stopped" or "failed"
                         #         scope-creep, dependency-missing,
                         #         unknown-error
 details: ""             # free-text context for the orchestrator/user
+isolation: same-branch  # or "worktree" — from ## Isolation Mode heuristic
 milestone_complete: false
 milestone: ""           # active milestone id when milestone_complete is true
 outputs:
