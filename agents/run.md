@@ -295,7 +295,7 @@ The worker's final message is a fenced YAML block matching the schema defined in
 | `status` | Action |
 |---|---|
 | `done` | Capture `commit` hash and `outputs` for the progress line. Continue to Step 7. |
-| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`). Recover the REQ from `working/` if the worker did not archive it, then handle per `## Stopping Rules`. Do not proceed to Step 7. |
+| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). Recover the REQ from `working/` if the worker did not archive it, then handle per `## Stopping Rules`. Do not proceed to Step 7. |
 | `failed` | The worker crashed before completing. Treat as `stopped` with `reason: unknown-error`. |
 
 If the worker's report is missing or unparseable, treat as `status: failed` with `reason: unknown-error` and surface the raw output to the user.
@@ -415,6 +415,7 @@ Workers cannot pause and ask the user — they have no interaction surface. Ever
 | Task requires external credentials or access not available | `missing-creds` |
 | Acceptance criteria are ambiguous and cannot be interpreted | `ambiguous-criteria` |
 | A change would affect files outside the REQ's stated scope | `scope-creep` |
+| Commit or merge conflict unresolved after 5 retries (see run-worker.md `## Concurrent-Conflict Retry`) | `concurrent-conflict` |
 | Any other unrecoverable error | `unknown-error` |
 
 The worker captures relevant details in the report's `details` field. The worker does not retry beyond what's defined in [agents/run-worker.md](run-worker.md) and never asks the user a question — it exits with the structured report.

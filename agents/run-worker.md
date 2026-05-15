@@ -267,6 +267,75 @@ If `active-milestone.md` does not exist, set `milestone_complete: false` uncondi
 
 ---
 
+## Concurrent-Conflict Retry
+
+When a commit or merge fails because a sibling agent's work landed first, apply this retry policy before returning a stopped report.
+
+### Trigger conditions
+
+Fire this policy when **any** of the following occurs during Step 8 (Commit) or — in `worktree` mode — during `## Worktree Workflow` W6 (Merge back):
+
+- `git commit` is rejected by a pre-commit hook that complains about stale state
+- `git merge` reports text-level conflicts (conflict markers `<<<<<<<` in any file)
+- `git push` is rejected as non-fast-forward (when a remote push is part of the workflow)
+- The base branch's `HEAD` advanced between the worker's last `git fetch`/`git pull` and the commit/merge attempt
+
+### Retry schedule
+
+Up to **5 attempts** with exponential backoff (4 wait intervals):
+
+| Attempt | Wait before retry |
+|---|---|
+| 1 → 2 | 5 seconds |
+| 2 → 3 | 15 seconds |
+| 3 → 4 | 30 seconds |
+| 4 → 5 | 60 seconds |
+| 5 → fail | n/a — exit with `status: stopped` |
+
+### Per-attempt actions
+
+Execute in this exact order for each retry:
+
+1. **Sleep** the backoff interval using the literal Bash sleep command:
+   ```bash
+   sleep <interval>
+   ```
+
+2. **Re-sync** the local branch with the remote/base:
+   - `same-branch` mode:
+     ```bash
+     git pull --rebase origin <current-branch>
+     ```
+     (If no remote exists, `git pull --rebase` against the local tracking branch.)
+   - `worktree` mode: from the orchestrator's checkout (not inside the worktree), pull the base branch, then re-attempt the merge from within:
+     ```bash
+     git pull --rebase origin <base-branch>
+     git merge --no-ff req/REQ-NNN -m "merge(REQ-NNN): integrate"
+     ```
+
+3. **Re-run affected tests** (the same tests from `## Steps` Step 4 — "Run affected tests") against the rebased state. If any test now fails because of the rebase, treat it as a conflict failure — it counts toward the retry budget. Do NOT auto-fix a test failure that arose from rebase; exit the attempt and proceed to the next retry interval.
+
+4. **Re-attempt** the commit or merge.
+
+### No auto-resolve
+
+The worker must **never** edit a file that contains conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) in order to resolve the conflict. If git reports conflict markers in any file after a merge attempt:
+
+```bash
+git merge --abort
+```
+
+Count the attempt as a failure and proceed to the next retry interval.
+
+### Exit conditions
+
+| Outcome | Action |
+|---|---|
+| Success on attempt N (1 ≤ N ≤ 5) | Capture the commit hash; proceed to the existing Step 8 epilogue; record `retry_count: N-1` in the Return Report (0 means first attempt succeeded) |
+| Failure after attempt 5 | Return `status: stopped`, `reason: concurrent-conflict`, `retry_count: 5`, with `details` listing the branch, last git stderr, and conflicting paths |
+
+---
+
 ## Return Report
 
 When you exit, your final message must be a fenced YAML block matching this schema. The orchestrator parses this — keep it strictly structured.
@@ -279,11 +348,12 @@ reason: ""              # required when status is "stopped" or "failed"
                         # one of: tests-failing, verification-failing,
                         #         missing-creds, ambiguous-criteria,
                         #         scope-creep, dependency-missing,
-                        #         unknown-error
+                        #         unknown-error, concurrent-conflict
 details: ""             # free-text context for the orchestrator/user
 isolation: same-branch  # or "worktree" — from ## Isolation Mode heuristic
 milestone_complete: false
 milestone: ""           # active milestone id when milestone_complete is true
+retry_count: 0          # integer — number of conflict retries consumed (0 = no retries)
 outputs:
   - path: path/to/file
     description: one line
@@ -294,6 +364,7 @@ Field rules:
 - `status: stopped` → `reason` must match the enum above; `commit` empty
 - `status: failed` → unrecoverable error (exception thrown, file write failed); `reason: unknown-error` or specific
 - Always include `milestone_complete` (defaults to `false`)
+- Always include `retry_count` (defaults to `0`; set to 5 when exiting via `concurrent-conflict`)
 
 ---
 
