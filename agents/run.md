@@ -206,7 +206,30 @@ Before globbing the backlog, check whether `{project}/do-work/state/active-miles
 - **File present (milestone mode):**
   1. Read the file. Its contents are a single line such as `M1` or `M2`. Trim whitespace to obtain `<active>`.
   2. **Constrain the candidate glob** to `{project}/do-work/REQ-M<active>-*.md` instead of `{project}/do-work/REQ-*.md`. Sort ascending and iterate exactly as the steps below describe.
-  3. **No fallback to other milestones.** If the constrained glob returns no files, the active milestone's backlog is drained — fall through immediately to `## When the Backlog is Empty`. The orchestrator MUST NOT silently widen the glob to pick up REQs from other milestones. The deploy gate (REQ-120) is the only mechanism that advances `active-milestone.md` to the next milestone.
+  3. **No fallback to other milestones.** If the constrained glob returns no files, the active milestone's backlog is drained — fall through to **Step 1.0a: Sibling idle-waiting** below. The orchestrator MUST NOT silently widen the glob to pick up REQs from other milestones. The deploy gate (Step 7b) is the only mechanism that advances `active-milestone.md` to the next milestone.
+
+#### Step 1.0a — Sibling idle-waiting (milestone mode, empty active-milestone backlog)
+
+Reached only when Step 1.0 found the active milestone's backlog empty. The local orchestrator may be a *sibling* — another orchestrator could already be handling the deploy gate. Do not fall through to `## When the Backlog is Empty` yet; first check whether a gate is in progress.
+
+1. Re-read `{project}/do-work/state/active-milestone.md` and capture its contents as `<active_at_entry>`.
+2. Check `{project}/do-work/state/gate-owner.md`:
+   - **File absent:** No sibling has claimed the gate. This orchestrator has finished its in-flight REQ and the milestone backlog is empty, but no one has surfaced the gate yet. Fall through to `## When the Backlog is Empty` — this is the genuine drain path for a single-orchestrator run, or the loser of a race where the gate-owner will detect milestone completion on its own next worker return.
+   - **File present:** Read the single line — the `<gate-owner-agent-id>`. If it equals the local `AGENT_ID`, this orchestrator already owns the gate (re-entry after a restart mid-prompt) — jump to Step 7b. Otherwise enter **idle-waiting** mode.
+3. **Idle-waiting loop.** Log exactly once:
+
+   ```
+   [<agent-id>] Idle — waiting on milestone M<active_at_entry> deploy gate (handled by <gate-owner-agent-id>).
+   ```
+
+   Then poll `{project}/do-work/state/active-milestone.md` every 30 seconds:
+   - **File contents changed** (new milestone id, e.g. `M<active_at_entry+1>`): the gate-owner advanced. Exit idle-waiting and restart the loop at Step 1 (which will re-read the new active milestone and glob accordingly).
+   - **File deleted:** the gate-owner stopped the run (user answered `n` to the gate prompt). Exit idle-waiting and fall through to `## When the Backlog is Empty` — the sibling exits cleanly.
+   - **File unchanged AND `gate-owner.md` deleted while `active-milestone.md` is also gone:** treat as stop. Fall through to `## When the Backlog is Empty`.
+   - **File unchanged after 30 minutes:** the gate-owner appears stuck. Surface to the user: `Gate owner <gate-owner-agent-id> has not resolved milestone M<active_at_entry> after 30 minutes. Continue waiting, or abort?` and act on the user's response.
+   - **Otherwise:** continue polling.
+
+No commits are made while idle-waiting — the orchestrator is reading state files only.
 
 **Compute your agent-id** using the rule in `## Agent Identity`:
 
@@ -325,36 +348,79 @@ Remaining in backlog: N
 
 ### Step 7b: Milestone deploy-gate check (milestone mode only)
 
-The deploy-gate prompt is **owned by the orchestrator, not the worker**. The worker has no user-interaction surface and is explicitly forbidden from auto-confirming any gate. The orchestrator decides when to surface the gate to the user, based on the worker's structured report.
+The deploy-gate prompt is **owned by the orchestrator, not the worker**. The worker has no user-interaction surface and is explicitly forbidden from auto-confirming any gate. Under parallelism, only **one** orchestrator surfaces the prompt to the user — the first to detect milestone completion *and* observe a fully drained milestone backlog.
+
+If `{project}/do-work/state/active-milestone.md` does NOT exist (non-milestone mode), the worker always reports `milestone_complete: false` and the orchestrator simply continues until the backlog is empty. Skip the rest of this step.
 
 If `{project}/do-work/state/active-milestone.md` exists (milestone mode):
 
 1. Read `milestone_complete` from the worker's most recent return report.
 2. If `milestone_complete` is `false`, continue the loop normally — claim the next REQ.
-3. If `milestone_complete` is `true`:
-   - Read the deploy gate text for the active milestone from `{project}/do-work/user-requests/UR-NNN/input.md`. The deploy gate is the line beginning `**Deploy gate:**` under the active milestone's `#### M<n>` heading.
-   - Halt the loop and print:
+3. If `milestone_complete` is `true`, run the **first-to-detect drain check** before showing any prompt. First-to-detect doesn't mean first-to-finish-its-REQ; it means *first whose worker reports milestone-complete AND whose drain check passes*.
 
-     ```
-     Milestone M<n> REQs complete.
+#### Step 7b.1 — Drain confirmation
 
-     Deploy gate: <gate text verbatim>
+Let `<active>` be the trimmed contents of `{project}/do-work/state/active-milestone.md`.
 
-     Has the deploy gate been satisfied? (y/n)
-     ```
+1. Glob `{project}/do-work/REQ-M<active>-*.md` (backlog root). **Must return zero files.** If non-zero, a sibling can still claim more work in this milestone — abort the gate detection, continue the loop normally (Step 8). Some other return-report will trigger the gate later.
+2. Glob `{project}/do-work/working/REQ-M<active>-*.md`. For each file, read its `<!-- claimed-start -->` ownership stamp:
+   - Slots whose `**Claimed by:**` equals the local `AGENT_ID` are expected — at most one (the just-archived REQ's transient state) and not a blocker.
+   - Any slot owned by a **different** agent-id is a sibling's in-flight REQ for the same milestone. The milestone is not yet drained.
+3. **If sibling slots are present**, poll every 30 seconds, up to 30 minutes:
+   - Re-run the working/ glob and re-classify on each tick.
+   - When no sibling-owned slots remain, the milestone is drained — proceed to Step 7b.2.
+   - On 30-minute timeout, surface to the user: `Milestone M<active> appears stuck — sibling slot(s) <list of agent-ids and REQ ids> have not drained after 30 minutes. Continue waiting, or abort?` Act on the user's response (continue → resume polling; abort → exit this orchestrator cleanly without writing `gate-owner.md`).
+4. **If both globs come back clean on the first check (or after polling completes)**, this orchestrator owns the gate. Proceed to Step 7b.2.
 
-   - Wait for user input.
-   - On **y**:
-     - Update `{project}/do-work/state/milestones.md` to mark M<n> as `deployed`.
-     - Ask: "Begin capture for the next milestone? (y/n)"
-       - On **y**: identify the next pending milestone (lowest M<n+1> with status `pending` in milestones.md). Update `active-milestone.md` to that milestone. Print: "Run `/do-work capture UR-NNN` to decompose milestone M<n+1>." Exit.
-       - On **n**: Exit cleanly. The user can return later.
-   - On **n**:
-     - Ask: "What needs to change? Describe the gap." Capture the user's description.
-     - Print: "Run `/do-work capture UR-NNN` to add new REQs for the gap, or edit the UR's milestone definition." Exit.
-   - **Sign-off is non-delegable.** The orchestrator must NOT auto-confirm the deploy gate. The orchestrator must NOT attempt to deploy or test deployment itself. The worker is also forbidden from these actions (see [agents/run-worker.md](run-worker.md)).
+#### Step 7b.2 — Claim the gate
 
-If `{project}/do-work/state/active-milestone.md` does NOT exist (non-milestone mode), the worker always reports `milestone_complete: false` and the orchestrator simply continues until the backlog is empty.
+1. Write `{project}/do-work/state/gate-owner.md` containing a single line: the local `AGENT_ID`. (This file is the cross-process signal that the gate is being handled — siblings reading it in Step 1.0a use the id to attribute the wait.)
+2. Read the deploy gate text for the active milestone from `{project}/do-work/user-requests/UR-NNN/input.md`. The deploy gate is the line beginning `**Deploy gate:**` under the active milestone's `#### M<active>` heading.
+3. Halt the loop and print:
+
+   ```
+   Milestone M<active> REQs complete.
+
+   Deploy gate: <gate text verbatim>
+
+   Has the deploy gate been satisfied? (y/n)
+   ```
+
+4. Wait for user input.
+
+#### Step 7b.3 — Advance on `y`
+
+- Update `{project}/do-work/state/milestones.md` to mark M<active> as `deployed`.
+- Identify the next pending milestone (lowest M<n+1> with status `pending` in milestones.md).
+  - **If one exists:** update `{project}/do-work/state/active-milestone.md` to that milestone id. **This file change is the signal that wakes idle siblings** (see Step 1.0a).
+  - **If none exists** (all milestones deployed): delete `{project}/do-work/state/active-milestone.md` so idle siblings fall through to `## When the Backlog is Empty`.
+- Delete `{project}/do-work/state/gate-owner.md`.
+- Ask: "Begin capture for the next milestone? (y/n)"
+  - On **y**: print: "Run `/do-work capture UR-NNN` to decompose milestone M<n+1>." Exit.
+  - On **n**: exit cleanly. The user can return later.
+
+#### Step 7b.4 — Stop on `n`
+
+- Ask: "What needs to change? Describe the gap." Capture the user's description.
+- Delete `{project}/do-work/state/gate-owner.md`.
+- Delete `{project}/do-work/state/active-milestone.md`. **This deletion wakes idle siblings into the empty-backlog path** (see Step 1.0a) so they exit cleanly without further user prompts.
+- Print: "Run `/do-work capture UR-NNN` to add new REQs for the gap, or edit the UR's milestone definition. Idle siblings will exit when active-milestone.md is removed."
+- Exit.
+
+#### State file: `gate-owner.md`
+
+| Action | Actor | When |
+|---|---|---|
+| **Write** | Gate-owning orchestrator (Step 7b.2) | After drain confirmation passes, before printing the gate prompt |
+| **Read** | Sibling orchestrators (Step 1.0a) | When their active-milestone backlog is empty, to attribute the idle log line |
+| **Delete** | Gate-owning orchestrator (Step 7b.3 or Step 7b.4) | After the user answers y or n, before exit |
+
+Contents: a single line — the gate-owner's `AGENT_ID`. No header, no trailing data. If the file is ever found with malformed contents, treat as absent and continue.
+
+#### Non-delegation
+
+- **Sign-off is non-delegable.** The orchestrator must NOT auto-confirm the deploy gate. The orchestrator must NOT attempt to deploy or test deployment itself. The worker is also forbidden from these actions (see [agents/run-worker.md](run-worker.md)).
+- Only the *which orchestrator owns showing the prompt* changes under parallelism. The prompt text and the requirement for an explicit human y/n answer are unchanged.
 
 ### Step 8: Loop
 
