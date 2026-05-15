@@ -430,26 +430,85 @@ Go back to Step 1 and claim the next REQ.
 
 ## When the Backlog is Empty
 
-### Final test suite run
+The final cross-REQ test suite must run exactly once per drained backlog — fired by the **last orchestrator to finish**, not whichever orchestrator happens to observe the empty backlog first. Under N-way parallelism, this section guarantees that property via an explicit drain check and a committed lockfile.
 
-Before reporting completion, run the project's full test suite as a safety net to catch cross-REQ interaction failures.
+### Step A — Trigger
 
-1. Determine the test suite command:
-   - If `config.test.suite_command` is set and non-empty, use it
-   - If not configured, try common defaults in order: `npm test`, `npx vitest run`, `./vendor/bin/pest`
-   - For each candidate, check if the runner exists (e.g. `which npx`, `test -f vendor/bin/pest`) before executing
-   - If no test runner is found, log "No test suite configured or detected — skipping full suite run" and skip to the completion report
+Reached when the claim step (Step 1, REQ-114) returns no claimable REQ **and** this orchestrator has just archived its previous REQ. (Pre-flight empty-backlog also lands here — see `## Pre-flight Check` Step 5.)
 
-2. Run the test suite command
+### Step B — Drain check (am I the last?)
 
-3. If all tests pass, proceed to the completion report
+Before running the suite, classify the live state by reading ownership stamps (per `## Agent Identity` and REQ-113):
 
-4. If any tests fail:
-   - Identify the likely responsible REQ by comparing each failing test file path against the `git diff --name-only` of each REQ's commit in this loop (use `git log --oneline` to find the commits, then `git diff-tree --no-commit-id --name-only -r <hash>` for each)
-   - Report which REQ likely caused the failure
-   - Attempt to fix the implementation
-   - Re-run the full suite to confirm the fix
-   - If the fix fails after 3 attempts, stop and report the failure to the user
+1. **Backlog root:** glob `{project}/do-work/REQ-*.md`. Must be empty.
+   - In milestone mode (`{project}/do-work/state/active-milestone.md` exists), glob `{project}/do-work/REQ-M<active>-*.md` instead.
+2. **Working slots:** glob `{project}/do-work/working/REQ-*.md` (milestone mode: `working/REQ-M<active>-*.md`). For each slot file, read its `<!-- claimed-start --> … <!-- claimed-end -->` block and classify by `**Claimed by:**`:
+
+   | Classification | Condition |
+   |---|---|
+   | `mine` | Stamp's `**Claimed by:**` equals local `AGENT_ID`. Tolerated — at most one, the just-archived REQ's transient state. Not a blocker. |
+   | `other` | Stamp's `**Claimed by:**` differs from local `AGENT_ID`. A sibling is still in flight — drain check **fails**. |
+   | `other` (defensive) | No stamp present (legacy / malformed slot). Treat as `other` — the local agent must not run the suite without checking with siblings. |
+
+3. **Drain check passes** iff backlog glob is empty AND no slot is classified `other`. Proceed to Step C.
+4. **Drain check fails** (one or more `other` slots): proceed to Step E (sibling idle exit).
+
+### Step C — Lockfile acquisition (sibling-also-drained race)
+
+Two orchestrators can both pass the drain check at near-the-same instant (each just archived its own REQ, neither sees the other's slot). The lockfile is the tiebreaker.
+
+Lockfile path:
+- Non-milestone mode: `{project}/do-work/state/final-suite-running.md`
+- Milestone mode: `{project}/do-work/state/final-suite-M<active>-running.md`
+
+Acquisition sequence (first-to-commit wins):
+
+1. Check whether the lockfile already exists. If yes, another orchestrator already holds the suite — proceed to Step E (sibling idle exit), substituting "Sibling is running the final suite" framing.
+2. Write the lockfile with a single block:
+
+   ```markdown
+   **Held by:** <agent-id>
+   **Started at:** <ISO-8601 UTC>
+   ```
+
+3. Stage and commit atomically:
+
+   ```bash
+   git add {project}/do-work/state/final-suite-running.md      # or final-suite-M<n>-running.md
+   git commit -m "chore: final-suite lock"
+   ```
+
+   - **Commit succeeds:** this orchestrator holds the lock. Proceed to Step D.
+   - **Commit fails** (e.g. sibling won the race, working tree shows their lockfile already committed, or merge conflict on the lockfile): treat as lost race. Discard local lockfile changes (`git checkout -- <lockfile>` then `rm -f <lockfile>` if still present), then proceed to Step E.
+
+The lockfile is intentionally committed *before* running the suite so other orchestrators can observe the lock even if the suite hangs.
+
+### Step D — Run the suite (lock-holder only)
+
+This orchestrator holds the lockfile. Run the project's full test suite as a cross-REQ safety net.
+
+1. **Suite command resolution** — unchanged. Use `config.test.suite_command` if set; otherwise try defaults in order (`npm test`, `npx vitest run`, `./vendor/bin/pest`), checking the runner exists before executing. If none found, log `No test suite configured or detected — skipping full suite run` and skip to Step D.4.
+2. **Execute** the suite command.
+3. **On failure** — apply the existing failure-attribution + 3-attempt fix loop unchanged: map failing test files to REQ commits via `git diff-tree --no-commit-id --name-only -r <hash>`, report the likely responsible REQ, fix the implementation, re-run; after 3 failed attempts, stop and report to the user.
+4. **Release the lockfile** (regardless of pass/fail):
+
+   ```bash
+   git rm {project}/do-work/state/final-suite-running.md      # or final-suite-M<n>-running.md
+   git commit -m "chore: final-suite lock released"
+   ```
+
+5. Proceed to the completion report below.
+
+### Step E — Sibling idle exit (drain check failed OR lockfile already held)
+
+This orchestrator does NOT run the suite. Emit exactly one idle log line, then exit cleanly:
+
+```
+[<agent-id>] Backlog drained for this orchestrator. <N> sibling slot(s) still in flight ([<sibling-agent-id>, ...]).
+Sibling will run the final suite when it finishes.
+```
+
+The user will see one final-suite report from whichever sibling finishes last. No further work, no polling, no lockfile writes.
 
 ### Completion report and prompt
 
