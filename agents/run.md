@@ -97,6 +97,7 @@ Glob `{project}/do-work/working/REQ-*.md`. For each file found, read its ownersh
 |---|---|---|
 | **`mine`** | `**Claimed by:**` in the stamp matches `AGENT_ID` | Resume this REQ — skip the claim step and jump directly to worker dispatch for it |
 | **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND `git log -1 --format=%ci -- <file>` is < 24 h ago | Silently ignore — another live orchestrator owns it |
+| **`out-of-milestone`** | Milestone mode is active (`do-work/state/active-milestone.md` exists) AND the slot's milestone id (parsed from the filename: `REQ-M<n>-NNN-slug.md` → `M<n>`) differs from the active milestone | Silently ignore — treat the same as `sibling` (a previous-milestone REQ still in flight during a milestone transition is informational only) |
 | **`stale`** | No ownership stamp present (legacy leftover), OR stamp present but `git log -1 --format=%ci -- <file>` is ≥ 24 h ago | Collect into the stale list |
 
 Check staleness per-slot:
@@ -196,6 +197,16 @@ The chosen `model` appears in the per-REQ announce line alongside `subagent_type
 Repeat until the backlog is empty:
 
 ### Step 1: Claim the next REQ
+
+#### Step 1.0 — Milestone filter (milestone mode only)
+
+Before globbing the backlog, check whether `{project}/do-work/state/active-milestone.md` exists.
+
+- **File absent (non-milestone mode):** skip this step entirely — proceed to the backlog glob as written below, behaviour unchanged from REQ-114.
+- **File present (milestone mode):**
+  1. Read the file. Its contents are a single line such as `M1` or `M2`. Trim whitespace to obtain `<active>`.
+  2. **Constrain the candidate glob** to `{project}/do-work/REQ-M<active>-*.md` instead of `{project}/do-work/REQ-*.md`. Sort ascending and iterate exactly as the steps below describe.
+  3. **No fallback to other milestones.** If the constrained glob returns no files, the active milestone's backlog is drained — fall through immediately to `## When the Backlog is Empty`. The orchestrator MUST NOT silently widen the glob to pick up REQs from other milestones. The deploy gate (REQ-120) is the only mechanism that advances `active-milestone.md` to the next milestone.
 
 **Compute your agent-id** using the rule in `## Agent Identity`:
 
