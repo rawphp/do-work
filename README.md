@@ -208,6 +208,24 @@ Capture inspects the codebase to draft the answers, verifies cited files actuall
 
 ---
 
+## Parallel Execution
+
+do-work supports parallel execution across multiple terminals. Open two or three terminals, run `/do-work run` in each, and the orchestrators pick disjoint REQs from the backlog and work in parallel. No flag is needed — parallel mode is implicit when a second terminal joins.
+
+Three guarantees keep the parallel terminals from stepping on each other:
+
+1. **Atomic claim.** Two orchestrators racing for the same REQ resolve via `git mv` — the loser sees the source file gone and falls through to the next REQ. No double-work, no manual coordination.
+2. **Visible ownership.** Each claimed REQ in `working/` carries a `**Claimed by: <agent-id>**` stamp at the top of the file so it's clear who is doing what. `agent-id` is `hostname.pid` of the owning `/do-work run` process.
+3. **Wait-and-retry on conflicts.** Workers whose commits collide on shared files wait with exponential backoff (5 retries over ~110 seconds), then surface the conflict to the user via `status: stopped`, `reason: concurrent-conflict`. No silent auto-resolve.
+
+**When parallel mode shines.** Backlogs of 5+ independent REQs — the work-sharing payoff grows with the backlog size. For single-REQ work, tightly-coupled REQs, or milestone deploy gates (which stay single-agent by design), the simplicity of one terminal is often the better trade-off.
+
+**Isolation per REQ.** Large REQs (migrations, refactors, schema changes) automatically use `git worktree` on a `req/REQ-NNN` branch and merge back when done; small REQs (most of them) work directly on the base branch.
+
+See `SKILL.md` `## Parallel Execution` for the full behavioural reference, including state files (`gate-owner.md`, `final-suite-running.md`) and the worktree-vs-same-branch heuristic.
+
+---
+
 ## Build in Public (Log)
 
 The log feature generates draft social media posts based on work you've completed — so you can share progress without writing posts from scratch.

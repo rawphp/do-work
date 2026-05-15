@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Parallel execution (2026-05-15)
+
+`/do-work run` is now safe to launch from multiple terminals simultaneously. Each orchestrator picks a different REQ from the backlog and they coordinate via the filesystem — no flag, no daemon.
+
+**Added**
+- Atomic REQ claim via `git mv` + ownership stamp (`**Claimed by:** <hostname.pid>`) committed to git so sibling terminals can see who owns what.
+- Multi-slot `working/` pre-flight: classifies each slot as `mine` / `sibling` / `stale` instead of treating any slot as a hard abort. Stale-slot prompt (Reclaim / Return-to-backlog / Abort) batched into one user interaction.
+- Runtime same-branch vs worktree isolation heuristic. Worktree mode triggers on large/structural REQs (migrations, refactors, schema changes, ≥3 service deps, >6 acceptance criteria). Worktrees live at `{project}/.worktrees/req-NNN` on `req/REQ-NNN` branches and merge back on completion.
+- Wait-and-retry on commit/merge conflicts: 5 retries with 5s / 15s / 30s / 60s exponential backoff. After 5 failures, worker exits with `status: stopped`, `reason: concurrent-conflict`. No silent auto-resolve.
+- Milestone mode constrained to "parallel within active milestone only" — orchestrators claim REQs only from `REQ-M<active>-*.md` while a milestone is active. The first orchestrator to detect milestone-complete owns the deploy gate; siblings idle (logging `Idle — waiting on milestone M<n> deploy gate`) and resume when the gate advances.
+- Final cross-REQ test suite runs from whichever orchestrator drains last, gated by a `do-work/state/final-suite-running.md` lockfile (or `final-suite-M<n>-running.md` in milestone mode).
+- New state files in `do-work/state/`: `gate-owner.md` (records the agent-id currently handling a milestone gate; deleted on resolve).
+- `concurrent-conflict` added to the worker's `reason` enum.
+- `retry_count` and `isolation` fields added to the worker's Return Report schema.
+
+**Changed**
+- The per-REQ announce line is prefixed with `[<agent-id>]` and now also shows `isolation=<mode>` alongside `type=<subagent_type>` and `model=<model>`.
+- Pre-flight check no longer aborts on the mere presence of REQs in `working/`. Siblings' live slots are silently respected.
+
+**Compatibility**
+- Running `/do-work run` in a single terminal has the same semantics as before. Parallel mode is implicit and only activates when a second terminal joins.
+- Existing REQs without ownership stamps in `working/` are classified as `stale` on first encounter and surface the Reclaim/Return/Abort prompt.
+
 ## Gap-aware capture (2026-04-29)
 
 **Added**

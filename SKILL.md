@@ -96,6 +96,37 @@ When a UR file contains both:
 
 Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that do not match the trigger continue to behave as before. The `/saas-thesis` skill produces UR files with the correct shape for handoff.
 
+## Parallel Execution
+
+`/do-work run` is safe to launch from multiple terminals simultaneously. Open two or three terminal sessions, run `/do-work run` in each, and each orchestrator claims a different REQ from the backlog. Coordination happens via the filesystem and git — no flag, no daemon, no in-memory orchestrator.
+
+**Visible differences from single-agent mode:**
+
+- The per-REQ announce line is prefixed with `[<agent-id>]` (where `agent-id` is `hostname.pid`) so users can attribute output across terminals.
+- Multiple REQs may appear in `working/` simultaneously, each carrying an ownership stamp:
+  ```markdown
+  <!-- claimed-start -->
+  **Claimed by:** mbp-tom.42137
+  **Claimed at:** 2026-05-15T11:42:08Z
+  <!-- claimed-end -->
+  ```
+- The final cross-REQ test suite runs once, from whichever orchestrator drains last (gated by `do-work/state/final-suite-running.md` lockfile).
+- On a commit or merge conflict, the loser-of-race waits up to ~110 seconds (5 retries with 5s / 15s / 30s / 60s exponential backoff) before exiting with `status: stopped`, `reason: concurrent-conflict`.
+
+**Isolation per REQ.** The worker chooses `same-branch` (default) or `worktree` at dispatch time based on REQ scope. Worktree mode triggers when the REQ task mentions `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, or `restructure`; when the Integration block lists ≥ 3 distinct service dependencies; or when the REQ has > 6 acceptance criteria. Worktree REQs work in `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch and merge back into the base branch on completion.
+
+**Constraints that stay single-agent:**
+
+- Milestone deploy gates remain non-delegable — the first orchestrator to detect milestone-complete owns the gate; siblings idle (logging `Idle — waiting on milestone M<n> deploy gate`) and resume when `do-work/state/active-milestone.md` advances. `do-work/state/gate-owner.md` records which agent owns the in-flight gate.
+- The stale-slot prompt in pre-flight runs in whichever orchestrator finds the stale slot first.
+
+**State files added by parallel mode** (all under `do-work/state/`):
+
+- `gate-owner.md` — the `agent-id` currently handling a milestone deploy gate (deleted on resolve).
+- `final-suite-running.md` (or `final-suite-M<n>-running.md` in milestone mode) — lockfile written by the orchestrator running the final cross-REQ test suite.
+
+**Implementation reference.** See `agents/run.md` `## Agent Identity`, `## Pre-flight Check`, `### Step 1: Claim the next REQ`, `## When the Backlog is Empty`, `### Step 7b`; `agents/run-worker.md` `## Isolation Mode`, `## Worktree Workflow`, `## Concurrent-Conflict Retry`.
+
 ## Layers
 
 do-work uses project-declared layers to gap-check feature briefs. Declare your project's layers once in `do-work/config.yml`:
