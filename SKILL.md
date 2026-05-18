@@ -95,6 +95,37 @@ if [ -f {project}/.gitignore ] && grep -Eq '^do-work/?$' {project}/.gitignore; t
 fi
 ```
 
+After the directory rename and `.gitignore` rewrite succeed, scan the consumer project for hardcoded `do-work/` references and print a warning if any are found.
+
+**Consumer-ref scan targets:**
+
+- All `*.md` files in `{project}` (recursive), excluding: `.git/`, `node_modules/`, `vendor/`, `.worktrees/`, `dist/`, `build/`
+- `{project}/.gitignore` itself (in case it contains other `do-work/` patterns beyond the one already rewritten)
+
+**Pattern:** regex `(^|[^.])do-work/` — matches the literal legacy form; the leading `[^.]` guard excludes post-migration `.do-work/` references so only genuine stale references surface.
+
+If matches are found, print:
+
+```
+Migration warning: consumer files still reference the legacy do-work/ path.
+Review and update these manually — migration does NOT auto-rewrite consumer docs:
+
+  CLAUDE.md:14:  Run intake: read systems/do-work/agents/intake.md
+  CLAUDE.md:18:  Identify which project the work is for in {project}/do-work/
+  README.md:42:  See do-work/ for backlog state
+  ...
+
+(Total: N references across M files.)
+```
+
+If zero matches, print nothing — silent success.
+
+**Advisory only.** This warning is informational. Never auto-rewrite consumer files — that is a separate explicit user action.
+
+**Failure handling.** If the scan command itself fails (permission denied, regex error on a particular platform, or any other non-zero exit from the underlying grep), skip the warning step silently. Migration already succeeded; the consumer-ref scan is best-effort and must never block the user from completing migration.
+
+**Skill source exclusion.** When this skill is invoked against its own source clone (`~/.claude/skills/do-work/`), that clone intentionally gitignores `.do-work/` and is excluded from this scan — no self-referential warnings will fire.
+
 Output `Migrated do-work/ → .do-work/` and continue with the subcommand.
 
 **Both-exist conflict.** When both `{project}/do-work/` and `{project}/.do-work/` are present, do not migrate. Halt the subcommand with this exact text and exit:
