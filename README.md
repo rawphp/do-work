@@ -11,7 +11,7 @@ Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 ### One-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rawphp/.do-work/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash
 ```
 
 ### Or clone manually
