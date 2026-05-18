@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## REQ-scoped commits (2026-05-18)
+
+Workers and orchestrators no longer use broad git-add sweeps. Every commit stages only paths keyed to its own REQ (or, for orchestrator-owned commits, the single state file the orchestrator is changing). Under parallel execution this prevents a worker from accidentally including a sibling's claim file, in-flight working/ slot, or unrelated state edits in its REQ commit.
+
+**Changed**
+- `agents/run-worker.md` Step 8 (Commit) — replaced the `git add -A {project}/do-work/` sweep with an explicit four-category staging list (REQ lifecycle, UR directory, logs/state, implementation files), plus a forbidden-paths list and a pre-stage `git status` check. The same explicit-paths rule now applies in both `same-branch` and `worktree` modes.
+- `agents/run.md` Step 1 (Claim) — added an explicit "stage only this REQ's path" note to the claim commit. Behaviour unchanged; intent clarified.
+- `agents/run.md` Pre-flight "Return to backlog" — added a concrete example showing only the single REQ's path being staged when returning a stale claim.
+
+**Why**
+- Under parallel `/do-work run`, a `git add -A do-work/` sweep can capture sibling agents' files that happen to be dirty in the working tree (their claim stamps mid-commit, their working/ slot edits, orchestrator-owned state files). The resulting REQ commit becomes a tangle of "this REQ + whatever else was in flight", which corrupts git blame, breaks REQ-to-commit attribution, and can cause the final-suite failure-attribution map (`git diff-tree -r <hash>`) to point at the wrong REQ.
+- The rule is now: a commit stages exactly the paths owned by the agent making the commit, for the REQ (or state-file role) it is currently performing.
+
 ## Parallel execution (2026-05-15)
 
 `/do-work run` is now safe to launch from multiple terminals simultaneously. Each orchestrator picks a different REQ from the backlog and they coordinate via the filesystem — no flag, no daemon.

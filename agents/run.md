@@ -120,7 +120,13 @@ These appear abandoned. Reclaim into this run, return to backlog, or abort?
 ```
 
 - **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
-- **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ.
+- **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ. Stage **only** that REQ's file path — do not sweep `do-work/`. Example:
+  ```bash
+  git mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/REQ-NNN-slug.md
+  # edit the file to strip the claim block and reset Status
+  git add {project}/do-work/REQ-NNN-slug.md
+  git commit -m "chore(REQ-NNN): return stale claim to backlog"
+  ```
 - **Abort:** Exit pre-flight and halt this orchestrator.
 
 ### 5. Backlog emptiness check
@@ -264,7 +270,7 @@ AGENT_ID="$(hostname).$$"
 
 4. **Update `**Status:**`** from `backlog` to `in-progress`.
 
-5. **Stage and commit** the stamped REQ file to make the claim visible to sibling orchestrators:
+5. **Stage and commit** the stamped REQ file to make the claim visible to sibling orchestrators. Stage **only** this REQ's path — never sweep `do-work/`. The `git mv` from substep 1 already staged the rename; this `git add` picks up the stamp edit on top of it.
 
    ```bash
    git add {project}/do-work/working/REQ-NNN-slug.md
