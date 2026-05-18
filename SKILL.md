@@ -67,6 +67,44 @@ git rev-parse --show-toplevel
 If this fails (not a git repo), use the current working directory.
 All references below use `{project}` to mean this resolved root.
 
+### Migration check
+
+Immediately after resolving `{project}` and before executing any subcommand-specific instructions, check whether this project's data folder needs migrating from the legacy `do-work/` location to `.do-work/`. Apply these four detection branches:
+
+| State at `{project}` | Action |
+|---|---|
+| `.do-work/` exists AND `do-work/` does not exist | Already migrated. Continue silently. |
+| `do-work/` exists AND `.do-work/` does not exist | Migrate (see below), then continue. |
+| Both `do-work/` and `.do-work/` exist | **Halt.** Output the conflict message below and stop the subcommand. |
+| Neither exists | No migration needed. Continue (the `install` flow handles fresh projects). |
+
+**Migration procedure** (legacy `do-work/` → `.do-work/`):
+
+```bash
+# Prefer `git mv` so history follows the rename. Fall back to plain `mv` if the path is
+# gitignored or this is not a git repo (both make `git mv` fail).
+git mv {project}/do-work {project}/.do-work 2>/dev/null \
+  || mv {project}/do-work {project}/.do-work
+```
+
+Then rewrite `.gitignore` if it contains a line matching `^do-work/?$`:
+
+```bash
+if [ -f {project}/.gitignore ] && grep -Eq '^do-work/?$' {project}/.gitignore; then
+  sed -i.bak -E 's|^do-work/?$|.do-work/|' {project}/.gitignore && rm {project}/.gitignore.bak
+fi
+```
+
+Output `Migrated do-work/ → .do-work/` and continue with the subcommand.
+
+**Both-exist conflict.** When both `{project}/do-work/` and `{project}/.do-work/` are present, do not migrate. Halt the subcommand with this exact text and exit:
+
+```
+Migration conflict: both do-work/ and .do-work/ exist at {project}. Resolve manually before re-running.
+```
+
+**No mid-flight protection.** This check does not inspect `working/` for in-flight REQs before migrating. Migration is rare in practice; the assumption is that the user runs it on an idle project. A migration that runs while a parallel `/do-work run` is mid-REQ will cause that worker to fail on the next file-system access — accept that risk rather than introducing a coordination layer for a once-per-project event.
+
 **Critical: skill directory is read-only at runtime.** The skill is loaded from `~/.claude/skills/do-work/` — this is a separate git clone. NEVER edit files, stage changes, or commit inside the skills directory. All edits and commits MUST happen in `{project}`. If a REQ targets agent files (e.g. `agents/log.md`), edit them at `{project}/agents/log.md`, not at the skill clone path.
 
 ---
