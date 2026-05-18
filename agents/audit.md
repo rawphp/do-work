@@ -103,6 +103,19 @@ For each REQ, apply auto-fixes inline:
 - Add missing error path criteria (Dimension 2)
 - Add dependency annotations (Dimension 4)
 - Add missing `ui` verification step when unambiguously inferrable (Dimension 6)
+- Apply blanket find-and-replace guard augmentations when triggered (see below)
+
+#### Blanket find-and-replace guard (mirror of capture.md Step 4d)
+
+Scan each REQ's `## Task` block against the trigger phrase list defined in `agents/capture.md` Step 4d (single source of truth). If a trigger fires AND the three mandatory augmentations are absent, auto-fix them now:
+
+1. Append the pre-commit grep acceptance criterion to `## Acceptance Criteria`.
+2. Append the `runtime` grep verification step to `## Verification Steps`.
+3. Append the Context warning to the REQ's `## Context` block.
+
+This is the same behaviour capture.md Step 4d applies at write time. Audit applies it retroactively to any REQ that slipped through without it.
+
+**This guard is purely additive** — do not delete or rewrite existing content. Do not block the run. Do not flag these as errors if the augmentations are already present; only act when they are missing.
 
 **Do NOT:**
 - Delete REQs

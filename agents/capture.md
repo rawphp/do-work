@@ -338,6 +338,69 @@ Options:
 
 **Prompt input convention.** The layer-coverage gate uses `AskUserQuestion` regardless of `config.next_steps.enabled` — this is a workflow gate, not a next-step suggestion. Empty user input picks option 2 ("No — record decision and skip"). This is the only safe default; option 1 would silently generate REQs the user hasn't endorsed.
 
+### 4d. Blanket find-and-replace guard
+
+This pass runs on every REQ generated in Step 4, regardless of classification or layer.
+
+**Purpose:** Detect REQs whose task description asks for a blanket string substitution and inject mandatory audit checkpoints so the implementer cannot blindly run `sed -i` without reviewing every match. This guard is **purely additive** — it never blocks capture, never modifies the user's brief, and never vetoes a REQ.
+
+**Trigger phrases** (case-insensitive, scan the REQ's `## Task` block, first match wins):
+
+| Pattern | Example match |
+|---|---|
+| `rewrite <X> → <Y>` or `rewrite <X> -> <Y>` | "rewrite do-work → .do-work across agents/" |
+| `rewrite <X> to <Y>` | "rewrite all foo to bar in docs/" |
+| `replace <X> with <Y>` (X and Y are short strings, not multi-clause sentences) | "replace foo with bar in all markdown files" |
+| `global find-and-replace` | "global find-and-replace of config path" |
+| `find and replace.*across` | "find and replace the old URL across the repo" |
+| `bulk rename` | "bulk rename all handler files" |
+| `mass rename` | "mass rename commands to new scheme" |
+| `rename .* across` | "rename the flag across all configs" |
+
+**When a trigger fires, append three augmentations to the REQ before committing. Do not ask the user — apply immediately:**
+
+1. **Acceptance criterion** — append to `## Acceptance Criteria` (this is the mandatory pre-commit grep check):
+   ```
+   - [ ] Before committing, run the pre-commit grep: `grep -nE '<X>' <files>` and confirm every remaining match is intentional (e.g. inside historical text, changelog entries, or migration prose where the legacy form must be preserved).
+   ```
+   Replace `<X>` with the literal search string from the REQ's task, and `<files>` with the target file pattern mentioned in the task (e.g. `agents/*.md`, `docs/**/*.md`).
+
+2. **Verification step** — append to `## Verification Steps` as a `runtime` step:
+   ```
+   N. **runtime** Run `grep -nE '<X>' <files>`. For each match, decide: intentional (historical/migration/changelog context) or unintended substitution target. List intentional matches explicitly. Only proceed with commit if all matches are accounted for.
+   ```
+
+3. **Context warning** — append to the REQ's `## Context` block (or add one if absent):
+   ```
+   > ⚠️ This REQ is a blanket find-and-replace. See UR-029 for a prior incident where this pattern corrupted migration prose. Audit hits in changelog/migration/historical contexts before committing.
+   ```
+
+**Worked example:**
+
+*Input brief:* "rewrite foo → bar across docs/*.md"
+
+*Capture generates a REQ. Step 4d fires on the trigger `rewrite foo → bar`. The REQ is augmented as follows before commit:*
+
+```markdown
+## Acceptance Criteria
+
+- [ ] All instances of `foo` in docs/*.md are replaced with `bar`
+- [ ] Before committing, run `grep -nE 'foo' docs/*.md` and confirm every remaining match is intentional (e.g. inside historical text, changelog entries, or migration prose where the legacy form must be preserved).
+
+## Verification Steps
+
+1. **test** `grep -rn 'foo' docs/*.md` — expected: zero matches after substitution (minus intentional preservations)
+2. **runtime** Run `grep -nE 'foo' docs/*.md`. For each match, decide: intentional (historical/migration/changelog context) or unintended substitution target. List intentional matches explicitly. Only proceed with commit if all matches are accounted for.
+
+## Context
+
+Background about the rename...
+
+> ⚠️ This REQ is a blanket find-and-replace. See UR-029 for a prior incident where this pattern corrupted migration prose. Audit hits in changelog/migration/historical contexts before committing.
+```
+
+*A normal feature REQ with no trigger phrases passes through Step 4d unchanged.*
+
 ### 5. Integration question pass
 
 This pass runs only for `feature`-class briefs and only on REQs whose `**Layer:**` is not `none`. Bug-fix briefs and `none`-layer REQs skip it.
