@@ -7,7 +7,7 @@ Thanks for your interest in contributing! This guide covers how the skill is str
 Do Work is a Claude Code skill — a set of Markdown agent files that Claude reads and follows as instructions.
 
 ```
-do-work/
+.do-work/
 ├── SKILL.md          ← entrypoint, command router
 ├── agents/
 │   ├── start.md      ← orchestrator: intake + ideate + capture

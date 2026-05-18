@@ -9,12 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Workers and orchestrators no longer use broad git-add sweeps. Every commit stages only paths keyed to its own REQ (or, for orchestrator-owned commits, the single state file the orchestrator is changing). Under parallel execution this prevents a worker from accidentally including a sibling's claim file, in-flight working/ slot, or unrelated state edits in its REQ commit.
 
 **Changed**
-- `agents/run-worker.md` Step 8 (Commit) — replaced the `git add -A {project}/do-work/` sweep with an explicit four-category staging list (REQ lifecycle, UR directory, logs/state, implementation files), plus a forbidden-paths list and a pre-stage `git status` check. The same explicit-paths rule now applies in both `same-branch` and `worktree` modes.
+- `agents/run-worker.md` Step 8 (Commit) — replaced the `git add -A {project}/.do-work/` sweep with an explicit four-category staging list (REQ lifecycle, UR directory, logs/state, implementation files), plus a forbidden-paths list and a pre-stage `git status` check. The same explicit-paths rule now applies in both `same-branch` and `worktree` modes.
 - `agents/run.md` Step 1 (Claim) — added an explicit "stage only this REQ's path" note to the claim commit. Behaviour unchanged; intent clarified.
 - `agents/run.md` Pre-flight "Return to backlog" — added a concrete example showing only the single REQ's path being staged when returning a stale claim.
 
 **Why**
-- Under parallel `/do-work run`, a `git add -A do-work/` sweep can capture sibling agents' files that happen to be dirty in the working tree (their claim stamps mid-commit, their working/ slot edits, orchestrator-owned state files). The resulting REQ commit becomes a tangle of "this REQ + whatever else was in flight", which corrupts git blame, breaks REQ-to-commit attribution, and can cause the final-suite failure-attribution map (`git diff-tree -r <hash>`) to point at the wrong REQ.
+- Under parallel `/do-work run`, a `git add -A .do-work/` sweep can capture sibling agents' files that happen to be dirty in the working tree (their claim stamps mid-commit, their working/ slot edits, orchestrator-owned state files). The resulting REQ commit becomes a tangle of "this REQ + whatever else was in flight", which corrupts git blame, breaks REQ-to-commit attribution, and can cause the final-suite failure-attribution map (`git diff-tree -r <hash>`) to point at the wrong REQ.
 - The rule is now: a commit stages exactly the paths owned by the agent making the commit, for the REQ (or state-file role) it is currently performing.
 
 ## Parallel execution (2026-05-15)
@@ -27,8 +27,8 @@ Workers and orchestrators no longer use broad git-add sweeps. Every commit stage
 - Runtime same-branch vs worktree isolation heuristic. Worktree mode triggers on large/structural REQs (migrations, refactors, schema changes, ≥3 service deps, >6 acceptance criteria). Worktrees live at `{project}/.worktrees/req-NNN` on `req/REQ-NNN` branches and merge back on completion.
 - Wait-and-retry on commit/merge conflicts: 5 retries with 5s / 15s / 30s / 60s exponential backoff. After 5 failures, worker exits with `status: stopped`, `reason: concurrent-conflict`. No silent auto-resolve.
 - Milestone mode constrained to "parallel within active milestone only" — orchestrators claim REQs only from `REQ-M<active>-*.md` while a milestone is active. The first orchestrator to detect milestone-complete owns the deploy gate; siblings idle (logging `Idle — waiting on milestone M<n> deploy gate`) and resume when the gate advances.
-- Final cross-REQ test suite runs from whichever orchestrator drains last, gated by a `do-work/state/final-suite-running.md` lockfile (or `final-suite-M<n>-running.md` in milestone mode).
-- New state files in `do-work/state/`: `gate-owner.md` (records the agent-id currently handling a milestone gate; deleted on resolve).
+- Final cross-REQ test suite runs from whichever orchestrator drains last, gated by a `.do-work/state/final-suite-running.md` lockfile (or `final-suite-M<n>-running.md` in milestone mode).
+- New state files in `.do-work/state/`: `gate-owner.md` (records the agent-id currently handling a milestone gate; deleted on resolve).
 - `concurrent-conflict` added to the worker's `reason` enum.
 - `retry_count` and `isolation` fields added to the worker's Return Report schema.
 
@@ -74,7 +74,7 @@ Workers and orchestrators no longer use broad git-add sweeps. Every commit stage
 - `/do-work ideate [UR-NNN]` — surfaces assumptions, risks, and connections before decomposition
 - `/do-work verify [UR-NNN]` — scores REQ coverage against the original brief (0-100%)
 - `/do-work run` — executes backlog with TDD loop, one REQ at a time, commit per REQ
-- `/do-work install` — creates per-project `do-work/` folder structure
+- `/do-work install` — creates per-project `.do-work/` folder structure
 - `--no-ideate` flag for `start` to skip creative review
 - `--force` flag for `go` to run regardless of confidence score
 - `--auto-fix` flag for `go` and `verify` to auto-create missing REQs

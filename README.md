@@ -11,7 +11,7 @@ Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 ### One-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rawphp/.do-work/main/install.sh | bash
 ```
 
 ### Or clone manually
@@ -63,7 +63,7 @@ Flags:
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs. |
 | `/do-work go [UR-NNN] --no-layers` | Verifies + runs, but skips layer-coverage checks for this UR. |
-| `/do-work install` | Creates `do-work/` folder structure in current project. |
+| `/do-work install` | Creates `.do-work/` folder structure in current project. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR into REQ files. |
 | `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
@@ -95,7 +95,7 @@ Flags:
 This skill is multi-file. `SKILL.md` is the entrypoint and routes commands to agent files:
 
 ```
-do-work/
+.do-work/
 ├── SKILL.md              ← entrypoint and command router
 ├── agents/
 │   ├── start.md          ← orchestrator: intake + ideate + capture
@@ -121,7 +121,7 @@ When you run `/do-work start` in a project, it creates:
 
 ```
 your-project/
-└── do-work/
+└── .do-work/
     ├── config.yml               ← project configuration
     ├── user-requests/
     │   └── UR-001/
@@ -142,7 +142,7 @@ Everything is auditable — the brief, decomposed tasks, and outputs all live in
 
 ## Configuration
 
-Each project gets a `do-work/config.yml` file, auto-created on first `/do-work start` or `/do-work install`. Edit it to customize agent behavior.
+Each project gets a `.do-work/config.yml` file, auto-created on first `/do-work start` or `/do-work install`. Edit it to customize agent behavior.
 
 ```yaml
 # do-work configuration
@@ -195,7 +195,7 @@ next_steps:
 
 Feature briefs frequently produce REQs that miss the frontend, miss the wiring, or both. do-work's gap-aware capture prevents this by enforcing two structural checks.
 
-**Declared layers.** Each project declares its layers in `do-work/config.yml` — `[frontend, backend]` for a web app, `[commands, core, output]` for a CLI, whatever fits your stack. Capture tags each REQ with one of the declared layers (or `none` for bug-fixes / pure refactors). If a brief looks full-stack but capture didn't write a REQ for a declared layer, you're prompted: *"Project has layer X, no REQ covers it. Needed?"* Yes generates the missing REQ; No records the decision so verify doesn't keep flagging it.
+**Declared layers.** Each project declares its layers in `.do-work/config.yml` — `[frontend, backend]` for a web app, `[commands, core, output]` for a CLI, whatever fits your stack. Capture tags each REQ with one of the declared layers (or `none` for bug-fixes / pure refactors). If a brief looks full-stack but capture didn't write a REQ for a declared layer, you're prompted: *"Project has layer X, no REQ covers it. Needed?"* Yes generates the missing REQ; No records the decision so verify doesn't keep flagging it.
 
 **Integration block.** Every feature REQ that adds new surface (a new page, route, command, endpoint, etc.) must have an `## Integration` section answering three questions, with concrete file references:
 - **Reachability** — How does the user/caller reach this?
@@ -232,10 +232,10 @@ The log feature generates draft social media posts based on work you've complete
 
 ### How it works
 
-1. Scans `do-work/archive/` for REQs completed since the last log entry
+1. Scans `.do-work/archive/` for REQs completed since the last log entry
 2. Generates multiple draft posts per configured platform (different angles, not minor rewrites)
 3. Presents all drafts for you to review
-4. You pick one per platform — the selection is recorded in `do-work/logs/log-history.yml` so the same work isn't re-prompted
+4. You pick one per platform — the selection is recorded in `.do-work/logs/log-history.yml` so the same work isn't re-prompted
 
 ### Usage
 
@@ -257,11 +257,11 @@ Or let it run automatically — `/do-work go` triggers the log step after a clea
 
 ### Length enforcement
 
-Every draft is hard-capped at `log.max_chars[platform]` before being written to disk. If a generated draft exceeds the ceiling, the agent rewrites it once; if it still exceeds, it truncates at the last sentence boundary that fits, falling back to a hard character truncation with an ellipsis if no boundary is available. The ceiling is mechanical, not aspirational — you can tune it per platform in `do-work/config.yml`.
+Every draft is hard-capped at `log.max_chars[platform]` before being written to disk. If a generated draft exceeds the ceiling, the agent rewrites it once; if it still exceeds, it truncates at the last sentence boundary that fits, falling back to a hard character truncation with an ellipsis if no boundary is available. The ceiling is mechanical, not aspirational — you can tune it per platform in `.do-work/config.yml`.
 
 ### Configuration
 
-Set platforms in `do-work/config.yml`:
+Set platforms in `.do-work/config.yml`:
 
 ```yaml
 log:
@@ -276,7 +276,7 @@ log:
 
 ### Disabling the log
 
-If you don't want build-in-public posts, set `log.enabled: false` in your project's `do-work/config.yml`:
+If you don't want build-in-public posts, set `log.enabled: false` in your project's `.do-work/config.yml`:
 
 ```yaml
 log:
@@ -294,8 +294,8 @@ Each completed REQ produces a commit:
 ```
 feat(REQ-001): short title
 
-REQ: do-work/archive/REQ-001-slug.md
-UR: do-work/user-requests/UR-001/input.md
+REQ: .do-work/archive/REQ-001-slug.md
+UR: .do-work/user-requests/UR-001/input.md
 Output: path/to/primary/output
 ```
 
