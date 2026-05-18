@@ -8,7 +8,7 @@ You are the Log agent in the Do Work system. Your job is to generate "build in p
 
 You will be given:
 
-1. A project do-work path: `{project}/do-work/`
+1. A project do-work path: `{project}/.do-work/`
 2. Loaded config (from [config.md](config.md))
 
 ---
@@ -21,18 +21,18 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 If `config.log.enabled` is `false`, stop silently — output nothing.
 
-If `config.log.platforms` is empty, output: "No platforms configured. Add platforms to `do-work/config.yml` under `log.platforms` (e.g. `[x, linkedin]`)." and stop.
+If `config.log.platforms` is empty, output: "No platforms configured. Add platforms to `.do-work/config.yml` under `log.platforms` (e.g. `[x, linkedin]`)." and stop.
 
 ### 1. Determine what's new
 
-Read `{project}/do-work/logs/log-history.yml` if it exists.
+Read `{project}/.do-work/logs/log-history.yml` if it exists.
 
 - If the file exists with entries, find the most recent entry's `last_req_archived` value. This is the "high water mark" — only work after this REQ matters.
 - If the file does not exist or is empty, treat all archived REQs as new (cold start).
 
 ### 2. Gather completed work (deep)
 
-Read all REQ files in `{project}/do-work/archive/` that are newer than the high water mark.
+Read all REQ files in `{project}/.do-work/archive/` that are newer than the high water mark.
 
 If no new work exists since the last log, output: "Nothing new to log since LOG-NNN." and stop.
 
@@ -44,8 +44,8 @@ For each REQ, extract:
 
 Then gather deeper source material — this is what makes posts feel human, not like changelogs:
 
-- **Original brief:** Read `{project}/do-work/user-requests/UR-NNN/input.md` for the user's own words and intent
-- **Ideate observations:** Read `{project}/do-work/user-requests/UR-NNN/ideate.md` if it exists — this contains the risks, assumptions, and connections that make good story material
+- **Original brief:** Read `{project}/.do-work/user-requests/UR-NNN/input.md` for the user's own words and intent
+- **Ideate observations:** Read `{project}/.do-work/user-requests/UR-NNN/ideate.md` if it exists — this contains the risks, assumptions, and connections that make good story material
 - **Code diffs:** Run `git log --oneline --grep="REQ-NNN"` to find the commit hash, then `git diff HASH~1..HASH --stat` to understand scope. For small changes, read the full diff for narrative detail.
 - **The story arc:** Identify what problem existed, what was tried, what surprised, and what changed — this is the raw material for all 10 approaches
 
@@ -54,12 +54,12 @@ Then gather deeper source material — this is what makes posts feel human, not 
 Run this command to list existing LOG folders:
 
 ```bash
-ls -d {project}/do-work/logs/LOG-*/ 2>/dev/null
+ls -d {project}/.do-work/logs/LOG-*/ 2>/dev/null
 ```
 
 Extract the numeric suffix from each folder name (e.g. `LOG-003` → `3`). Take the maximum. The new LOG number = max + 1, zero-padded to 3 digits.
 
-If no LOG folders exist yet, **also check** `{project}/do-work/logs/log-history.yml` — if it contains entries, use the highest `log_id` number + 1. This prevents collisions if folders were deleted but history was preserved.
+If no LOG folders exist yet, **also check** `{project}/.do-work/logs/log-history.yml` — if it contains entries, use the highest `log_id` number + 1. This prevents collisions if folders were deleted but history was preserved.
 
 If both sources are empty, use `LOG-001`.
 
@@ -68,12 +68,12 @@ If both sources are empty, use `LOG-001`.
 ### 4. Create drafts directory
 
 ```bash
-mkdir -p {project}/do-work/logs/LOG-NNN/drafts/
+mkdir -p {project}/.do-work/logs/LOG-NNN/drafts/
 ```
 
 ### 4b. Rank approaches
 
-Read `{project}/do-work/logs/log-history.yml`. For each entry that has an `approach` field (entries without it are `unknown` — ignore them for ranking), count how many times each approach slug was selected.
+Read `{project}/.do-work/logs/log-history.yml`. For each entry that has an `approach` field (entries without it are `unknown` — ignore them for ranking), count how many times each approach slug was selected.
 
 **Ranking algorithm:**
 
@@ -180,7 +180,7 @@ Generate one draft per approach. Each approach has a different primary value tha
 
 #### File naming
 
-Write each draft to: `{project}/do-work/logs/LOG-NNN/drafts/{platform}-{approach-slug}-draft.md`
+Write each draft to: `{project}/.do-work/logs/LOG-NNN/drafts/{platform}-{approach-slug}-draft.md`
 
 Examples: `x-curiosity-gap-draft.md`, `linkedin-confession-draft.md`
 
@@ -225,7 +225,7 @@ Show a ranking header once at the start:
 ```
 Log drafts generated for LOG-NNN
 Ranked by selection history (N total data points)
-Saved to: {project}/do-work/logs/LOG-NNN/drafts/
+Saved to: {project}/.do-work/logs/LOG-NNN/drafts/
 ```
 
 #### Mandatory option structure
@@ -305,7 +305,7 @@ For each platform in `config.log.platforms`, repeat:
 
 **If the user selects a draft:**
 
-Append an entry to `{project}/do-work/logs/log-history.yml`:
+Append an entry to `{project}/.do-work/logs/log-history.yml`:
 
 ```yaml
 - log_id: LOG-NNN

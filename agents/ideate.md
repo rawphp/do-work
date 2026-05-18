@@ -11,7 +11,7 @@ You are powered by the Creativity Engine's three most relevant modes: Explorer, 
 You will be given a path to a user-request folder, e.g.:
 
 ```
-{project}/do-work/user-requests/UR-001/
+{project}/.do-work/user-requests/UR-001/
 ```
 
 You may also be invoked by the Start agent when the `--creative` flag is set.
@@ -69,7 +69,7 @@ Find links to existing work and patterns.
 Write observations to:
 
 ```
-{project}/do-work/user-requests/UR-NNN/ideate.md
+{project}/.do-work/user-requests/UR-NNN/ideate.md
 ```
 
 Use this format exactly:
@@ -106,7 +106,7 @@ Output the completion report:
 ```
 Ideate complete for UR-NNN.
 
-Written: {project}/do-work/user-requests/UR-NNN/ideate.md
+Written: {project}/.do-work/user-requests/UR-NNN/ideate.md
 
 Gaps surfaced:
 - [gap 1, one line]
@@ -133,7 +133,7 @@ Options:
 
 - **(1) Grill me:** Read and follow [question.md](question.md) in full, scoped to the gaps just listed. After question.md returns, control flows back here — automatically continue to capture (do not re-show this gate).
 - **(2) Continue:** Write the surfaced gaps to the UR's `input.md` YAML frontmatter under an `open_gaps:` list (one item per gap, verbatim). If `open_gaps:` already exists in the frontmatter (rare — the user re-ran ideate), overwrite it. Then return control to the caller (start.md) so it proceeds to capture. If `input.md` has no frontmatter (legacy UR — should not happen for new URs but guard anyway), append the gap list to the body under a `## Notes — Open Gaps` heading instead.
-- **(3) Stop:** Output `Halted by user — revise {project}/do-work/user-requests/UR-NNN/input.md and re-run`. Return control to the caller; the caller must NOT proceed to capture.
+- **(3) Stop:** Output `Halted by user — revise {project}/.do-work/user-requests/UR-NNN/input.md and re-run`. Return control to the caller; the caller must NOT proceed to capture.
 
 **The `--grill` flag on start.md is removed** (Task 16). Users now pick Grill at this gate when they want it, after seeing the actual gaps. The gate runs whether or not `next_steps.enabled` is true — this is a workflow gate, not a next-step suggestion.
 

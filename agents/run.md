@@ -9,7 +9,7 @@ You are the Run agent in the Do Work system. Your job is to execute the backlog 
 You will be given a project do-work path:
 
 ```
-{project}/do-work/
+{project}/.do-work/
 ```
 
 ---
@@ -91,19 +91,19 @@ AGENT_ID="$(hostname).$$"
 
 ### 3. Scan and classify working/ slots
 
-Glob `{project}/do-work/working/REQ-*.md`. For each file found, read its ownership stamp (the `<!-- claimed-start --> … <!-- claimed-end -->` block) and classify the slot into one of three buckets:
+Glob `{project}/.do-work/working/REQ-*.md`. For each file found, read its ownership stamp (the `<!-- claimed-start --> … <!-- claimed-end -->` block) and classify the slot into one of three buckets:
 
 | Bucket | Condition | Action |
 |---|---|---|
 | **`mine`** | `**Claimed by:**` in the stamp matches `AGENT_ID` | Resume this REQ — skip the claim step and jump directly to worker dispatch for it |
 | **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND `git log -1 --format=%ci -- <file>` is < 24 h ago | Silently ignore — another live orchestrator owns it |
-| **`out-of-milestone`** | Milestone mode is active (`do-work/state/active-milestone.md` exists) AND the slot's milestone id (parsed from the filename: `REQ-M<n>-NNN-slug.md` → `M<n>`) differs from the active milestone | Silently ignore — treat the same as `sibling` (a previous-milestone REQ still in flight during a milestone transition is informational only) |
+| **`out-of-milestone`** | Milestone mode is active (`.do-work/state/active-milestone.md` exists) AND the slot's milestone id (parsed from the filename: `REQ-M<n>-NNN-slug.md` → `M<n>`) differs from the active milestone | Silently ignore — treat the same as `sibling` (a previous-milestone REQ still in flight during a milestone transition is informational only) |
 | **`stale`** | No ownership stamp present (legacy leftover), OR stamp present but `git log -1 --format=%ci -- <file>` is ≥ 24 h ago | Collect into the stale list |
 
 Check staleness per-slot:
 
 ```bash
-git log -1 --format="%ci" -- {project}/do-work/working/REQ-NNN-slug.md
+git log -1 --format="%ci" -- {project}/.do-work/working/REQ-NNN-slug.md
 ```
 
 A slot is **stale** if the command returns no output (file was never committed) or the returned timestamp is ≥ 24 h ago.
@@ -120,11 +120,11 @@ These appear abandoned. Reclaim into this run, return to backlog, or abort?
 ```
 
 - **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
-- **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ. Stage **only** that REQ's file path — do not sweep `do-work/`. Example:
+- **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ. Stage **only** that REQ's file path — do not sweep `.do-work/`. Example:
   ```bash
-  git mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/REQ-NNN-slug.md
+  git mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/REQ-NNN-slug.md
   # edit the file to strip the claim block and reset Status
-  git add {project}/do-work/REQ-NNN-slug.md
+  git add {project}/.do-work/REQ-NNN-slug.md
   git commit -m "chore(REQ-NNN): return stale claim to backlog"
   ```
 - **Abort:** Exit pre-flight and halt this orchestrator.
@@ -151,7 +151,7 @@ Scan the REQ's `## Task`, `## Context`, `## Acceptance Criteria`, and `## Verifi
 | Task is a new feature spanning multiple layers (controller + view + model) and no specialist above matches | `feature-dev:code-architect` |
 | Task is "find code", "search for X", "where is Y defined", or pure exploration | `Explore` |
 | Task is a code review or "review the implementation against the plan" | `feature-dev:code-reviewer` |
-| File paths under `~/.claude/skills/`, `~/.claude/agents/`, `do-work/agents/`, OR task mentions "skill", "agent file", "SKILL.md", "slash command", "trigger description" | `skill-author` |
+| File paths under `~/.claude/skills/`, `~/.claude/agents/`, `.do-work/agents/`, OR task mentions "skill", "agent file", "SKILL.md", "slash command", "trigger description" | `skill-author` |
 | File imports `anthropic`, `@anthropic-ai/sdk`, `openai`, or a vector DB client (pinecone, qdrant, weaviate, chroma, pgvector); OR task mentions "prompt", "eval", "RAG", "embeddings", "tool use", "function calling", "LLM", or "agent loop" | `llm-app-engineer` |
 | Anything else (markdown edits, config tweaks, scripting, generic refactors) | `general-purpose` |
 
@@ -206,20 +206,20 @@ Repeat until the backlog is empty:
 
 #### Step 1.0 — Milestone filter (milestone mode only)
 
-Before globbing the backlog, check whether `{project}/do-work/state/active-milestone.md` exists.
+Before globbing the backlog, check whether `{project}/.do-work/state/active-milestone.md` exists.
 
 - **File absent (non-milestone mode):** skip this step entirely — proceed to the backlog glob as written below, behaviour unchanged from REQ-114.
 - **File present (milestone mode):**
   1. Read the file. Its contents are a single line such as `M1` or `M2`. Trim whitespace to obtain `<active>`.
-  2. **Constrain the candidate glob** to `{project}/do-work/REQ-M<active>-*.md` instead of `{project}/do-work/REQ-*.md`. Sort ascending and iterate exactly as the steps below describe.
+  2. **Constrain the candidate glob** to `{project}/.do-work/REQ-M<active>-*.md` instead of `{project}/.do-work/REQ-*.md`. Sort ascending and iterate exactly as the steps below describe.
   3. **No fallback to other milestones.** If the constrained glob returns no files, the active milestone's backlog is drained — fall through to **Step 1.0a: Sibling idle-waiting** below. The orchestrator MUST NOT silently widen the glob to pick up REQs from other milestones. The deploy gate (Step 7b) is the only mechanism that advances `active-milestone.md` to the next milestone.
 
 #### Step 1.0a — Sibling idle-waiting (milestone mode, empty active-milestone backlog)
 
 Reached only when Step 1.0 found the active milestone's backlog empty. The local orchestrator may be a *sibling* — another orchestrator could already be handling the deploy gate. Do not fall through to `## When the Backlog is Empty` yet; first check whether a gate is in progress.
 
-1. Re-read `{project}/do-work/state/active-milestone.md` and capture its contents as `<active_at_entry>`.
-2. Check `{project}/do-work/state/gate-owner.md`:
+1. Re-read `{project}/.do-work/state/active-milestone.md` and capture its contents as `<active_at_entry>`.
+2. Check `{project}/.do-work/state/gate-owner.md`:
    - **File absent:** No sibling has claimed the gate. This orchestrator has finished its in-flight REQ and the milestone backlog is empty, but no one has surfaced the gate yet. Fall through to `## When the Backlog is Empty` — this is the genuine drain path for a single-orchestrator run, or the loser of a race where the gate-owner will detect milestone completion on its own next worker return.
    - **File present:** Read the single line — the `<gate-owner-agent-id>`. If it equals the local `AGENT_ID`, this orchestrator already owns the gate (re-entry after a restart mid-prompt) — jump to Step 7b. Otherwise enter **idle-waiting** mode.
 3. **Idle-waiting loop.** Log exactly once:
@@ -228,7 +228,7 @@ Reached only when Step 1.0 found the active milestone's backlog empty. The local
    [<agent-id>] Idle — waiting on milestone M<active_at_entry> deploy gate (handled by <gate-owner-agent-id>).
    ```
 
-   Then poll `{project}/do-work/state/active-milestone.md` every 30 seconds:
+   Then poll `{project}/.do-work/state/active-milestone.md` every 30 seconds:
    - **File contents changed** (new milestone id, e.g. `M<active_at_entry+1>`): the gate-owner advanced. Exit idle-waiting and restart the loop at Step 1 (which will re-read the new active milestone and glob accordingly).
    - **File deleted:** the gate-owner stopped the run (user answered `n` to the gate prompt). Exit idle-waiting and fall through to `## When the Backlog is Empty` — the sibling exits cleanly.
    - **File unchanged AND `gate-owner.md` deleted while `active-milestone.md` is also gone:** treat as stop. Fall through to `## When the Backlog is Empty`.
@@ -243,12 +243,12 @@ No commits are made while idle-waiting — the orchestrator is reading state fil
 AGENT_ID="$(hostname).$$"
 ```
 
-**Iterate the backlog in ascending order.** Glob `{project}/do-work/REQ-*.md`, sort by filename (ascending). For each candidate `REQ-NNN-slug.md`:
+**Iterate the backlog in ascending order.** Glob `{project}/.do-work/REQ-*.md`, sort by filename (ascending). For each candidate `REQ-NNN-slug.md`:
 
 1. **Attempt the atomic claim:**
 
    ```bash
-   git mv {project}/do-work/REQ-NNN-slug.md {project}/do-work/working/REQ-NNN-slug.md
+   git mv {project}/.do-work/REQ-NNN-slug.md {project}/.do-work/working/REQ-NNN-slug.md
    ```
 
    - **Success** — this orchestrator owns the slot. Break out of the iteration and continue below.
@@ -270,10 +270,10 @@ AGENT_ID="$(hostname).$$"
 
 4. **Update `**Status:**`** from `backlog` to `in-progress`.
 
-5. **Stage and commit** the stamped REQ file to make the claim visible to sibling orchestrators. Stage **only** this REQ's path — never sweep `do-work/`. The `git mv` from substep 1 already staged the rename; this `git add` picks up the stamp edit on top of it.
+5. **Stage and commit** the stamped REQ file to make the claim visible to sibling orchestrators. Stage **only** this REQ's path — never sweep `.do-work/`. The `git mv` from substep 1 already staged the rename; this `git add` picks up the stamp edit on top of it.
 
    ```bash
-   git add {project}/do-work/working/REQ-NNN-slug.md
+   git add {project}/.do-work/working/REQ-NNN-slug.md
    git commit -m "chore(REQ-NNN): claim by <agent-id>"
    ```
 
@@ -293,7 +293,7 @@ Determine `model` using the rules in `## Model Selection` above. Default to `son
 Identify the **prior-REQ archived paths** for the same UR — these provide the worker context about what has already been built:
 
 1. Read the REQ's `**UR:**` field
-2. Glob `{project}/do-work/archive/REQ-*.md`
+2. Glob `{project}/.do-work/archive/REQ-*.md`
 3. For each archived REQ, read its `**UR:**` field and keep only those matching the current UR
 4. Pass the resulting absolute paths to the worker
 
@@ -356,9 +356,9 @@ Remaining in backlog: N
 
 The deploy-gate prompt is **owned by the orchestrator, not the worker**. The worker has no user-interaction surface and is explicitly forbidden from auto-confirming any gate. Under parallelism, only **one** orchestrator surfaces the prompt to the user — the first to detect milestone completion *and* observe a fully drained milestone backlog.
 
-If `{project}/do-work/state/active-milestone.md` does NOT exist (non-milestone mode), the worker always reports `milestone_complete: false` and the orchestrator simply continues until the backlog is empty. Skip the rest of this step.
+If `{project}/.do-work/state/active-milestone.md` does NOT exist (non-milestone mode), the worker always reports `milestone_complete: false` and the orchestrator simply continues until the backlog is empty. Skip the rest of this step.
 
-If `{project}/do-work/state/active-milestone.md` exists (milestone mode):
+If `{project}/.do-work/state/active-milestone.md` exists (milestone mode):
 
 1. Read `milestone_complete` from the worker's most recent return report.
 2. If `milestone_complete` is `false`, continue the loop normally — claim the next REQ.
@@ -366,10 +366,10 @@ If `{project}/do-work/state/active-milestone.md` exists (milestone mode):
 
 #### Step 7b.1 — Drain confirmation
 
-Let `<active>` be the trimmed contents of `{project}/do-work/state/active-milestone.md`.
+Let `<active>` be the trimmed contents of `{project}/.do-work/state/active-milestone.md`.
 
-1. Glob `{project}/do-work/REQ-M<active>-*.md` (backlog root). **Must return zero files.** If non-zero, a sibling can still claim more work in this milestone — abort the gate detection, continue the loop normally (Step 8). Some other return-report will trigger the gate later.
-2. Glob `{project}/do-work/working/REQ-M<active>-*.md`. For each file, read its `<!-- claimed-start -->` ownership stamp:
+1. Glob `{project}/.do-work/REQ-M<active>-*.md` (backlog root). **Must return zero files.** If non-zero, a sibling can still claim more work in this milestone — abort the gate detection, continue the loop normally (Step 8). Some other return-report will trigger the gate later.
+2. Glob `{project}/.do-work/working/REQ-M<active>-*.md`. For each file, read its `<!-- claimed-start -->` ownership stamp:
    - Slots whose `**Claimed by:**` equals the local `AGENT_ID` are expected — at most one (the just-archived REQ's transient state) and not a blocker.
    - Any slot owned by a **different** agent-id is a sibling's in-flight REQ for the same milestone. The milestone is not yet drained.
 3. **If sibling slots are present**, poll every 30 seconds, up to 30 minutes:
@@ -380,8 +380,8 @@ Let `<active>` be the trimmed contents of `{project}/do-work/state/active-milest
 
 #### Step 7b.2 — Claim the gate
 
-1. Write `{project}/do-work/state/gate-owner.md` containing a single line: the local `AGENT_ID`. (This file is the cross-process signal that the gate is being handled — siblings reading it in Step 1.0a use the id to attribute the wait.)
-2. Read the deploy gate text for the active milestone from `{project}/do-work/user-requests/UR-NNN/input.md`. The deploy gate is the line beginning `**Deploy gate:**` under the active milestone's `#### M<active>` heading.
+1. Write `{project}/.do-work/state/gate-owner.md` containing a single line: the local `AGENT_ID`. (This file is the cross-process signal that the gate is being handled — siblings reading it in Step 1.0a use the id to attribute the wait.)
+2. Read the deploy gate text for the active milestone from `{project}/.do-work/user-requests/UR-NNN/input.md`. The deploy gate is the line beginning `**Deploy gate:**` under the active milestone's `#### M<active>` heading.
 3. Halt the loop and print:
 
    ```
@@ -396,11 +396,11 @@ Let `<active>` be the trimmed contents of `{project}/do-work/state/active-milest
 
 #### Step 7b.3 — Advance on `y`
 
-- Update `{project}/do-work/state/milestones.md` to mark M<active> as `deployed`.
+- Update `{project}/.do-work/state/milestones.md` to mark M<active> as `deployed`.
 - Identify the next pending milestone (lowest M<n+1> with status `pending` in milestones.md).
-  - **If one exists:** update `{project}/do-work/state/active-milestone.md` to that milestone id. **This file change is the signal that wakes idle siblings** (see Step 1.0a).
-  - **If none exists** (all milestones deployed): delete `{project}/do-work/state/active-milestone.md` so idle siblings fall through to `## When the Backlog is Empty`.
-- Delete `{project}/do-work/state/gate-owner.md`.
+  - **If one exists:** update `{project}/.do-work/state/active-milestone.md` to that milestone id. **This file change is the signal that wakes idle siblings** (see Step 1.0a).
+  - **If none exists** (all milestones deployed): delete `{project}/.do-work/state/active-milestone.md` so idle siblings fall through to `## When the Backlog is Empty`.
+- Delete `{project}/.do-work/state/gate-owner.md`.
 - Ask: "Begin capture for the next milestone? (y/n)"
   - On **y**: print: "Run `/do-work capture UR-NNN` to decompose milestone M<n+1>." Exit.
   - On **n**: exit cleanly. The user can return later.
@@ -408,8 +408,8 @@ Let `<active>` be the trimmed contents of `{project}/do-work/state/active-milest
 #### Step 7b.4 — Stop on `n`
 
 - Ask: "What needs to change? Describe the gap." Capture the user's description.
-- Delete `{project}/do-work/state/gate-owner.md`.
-- Delete `{project}/do-work/state/active-milestone.md`. **This deletion wakes idle siblings into the empty-backlog path** (see Step 1.0a) so they exit cleanly without further user prompts.
+- Delete `{project}/.do-work/state/gate-owner.md`.
+- Delete `{project}/.do-work/state/active-milestone.md`. **This deletion wakes idle siblings into the empty-backlog path** (see Step 1.0a) so they exit cleanly without further user prompts.
 - Print: "Run `/do-work capture UR-NNN` to add new REQs for the gap, or edit the UR's milestone definition. Idle siblings will exit when active-milestone.md is removed."
 - Exit.
 
@@ -446,9 +446,9 @@ Reached when the claim step (Step 1, REQ-114) returns no claimable REQ **and** t
 
 Before running the suite, classify the live state by reading ownership stamps (per `## Agent Identity` and REQ-113):
 
-1. **Backlog root:** glob `{project}/do-work/REQ-*.md`. Must be empty.
-   - In milestone mode (`{project}/do-work/state/active-milestone.md` exists), glob `{project}/do-work/REQ-M<active>-*.md` instead.
-2. **Working slots:** glob `{project}/do-work/working/REQ-*.md` (milestone mode: `working/REQ-M<active>-*.md`). For each slot file, read its `<!-- claimed-start --> … <!-- claimed-end -->` block and classify by `**Claimed by:**`:
+1. **Backlog root:** glob `{project}/.do-work/REQ-*.md`. Must be empty.
+   - In milestone mode (`{project}/.do-work/state/active-milestone.md` exists), glob `{project}/.do-work/REQ-M<active>-*.md` instead.
+2. **Working slots:** glob `{project}/.do-work/working/REQ-*.md` (milestone mode: `working/REQ-M<active>-*.md`). For each slot file, read its `<!-- claimed-start --> … <!-- claimed-end -->` block and classify by `**Claimed by:**`:
 
    | Classification | Condition |
    |---|---|
@@ -464,8 +464,8 @@ Before running the suite, classify the live state by reading ownership stamps (p
 Two orchestrators can both pass the drain check at near-the-same instant (each just archived its own REQ, neither sees the other's slot). The lockfile is the tiebreaker.
 
 Lockfile path:
-- Non-milestone mode: `{project}/do-work/state/final-suite-running.md`
-- Milestone mode: `{project}/do-work/state/final-suite-M<active>-running.md`
+- Non-milestone mode: `{project}/.do-work/state/final-suite-running.md`
+- Milestone mode: `{project}/.do-work/state/final-suite-M<active>-running.md`
 
 Acquisition sequence (first-to-commit wins):
 
@@ -480,7 +480,7 @@ Acquisition sequence (first-to-commit wins):
 3. Stage and commit atomically:
 
    ```bash
-   git add {project}/do-work/state/final-suite-running.md      # or final-suite-M<n>-running.md
+   git add {project}/.do-work/state/final-suite-running.md      # or final-suite-M<n>-running.md
    git commit -m "chore: final-suite lock"
    ```
 
@@ -499,7 +499,7 @@ This orchestrator holds the lockfile. Run the project's full test suite as a cro
 4. **Release the lockfile** (regardless of pass/fail):
 
    ```bash
-   git rm {project}/do-work/state/final-suite-running.md      # or final-suite-M<n>-running.md
+   git rm {project}/.do-work/state/final-suite-running.md      # or final-suite-M<n>-running.md
    git commit -m "chore: final-suite lock released"
    ```
 
@@ -526,7 +526,7 @@ Do Work loop complete.
 Processed: N REQs
 Full suite: [passed / skipped — no test runner found]
 All outputs committed.
-Archive: {project}/do-work/archive/
+Archive: {project}/.do-work/archive/
 ```
 
 **Then, immediately after the report**, check whether to present next-step options:

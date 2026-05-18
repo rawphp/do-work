@@ -10,7 +10,7 @@ You sharpen REQs by fixing vague criteria, adding missing error paths, and annot
 
 You will be given:
 
-1. A project do-work path: `{project}/do-work/`
+1. A project do-work path: `{project}/.do-work/`
 2. A UR reference: `UR-NNN`
 
 You are invoked automatically by the Go agent after Verify passes, or standalone via `/do-work audit UR-NNN`.
@@ -25,13 +25,13 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 1. Read ground truth
 
-Read `{project}/do-work/user-requests/UR-NNN/input.md` in full — including the `## Clarifications` section if it exists. Clarifications are user-verified answers from the Question agent and carry the highest authority for interpreting intent.
+Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full — including the `## Clarifications` section if it exists. Clarifications are user-verified answers from the Question agent and carry the highest authority for interpreting intent.
 
-Read `{project}/do-work/user-requests/UR-NNN/ideate.md` if it exists. Note Challenger risks and Connector overlaps for reference during interrogation.
+Read `{project}/.do-work/user-requests/UR-NNN/ideate.md` if it exists. Note Challenger risks and Connector overlaps for reference during interrogation.
 
 ### 2. Read all REQ files for this UR
 
-Scan the backlog root (`{project}/do-work/`) for `REQ-NNN-*.md` files.
+Scan the backlog root (`{project}/.do-work/`) for `REQ-NNN-*.md` files.
 
 For each REQ file, read its `**UR:**` field. **Only audit REQs whose UR field matches the target UR** (e.g. `UR-018`). Skip REQs belonging to other URs.
 
@@ -148,7 +148,7 @@ Audit Report — UR-NNN
 If any REQ files were modified, stage and commit:
 
 ```bash
-git add {project}/do-work/REQ-*.md
+git add {project}/.do-work/REQ-*.md
 git commit -m "chore(UR-NNN): audit REQs — N fixes applied"
 ```
 

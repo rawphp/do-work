@@ -61,7 +61,7 @@ git worktree add {project}/.worktrees/req-NNN -b req/REQ-NNN <base-branch>
 
 ### W3. REQ file visibility
 
-The REQ file in `{project}/do-work/working/REQ-NNN-slug.md` is immediately visible from the worktree because `git worktree` shares the repository's object database and tracked index. No physical copy or move is required.
+The REQ file in `{project}/.do-work/working/REQ-NNN-slug.md` is immediately visible from the worktree because `git worktree` shares the repository's object database and tracked index. No physical copy or move is required.
 
 ### W4. Work inside the worktree
 
@@ -219,13 +219,13 @@ Add an `## Outputs` section at the end of the REQ:
 Move the REQ from `working/` to `archive/`:
 
 ```bash
-mv {project}/do-work/working/REQ-NNN-slug.md {project}/do-work/archive/REQ-NNN-slug.md
+mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/archive/REQ-NNN-slug.md
 ```
 
 Confirm the archive file exists, then defensively remove any leftover `working/` copy:
 
 ```bash
-rm -f {project}/do-work/working/REQ-NNN-slug.md
+rm -f {project}/.do-work/working/REQ-NNN-slug.md
 ```
 
 ### 8. Commit
@@ -236,43 +236,43 @@ You commit the REQ yourself. Do not return to the orchestrator and ask it to com
 
 **`same-branch` mode:** run the commit from the orchestrator's checkout as before.
 
-**Stage only paths keyed to THIS REQ.** Never use a broad sweep (`git add -A`, `git add do-work/`, `git add .`). Under parallelism a sweep would pick up a sibling agent's claim file, in-flight working/ slot, or unrelated state file edits — each REQ commit must contain only its own work.
+**Stage only paths keyed to THIS REQ.** Never use a broad sweep (`git add -A`, `git add .do-work/`, `git add .`). Under parallelism a sweep would pick up a sibling agent's claim file, in-flight working/ slot, or unrelated state file edits — each REQ commit must contain only its own work.
 
 Build the staging list explicitly from the four categories below. Anything outside these categories is not your work and must not be staged.
 
 | Category | What to stage | Path pattern |
 |---|---|---|
-| REQ lifecycle (always) | The archive create + the working/ slot deletion for THIS REQ | `do-work/archive/REQ-NNN-slug.md`, `do-work/working/REQ-NNN-slug.md` |
-| UR directory (if touched) | Files this REQ created or modified under its own UR's directory | `do-work/user-requests/UR-NNN/REQ-NNN-*` or sibling artifacts owned by this REQ |
-| Logs / state (if written) | Log or state files this REQ wrote, named for this REQ | `do-work/logs/REQ-NNN-*`, or any `do-work/state/` file owned by this REQ |
-| Implementation files | Source files outside `do-work/` that this REQ changed | Anywhere in the repo, listed explicitly |
+| REQ lifecycle (always) | The archive create + the working/ slot deletion for THIS REQ | `.do-work/archive/REQ-NNN-slug.md`, `.do-work/working/REQ-NNN-slug.md` |
+| UR directory (if touched) | Files this REQ created or modified under its own UR's directory | `.do-work/user-requests/UR-NNN/REQ-NNN-*` or sibling artifacts owned by this REQ |
+| Logs / state (if written) | Log or state files this REQ wrote, named for this REQ | `.do-work/logs/REQ-NNN-*`, or any `.do-work/state/` file owned by this REQ |
+| Implementation files | Source files outside `.do-work/` that this REQ changed | Anywhere in the repo, listed explicitly |
 
 Forbidden to stage from this commit (these belong to sibling agents or other commits):
-- Any `do-work/working/REQ-MMM-*.md` where `MMM` ≠ this REQ's number
-- Any `do-work/archive/REQ-MMM-*.md` where `MMM` ≠ this REQ's number
-- `do-work/state/active-milestone.md`, `do-work/state/milestones.md`, `do-work/state/gate-owner.md`, `do-work/state/final-suite-*.md` (owned by the orchestrator, not the worker)
-- Any other REQ file in `do-work/REQ-*.md` (those are sibling-owned backlog items)
+- Any `.do-work/working/REQ-MMM-*.md` where `MMM` ≠ this REQ's number
+- Any `.do-work/archive/REQ-MMM-*.md` where `MMM` ≠ this REQ's number
+- `.do-work/state/active-milestone.md`, `.do-work/state/milestones.md`, `.do-work/state/gate-owner.md`, `.do-work/state/final-suite-*.md` (owned by the orchestrator, not the worker)
+- Any other REQ file in `.do-work/REQ-*.md` (those are sibling-owned backlog items)
 
 Use `git status` before staging to confirm only your own paths appear, then stage explicitly:
 
 ```bash
 git status                                            # confirm only REQ-NNN paths are dirty
-git add {project}/do-work/archive/REQ-NNN-slug.md     # archive create
-git add {project}/do-work/working/REQ-NNN-slug.md     # working/ deletion (git stages the removal)
-git add {project}/do-work/user-requests/UR-NNN/...    # only if this REQ touched UR-owned files
-git add {project}/do-work/logs/REQ-NNN-...            # only if this REQ wrote logs
-git add path/to/changed/implementation/files...       # implementation files outside do-work/, listed explicitly
+git add {project}/.do-work/archive/REQ-NNN-slug.md     # archive create
+git add {project}/.do-work/working/REQ-NNN-slug.md     # working/ deletion (git stages the removal)
+git add {project}/.do-work/user-requests/UR-NNN/...    # only if this REQ touched UR-owned files
+git add {project}/.do-work/logs/REQ-NNN-...            # only if this REQ wrote logs
+git add path/to/changed/implementation/files...       # implementation files outside .do-work/, listed explicitly
 
 git commit -m "feat(REQ-NNN): short title
 
-REQ: {project}/do-work/archive/REQ-NNN-slug.md
-UR: {project}/do-work/user-requests/UR-NNN/input.md
+REQ: {project}/.do-work/archive/REQ-NNN-slug.md
+UR: {project}/.do-work/user-requests/UR-NNN/input.md
 Output: path/to/primary/output"
 ```
 
 In `worktree` mode the checkout is already isolated to this REQ, so a sweep would be safe — but the explicit-paths rule still applies. Identical instructions in both modes means there is no chance of cross-mode regression if a future REQ blurs the isolation boundary.
 
-If `do-work/` is gitignored in the project, the `do-work/...` paths above will fail to add — that is expected. Stage and commit only the implementation files and any non-ignored paths. Do not use `--no-verify`. Do not skip hooks.
+If `.do-work/` is gitignored in the project, the `.do-work/...` paths above will fail to add — that is expected. Stage and commit only the implementation files and any non-ignored paths. Do not use `--no-verify`. Do not skip hooks.
 
 If `git status` shows dirty paths you did **not** intend to stage (a sibling's claim file landed mid-flight, an orchestrator-owned state file changed), do not stage them and do not `git checkout --` them. Leave them in the working tree for their owner; commit only the explicit list above.
 
@@ -280,7 +280,7 @@ Capture the resulting commit short hash for the Return Report.
 
 ### 9. Detect milestone completion
 
-If `{project}/do-work/state/active-milestone.md` exists (milestone mode):
+If `{project}/.do-work/state/active-milestone.md` exists (milestone mode):
 
 1. Scan the backlog root for any remaining `REQ-M<active>-*.md` files (use Glob).
 2. If none remain, set `milestone_complete: true` in your Return Report and include the active milestone identifier in `milestone`.

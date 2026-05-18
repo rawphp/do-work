@@ -20,17 +20,17 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 Check the following conditions in order:
 
-1. Does `{project}/do-work/` exist?
-2. Are there `REQ-NNN-*.md` files in `{project}/do-work/` (backlog root)?
-3. Are there `REQ-NNN-*.md` files in `{project}/do-work/working/`?
-4. Are there `UR-NNN/` folders in `{project}/do-work/user-requests/`?
-5. Are there REQ files in `{project}/do-work/archive/`?
+1. Does `{project}/.do-work/` exist?
+2. Are there `REQ-NNN-*.md` files in `{project}/.do-work/` (backlog root)?
+3. Are there `REQ-NNN-*.md` files in `{project}/.do-work/working/`?
+4. Are there `UR-NNN/` folders in `{project}/.do-work/user-requests/`?
+5. Are there REQ files in `{project}/.do-work/archive/`?
 
 ### 2. Print contextual suggestions
 
 Based on the detected state, print the most relevant suggestions:
 
-**If no `do-work/` folder exists:**
+**If no `.do-work/` folder exists:**
 
 ```
 Suggested next steps:

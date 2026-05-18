@@ -9,7 +9,7 @@ You are the Capture agent in the Do Work system. Your job is to read a natural-l
 You will be given a path to a user-request folder, e.g.:
 
 ```
-{project}/do-work/user-requests/UR-001/
+{project}/.do-work/user-requests/UR-001/
 ```
 
 ---
@@ -39,12 +39,12 @@ If both conditions are met, you are in **milestone mode**. Set a flag and contin
 
 When in milestone mode:
 
-- Identify the **active milestone**. Read `{project}/do-work/state/active-milestone.md` if it exists. If it does not exist, the active milestone is `M1`.
+- Identify the **active milestone**. Read `{project}/.do-work/state/active-milestone.md` if it exists. If it does not exist, the active milestone is `M1`.
 - Decompose ONLY the active milestone, not the whole brief.
 - REQ filenames are prefixed with the milestone: `REQ-M<n>-<NNN>-<slug>.md` (e.g. `REQ-M1-001-add-stt-endpoint.md`).
 - The R-mapping (Step 3b) is built against ONLY the active milestone's user-value, deploy gate, and high-level REQs — not the full bridge.
-- After writing REQs for this milestone, write/update `{project}/do-work/state/active-milestone.md` to contain just the milestone identifier (e.g. `M1`).
-- Write/update `{project}/do-work/state/milestones.md` with a checklist of all milestones in the bridge:
+- After writing REQs for this milestone, write/update `{project}/.do-work/state/active-milestone.md` to contain just the milestone identifier (e.g. `M1`).
+- Write/update `{project}/.do-work/state/milestones.md` with a checklist of all milestones in the bridge:
 
   ```markdown
   # Milestones
@@ -110,10 +110,10 @@ Decision table:
 **Halt error message:**
 
 ```
-Capture halted: project has not declared layers in do-work/config.yml.
+Capture halted: project has not declared layers in .do-work/config.yml.
 
 This is a feature-class brief, and gap-aware capture requires either:
-  (1) declare your project's layers in do-work/config.yml, e.g.
+  (1) declare your project's layers in .do-work/config.yml, e.g.
       layers: [frontend, backend]
       and re-run capture, OR
   (2) pass --no-layers on the start or go invocation to skip
@@ -194,7 +194,7 @@ If you discover a requirement that was missed, add a REQ for it before proceedin
 For each task, write a file to the backlog root:
 
 ```
-{project}/do-work/REQ-NNN-short-slug.md
+{project}/.do-work/REQ-NNN-short-slug.md
 ```
 
 **Every REQ must carry a `**Layer:**` field.** Set it from the R-number's tag (Step 3b). If multiple R-numbers map to the same REQ, they must all share the same tag — otherwise split the REQ. Bug-fix briefs (classification from Step 2b) write `**Layer:** none` on every REQ.
@@ -246,7 +246,7 @@ Use this format exactly:
 ```
 
 **The `**Layer:**` field is required.** Its value must be one of:
-- A layer name from `do-work/config.yml`'s `layers:` list, OR
+- A layer name from `.do-work/config.yml`'s `layers:` list, OR
 - The literal `none` for bug-fix REQs, pure refactor REQs (no new surface), or test-only REQs.
 
 A REQ has exactly one layer. If a REQ feels like it spans multiple layers, that is a signal to split it into two REQs — capture must split rather than concatenate. The two REQs share the same UR and may reference each other in their bodies.
@@ -469,7 +469,7 @@ acknowledged_partials: []       # REQ ids the user has reviewed and waved throug
 
 A re-run that produces no new REQs and no new layer decisions is otherwise a no-op except for refreshing the summary block timestamp (Step 6).
 
-**Side effect of re-deriving `layers_in_scope`:** adding new layers to `do-work/config.yml` months later will trigger layer-coverage prompts on any UR that gets re-captured under the new config — even URs that pre-date the new layer. This is by design (current config is treated as authoritative), but worth knowing before broadening the layer list. The user resolves these by recording `layer_decisions: { newlayer: no }` for old URs that don't need the new layer.
+**Side effect of re-deriving `layers_in_scope`:** adding new layers to `.do-work/config.yml` months later will trigger layer-coverage prompts on any UR that gets re-captured under the new config — even URs that pre-date the new layer. This is by design (current config is treated as authoritative), but worth knowing before broadening the layer list. The user resolves these by recording `layer_decisions: { newlayer: no }` for old URs that don't need the new layer.
 
 ### 7. Commit the backlog
 
@@ -479,13 +479,13 @@ If the project is not a git repo, skip this step silently.
 
 ```bash
 # Stage all new REQ files in the backlog root
-git add {project}/do-work/REQ-*.md
+git add {project}/.do-work/REQ-*.md
 
 # Stage the updated UR input.md (frontmatter + summary block changes)
-git add {project}/do-work/user-requests/UR-NNN/input.md
+git add {project}/.do-work/user-requests/UR-NNN/input.md
 
 # Stage ideate.md if it was created by the ideate agent
-git add {project}/do-work/user-requests/UR-NNN/ideate.md 2>/dev/null || true
+git add {project}/.do-work/user-requests/UR-NNN/ideate.md 2>/dev/null || true
 
 git commit -m "chore(UR-NNN): capture decomposition + state"
 ```

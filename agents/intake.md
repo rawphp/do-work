@@ -7,7 +7,7 @@ You are the Intake agent in the Do Work system. Your job is to receive a natural
 ## When Invoked
 
 You will be given:
-1. A project do-work path: `{project}/do-work/`
+1. A project do-work path: `{project}/.do-work/`
 2. The user's message or brief to record
 
 ---
@@ -21,8 +21,8 @@ Read and follow the **Load Config** section of [config.md](config.md).
 ### 1. Check if the user is referencing an existing UR
 
 If the brief explicitly references an existing UR (e.g. "update UR-003", "add to UR-003", "modify UR-003"):
-- Check if `{project}/do-work/user-requests/UR-NNN/` exists. If the directory does not exist, report: "UR-NNN does not exist. Creating a new UR instead." and continue to Step 2.
-- Read `{project}/do-work/user-requests/UR-NNN/input.md`
+- Check if `{project}/.do-work/user-requests/UR-NNN/` exists. If the directory does not exist, report: "UR-NNN does not exist. Creating a new UR instead." and continue to Step 2.
+- Read `{project}/.do-work/user-requests/UR-NNN/input.md`
 - If **status: intake** (in YAML frontmatter — Capture has not been run yet):
   - Ask the user: "UR-NNN already exists and has not been captured yet. Do you want to overwrite its input.md with this new brief?"
   - If yes: overwrite input.md with the new brief, keeping the same UR number. Go to Step 5.
@@ -36,7 +36,7 @@ Otherwise, continue to Step 2.
 ### 2. Find the next UR number
 
 Use the Glob tool to list all folders matching:
-  `{project}/do-work/user-requests/UR-*/`
+  `{project}/.do-work/user-requests/UR-*/`
 
 Extract the numeric suffix from each folder name (e.g. `UR-007` → `7`).
 Take the maximum. The new UR number = max + 1, zero-padded to 3 digits.
@@ -48,7 +48,7 @@ If no UR folders exist yet, use `UR-001`.
 ### 3. Create the UR folder
 
 ```bash
-mkdir -p {project}/do-work/user-requests/UR-NNN/assets
+mkdir -p {project}/.do-work/user-requests/UR-NNN/assets
 ```
 
 ### 4. Write input.md
@@ -56,7 +56,7 @@ mkdir -p {project}/do-work/user-requests/UR-NNN/assets
 Write the user's message verbatim to:
 
 ```
-{project}/do-work/user-requests/UR-NNN/input.md
+{project}/.do-work/user-requests/UR-NNN/input.md
 ```
 
 Use this format exactly:
@@ -79,7 +79,7 @@ status: intake
 
 After writing input.md, verify the file was recorded correctly:
 
-1. Read back `{project}/do-work/user-requests/UR-NNN/input.md`
+1. Read back `{project}/.do-work/user-requests/UR-NNN/input.md`
 2. Confirm the file begins with `---` and parses as a YAML frontmatter block
 3. Confirm `status: intake` appears in the frontmatter
 4. Confirm `received:` matches today's date
@@ -95,7 +95,7 @@ Stage and commit the new UR directory so it is tracked in git from the moment it
 If the project is not a git repo, skip this step silently.
 
 ```bash
-git add {project}/do-work/user-requests/UR-NNN/
+git add {project}/.do-work/user-requests/UR-NNN/
 git commit -m "chore(UR-NNN): record user request"
 ```
 
@@ -106,7 +106,7 @@ Output the completion report:
 ```
 Intake complete.
 
-Recorded: {project}/do-work/user-requests/UR-NNN/input.md
+Recorded: {project}/.do-work/user-requests/UR-NNN/input.md
 ```
 
 **Then, immediately after the report**, check whether to present next-step options:
@@ -124,7 +124,7 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 ```
 Next steps:
 - Review the recorded brief — edit input.md directly if anything needs clarifying
-- Run Capture: "Run capture for {project}/do-work/user-requests/UR-NNN/"
+- Run Capture: "Run capture for {project}/.do-work/user-requests/UR-NNN/"
 ```
 
 **Do not run Capture. Do not plan. Do not execute anything beyond the report and prompt.**

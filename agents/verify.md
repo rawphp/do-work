@@ -9,7 +9,7 @@ You are the Verify agent in the Do Work system. Your job is to compare the backl
 You will be given a project do-work path and a UR reference, e.g.:
 
 ```
-{project}/do-work/   ←  backlog to verify
+{project}/.do-work/   ←  backlog to verify
 UR-001               ←  brief to verify against
 ```
 
@@ -23,7 +23,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 1. Read the brief
 
-Read `{project}/do-work/user-requests/UR-NNN/input.md` in full.
+Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full.
 
 Read every file in `UR-NNN/assets/` if present.
 
@@ -51,7 +51,7 @@ Also scan `working/` and `archive/` — include those in coverage, mark them as 
 
 ### 2b. Check ideate observation coverage
 
-If `{project}/do-work/user-requests/UR-NNN/ideate.md` exists:
+If `{project}/.do-work/user-requests/UR-NNN/ideate.md` exists:
 
 1. Read `ideate.md` in full
 2. Extract all observations from the **Challenger — Risks & Edge Cases** and **Connector — Links & Reuse** sections
@@ -64,7 +64,7 @@ If `ideate.md` does not exist for this UR, skip this step silently.
 
 ## Milestone mode adjustment
 
-If `{project}/do-work/state/active-milestone.md` exists, you are scoring coverage of the **active milestone only**, not the whole UR.
+If `{project}/.do-work/state/active-milestone.md` exists, you are scoring coverage of the **active milestone only**, not the whole UR.
 
 - Read the active milestone identifier (e.g. `M1`).
 - Locate the `#### M<n>` section in `UR-NNN/input.md`.
@@ -240,9 +240,9 @@ Cases that do **not** reach the bail-out rule:
 
 2. Update partially-covered REQs to expand their scope or acceptance criteria. A partial REQ is "expanded enough" when every sub-requirement it addresses has at least one acceptance criterion with a specific, verifiable outcome.
 3. Merge or remove duplicate REQs (keeping the higher-quality one)
-4. Before writing new REQs, check `{project}/do-work/working/` — never create a REQ with a number that conflicts with a REQ currently in working/. Use the next available number after the highest existing REQ across backlog, working, and archive.
+4. Before writing new REQs, check `{project}/.do-work/working/` — never create a REQ with a number that conflicts with a REQ currently in working/. Use the next available number after the highest existing REQ across backlog, working, and archive.
 5. **Re-score after auto-fix.** Re-run Steps 1-5 (read brief, read all REQs including new ones, analyse coverage, check issues, produce report) to compute the new confidence score. This is mandatory — do not assume auto-fix achieved 100%.
-6. Commit auto-fix changes: `git add {project}/do-work/REQ-*.md && git commit -m "chore(UR-NNN): auto-fix N gaps"`
+6. Commit auto-fix changes: `git add {project}/.do-work/REQ-*.md && git commit -m "chore(UR-NNN): auto-fix N gaps"`
 7. Report what was changed, including the **before and after confidence scores**:
    ```
    Auto-fix complete for UR-NNN

@@ -11,7 +11,7 @@ You sharpen the brief by asking what the user already knows but didn't say. You 
 You will be given a path to a user-request folder, e.g.:
 
 ```
-{project}/do-work/user-requests/UR-001/
+{project}/.do-work/user-requests/UR-001/
 ```
 
 You may also be invoked by the Start agent when the `--grill` flag is set.
@@ -74,7 +74,7 @@ When stopping, announce: "That covers the key ambiguities. Writing clarification
 
 ### 5. Write clarifications
 
-Append a `## Clarifications` section to `{project}/do-work/user-requests/UR-NNN/input.md`.
+Append a `## Clarifications` section to `{project}/.do-work/user-requests/UR-NNN/input.md`.
 
 **If `## Clarifications` already exists** (re-run scenario), append new Q&A entries below the existing ones. Never overwrite or modify prior clarifications.
 
@@ -99,7 +99,7 @@ Use this format exactly:
 Stage and commit the updated `input.md`:
 
 ```bash
-git add {project}/do-work/user-requests/UR-NNN/input.md
+git add {project}/.do-work/user-requests/UR-NNN/input.md
 git commit -m "chore(UR-NNN): record question session clarifications"
 ```
 
@@ -112,7 +112,7 @@ Output the completion report:
 ```
 Question session complete for UR-NNN.
 
-Updated: {project}/do-work/user-requests/UR-NNN/input.md
+Updated: {project}/.do-work/user-requests/UR-NNN/input.md
 
 Clarifications recorded: N questions answered
 ```

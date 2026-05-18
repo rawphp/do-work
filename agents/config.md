@@ -8,7 +8,7 @@ This is a reusable instruction block. Other agents reference this file to load c
 
 At the start of execution, after detecting the project root:
 
-1. Check if `{project}/do-work/config.yml` exists
+1. Check if `{project}/.do-work/config.yml` exists
 2. If it exists, read the file and keep its values in context for subsequent steps
 3. If it does not exist, create it with the default template below, then keep those values in context:
 

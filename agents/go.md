@@ -10,7 +10,7 @@ This is a convenience orchestrator — it delegates to the existing Verify and R
 
 You will be given:
 
-1. A project do-work path: `{project}/do-work/`
+1. A project do-work path: `{project}/.do-work/`
 2. A UR reference: `UR-NNN`
 3. Optional flags:
    - `--force` — skip the confidence threshold, run regardless of score
@@ -28,8 +28,8 @@ Read and follow the **Load Config** section of [config.md](config.md). Keep the 
 ### 0b. Validate UR exists
 
 Before delegating to any sub-agent, confirm the UR directory exists:
-- Check if `{project}/do-work/user-requests/UR-NNN/input.md` exists
-- If it does not exist, report: "UR-NNN not found at {project}/do-work/user-requests/UR-NNN/. Check the UR number and try again." and stop.
+- Check if `{project}/.do-work/user-requests/UR-NNN/input.md` exists
+- If it does not exist, report: "UR-NNN not found at {project}/.do-work/user-requests/UR-NNN/. Check the UR number and try again." and stop.
 
 ### 1. Run Verify
 
@@ -110,7 +110,7 @@ Verify: NN% confidence
 Audit: [N fixes applied / clean / skipped]
 Run: [N REQs processed / stopped at verify — score below 90%]
 
-Archive: {project}/do-work/archive/
+Archive: {project}/.do-work/archive/
 ```
 
 **Then, immediately after the report**, check whether to present next-step options:
