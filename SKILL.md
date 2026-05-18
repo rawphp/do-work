@@ -23,7 +23,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of confidence score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs if >= 90%. |
 | `/do-work go [UR-NNN] --no-layers` | Verify + run, skipping layer-coverage checks for this UR. |
-| `/do-work install` | Creates `do-work/` structure in current project. |
+| `/do-work install` | Creates `.do-work/` structure in current project. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR brief into REQ files in the backlog. |
 | `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
@@ -69,16 +69,16 @@ All references below use `{project}` to mean this resolved root.
 
 ### Migration check
 
-Immediately after resolving `{project}` and before executing any subcommand-specific instructions, check whether this project's data folder needs migrating from the legacy `do-work/` location to `.do-work/`. Apply these four detection branches:
+Immediately after resolving `{project}` and before executing any subcommand-specific instructions, check whether this project's data folder needs migrating from the legacy `.do-work/` location to `.do-work/`. Apply these four detection branches:
 
 | State at `{project}` | Action |
 |---|---|
-| `.do-work/` exists AND `do-work/` does not exist | Already migrated. Continue silently. |
-| `do-work/` exists AND `.do-work/` does not exist | Migrate (see below), then continue. |
-| Both `do-work/` and `.do-work/` exist | **Halt.** Output the conflict message below and stop the subcommand. |
+| `.do-work/` exists AND `.do-work/` does not exist | Already migrated. Continue silently. |
+| `.do-work/` exists AND `.do-work/` does not exist | Migrate (see below), then continue. |
+| Both `.do-work/` and `.do-work/` exist | **Halt.** Output the conflict message below and stop the subcommand. |
 | Neither exists | No migration needed. Continue (the `install` flow handles fresh projects). |
 
-**Migration procedure** (legacy `do-work/` → `.do-work/`):
+**Migration procedure** (legacy `.do-work/` → `.do-work/`):
 
 ```bash
 # Prefer `git mv` so history follows the rename. Fall back to plain `mv` if the path is
@@ -87,20 +87,20 @@ git mv {project}/do-work {project}/.do-work 2>/dev/null \
   || mv {project}/do-work {project}/.do-work
 ```
 
-Then rewrite `.gitignore` if it contains a line matching `^do-work/?$`:
+Then rewrite `.gitignore` if it contains a line matching `^.do-work/?$`:
 
 ```bash
-if [ -f {project}/.gitignore ] && grep -Eq '^do-work/?$' {project}/.gitignore; then
-  sed -i.bak -E 's|^do-work/?$|.do-work/|' {project}/.gitignore && rm {project}/.gitignore.bak
+if [ -f {project}/.gitignore ] && grep -Eq '^.do-work/?$' {project}/.gitignore; then
+  sed -i.bak -E 's|^.do-work/?$|.do-work/|' {project}/.gitignore && rm {project}/.gitignore.bak
 fi
 ```
 
-Output `Migrated do-work/ → .do-work/` and continue with the subcommand.
+Output `Migrated .do-work/ → .do-work/` and continue with the subcommand.
 
-**Both-exist conflict.** When both `{project}/do-work/` and `{project}/.do-work/` are present, do not migrate. Halt the subcommand with this exact text and exit:
+**Both-exist conflict.** When both `{project}/.do-work/` and `{project}/.do-work/` are present, do not migrate. Halt the subcommand with this exact text and exit:
 
 ```
-Migration conflict: both do-work/ and .do-work/ exist at {project}. Resolve manually before re-running.
+Migration conflict: both .do-work/ and .do-work/ exist at {project}. Resolve manually before re-running.
 ```
 
 **No mid-flight protection.** This check does not inspect `working/` for in-flight REQs before migrating. Migration is rare in practice; the assumption is that the user runs it on an idle project. A migration that runs while a parallel `/do-work run` is mid-REQ will cause that worker to fail on the next file-system access — accept that risk rather than introducing a coordination layer for a once-per-project event.
@@ -128,7 +128,7 @@ When a UR file contains both:
 - REQ files are prefixed: `REQ-M1-001-<slug>.md`, `REQ-M2-001-<slug>.md`.
 - Run loop halts at the end of each milestone's REQs and prompts for the deploy gate.
 - Deploy-gate sign-off is non-delegable human confirmation.
-- State files in `{project}/do-work/state/`:
+- State files in `{project}/.do-work/state/`:
   - `active-milestone.md` — single line, current milestone identifier (e.g. `M1`).
   - `milestones.md` — checklist of all milestones with status: `pending` / `captured` / `running` / `deployed`.
 
@@ -148,17 +148,17 @@ Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that d
   **Claimed at:** 2026-05-15T11:42:08Z
   <!-- claimed-end -->
   ```
-- The final cross-REQ test suite runs once, from whichever orchestrator drains last (gated by `do-work/state/final-suite-running.md` lockfile).
+- The final cross-REQ test suite runs once, from whichever orchestrator drains last (gated by `.do-work/state/final-suite-running.md` lockfile).
 - On a commit or merge conflict, the loser-of-race waits up to ~110 seconds (5 retries with 5s / 15s / 30s / 60s exponential backoff) before exiting with `status: stopped`, `reason: concurrent-conflict`.
 
 **Isolation per REQ.** The worker chooses `same-branch` (default) or `worktree` at dispatch time based on REQ scope. Worktree mode triggers when the REQ task mentions `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, or `restructure`; when the Integration block lists ≥ 3 distinct service dependencies; or when the REQ has > 6 acceptance criteria. Worktree REQs work in `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch and merge back into the base branch on completion.
 
 **Constraints that stay single-agent:**
 
-- Milestone deploy gates remain non-delegable — the first orchestrator to detect milestone-complete owns the gate; siblings idle (logging `Idle — waiting on milestone M<n> deploy gate`) and resume when `do-work/state/active-milestone.md` advances. `do-work/state/gate-owner.md` records which agent owns the in-flight gate.
+- Milestone deploy gates remain non-delegable — the first orchestrator to detect milestone-complete owns the gate; siblings idle (logging `Idle — waiting on milestone M<n> deploy gate`) and resume when `.do-work/state/active-milestone.md` advances. `.do-work/state/gate-owner.md` records which agent owns the in-flight gate.
 - The stale-slot prompt in pre-flight runs in whichever orchestrator finds the stale slot first.
 
-**State files added by parallel mode** (all under `do-work/state/`):
+**State files added by parallel mode** (all under `.do-work/state/`):
 
 - `gate-owner.md` — the `agent-id` currently handling a milestone deploy gate (deleted on resolve).
 - `final-suite-running.md` (or `final-suite-M<n>-running.md` in milestone mode) — lockfile written by the orchestrator running the final cross-REQ test suite.
@@ -167,7 +167,7 @@ Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that d
 
 ## Layers
 
-do-work uses project-declared layers to gap-check feature briefs. Declare your project's layers once in `do-work/config.yml`:
+do-work uses project-declared layers to gap-check feature briefs. Declare your project's layers once in `.do-work/config.yml`:
 
 ```yaml
 layers: [frontend, backend]   # web app
@@ -193,8 +193,8 @@ Capture inspects the codebase to draft answers and verifies each cited file/symb
 ```
 feat(REQ-NNN): short title
 
-REQ: do-work/archive/REQ-NNN-slug.md
-UR: do-work/user-requests/UR-NNN/input.md
+REQ: .do-work/archive/REQ-NNN-slug.md
+UR: .do-work/user-requests/UR-NNN/input.md
 Output: path/to/primary/output
 ```
 
@@ -214,11 +214,11 @@ Create the do-work folder structure. Idempotent — safe to run multiple times.
 
 1. Detect `{project}`.
 2. Create directories if they do not already exist:
-   - `{project}/do-work/user-requests/`
-   - `{project}/do-work/working/`
-   - `{project}/do-work/archive/`
-   - `{project}/do-work/logs/`
-3. Create `{project}/do-work/config.yml` if it does not already exist, using the default template below:
+   - `{project}/.do-work/user-requests/`
+   - `{project}/.do-work/working/`
+   - `{project}/.do-work/archive/`
+   - `{project}/.do-work/logs/`
+3. Create `{project}/.do-work/config.yml` if it does not already exist, using the default template below:
 
 ```yaml
 # do-work configuration
@@ -236,14 +236,14 @@ log:
 4. Report what was created vs already existed. Example:
 
 ```
-do-work installed at /path/to/project/do-work/
+do-work installed at /path/to/project/.do-work/
 
 Created:
-  do-work/user-requests/
-  do-work/working/
-  do-work/archive/
-  do-work/logs/
-  do-work/config.yml
+  .do-work/user-requests/
+  .do-work/working/
+  .do-work/archive/
+  .do-work/logs/
+  .do-work/config.yml
 
 Ready. Run `/do-work start` to record your first brief.
 ```
@@ -257,7 +257,7 @@ If already installed, report "Already installed." and stop.
 Record a brief and decompose it into REQ files in one shot. Ideate runs by default and ends with an interactive gate (Grill / Continue / Stop).
 
 1. Detect `{project}`.
-2. Check if `{project}/do-work/` exists. If not, run install automatically first, then continue.
+2. Check if `{project}/.do-work/` exists. If not, run install automatically first, then continue.
 3. Determine the brief:
    - If text was provided after `start`, use it as the brief.
    - If not, ask the user to paste their brief and wait.
@@ -274,7 +274,7 @@ Verify REQ coverage and conditionally execute the backlog.
 1. Detect `{project}`.
 2. Determine the UR:
    - If `UR-NNN` was provided, use it.
-   - If not, list `{project}/do-work/user-requests/` and ask which UR to verify against.
+   - If not, list `{project}/.do-work/user-requests/` and ask which UR to verify against.
 3. Note whether `--force` or `--auto-fix` are present in the arguments.
 4. Read [agents/go.md](agents/go.md) in full.
 5. Follow the go agent instructions exactly. Pass through any flags.
@@ -286,7 +286,7 @@ Verify REQ coverage and conditionally execute the backlog.
 Record a natural-language brief as the next UR file. Never skip to planning or implementation.
 
 1. Detect `{project}`.
-2. Check if `{project}/do-work/` exists. If not, run install automatically first, then continue.
+2. Check if `{project}/.do-work/` exists. If not, run install automatically first, then continue.
 3. Determine the brief:
    - If text was provided after `intake`, use it as the brief.
    - If not, ask the user to paste their brief and wait.
@@ -302,8 +302,8 @@ Decompose a UR brief into discrete REQ files in the backlog.
 1. Detect `{project}`.
 2. Determine the UR:
    - If `UR-NNN` was provided, use it.
-   - If not, list `{project}/do-work/user-requests/` and ask which UR to capture.
-3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+   - If not, list `{project}/.do-work/user-requests/` and ask which UR to capture.
+3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
 4. Read [agents/capture.md](agents/capture.md) in full.
 5. Follow the capture agent instructions exactly.
 
@@ -316,8 +316,8 @@ Surface assumptions, risks, and connections in a brief before decomposition.
 1. Detect `{project}`.
 2. Determine the UR:
    - If `UR-NNN` was provided, use it.
-   - If not, list `{project}/do-work/user-requests/` and ask which UR to review.
-3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+   - If not, list `{project}/.do-work/user-requests/` and ask which UR to review.
+3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
 4. Read [agents/ideate.md](agents/ideate.md) in full.
 5. Follow the ideate agent instructions exactly.
 
@@ -330,8 +330,8 @@ Grill the user about their brief — extract assumptions, gaps, and constraints 
 1. Detect `{project}`.
 2. Determine the UR:
    - If `UR-NNN` was provided, use it.
-   - If not, list `{project}/do-work/user-requests/` and ask which UR to question.
-3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+   - If not, list `{project}/.do-work/user-requests/` and ask which UR to question.
+3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
 4. Read [agents/question.md](agents/question.md) in full.
 5. Follow the question agent instructions exactly.
 
@@ -344,8 +344,8 @@ Interrogate REQ quality for a given UR — auto-fix soft spots and report change
 1. Detect `{project}`.
 2. Determine the UR:
    - If `UR-NNN` was provided, use it.
-   - If not, list `{project}/do-work/user-requests/` and ask which UR to audit.
-3. Confirm `{project}/do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
+   - If not, list `{project}/.do-work/user-requests/` and ask which UR to audit.
+3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
 4. Read [agents/audit.md](agents/audit.md) in full.
 5. Follow the audit agent instructions exactly.
 
@@ -358,7 +358,7 @@ Score REQ coverage against the original brief. List gaps and issues.
 1. Detect `{project}`.
 2. Determine the UR:
    - If `UR-NNN` was provided, use it.
-   - If not, list `{project}/do-work/user-requests/` and ask which UR to verify against.
+   - If not, list `{project}/.do-work/user-requests/` and ask which UR to verify against.
 3. Note whether `--auto-fix` is present in the arguments.
 4. Read [agents/verify.md](agents/verify.md) in full.
 5. Follow the verify agent instructions. If `--auto-fix` was present, follow the auto-fix section.
@@ -371,8 +371,8 @@ Execute the backlog autonomously — one REQ at a time — until empty or a stop
 
 1. Detect `{project}`.
 2. Pre-flight checks:
-   - If a REQ file exists in `{project}/do-work/working/`, report it and ask the user: resume or abort?
-   - If no `REQ-NNN-*.md` files exist in `{project}/do-work/` (backlog root), report "Backlog is empty." and stop.
+   - If a REQ file exists in `{project}/.do-work/working/`, report it and ask the user: resume or abort?
+   - If no `REQ-NNN-*.md` files exist in `{project}/.do-work/` (backlog root), report "Backlog is empty." and stop.
 3. Read [agents/run.md](agents/run.md) in full.
 4. Follow the run agent instructions exactly.
 
