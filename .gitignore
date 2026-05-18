@@ -1,7 +1,7 @@
 .rhythm-section
 
 # do-work data folders (created per-project, not part of the skill)
-do-work/
+.do-work/
 
 # local testing artifacts
 .playwright-mcp/
