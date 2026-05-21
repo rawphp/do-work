@@ -4,6 +4,17 @@ You are the Capture agent in the Do Work system. Your job is to read a natural-l
 
 ---
 
+## Judgment Points
+
+The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
+
+| # | Step | Decision |
+|---|------|----------|
+| J1 | Step 4 — Files | Which files will this REQ touch? List paths relative to the project root. Err toward specificity; vague globs are less useful than named files. |
+| J2 | Step 4 — Depends on | Which other REQs must be committed before this one can start? Only hard ordering constraints (not soft "nice to have" ordering). Empty list is valid and common. |
+
+---
+
 ## When Invoked
 
 You will be given a path to a user-request folder, e.g.:
@@ -199,6 +210,10 @@ For each task, write a file to the backlog root:
 
 **Every REQ must carry a `**Layer:**` field.** Set it from the R-number's tag (Step 3b). If multiple R-numbers map to the same REQ, they must all share the same tag — otherwise split the REQ. Bug-fix briefs (classification from Step 2b) write `**Layer:** none` on every REQ.
 
+> **JUDGMENT:** [J1 — Files] Before writing the `**Files:**` line, enumerate the project-relative paths this REQ will touch. For agents: list the specific `agents/*.md` file(s). For commands: list `commands/*.md`. For lib scripts: list `lib/<name>.sh` and its test. For templates: list the specific template file. Globs are allowed but prefer named paths. A blank `**Files:**` line is a signal the REQ is under-specified — think harder before leaving it empty.
+
+> **JUDGMENT:** [J2 — Depends on] Before writing the `**Depends on:**` line, scan the decomposition from Step 3 for hard ordering constraints: does this REQ assume another REQ's output file exists, or call a function that another REQ will write? If yes, list those REQ ids. If the REQ is independently implementable from HEAD, write an empty value (the field must still appear). Do not add soft ordering preferences — only blocking dependencies.
+
 Use this format exactly:
 
 ```markdown
@@ -208,6 +223,8 @@ Use this format exactly:
 **Status:** backlog
 **Created:** YYYY-MM-DD
 **Layer:** <one of the project's declared layers, or `none` for bug-fix / pure refactor / test-only>
+**Files:** <comma-separated project-relative paths or globs of files this REQ will touch; globs allowed>
+**Depends on:** <comma-separated REQ-NNN ids that must be done before this REQ starts; empty if none>
 
 ## Task
 
@@ -400,6 +417,40 @@ Background about the rename...
 ```
 
 *A normal feature REQ with no trigger phrases passes through Step 4d unchanged.*
+
+### 4e. Cycle-check
+
+After all REQ files are written (Steps 4, 4b, 4c, 4d complete), validate that the `**Depends on:**` graph is acyclic.
+
+```bash
+bash lib/cycle-check.sh UR-NNN
+```
+
+Replace `UR-NNN` with the actual UR identifier. The script scans all REQs matching that UR across backlog, working, and archive, builds the dep graph, and runs DFS cycle detection.
+
+**On exit 0 (no cycle):** Continue to Step 5.
+
+**On exit 1 (cycle detected):** The script prints the cycle path to stdout (e.g. `REQ-007 → REQ-009 → REQ-007`). Capture must:
+
+1. Capture the cycle path from stdout as `$cycle_path`.
+2. Build a fingerprint: `cap-cycle-UR-NNN` (replace UR-NNN with the actual id).
+3. Call file-feedback to log the event:
+   ```bash
+   bash lib/file-feedback.sh cap-cycle "cap-cycle-UR-NNN" \
+     '{"ur":"UR-NNN","cycle":"'"$cycle_path"'"}' \
+     "cap-cycle: circular dependency in UR-NNN" \
+     "Cycle detected during capture of UR-NNN: $cycle_path"
+   ```
+4. **Halt** with the following human-readable error (do not commit REQ files):
+   ```
+   Capture halted: circular dependency detected in UR-NNN.
+
+   Cycle: <cycle_path>
+
+   Fix the **Depends on:** fields to break the cycle, then re-run capture.
+   ```
+
+The file-feedback call is best-effort — if `feedback.enabled` is false or `gh` is absent, it exits 0 silently, and capture still halts with the error above. Never skip the halt because feedback failed.
 
 ### 5. Integration question pass
 
