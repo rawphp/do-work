@@ -317,6 +317,7 @@ Create the do-work folder structure. Idempotent — safe to run multiple times.
    - `{project}/.do-work/working/`
    - `{project}/.do-work/archive/`
    - `{project}/.do-work/logs/`
+   - `{project}/.do-work/state/`
 3. Create `{project}/.do-work/config.yml` if it does not already exist, using the default template below:
 
 ```yaml
@@ -354,6 +355,7 @@ Created:
   .do-work/working/
   .do-work/archive/
   .do-work/logs/
+  .do-work/state/
   .do-work/config.yml
 
 Ready. Run `/do-work start` to record your first brief.

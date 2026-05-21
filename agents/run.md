@@ -113,6 +113,7 @@ Before starting the loop:
 
 - Confirm you are on the correct git branch.
 - Confirm your working directory is `{project}` (the user's repo), NOT the skill clone at `~/.claude/skills/do-work/`. All file edits and git commits must happen in `{project}`. If you are in the skills directory, `cd` to `{project}` before proceeding.
+- **Ensure `.do-work/state/` exists.** Run `mkdir -p {project}/.do-work/state` defensively. Subsequent steps (stale reclaim, milestone mode, deadlock surfacing, gate-owner writes, final-suite lockfile) write here; installs from before REQ-170 may not have created the directory.
 
 ### 2. Resolve agent id
 
@@ -359,10 +360,11 @@ DEADLOCK_OUT=$(bash {skill-root}/lib/deadlock-check.sh)
 **If `DEADLOCK_OUT` is non-empty (deadlock detected):**
 
 1. Parse the report. Extract `signal`, `fingerprint`, `diagnosis`, `live-slots`, `stale-slots`, `backlog-size`, `last-commit-age`.
-2. **Acquire the surfacing lock** via `flock -n` on `.do-work/state/feedback.lock` so only one orchestrator writes `deadlock.md` and surfaces to the user. Siblings that fail to acquire the lock skip steps 3–5 and exit the idle-wait loop quietly (they will pick up via their own timeout if the deadlock persists).
-3. **Lock-holder only:** write `{project}/.do-work/state/deadlock.md` containing the full `deadlock-check.sh` output plus a timestamp. This file is the cross-process signal that the deadlock has been surfaced.
-4. **Lock-holder only:** emit feedback by calling `bash {skill-root}/lib/file-feedback.sh deadlock "<fingerprint>" '<context-json>'` where `<context-json>` is a single-line JSON object with `signal`, `live-slots`, `stale-slots`, `backlog-size`, `last-commit-age`, `classification` (the idle-wait entry classification). The script handles its own enable/disable, deduplication, and lock-on-feedback.lock — call it best-effort and continue regardless of exit code.
-5. **Lock-holder only — surface to the user**, gated on `config.next_steps.enabled` and standalone mode (same gate as Stopping Rules):
+2. **Ensure `state/` exists.** Run `mkdir -p {project}/.do-work/state` before any lock acquisition or state write. This is defensive — installs created before REQ-170 may not have `state/`, and orchestrators must not crash on a missing directory.
+3. **Acquire the surfacing lock** via `flock -n` on `.do-work/state/feedback.lock` so only one orchestrator writes `deadlock.md` and surfaces to the user. Siblings that fail to acquire the lock skip steps 4–6 and exit the idle-wait loop quietly (they will pick up via their own timeout if the deadlock persists).
+4. **Lock-holder only:** write `{project}/.do-work/state/deadlock.md` containing the full `deadlock-check.sh` output plus a timestamp. This file is the cross-process signal that the deadlock has been surfaced.
+5. **Lock-holder only:** emit feedback by calling `bash {skill-root}/lib/file-feedback.sh deadlock "<fingerprint>" '<context-json>'` where `<context-json>` is a single-line JSON object with `signal`, `live-slots`, `stale-slots`, `backlog-size`, `last-commit-age`, `classification` (the idle-wait entry classification). The script handles its own enable/disable, deduplication, and lock-on-feedback.lock — call it best-effort and continue regardless of exit code.
+6. **Lock-holder only — surface to the user**, gated on `config.next_steps.enabled` and standalone mode (same gate as Stopping Rules):
    - If gate passes: use the `AskUserQuestion` tool with options:
      1. **"Reset stale slots"** — return any slots listed in `stale-slots` to the backlog (per the Pre-flight stale-slot return path).
      2. **"Show situation room"** — print the suggestion `Run /do-work status` and exit cleanly.

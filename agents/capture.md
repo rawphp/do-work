@@ -50,6 +50,7 @@ If both conditions are met, you are in **milestone mode**. Set a flag and contin
 
 When in milestone mode:
 
+- **Ensure `.do-work/state/` exists.** Run `mkdir -p {project}/.do-work/state` defensively before any state write. Installs from before REQ-170 may not have created the directory.
 - Identify the **active milestone**. Read `{project}/.do-work/state/active-milestone.md` if it exists. If it does not exist, the active milestone is `M1`.
 - Decompose ONLY the active milestone, not the whole brief.
 - REQ filenames are prefixed with the milestone: `REQ-M<n>-<NNN>-<slug>.md` (e.g. `REQ-M1-001-add-stt-endpoint.md`).
