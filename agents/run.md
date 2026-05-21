@@ -434,7 +434,7 @@ Return your structured YAML report as your final message. Nothing else.
 )
 ```
 
-The worker performs read REQ → read context → TDD red → implement → verify green → run affected tests → check acceptance criteria → execute verification steps → archive → commit, all in its own session. The orchestrator does not execute these steps inline.
+The worker performs: create worktree → read REQ → read context → TDD red → implement → verify green → run affected tests → check acceptance criteria → execute verification steps → commit on feature branch → return YAML, all in its own session. **The worker does NOT merge, archive, or tear down its worktree** — those are the orchestrator's Step 4 (Integrate) responsibilities.
 
 The worker's stdout does not stream back to the orchestrator — only its final structured report is visible. Do not poll, do not babysit. Wait for the dispatch to return.
 
@@ -444,13 +444,83 @@ The worker's final message is a fenced YAML block matching the schema defined in
 
 | `status` | Action |
 |---|---|
-| `done` | Capture `commit` hash and `outputs` for the progress line. Continue to Step 7. |
-| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). Recover the REQ from `working/` if the worker did not archive it, then handle per `## Stopping Rules`. Do not proceed to Step 7. |
+| `done` | Capture `commit` hash and `outputs`. Continue to Step 4 (Integrate). |
+| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). Continue to Step 5 (Recover) — handle per `## Stopping Rules`. Skip Step 4. |
 | `failed` | The worker crashed before completing. Treat as `stopped` with `reason: unknown-error`. |
 
 If the worker's report is missing or unparseable, treat as `status: failed` with `reason: unknown-error` and surface the raw output to the user.
 
 The worker also reports `milestone_complete` (boolean) and `milestone` (id when true). Step 7b uses these.
+
+### Step 4: Integrate (worker = code, orchestrator = state)
+
+> **JUDGMENT:** J4 — The integration sequence below is the orchestrator's responsibility BECAUSE workers run in isolated worktrees. The worker has committed implementation files to `req/REQ-NNN`; the orchestrator now merges that branch into the base branch, archives the REQ, tears down the worktree, and commits the metadata change. This is the only place where `.do-work/` lifecycle writes happen.
+
+Reached only when `status: done`. Execute these substeps in order; each must succeed before the next.
+
+#### 4a. Merge the feature branch
+
+From the orchestrator's checkout (the main working tree, NOT the worktree):
+
+```bash
+git merge --no-ff req/REQ-NNN -m "merge(REQ-NNN): integrate"
+```
+
+On text-level conflict (any file contains `<<<<<<<`):
+
+1. `git merge --abort`.
+2. Apply the 5-retry exponential-backoff policy (5s / 15s / 30s / 60s waits):
+   - `git pull --rebase origin <base-branch>` (if remote exists; otherwise local fetch).
+   - Re-attempt the merge.
+3. On the 5th failure, leave the feature branch alive (do NOT delete it), transition the REQ to `**Status:** stopped`, `**Reason:** concurrent-conflict` (handled in the Recover step below), and surface to the user. The branch can be resumed via `/do-work resume REQ-NNN` which checks out the worktree and re-runs the worker on the same branch.
+
+#### 4b. Archive the REQ file
+
+Read the worker's YAML report's `outputs:` list. Rewrite the REQ file in place under `.do-work/working/REQ-NNN-slug.md`:
+
+1. Strip the ownership stamp (`<!-- claimed-start --> … <!-- claimed-end -->`).
+2. Update `**Status:**` to `done`.
+3. Append a `## Outputs` section based on the `outputs:` array from the worker's YAML report. One bullet per entry: `- <path> — <description>`.
+4. Move the file to `archive/`:
+   ```bash
+   mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/archive/REQ-NNN-slug.md
+   ```
+
+#### 4c. Tear down the worktree
+
+```bash
+git worktree remove {project}/.worktrees/req-NNN
+git branch -d req/REQ-NNN   # safe delete; refuses if not fully merged
+```
+
+If `git branch -d` refuses (the merge somehow incomplete), surface to the user; leave the branch alive for manual investigation. Never use `-D`.
+
+#### 4d. Commit the metadata change
+
+If `.do-work/` is tracked in this project, stage only the archive move and commit:
+
+```bash
+git add {project}/.do-work/archive/REQ-NNN-slug.md
+git add {project}/.do-work/working/REQ-NNN-slug.md   # stages the removal
+git commit -m "chore(REQ-NNN): archive
+
+REQ: {project}/.do-work/archive/REQ-NNN-slug.md
+UR: {project}/.do-work/user-requests/UR-NNN/input.md"
+```
+
+If `.do-work/` is gitignored: skip this commit silently. The archive move is filesystem-only, and the worker's `feat(REQ-NNN): ...` commit (now on the base branch via the merge) is the authoritative record.
+
+Proceed to Step 7.
+
+### Step 5: Recover (on stopper)
+
+Reached only when `status: stopped` or `failed`. The REQ file is still in `working/` (worker didn't move it). Handle per `## Stopping Rules`.
+
+For `reason: concurrent-conflict` after Step 4a's 5-retry exhaustion: leave the feature branch alive; update the REQ to `**Status:** stopped` and `**Reason:** concurrent-conflict`. `/do-work resume REQ-NNN` is the recovery path.
+
+For other stoppers: surface to the user via `AskUserQuestion` (existing stopping-rules behaviour).
+
+Do not proceed to Step 7.
 
 ### Step 7: Report progress
 

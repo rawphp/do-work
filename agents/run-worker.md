@@ -30,30 +30,22 @@ Treat these as your full context. Do not search for additional REQs, do not load
 
 ## Isolation Mode
 
-After reading the REQ (Step 1) and before starting TDD (Step 3), evaluate the following heuristic to determine your working location for this REQ. Apply rules top-to-bottom; first match wins.
+**Workers always operate in worktree mode.** Same-branch mode has been retired — its parallel-safety failure modes (workers wiping each other's unstaged changes via `git reset`, staging sibling-owned files, racing commits on the same branch) are not acceptable risks even for single-agent runs.
 
-> **JUDGMENT:** J1 — Choose the first row whose signal matches. The `--isolation=worktree` override (row 1) is set by the orchestrator when the only-pickable REQ's declared footprint overlaps a sibling's active footprint; it overrides all content-based signals below it.
+The worker's responsibilities are bounded:
 
-| Signal in REQ | Mode |
-|---|---|
-| Dispatch invoked with `--isolation=worktree` (orchestrator forced this after overlap detection at claim time) | `worktree` |
-| `**Layer:** none` (docs / pure refactor / test-only) | `same-branch` |
-| REQ task description matches any of: `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, `restructure` | `worktree` |
-| REQ `## Integration` block lists ≥ 3 distinct service dependencies | `worktree` |
-| REQ acceptance criteria total > 6 items, OR the REQ touches > 5 files in a documented `## Files` block | `worktree` |
-| Anything else | `same-branch` |
+- **Worker = code.** Creates a worktree on a feature branch (`req/REQ-NNN`). Implements + tests + commits to that branch. Never touches `.do-work/`. Never merges back. Never tears down its worktree.
+- **Orchestrator = state.** Owns `.do-work/` lifecycle. After the worker returns `status: done`, the orchestrator merges the feature branch into the base branch, moves the REQ from `working/` to `archive/`, commits the metadata change, and tears down the worktree.
 
-**`same-branch`** — operate directly in the orchestrator's checkout, on whatever branch it is currently on (typically `main`).
+This separation makes parallelism safe by construction: workers cannot interfere with each other's working trees because each one has its own. Merge conflicts surface explicitly at the orchestrator's integration step rather than silently corrupting another worker's in-flight edits.
 
-**`worktree`** — follow `## Worktree Workflow` below (git worktree on its own branch, merge back when done).
-
-Record the chosen mode in the `isolation:` field of your Return Report.
+Set `isolation: worktree` in the Return Report unconditionally.
 
 ---
 
 ## Worktree Workflow
 
-Used when `## Isolation Mode` resolves to `worktree`. Execute these steps in order before proceeding to the normal `## Steps`.
+Execute these steps in order before proceeding to the normal `## Steps`. **This is always required — every worker runs in a worktree.**
 
 ### W1. Record the base branch
 
@@ -82,25 +74,16 @@ The REQ file in `{project}/.do-work/working/REQ-NNN-slug.md` is immediately visi
 
 ### W5. Commit on the feature branch
 
-The Step 8 commit (`feat(REQ-NNN): ...`) lands on `req/REQ-NNN` inside the worktree. This is the normal `## Steps` Step 8 commit, executed from within the worktree directory. Proceed to W6 after the commit succeeds.
+The Step 8 commit (`feat(REQ-NNN): ...`) lands on `req/REQ-NNN` inside the worktree. This is the normal `## Steps` Step 8 commit, executed from within the worktree directory. After the commit succeeds, capture the commit short hash for the Return Report.
 
-### W6. Merge back to `<base-branch>`
+**Worker stops here.** Do NOT merge back. Do NOT tear down the worktree. Do NOT touch `.do-work/`. The orchestrator (see `agents/run.md` post-worker integration steps) is responsible for:
 
-```bash
-cd {project}                                            # back to the orchestrator's checkout
-git merge --no-ff req/REQ-NNN -m "merge(REQ-NNN): integrate"
-```
+- Merging `req/REQ-NNN` into `<base-branch>` with conflict-retry handling.
+- Moving the REQ file from `.do-work/working/` to `.do-work/archive/`, setting `**Status:** done`, appending the `## Outputs` section based on the YAML report you returned.
+- Tearing down the worktree (`git worktree remove`) and deleting the feature branch (`git branch -d`).
+- Committing the `.do-work/` metadata change.
 
-If the merge has text-level conflicts, apply the upcoming `## Concurrent-Conflict Retry` section's wait-and-retry policy (landed by REQ-118): pull `<base-branch>`, retry the merge after backoff, up to **5 attempts**. If the 5th attempt fails, return `status: stopped`, `reason: concurrent-conflict`, with `details` listing the conflicting paths. Do NOT auto-resolve conflicts.
-
-### W7. Tear down the worktree
-
-```bash
-git worktree remove {project}/.worktrees/req-NNN
-git branch -d req/REQ-NNN                               # safe delete; refuses if not merged
-```
-
-Do **not** force-delete the branch (`-D` is forbidden). If `git branch -d` refuses because the branch was not fully merged, leave the branch as-is and surface the situation in the Return Report as a partial-completion stopper (`status: stopped`, `reason: unknown-error`, `details` describing the unmerged branch).
+Your `Return Report` must list every output path in the `outputs:` array — the orchestrator uses that list to build the `## Outputs` section it appends to the archived REQ. Returning incomplete `outputs:` means the archive record will be incomplete.
 
 ---
 
@@ -244,38 +227,15 @@ Record the result of each step: pass/fail + actual output or screenshot.
 
    > **JUDGMENT:** Title and body must name the failing step type plainly (test / build / runtime / ui) and the REQ id. Do not paste raw test output or absolute paths — the sanitiser strips paths, but commit messages and diffs must be omitted by the caller. One sentence in the body is enough; the goal is trend visibility, not a full failure log.
 
-### 7. Archive the REQ
+### 7. (Reserved — archive moved to orchestrator)
 
-Update the REQ's `**Status:**` field to `done`.
+Earlier worker versions archived the REQ here. Under the worker = code / orchestrator = state split, the worker does NOT update `**Status:**`, does NOT add `## Outputs`, does NOT move the REQ file. All three are the orchestrator's job — driven by your YAML report.
 
-Add an `## Outputs` section at the end of the REQ:
-
-```markdown
-## Outputs
-
-- [path/to/primary/output] — [one-line description]
-- [path/to/test/file] — tests
-```
-
-Move the REQ from `working/` to `archive/`:
-
-```bash
-mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/archive/REQ-NNN-slug.md
-```
-
-Confirm the archive file exists, then defensively remove any leftover `working/` copy:
-
-```bash
-rm -f {project}/.do-work/working/REQ-NNN-slug.md
-```
+Skip directly to Step 8.
 
 ### 8. Commit
 
-You commit the REQ yourself. Do not return to the orchestrator and ask it to commit — the orchestrator only reads your report.
-
-**`worktree` mode:** run the commit from inside `{project}/.worktrees/req-NNN` (the worktree directory). After this commit succeeds, proceed to `## Worktree Workflow` W6 (merge back) and W7 (teardown). The commit hash you capture for the Return Report is this feature-branch commit.
-
-**`same-branch` mode:** run the commit from the orchestrator's checkout as before.
+Commit your implementation files to the feature branch (`req/REQ-NNN`) from inside the worktree directory (`{project}/.worktrees/req-NNN`). The orchestrator merges this branch into the base branch after you return.
 
 ### Footprint Verification (does not block commit)
 
@@ -305,45 +265,38 @@ For any staged path NOT covered by the declared footprint (use `lib/check-footpr
 
 This DOES NOT block the commit. Footprint declarations evolve with reality, and the feedback loop is for trend visibility, not enforcement.
 
-**Stage only paths keyed to THIS REQ.** Never use a broad sweep (`git add -A`, `git add .do-work/`, `git add .`). Under parallelism a sweep would pick up a sibling agent's claim file, in-flight working/ slot, or unrelated state file edits — each REQ commit must contain only its own work.
+**Stage only implementation files this REQ produced.** You are committing to your feature branch — there are no sibling workers in your worktree, but the discipline still applies: a sweep can pick up files left by a prior incomplete worker run, leftover test fixtures, or orchestrator state visible through the shared object database.
 
-Build the staging list explicitly from the four categories below. Anything outside these categories is not your work and must not be staged.
+The categories that should appear in your commit:
 
 | Category | What to stage | Path pattern |
 |---|---|---|
-| REQ lifecycle (always) | The archive create + the working/ slot deletion for THIS REQ | `.do-work/archive/REQ-NNN-slug.md`, `.do-work/working/REQ-NNN-slug.md` |
-| UR directory (if touched) | Files this REQ created or modified under its own UR's directory | `.do-work/user-requests/UR-NNN/REQ-NNN-*` or sibling artifacts owned by this REQ |
-| Logs / state (if written) | Log or state files this REQ wrote, named for this REQ | `.do-work/logs/REQ-NNN-*`, or any `.do-work/state/` file owned by this REQ |
-| Implementation files | Source files outside `.do-work/` that this REQ changed | Anywhere in the repo, listed explicitly |
+| Implementation files | Source files this REQ changed | Anywhere in the repo, listed explicitly |
+| UR-owned artifacts (if touched) | Files this REQ created under its UR directory (e.g. ideate.md, captured assets) | `.do-work/user-requests/UR-NNN/REQ-NNN-*` |
 
-Forbidden to stage from this commit (these belong to sibling agents or other commits):
-- Any `.do-work/working/REQ-MMM-*.md` where `MMM` ≠ this REQ's number
-- Any `.do-work/archive/REQ-MMM-*.md` where `MMM` ≠ this REQ's number
-- `.do-work/state/active-milestone.md`, `.do-work/state/milestones.md`, `.do-work/state/gate-owner.md`, `.do-work/state/final-suite-*.md` (owned by the orchestrator, not the worker)
-- Any other REQ file in `.do-work/REQ-*.md` (those are sibling-owned backlog items)
-
-Use `git status` before staging to confirm only your own paths appear, then stage explicitly:
+Forbidden to stage:
+- Any `.do-work/working/REQ-*.md` — that's orchestrator state; orchestrator commits the working→archive move on the main checkout after merge.
+- Any `.do-work/archive/REQ-*.md` — same, orchestrator-owned.
+- `.do-work/state/*` — orchestrator-owned.
+- Any other REQ file in `.do-work/REQ-*.md` — sibling-owned backlog items.
 
 ```bash
 git status                                            # confirm only REQ-NNN paths are dirty
-git add {project}/.do-work/archive/REQ-NNN-slug.md     # archive create
-git add {project}/.do-work/working/REQ-NNN-slug.md     # working/ deletion (git stages the removal)
-git add {project}/.do-work/user-requests/UR-NNN/...    # only if this REQ touched UR-owned files
-git add {project}/.do-work/logs/REQ-NNN-...            # only if this REQ wrote logs
-git add path/to/changed/implementation/files...       # implementation files outside .do-work/, listed explicitly
+git add path/to/changed/implementation/files...       # implementation files, listed explicitly
+git add {project}/.do-work/user-requests/UR-NNN/...   # only if this REQ touched UR-owned files
 
 git commit -m "feat(REQ-NNN): short title
 
-REQ: {project}/.do-work/archive/REQ-NNN-slug.md
+REQ: {project}/.do-work/working/REQ-NNN-slug.md
 UR: {project}/.do-work/user-requests/UR-NNN/input.md
 Output: path/to/primary/output"
 ```
 
-In `worktree` mode the checkout is already isolated to this REQ, so a sweep would be safe — but the explicit-paths rule still applies. Identical instructions in both modes means there is no chance of cross-mode regression if a future REQ blurs the isolation boundary.
+Note the commit message's `REQ:` line points at `working/` (the live slot at commit time), not `archive/`. The orchestrator will rewrite the file system path when it archives the REQ post-merge, but the commit message text is fine as-is — it documents the REQ id, not a stable filesystem path.
 
-If `.do-work/` is gitignored in the project, the `.do-work/...` paths above will fail to add — that is expected. Stage and commit only the implementation files and any non-ignored paths. Do not use `--no-verify`. Do not skip hooks.
+If `.do-work/` is gitignored in the project, the `.do-work/...` paths above will fail to add — that is expected. Stage and commit only the implementation files. Do not use `--no-verify`. Do not skip hooks.
 
-If `git status` shows dirty paths you did **not** intend to stage (a sibling's claim file landed mid-flight, an orchestrator-owned state file changed), do not stage them and do not `git checkout --` them. Leave them in the working tree for their owner; commit only the explicit list above.
+If `git status` shows dirty paths you did **not** intend to stage, do not stage them and do not `git checkout --` them. Leave them; the orchestrator will handle anything it owns.
 
 Capture the resulting commit short hash for the Return Report.
 
@@ -363,63 +316,28 @@ If `active-milestone.md` does not exist, set `milestone_complete: false` uncondi
 
 ## Concurrent-Conflict Retry
 
-When a commit or merge fails because a sibling agent's work landed first, apply this retry policy before returning a stopped report.
+When a `git commit` to your feature branch fails because the local index is stale (rare in worktree mode — your branch is isolated, but a pre-commit hook may still complain), apply a bounded retry policy before returning a stopped report. **Merge-conflict retry is no longer the worker's concern** — the orchestrator handles merge into the base branch after you return `status: done`.
 
 ### Trigger conditions
 
-Fire this policy when **any** of the following occurs during Step 8 (Commit) or — in `worktree` mode — during `## Worktree Workflow` W6 (Merge back):
+Fire this policy when **any** of the following occurs during Step 8 (Commit on your feature branch):
 
-- `git commit` is rejected by a pre-commit hook that complains about stale state
-- `git merge` reports text-level conflicts (conflict markers `<<<<<<<` in any file)
-- `git push` is rejected as non-fast-forward (when a remote push is part of the workflow)
-- The base branch's `HEAD` advanced between the worker's last `git fetch`/`git pull` and the commit/merge attempt
+- `git commit` is rejected by a pre-commit hook that complains about stale state.
+- The feature branch's index reports unexpected staged paths from a leftover prior run.
 
 ### Retry schedule
 
-Up to **5 attempts** with exponential backoff (4 wait intervals):
-
-| Attempt | Wait before retry |
-|---|---|
-| 1 → 2 | 5 seconds |
-| 2 → 3 | 15 seconds |
-| 3 → 4 | 30 seconds |
-| 4 → 5 | 60 seconds |
-| 5 → fail | n/a — exit with `status: stopped` |
+Up to **5 attempts** with exponential backoff (5s, 15s, 30s, 60s waits). On the 5th failure, exit with `status: stopped`, `reason: concurrent-conflict`, with `details` describing the hook output.
 
 ### Per-attempt actions
 
-Execute in this exact order for each retry:
-
-1. **Sleep** the backoff interval using the literal Bash sleep command:
-   ```bash
-   sleep <interval>
-   ```
-
-2. **Re-sync** the local branch with the remote/base:
-   - `same-branch` mode:
-     ```bash
-     git pull --rebase origin <current-branch>
-     ```
-     (If no remote exists, `git pull --rebase` against the local tracking branch.)
-   - `worktree` mode: from the orchestrator's checkout (not inside the worktree), pull the base branch, then re-attempt the merge from within:
-     ```bash
-     git pull --rebase origin <base-branch>
-     git merge --no-ff req/REQ-NNN -m "merge(REQ-NNN): integrate"
-     ```
-
-3. **Re-run affected tests** (the same tests from `## Steps` Step 4 — "Run affected tests") against the rebased state. If any test now fails because of the rebase, treat it as a conflict failure — it counts toward the retry budget. Do NOT auto-fix a test failure that arose from rebase; exit the attempt and proceed to the next retry interval.
-
-4. **Re-attempt** the commit or merge.
+1. `sleep <interval>` (5 / 15 / 30 / 60).
+2. Re-run any test or build the pre-commit hook depends on. Do NOT auto-fix test failures that arose from the rebase — exit and count toward the retry budget.
+3. Re-attempt the commit on the feature branch.
 
 ### No auto-resolve
 
-The worker must **never** edit a file that contains conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) in order to resolve the conflict. If git reports conflict markers in any file after a merge attempt:
-
-```bash
-git merge --abort
-```
-
-Count the attempt as a failure and proceed to the next retry interval.
+The worker must **never** edit a file that contains conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`). If your feature-branch commit somehow produces them, return `status: stopped`, `reason: concurrent-conflict` and let the orchestrator deal with it.
 
 ### Exit conditions
 

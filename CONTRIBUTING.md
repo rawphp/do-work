@@ -66,6 +66,28 @@ If your change isn't tied to a REQ, use `feat:`, `fix:`, or `docs:` without a RE
 - Don't add features that aren't needed yet. The skill is intentionally minimal.
 - Test with real `/do-work` commands before submitting.
 
+## Worker / Orchestrator Boundary
+
+`/do-work run` enforces a strict separation between two layers of responsibility.
+
+**Worker (`agents/run-worker.md`) — owns code.**
+
+- Operates in a git worktree on a feature branch (`req/REQ-NNN`).
+- Implements + tests + commits to that branch.
+- **Never** touches `.do-work/` (no working→archive move, no metadata edits).
+- **Never** merges back to the base branch.
+- **Never** tears down its worktree.
+- Returns a YAML report. Done.
+
+**Orchestrator (`agents/run.md`) — owns `.do-work/`.**
+
+- Lives in the main checkout.
+- After the worker returns `status: done`: merges `req/REQ-NNN` into the base branch, moves the REQ file from `working/` to `archive/`, sets `**Status:** done`, writes the `## Outputs` section from the worker's YAML report, tears down the worktree, commits the metadata change.
+
+This separation makes parallelism safe by construction. Workers cannot wipe each other's working trees because each one has its own checkout. Merge conflicts surface explicitly at the orchestrator's integration step rather than silently corrupting another worker's in-flight edits.
+
+Same-branch mode has been retired. All workers — single-agent or parallel — run in worktrees.
+
 ## REQ Header Schema
 
 Every REQ file starts with a **fixed header block** that is regex-parseable by bash scripts. Each field appears on its own line in the form `**Field:** value`. Values are plain text or comma-separated lists. No multi-line values, no nested structures.
