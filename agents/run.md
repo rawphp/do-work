@@ -307,7 +307,31 @@ while [ "$ELAPSED" -lt 1800 ]; do
 done
 ```
 
-On 30-minute timeout, surface to the user: `Claim blocked (<classification>) — still no claimable REQ after 30 min. Continue waiting, or abort?` Act on user response. **JUDGMENT:** distinguish a stuck deadlock (no progress at all from siblings) from a slow but live backlog — if the working/ slots' heartbeats are advancing, prefer "continue waiting"; if heartbeats are also stale, escalate to the user with that context. Refer to deadlock-detection guidance for the diagnosis narrative.
+On 30-minute timeout, **run deadlock detection before falling back to the generic prompt**:
+
+```bash
+DEADLOCK_OUT=$(bash {skill-root}/lib/deadlock-check.sh)
+```
+
+`deadlock-check.sh` (REQ-156) prints empty stdout when no deadlock is detected and a structured report otherwise. Branch on its output:
+
+**If `DEADLOCK_OUT` is empty (no deadlock):** Surface the generic prompt to the user: `Claim blocked (<classification>) — still no claimable REQ after 30 min. Continue waiting, or abort?` Act on user response.
+
+**If `DEADLOCK_OUT` is non-empty (deadlock detected):**
+
+1. Parse the report. Extract `signal`, `fingerprint`, `diagnosis`, `live-slots`, `stale-slots`, `backlog-size`, `last-commit-age`.
+2. **Acquire the surfacing lock** via `flock -n` on `.do-work/state/feedback.lock` so only one orchestrator writes `deadlock.md` and surfaces to the user. Siblings that fail to acquire the lock skip steps 3–5 and exit the idle-wait loop quietly (they will pick up via their own timeout if the deadlock persists).
+3. **Lock-holder only:** write `{project}/.do-work/state/deadlock.md` containing the full `deadlock-check.sh` output plus a timestamp. This file is the cross-process signal that the deadlock has been surfaced.
+4. **Lock-holder only:** emit feedback by calling `bash {skill-root}/lib/file-feedback.sh deadlock "<fingerprint>" '<context-json>'` where `<context-json>` is a single-line JSON object with `signal`, `live-slots`, `stale-slots`, `backlog-size`, `last-commit-age`, `classification` (the idle-wait entry classification). The script handles its own enable/disable, deduplication, and lock-on-feedback.lock — call it best-effort and continue regardless of exit code.
+5. **Lock-holder only — surface to the user**, gated on `config.next_steps.enabled` and standalone mode (same gate as Stopping Rules):
+   - If gate passes: use the `AskUserQuestion` tool with options:
+     1. **"Reset stale slots"** — return any slots listed in `stale-slots` to the backlog (per the Pre-flight stale-slot return path).
+     2. **"Show situation room"** — print the suggestion `Run /do-work status` and exit cleanly.
+     3. **"Unblock a REQ"** — ask which REQ id; print `Run /do-work unblock REQ-NNN` and exit cleanly.
+     4. **"Abort"** — exit this orchestrator cleanly.
+   - If gate fails (`next_steps.enabled` is `false` / missing, or running as a delegate): print the diagnosis block (the `deadlock-check.sh` output plus a one-line summary) and exit cleanly. Do not prompt.
+
+> **JUDGMENT:** The deadlock diagnosis must distinguish a stuck deadlock from a slow-but-live backlog. `deadlock-check.sh` returning a report is strong evidence (no commits in 5 min OR all slots stale OR runtime cycle) — trust it and surface. Empty output means heartbeats are still advancing or commits are landing; in that case the generic "continue waiting?" prompt is correct. Never silently keep idling past the 30-minute mark — either the deadlock path or the user prompt must fire.
 
 **If `pick-req.sh` returns a path (exit 0) — claim it atomically via `lib/claim-req.sh`:**
 
