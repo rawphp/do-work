@@ -22,11 +22,28 @@ Points where the orchestrator must apply judgment rather than follow a determini
 
 ## When Invoked
 
+```
+/do-work run [UR-NNN]
+```
+
 You will be given a project do-work path:
 
 ```
 {project}/.do-work/
 ```
+
+The optional `UR-NNN` argument scopes this orchestrator's claim loop to a single UR. Read it immediately after startup:
+
+```bash
+# $1 is the optional UR-NNN argument passed by the caller
+if [ -n "${1:-}" ]; then
+    SCOPE="$1"   # e.g. UR-002
+else
+    SCOPE="any"  # default — consider all REQs in backlog
+fi
+```
+
+Scope is an **in-memory filter, NOT a hard reservation**. Other orchestrators launched without a scope (or with a different scope) can still claim REQs in the same UR. Use scope to focus an orchestrator; do not rely on it to exclude siblings.
 
 ---
 
@@ -138,6 +155,28 @@ These appear abandoned. Reclaim into this run, return to backlog, or abort?
 ```
 
 - **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
+
+  Before rewriting the stamp, classify *why* the slot went stale and emit feedback (best-effort, non-blocking) iff there has been **no commit activity** touching any path under the REQ's `**Files:**` declaration in the last hour:
+
+  ```bash
+  LAST_COMMIT_AGE_SEC=$(($(date +%s) - $(git log -1 --format=%ct -- <files-from-REQ> 2>/dev/null || echo 0)))
+  if [ "$LAST_COMMIT_AGE_SEC" -gt 3600 ] || [ "$LAST_COMMIT_AGE_SEC" -eq "$(date +%s)" ]; then
+      # Classify the reason. One of:
+      #   no-heartbeat      — Heartbeat field absent or malformed
+      #   heartbeat-frozen  — Heartbeat present but older than threshold
+      #   no-progress       — Heartbeat fresh-ish but no commits touching the REQ's files
+      REASON_CLASS="<no-heartbeat|heartbeat-frozen|no-progress>"
+      FINGERPRINT="stale-slot:${REASON_CLASS}"
+      bash {skill-root}/lib/file-feedback.sh stale-slot \
+        "$FINGERPRINT" \
+        '{"req":"REQ-NNN","prior_owner":"<previous-agent-id>","reason_class":"'"$REASON_CLASS"'","last_commit_age_sec":'"$LAST_COMMIT_AGE_SEC"'}' \
+        "Stale-slot reclaim: REQ-NNN (${REASON_CLASS})" \
+        "REQ-NNN sat in working/ with no commit progress in over an hour before reclaim. Prior owner appears abandoned; this orchestrator is taking the slot." \
+        || true
+  fi
+  ```
+
+  > **JUDGMENT:** The title carries the REQ id and the reason class so an inbox skim tells you whether agents are dying silently (no-heartbeat) versus making progress without committing (no-progress). The body is one sentence — a single stale reclaim is routine; the inbox's fingerprint dedup surfaces the recurrence pattern.
 - **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ. Stage **only** that REQ's file path — do not sweep `.do-work/`. Example:
   ```bash
   git mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/REQ-NNN-slug.md
@@ -261,7 +300,7 @@ No commits are made while idle-waiting — the orchestrator is reading state fil
 AGENT_ID="$(hostname).$$"
 ```
 
-**Scope argument:** The caller may pass a `<scope>` value (`any` or a UR id like `UR-030`). Default is `any`. When `/do-work run UR-NNN` is invoked, the orchestrator passes that UR id as `<scope>` so the picker only considers REQs in that UR — that CLI wiring lives in REQ-166. Until REQ-166 lands, treat `SCOPE` as `any` unless the user has passed it explicitly through an already-wired mechanism. The picker is also milestone-aware: when `state/active-milestone.md` exists it constrains its glob to `REQ-M<active>-*.md` regardless of `<scope>`.
+**Scope argument:** `SCOPE` is derived from the optional `UR-NNN` argument at startup (see `## When Invoked`). Default is `any`. When `/do-work run UR-NNN` is invoked, `SCOPE=UR-NNN` and the picker filters out REQs whose `**UR:**` field does not match. The picker is also milestone-aware: when `state/active-milestone.md` exists it constrains its glob to `REQ-M<active>-*.md` regardless of `SCOPE`.
 
 **Pick the next claimable REQ — delegate to `lib/pick-req.sh`:**
 
@@ -349,7 +388,7 @@ After a successful `claim-req.sh`:
 **Announce:**
 
 ```
-[<agent-id>] Starting REQ-NNN [type=<subagent_type>, model=<model>, isolation=<mode>]: [title]
+[<agent-id>] [scope=<UR-NNN|any>] Starting REQ-NNN [type=<subagent_type>, model=<model>, isolation=<mode>]: [title]
 ```
 
 ### Step 2: Dispatch the worker subagent
@@ -644,6 +683,37 @@ If `config.next_steps.enabled` is `true` **and** this agent is running standalon
 3. **"Skip"** — End the interaction
 
 If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: print the stopper and the worker's `details` field, then stop. Do not loop, do not silently retry, do not auto-resolve.
+
+### Per-REQ retry counter (ambiguous-criteria recurrence)
+
+The orchestrator tracks per-REQ stopped-reason occurrences so a *second* `ambiguous-criteria` stop on the same REQ can surface as feedback (a single ambiguity is normal; a second on the same REQ means the user-facing clarification did not stick or the REQ wording is genuinely defective).
+
+Counter store: `{project}/.do-work/state/retry-counters.md`. Format — one Markdown table row per (REQ, reason) pair:
+
+```markdown
+| REQ-NNN | ambiguous-criteria | 2 | 2026-05-21T02:14:22Z |
+```
+
+Columns: REQ id, reason, count, last-seen ISO-8601 UTC. The orchestrator keeps this in memory for the lifetime of the loop and flushes to the file after each update. If the file is missing on startup, treat all counters as zero.
+
+When the worker returns `status: stopped`, `reason: ambiguous-criteria`:
+
+1. Increment the (REQ-NNN, ambiguous-criteria) counter in memory and persist to `retry-counters.md`.
+2. If the new count is **≥ 2**, emit feedback (best-effort, non-blocking) before surfacing the stopper to the user:
+
+   ```bash
+   FINGERPRINT="ambiguous-req:REQ-NNN"
+   bash {skill-root}/lib/file-feedback.sh ambiguous-criteria \
+     "$FINGERPRINT" \
+     '{"req":"REQ-NNN","occurrence":'"$COUNT"',"first_seen":"<iso8601>","last_seen":"<iso8601>"}' \
+     "Ambiguous-criteria recurrence: REQ-NNN (occurrence #$COUNT)" \
+     "Worker has now stopped on REQ-NNN with reason ambiguous-criteria $COUNT times. The acceptance criteria likely need a rewrite, not another retry." \
+     || true
+   ```
+
+3. Proceed to the existing user-interaction step above (AskUserQuestion or stop-and-print).
+
+> **JUDGMENT:** Fire feedback only on the 2nd+ occurrence — the first stop is the worker doing its job; the second is the signal. Title states the REQ id and occurrence count so the human inbox immediately knows which REQ needs editing. The body must point at the *criteria* as the problem (not the worker, not the model) so the human reaches for the REQ file rather than a retry button.
 
 ---
 
