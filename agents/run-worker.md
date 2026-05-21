@@ -128,6 +128,8 @@ trap 'kill "$HEARTBEAT_PID" 2>/dev/null' EXIT
 
 `REQ_PATH` is the absolute path to the REQ file in `working/`. The `trap ... EXIT` ensures the background process is cleaned up even if the worker exits early (stop, error, or normal completion). `lib/heartbeat.sh` writes the current UTC timestamp into the `**Heartbeat:**` field of the REQ file; stale-slot detection in the pre-flight scan uses this timestamp to decide whether a claimed slot is dead.
 
+**Why these numbers.** The 60-second refresh interval pairs with the pre-flight scanner's 300-second stale threshold — a 5× safety factor that absorbs transient slow ticks (long test runs, paused subagents) without falsely declaring the slot dead. The `EXIT` trap is what makes the loop *safe*: any exit path (normal return, stopped report, thrown error, signal) tears down the background process so it cannot keep stamping a REQ the worker has abandoned.
+
 ### 2. Read context
 
 Read the UR `input.md` once for orientation.
@@ -264,13 +266,31 @@ You commit the REQ yourself. Do not return to the orchestrator and ask it to com
 
 ### Footprint Verification (does not block commit)
 
-Before staging, diff `git diff --name-only` against the REQ's `**Files:**` declaration. For any staged path NOT covered by the declared footprint:
+Before the `git commit` line, diff the staged set against the REQ's `**Files:**` declaration:
 
-1. Log a warning: `footprint-miss: <path> not in declared **Files:**`
-2. Update the REQ's `**Files:**` line in place to the actual changed-file set.
-3. Call `lib/file-feedback.sh footprint-miss <fingerprint> <context-json> ...` to surface for human review.
+```bash
+STAGED=$(git diff --name-only --cached)
+DECLARED=$(grep '^\*\*Files:\*\*' {project}/.do-work/working/REQ-NNN-slug.md | sed 's/^\*\*Files:\*\*//' | tr ',' '\n' | xargs)
+```
 
-This DOES NOT block the commit — footprint declarations evolve with reality, and the feedback loop is for trend visibility, not enforcement.
+For any staged path NOT covered by the declared footprint (use `lib/check-footprint.sh` logic or an inline `grep -F` check):
+
+1. Log a warning to the worker's stderr: `footprint-miss: <path> not in declared **Files:**`.
+2. Update the REQ's `**Files:**` line in place — replace the declared list with the actual staged set so the archived REQ reflects reality.
+3. Emit a feedback record so the trend surfaces in the human inbox:
+
+   ```bash
+   FINGERPRINT="footprint-miss:$(git diff --name-only --cached | md5sum | cut -d' ' -f1)"
+   bash lib/file-feedback.sh footprint-miss \
+     "$FINGERPRINT" \
+     '{"req":"REQ-NNN"}' \
+     "Footprint miss: REQ-NNN" \
+     "Worker staged paths not in declared **Files:** field"
+   ```
+
+> **JUDGMENT:** J2 — Distinguish a legitimate adjacent file (test fixtures, related helper, a forgotten doc) from genuine scope creep. Default to continue-and-correct. If the unstaged-but-declared diff suggests a new module or unrelated refactor, return `status: stopped`, `reason: scope-creep` instead.
+
+This DOES NOT block the commit. Footprint declarations evolve with reality, and the feedback loop is for trend visibility, not enforcement.
 
 **Stage only paths keyed to THIS REQ.** Never use a broad sweep (`git add -A`, `git add .do-work/`, `git add .`). Under parallelism a sweep would pick up a sibling agent's claim file, in-flight working/ slot, or unrelated state file edits — each REQ commit must contain only its own work.
 
