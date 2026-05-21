@@ -14,8 +14,9 @@ Points where the orchestrator must apply judgment rather than follow a determini
 | J2 | REQ Classification | Which `subagent_type` fits this REQ when no signal clearly matches? |
 | J3 | Model Selection | Escalate to `opus` when signals are borderline? |
 | J4 | Step 1.0a idle-wait | Gate-owner stuck after 30 min: continue waiting or abort? |
-| J5 | Step 7b drain | Sibling slot not drained after 30 min: continue polling or surface to user? |
-| J6 | Step D suite failure | Which REQ is responsible for a failing test? |
+| J5 | Step 1 idle-wait (deps/overlap/scope) | Deadlock vs slow-but-live: continue waiting or surface to user? |
+| J6 | Step 7b drain | Sibling slot not drained after 30 min: continue polling or surface to user? |
+| J7 | Step D suite failure | Which REQ is responsible for a failing test? |
 
 ---
 
@@ -260,7 +261,7 @@ No commits are made while idle-waiting — the orchestrator is reading state fil
 AGENT_ID="$(hostname).$$"
 ```
 
-**Scope argument:** The caller may pass a `<scope>` value (e.g. `UR-030` or `any`). Default is `any`. Wiring of the `/do-work run [scope]` CLI arg is handled in REQ-166 — until that lands, treat `SCOPE` as `any` unless the user has passed it explicitly through an already-wired mechanism.
+**Scope argument:** The caller may pass a `<scope>` value (`any` or a UR id like `UR-030`). Default is `any`. When `/do-work run UR-NNN` is invoked, the orchestrator passes that UR id as `<scope>` so the picker only considers REQs in that UR — that CLI wiring lives in REQ-166. Until REQ-166 lands, treat `SCOPE` as `any` unless the user has passed it explicitly through an already-wired mechanism. The picker is also milestone-aware: when `state/active-milestone.md` exists it constrains its glob to `REQ-M<active>-*.md` regardless of `<scope>`.
 
 **Pick the next claimable REQ — delegate to `lib/pick-req.sh`:**
 
@@ -278,16 +279,35 @@ CLASSIFICATION=$(cat "$PICK_STDERR" | bash {skill-root}/lib/drain-classify.sh)
 rm -f "$PICK_STDERR"
 ```
 
-`drain-classify.sh` (REQ-152) reads the stderr lines and emits one of four labels:
+`drain-classify.sh` (REQ-152) reads the stderr lines and emits one of four labels, precedence `overlap-blocked > deps-blocked > scope-blocked > truly-empty`:
 
 | Classification | Meaning | Action |
 |---|---|---|
-| `truly-empty` | No candidates considered at all | Fall through to `## When the Backlog is Empty` |
-| `deps-blocked` | All survivors blocked on unsatisfied dependencies | Idle-wait: log once, poll every 30 s until a dep is archived, then re-run pick |
-| `overlap-blocked` | At least one candidate blocked by footprint overlap with a sibling slot | Idle-wait: log once, poll every 30 s until the overlapping slot drains, then re-run pick |
-| `scope-blocked` | All candidates excluded by the `<scope>` filter, but backlog is not empty | Fall through to `## When the Backlog is Empty` (this orchestrator's scope is exhausted) |
+| `overlap-blocked` | At least one candidate blocked by footprint overlap with a sibling slot | Idle-wait (see below) |
+| `deps-blocked` | All survivors blocked on unsatisfied dependencies | Idle-wait (see below) |
+| `scope-blocked` | All candidates excluded by the `<scope>` filter | Idle-wait (see below) — a new capture or a scope change can add eligible REQs |
+| `truly-empty` | No candidates considered at all (backlog drained for this picker view) | Fall through to `## When the Backlog is Empty` |
 
-Idle-wait polling cap: 30 minutes. If still blocked after 30 minutes, surface to the user: `Claim blocked (<classification>) — still no claimable REQ after 30 min. Continue waiting, or abort?` Act on user response.
+**Idle-wait loop** (entered on `overlap-blocked`, `deps-blocked`, or `scope-blocked`). Log the entry classification once, then poll every **30 seconds**, max **30 minutes**:
+
+```bash
+ELAPSED=0
+while [ "$ELAPSED" -lt 1800 ]; do
+    sleep 30
+    ELAPSED=$((ELAPSED + 30))
+    # Refresh heartbeat on a still-owned slot, if any. No-op when CURRENT_SLOT is unset.
+    if [ -n "${CURRENT_SLOT:-}" ] && [ -e "$CURRENT_SLOT" ]; then
+        bash {skill-root}/lib/heartbeat.sh "$CURRENT_SLOT" >/dev/null 2>&1 || true
+    fi
+    # Re-pick.
+    REQ_PATH=$(bash {skill-root}/lib/pick-req.sh "$SCOPE" "$AGENT_ID" 2>"$PICK_STDERR")
+    if [ -n "$REQ_PATH" ]; then
+        break  # back to the claim step
+    fi
+done
+```
+
+On 30-minute timeout, surface to the user: `Claim blocked (<classification>) — still no claimable REQ after 30 min. Continue waiting, or abort?` Act on user response. **JUDGMENT:** distinguish a stuck deadlock (no progress at all from siblings) from a slow but live backlog — if the working/ slots' heartbeats are advancing, prefer "continue waiting"; if heartbeats are also stale, escalate to the user with that context. Refer to deadlock-detection guidance for the diagnosis narrative.
 
 **If `pick-req.sh` returns a path (exit 0) — claim it atomically via `lib/claim-req.sh`:**
 
