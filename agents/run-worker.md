@@ -6,6 +6,16 @@ You operate in a fresh subagent session. You have no memory of prior REQs, prior
 
 ---
 
+## Judgment Points
+
+The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
+
+| # | Step | Decision |
+|---|------|----------|
+| J1 | Step 2 (Isolation Mode) — choosing isolation mode | Which isolation mode applies: `same-branch` or `worktree`? Apply the table top-to-bottom; first match wins. The `--isolation=worktree` override (passed by the orchestrator) takes priority over all content signals. |
+
+---
+
 ## When Invoked
 
 The orchestrator dispatches you with exactly three inputs:
@@ -22,8 +32,11 @@ Treat these as your full context. Do not search for additional REQs, do not load
 
 After reading the REQ (Step 1) and before starting TDD (Step 3), evaluate the following heuristic to determine your working location for this REQ. Apply rules top-to-bottom; first match wins.
 
+> **JUDGMENT:** J1 — Choose the first row whose signal matches. The `--isolation=worktree` override (row 1) is set by the orchestrator when the only-pickable REQ's declared footprint overlaps a sibling's active footprint; it overrides all content-based signals below it.
+
 | Signal in REQ | Mode |
 |---|---|
+| Dispatch invoked with `--isolation=worktree` (orchestrator forced this after overlap detection at claim time) | `worktree` |
 | `**Layer:** none` (docs / pure refactor / test-only) | `same-branch` |
 | REQ task description matches any of: `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, `restructure` | `worktree` |
 | REQ `## Integration` block lists ≥ 3 distinct service dependencies | `worktree` |
@@ -101,6 +114,19 @@ Read the REQ file in full. Understand:
 - The Acceptance Criteria
 - The Verification Steps
 - Any referenced assets
+
+### 1b. Start background heartbeat
+
+Immediately after reading the REQ, start a background heartbeat loop. This refreshes the REQ's `**Heartbeat:**` timestamp every 60 seconds so that sibling agents and the pre-flight scanner know this slot is alive. Without this loop, the worker would appear stale after 5 minutes and a sibling could attempt to re-claim the slot.
+
+```bash
+# Background heartbeat — refreshes **Heartbeat:** every 60s so siblings know we're alive.
+( while sleep 60; do lib/heartbeat.sh "$REQ_PATH" || break; done ) &
+HEARTBEAT_PID=$!
+trap 'kill "$HEARTBEAT_PID" 2>/dev/null' EXIT
+```
+
+`REQ_PATH` is the absolute path to the REQ file in `working/`. The `trap ... EXIT` ensures the background process is cleaned up even if the worker exits early (stop, error, or normal completion). `lib/heartbeat.sh` writes the current UTC timestamp into the `**Heartbeat:**` field of the REQ file; stale-slot detection in the pre-flight scan uses this timestamp to decide whether a claimed slot is dead.
 
 ### 2. Read context
 
@@ -235,6 +261,16 @@ You commit the REQ yourself. Do not return to the orchestrator and ask it to com
 **`worktree` mode:** run the commit from inside `{project}/.worktrees/req-NNN` (the worktree directory). After this commit succeeds, proceed to `## Worktree Workflow` W6 (merge back) and W7 (teardown). The commit hash you capture for the Return Report is this feature-branch commit.
 
 **`same-branch` mode:** run the commit from the orchestrator's checkout as before.
+
+### Footprint Verification (does not block commit)
+
+Before staging, diff `git diff --name-only` against the REQ's `**Files:**` declaration. For any staged path NOT covered by the declared footprint:
+
+1. Log a warning: `footprint-miss: <path> not in declared **Files:**`
+2. Update the REQ's `**Files:**` line in place to the actual changed-file set.
+3. Call `lib/file-feedback.sh footprint-miss <fingerprint> <context-json> ...` to surface for human review.
+
+This DOES NOT block the commit — footprint declarations evolve with reality, and the feedback loop is for trend visibility, not enforcement.
 
 **Stage only paths keyed to THIS REQ.** Never use a broad sweep (`git add -A`, `git add .do-work/`, `git add .`). Under parallelism a sweep would pick up a sibling agent's claim file, in-flight working/ slot, or unrelated state file edits — each REQ commit must contain only its own work.
 
