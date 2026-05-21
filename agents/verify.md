@@ -148,6 +148,24 @@ For all other URs, iterate through `reqs:` in the frontmatter:
 
    **v1 limitation noted in spec:** the user edits frontmatter directly. A richer "(1) Resolve / (2) Acknowledge / (3) Skip" prompt is scoped as a follow-up; not in this plan.
 
+### 4e. Dangling-dep check
+
+For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog ∪ working/ ∪ archive/) for a `**Depends on:**` line.
+
+1. Parse each `**Depends on:**` value as a comma-separated list of REQ ids (e.g. `REQ-144, REQ-150`). Trim whitespace; ignore `none` / empty.
+
+2. For each referenced id, check whether a file matching `REQ-<id>-*.md` exists in `{project}/.do-work/` root, `{project}/.do-work/working/`, or `{project}/.do-work/archive/`.
+
+3. If the id resolves nowhere, it is a **dangling dependency**. Record the source REQ id and the unresolved id.
+
+4. Each dangling dep deducts 5 points from the confidence score (capped at -20 total across all dangling deps).
+
+5. **Auto-fix integration.** With `--auto-fix`, for each dangling dep present an `AskUserQuestion` with two options:
+   - **"Remove reference"** — strip the unresolved id from the source REQ's `**Depends on:**` line (delete the line entirely if it becomes empty).
+   - **"Note as expected (cross-UR dep)"** — leave the reference in place; record the pair in the verify report as acknowledged, no score deduction on next run within the same invocation.
+
+   Apply the chosen action per dep before re-scoring.
+
 ### 5. Produce the report
 
 Output to console (do not write to file unless asked):
@@ -172,6 +190,10 @@ Gaps
 Issues
 ──────
 [Duplicates, scope creep, ordering problems, vague criteria — or "none"]
+
+Dangling dependencies
+─────────────────────
+[REQ-NNN → unresolved: REQ-XXX, REQ-YYY — or omit section if none]
 
 Summary
 ───────
