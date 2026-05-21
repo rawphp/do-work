@@ -4,6 +4,21 @@ You are the Run agent in the Do Work system. Your job is to execute the backlog 
 
 ---
 
+## Judgment Points
+
+Points where the orchestrator must apply judgment rather than follow a deterministic rule:
+
+| # | Location | Question |
+|---|---|---|
+| J1 | Pre-flight → staleness | Stale slots found: reclaim, return to backlog, or abort? |
+| J2 | REQ Classification | Which `subagent_type` fits this REQ when no signal clearly matches? |
+| J3 | Model Selection | Escalate to `opus` when signals are borderline? |
+| J4 | Step 1.0a idle-wait | Gate-owner stuck after 30 min: continue waiting or abort? |
+| J5 | Step 7b drain | Sibling slot not drained after 30 min: continue polling or surface to user? |
+| J6 | Step D suite failure | Which REQ is responsible for a failing test? |
+
+---
+
 ## When Invoked
 
 You will be given a project do-work path:
@@ -91,22 +106,24 @@ AGENT_ID="$(hostname).$$"
 
 ### 3. Scan and classify working/ slots
 
+**Staleness detection — delegate to `lib/scan-stale.sh`:**
+
+```bash
+STALE_SLOTS=$(bash {skill-root}/lib/scan-stale.sh)
+```
+
+`scan-stale.sh` (REQ-149) reads `parallel.stale_threshold_seconds` from `.do-work/config.yml` (default 300 s) and prints one line per stale slot in the form `<req-path> <heartbeat-iso>`. Slots with a missing or malformed `**Heartbeat:**` are treated as stale by the script. The orchestrator does not re-implement this logic inline.
+
+**Ownership classification — inline (cheap deterministic read):**
+
 Glob `{project}/.do-work/working/REQ-*.md`. For each file found, read its ownership stamp (the `<!-- claimed-start --> … <!-- claimed-end -->` block) and classify the slot into one of three buckets:
 
 | Bucket | Condition | Action |
 |---|---|---|
 | **`mine`** | `**Claimed by:**` in the stamp matches `AGENT_ID` | Resume this REQ — skip the claim step and jump directly to worker dispatch for it |
-| **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND `git log -1 --format=%ci -- <file>` is < 24 h ago | Silently ignore — another live orchestrator owns it |
+| **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND the slot path is NOT in `$STALE_SLOTS` | Silently ignore — another live orchestrator owns it |
 | **`out-of-milestone`** | Milestone mode is active (`.do-work/state/active-milestone.md` exists) AND the slot's milestone id (parsed from the filename: `REQ-M<n>-NNN-slug.md` → `M<n>`) differs from the active milestone | Silently ignore — treat the same as `sibling` (a previous-milestone REQ still in flight during a milestone transition is informational only) |
-| **`stale`** | No ownership stamp present (legacy leftover), OR stamp present but `git log -1 --format=%ci -- <file>` is ≥ 24 h ago | Collect into the stale list |
-
-Check staleness per-slot:
-
-```bash
-git log -1 --format="%ci" -- {project}/.do-work/working/REQ-NNN-slug.md
-```
-
-A slot is **stale** if the command returns no output (file was never committed) or the returned timestamp is ≥ 24 h ago.
+| **`stale`** | Slot path appears in `$STALE_SLOTS` output | Collect into the stale list |
 
 ### 4. Handle stale slots
 
@@ -243,45 +260,53 @@ No commits are made while idle-waiting — the orchestrator is reading state fil
 AGENT_ID="$(hostname).$$"
 ```
 
-**Iterate the backlog in ascending order.** Glob `{project}/.do-work/REQ-*.md`, sort by filename (ascending). For each candidate `REQ-NNN-slug.md`:
+**Scope argument:** The caller may pass a `<scope>` value (e.g. `UR-030` or `any`). Default is `any`. Wiring of the `/do-work run [scope]` CLI arg is handled in REQ-166 — until that lands, treat `SCOPE` as `any` unless the user has passed it explicitly through an already-wired mechanism.
 
-1. **Attempt the atomic claim:**
+**Pick the next claimable REQ — delegate to `lib/pick-req.sh`:**
 
-   ```bash
-   git mv {project}/.do-work/REQ-NNN-slug.md {project}/.do-work/working/REQ-NNN-slug.md
-   ```
+```bash
+PICK_STDERR=$(mktemp)
+REQ_PATH=$(bash {skill-root}/lib/pick-req.sh "$SCOPE" "$AGENT_ID" 2>"$PICK_STDERR")
+```
 
-   - **Success** — this orchestrator owns the slot. Break out of the iteration and continue below.
-   - **Failure: source path no longer exists** (`did not match any files` / non-zero exit because the file is gone) — a sibling orchestrator won the race. Log: `Claim lost: REQ-NNN (taken by another agent)`. Continue to the next candidate.
-   - **Failure: any other reason** (e.g. `index.lock` held) — retry up to 3 times with backoff (1 s, 2 s, 4 s). On the 4th consecutive failure for this same REQ, log the error and skip that REQ (continue to the next candidate). Do not block the loop on a single problematic REQ.
+`pick-req.sh` (REQ-145) applies the full scope / dependency / footprint-overlap filter in one pass and prints the absolute path of the first claimable REQ to stdout (exit 0), or nothing (exit 1) if no candidate survives. Its stderr carries one `<reason>:<detail>` line per rejected candidate.
 
-2. If iteration finishes with no successful claim, the backlog is empty for this orchestrator — fall through to `## When the Backlog is Empty`.
+**If `pick-req.sh` returns empty (exit 1) — classify and branch:**
 
-**After a successful claim:**
+```bash
+CLASSIFICATION=$(cat "$PICK_STDERR" | bash {skill-root}/lib/drain-classify.sh)
+rm -f "$PICK_STDERR"
+```
 
-3. **Write the ownership stamp** into the claimed REQ file. Per the format defined in `## Agent Identity`, insert the block immediately under the `# REQ-NNN:` heading and before the existing `**UR:** ...` field. Use ISO-8601 UTC for `**Claimed at:**`:
+`drain-classify.sh` (REQ-152) reads the stderr lines and emits one of four labels:
 
-   ```markdown
-   <!-- claimed-start -->
-   **Claimed by:** <agent-id>
-   **Claimed at:** <ISO-8601 UTC>
-   <!-- claimed-end -->
-   ```
+| Classification | Meaning | Action |
+|---|---|---|
+| `truly-empty` | No candidates considered at all | Fall through to `## When the Backlog is Empty` |
+| `deps-blocked` | All survivors blocked on unsatisfied dependencies | Idle-wait: log once, poll every 30 s until a dep is archived, then re-run pick |
+| `overlap-blocked` | At least one candidate blocked by footprint overlap with a sibling slot | Idle-wait: log once, poll every 30 s until the overlapping slot drains, then re-run pick |
+| `scope-blocked` | All candidates excluded by the `<scope>` filter, but backlog is not empty | Fall through to `## When the Backlog is Empty` (this orchestrator's scope is exhausted) |
 
-4. **Update `**Status:**`** from `backlog` to `in-progress`.
+Idle-wait polling cap: 30 minutes. If still blocked after 30 minutes, surface to the user: `Claim blocked (<classification>) — still no claimable REQ after 30 min. Continue waiting, or abort?` Act on user response.
 
-5. **Stage and commit** the stamped REQ file to make the claim visible to sibling orchestrators. Stage **only** this REQ's path — never sweep `.do-work/`. The `git mv` from substep 1 already staged the rename; this `git add` picks up the stamp edit on top of it.
+**If `pick-req.sh` returns a path (exit 0) — claim it atomically via `lib/claim-req.sh`:**
 
-   ```bash
-   git add {project}/.do-work/working/REQ-NNN-slug.md
-   git commit -m "chore(REQ-NNN): claim by <agent-id>"
-   ```
+```bash
+COMMIT_HASH=$(bash {skill-root}/lib/claim-req.sh "$REQ_PATH" "$AGENT_ID")
+```
 
-6. **Announce:**
+`claim-req.sh` (REQ-146) performs the `git mv` → stamp insertion → `Status: in-progress` update → stage → commit sequence atomically and prints the commit short hash to stdout. On failure it writes a diagnostic to stderr and exits non-zero:
 
-   ```
-   [<agent-id>] Starting REQ-NNN [type=<subagent_type>, model=<model>, isolation=<mode>]: [title]
-   ```
+- **Exit 2 (`Claim lost: REQ-NNN`)** — a sibling won the race on this exact file. Re-run `pick-req.sh` from the top of Step 1 (the lost candidate is now in `working/` and will be excluded by the overlap filter).
+- **Any other non-zero exit** — log the stderr diagnostic and re-run `pick-req.sh` after a 2 s backoff. After 3 consecutive non-race failures, stop and report to the user.
+
+After a successful `claim-req.sh`:
+
+**Announce:**
+
+```
+[<agent-id>] Starting REQ-NNN [type=<subagent_type>, model=<model>, isolation=<mode>]: [title]
+```
 
 ### Step 2: Dispatch the worker subagent
 
