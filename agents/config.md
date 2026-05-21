@@ -43,9 +43,18 @@ test:
 
 next_steps:
   enabled: false         # when true, agents present next-step options via AskUserQuestion after each phase
+
+feedback:
+  enabled: false         # when true, agents file GitHub issues on notable events
+  repo: tomkaczocha/do-work  # GitHub repo (owner/name) for system-class feedback issues
+  label: auto:do-work-feedback  # label applied to every filed issue; must exist in the target repo
+  project_repo: ""       # GitHub repo for project-class events; falls back to feedback.repo when empty
+
+parallel:
+  stale_threshold_seconds: 300  # seconds of heartbeat silence before a working/ slot is considered stale
 ```
 
-4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`) and each key within those sections:
+4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`) and each key within those sections:
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
    - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
@@ -74,3 +83,8 @@ next_steps:
 | `log.max_chars` | map | `{x: 280, blog: 500, linkedin: 1300}` | Per-platform character ceiling the log agent must keep each draft under. Keys are platform slugs (`x`, `blog`, `linkedin`, etc.); values are integer char limits. Missing platforms fall back to the defaults shown here. |
 | `test.suite_command` | string | `""` | Full test suite command to run at end of the do-work loop (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, the run agent attempts common defaults. |
 | `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase completes. When false or missing, agents report as they do today without prompting. |
+| `feedback.enabled` | boolean | `false` | Master switch for GitHub issue feedback. When `false`, `lib/file-feedback.sh` exits silently without making any `gh` calls. **Self-targeting default:** if the running repo's `git config --get remote.origin.url` matches the do-work upstream pattern (a `github.com` URL ending in `/do-work` or `/do-work.git`), this key is treated as `true` even when the config.yml value is `false` or absent. Consumers: `lib/file-feedback.sh`. |
+| `feedback.repo` | string | `"tomkaczocha/do-work"` | Target GitHub repo (`owner/name`) for **system-class** events: `deadlock`, `footprint-miss`, `concurrent-conflict`, `cap-cycle`, `stale-slot`. Must exist and have the label specified in `feedback.label`. Consumers: `lib/file-feedback.sh`. |
+| `feedback.label` | string | `"auto:do-work-feedback"` | GitHub issue label applied to every issue filed by `lib/file-feedback.sh`. The label must exist in the target repo before the first event fires; the script will not create it automatically. Consumers: `lib/file-feedback.sh`. |
+| `feedback.project_repo` | string | `""` | Target GitHub repo (`owner/name`) for **project-class** events: `ambiguous-criteria`, `verify-fail`. When non-empty, these events are filed here instead of `feedback.repo`. When empty, falls back to `feedback.repo`. Consumers: `lib/file-feedback.sh`. |
+| `parallel.stale_threshold_seconds` | integer | `300` | Number of seconds of heartbeat silence after which a `working/REQ-*.md` slot is declared stale. Must be a positive integer; non-integer or absent values fall back to the default. Consumers: `lib/scan-stale.sh` (called by `agents/run.md` pre-flight and `lib/deadlock-check.sh`). |
