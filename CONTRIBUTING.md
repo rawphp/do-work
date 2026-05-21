@@ -164,6 +164,74 @@ Scripts in `lib/` use these line-anchored patterns to extract field values:
 
 After extraction, comma-separated values are split on `,` and trimmed of surrounding whitespace.
 
+## Judgment Points
+
+Agent files in `agents/` mark places where the model must make a judgment call that cannot be reduced to a deterministic rule. The convention has two parts: a **top-of-file index** and **inline markers**.
+
+### Table of Contents Entry
+
+Add `## Judgment Points` to the table of contents (or a "Sections" list) at the top of any agent file that contains judgment points, so readers can scan them before diving in.
+
+### Top-of-File Index
+
+Each agent file that requires model judgment SHOULD open with a `## Judgment Points in this Agent` section immediately after the intro paragraph. The index lists every judgment point in the file as a table:
+
+```markdown
+## Judgment Points in this Agent
+
+The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
+
+| # | Step | Decision |
+|---|------|----------|
+| J1 | Step N — <field name> | One-sentence description of what the model must decide. |
+| J2 | Step N — <field name> | One-sentence description. |
+```
+
+Rules:
+- Each row corresponds to exactly one inline `> **JUDGMENT:**` marker elsewhere in the file.
+- The `Step` column names the heading and subheading where the marker appears (e.g. `Step 4 — Files`).
+- Rows are numbered `J1`, `J2`, … in the order they appear in the file.
+
+### Inline Markers
+
+At the exact step where the model must exercise judgment, insert a blockquote marker immediately before the relevant instruction:
+
+```markdown
+> **JUDGMENT:** [J<n> — <label>] <What decision must be made. What inputs to use. What the failure mode of getting it wrong looks like.>
+```
+
+Rules:
+- The label in brackets (`[J1 — Files]`) matches the `#` and `Step` columns in the top-of-file index.
+- The body explains three things: (1) what choice the model is making, (2) what inputs or signals should guide the choice, (3) what goes wrong if the model chooses badly.
+- Keep it to 1-3 sentences. If more is needed, the step itself should be split or the rule should be made explicit.
+
+### Worked Example
+
+The following shows both parts of the convention. It is drawn from `agents/capture.md`.
+
+**Top-of-file index (in `agents/capture.md`):**
+
+```markdown
+## Judgment Points in this Agent
+
+The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
+
+| # | Step | Decision |
+|---|------|----------|
+| J1 | Step 4 — Files | Which files will this REQ touch? List paths relative to the project root. Err toward specificity; vague globs are less useful than named files. |
+| J2 | Step 4 — Depends on | Which other REQs must be committed before this one can start? Only hard ordering constraints (not soft "nice to have" ordering). Empty list is valid and common. |
+```
+
+**Inline markers (inside Step 4 of `agents/capture.md`):**
+
+```markdown
+> **JUDGMENT:** [J1 — Files] Before writing the `**Files:**` line, enumerate the project-relative paths this REQ will touch. For agents: list the specific `agents/*.md` file(s). Globs are allowed but prefer named paths. A blank `**Files:**` line is a signal the REQ is under-specified — think harder before leaving it empty.
+
+> **JUDGMENT:** [J2 — Depends on] Before writing the `**Depends on:**` line, scan the decomposition for hard ordering constraints: does this REQ assume another REQ's output file exists, or call a function another REQ will write? If yes, list those REQ ids. If independently implementable from HEAD, write an empty value. Do not add soft ordering preferences — only blocking dependencies.
+```
+
+**Why this matters:** without explicit markers, future edits to agent files silently lose the judgment context. New agent authors see a step but not the decision it asks for. The index makes them impossible to miss; the inline marker makes them impossible to edit around.
+
 ## Questions?
 
 Open an issue — we're happy to help.
