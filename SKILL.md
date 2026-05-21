@@ -31,7 +31,10 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections in a brief. |
 | `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
-| `/do-work run` | Executes backlog: TDD loop, one REQ at a time, commit per REQ. |
+| `/do-work run [UR-NNN]` | Executes backlog: TDD loop, one REQ at a time, commit per REQ. Optional UR-NNN scopes the run to that UR's REQs only. |
+| `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings. Optional UR-NNN scopes the report. |
+| `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
+| `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
 | `/do-work` | Show this help. |
 
@@ -51,6 +54,9 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/verify.md](agents/verify.md) — Scores REQ coverage against brief
 - [agents/run.md](agents/run.md) — Orchestrator: dispatches a worker subagent per REQ
 - [agents/run-worker.md](agents/run-worker.md) — Worker: TDD-and-commits a single REQ in a fresh subagent session
+- [agents/status.md](agents/status.md) — Read-only situation room: REQs, claimers, heartbeats, deadlock warnings
+- [agents/unblock.md](agents/unblock.md) — Force a stuck in-flight REQ back to the backlog
+- [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
 - [agents/config.md](agents/config.md) — Reusable config loading instructions
 
@@ -167,34 +173,69 @@ Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that d
 
 ## Parallel Execution
 
-`/do-work run` is safe to launch from multiple terminals simultaneously. Open two or three terminal sessions, run `/do-work run` in each, and each orchestrator claims a different REQ from the backlog. Coordination happens via the filesystem and git — no flag, no daemon, no in-memory orchestrator.
+`/do-work run [UR-NNN]` is safe to launch from multiple terminals simultaneously. Up to 10 orchestrators can run in parallel — each claims a different REQ from the backlog. Coordination is handled by a dedicated library layer; no flag, no daemon, no in-memory state is required.
+
+### Coordination Layer
+
+**Footprint-aware claiming.** Before claiming a REQ, each orchestrator calls `lib/pick-req.sh` to identify the next safe candidate. `lib/pick-req.sh` uses `lib/check-footprint.sh` to detect file-level overlap between the candidate and every REQ currently in `working/`. If overlap exists, the candidate is skipped and the next backlog entry is evaluated. This eliminates the primary source of cross-agent file conflicts.
+
+**Dependency-aware ordering.** `lib/pick-req.sh` also calls `lib/check-deps.sh` to verify that all `Depends on:` REQs listed in the candidate's header have been archived (status: done) before the candidate is eligible. Circular dependency chains are gated at capture time by `lib/cycle-check.sh` — a dependency graph with a cycle will be rejected during capture, not at run time.
+
+**Atomic claim.** Once a safe, dep-satisfied candidate is selected, `lib/claim-req.sh` writes the ownership stamp atomically:
+
+```markdown
+<!-- claimed-start -->
+**Claimed by:** hostname.pid
+**Claimed at:** 2026-05-21T11:42:08Z
+**Heartbeat:** 2026-05-21T11:42:08Z
+<!-- claimed-end -->
+```
+
+**Heartbeat-based liveness.** Each worker refreshes the `**Heartbeat:**` timestamp in its REQ file while active via `lib/heartbeat.sh`. `lib/scan-stale.sh` (called during pre-flight and by `/do-work status`) flags REQs whose heartbeat is older than `parallel.stale_threshold_seconds` (default 300 s / 5 minutes) as potentially dead. Stale REQs surface in the status report for human triage — they are not automatically unblocked.
+
+**Deadlock detection.** `lib/deadlock-check.sh` checks for circular wait chains across the `working/` set: does REQ-A depend on REQ-B which depends on REQ-A (both in-flight)? Any cycle found is reported immediately by `/do-work status` under a `DEADLOCK DETECTED` banner. Recovery is manual: use `/do-work unblock REQ-NNN` to break the cycle.
 
 **Visible differences from single-agent mode:**
 
-- The per-REQ announce line is prefixed with `[<agent-id>]` (where `agent-id` is `hostname.pid`) so users can attribute output across terminals.
-- Multiple REQs may appear in `working/` simultaneously, each carrying an ownership stamp:
-  ```markdown
-  <!-- claimed-start -->
-  **Claimed by:** mbp-tom.42137
-  **Claimed at:** 2026-05-15T11:42:08Z
-  <!-- claimed-end -->
-  ```
+- The per-REQ announce line is prefixed with `[<agent-id>]` (where `agent-id` is `hostname.pid`) so you can attribute output across terminals.
+- Multiple REQs appear in `working/` simultaneously, each carrying the ownership stamp above.
 - The final cross-REQ test suite runs once, from whichever orchestrator drains last (gated by `.do-work/state/final-suite-running.md` lockfile).
-- On a commit or merge conflict, the loser-of-race waits up to ~110 seconds (5 retries with 5s / 15s / 30s / 60s exponential backoff) before exiting with `status: stopped`, `reason: concurrent-conflict`.
+- On a commit or merge conflict, the losing worker waits up to ~110 seconds (5 retries: 5s / 15s / 30s / 60s backoff) before exiting with `status: stopped`, `reason: concurrent-conflict`. Use `/do-work resume REQ-NNN` to re-dispatch.
 
-**Isolation per REQ.** The worker chooses `same-branch` (default) or `worktree` at dispatch time based on REQ scope. Worktree mode triggers when the REQ task mentions `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, or `restructure`; when the Integration block lists ≥ 3 distinct service dependencies; or when the REQ has > 6 acceptance criteria. Worktree REQs work in `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch and merge back into the base branch on completion.
+### Isolation per REQ
 
-**Constraints that stay single-agent:**
+The worker chooses `same-branch` (default) or `worktree` at dispatch time based on REQ scope. Worktree mode triggers when the REQ task mentions `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, or `restructure`; when the Integration block lists ≥ 3 distinct service dependencies; or when the REQ has > 6 acceptance criteria. Worktree REQs work in `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch and merge back into the base branch on completion.
 
-- Milestone deploy gates remain non-delegable — the first orchestrator to detect milestone-complete owns the gate; siblings idle (logging `Idle — waiting on milestone M<n> deploy gate`) and resume when `.do-work/state/active-milestone.md` advances. `.do-work/state/gate-owner.md` records which agent owns the in-flight gate.
+### Recovery Commands
+
+| Situation | Command |
+|---|---|
+| REQ is stuck / worker died / heartbeat stale | `/do-work unblock REQ-NNN` — strips claim, returns REQ to backlog |
+| REQ stopped (concurrent-conflict / transient error) | `/do-work resume REQ-NNN` — refreshes heartbeat, re-dispatches worker |
+| Deadlock or unclear state | `/do-work status [UR-NNN]` — renders live situation room, deadlock banner |
+
+See `agents/status.md`, `agents/unblock.md`, `agents/resume.md` for agent-level instructions.
+
+### Constraints That Stay Single-Agent
+
+- Milestone deploy gates remain non-delegable — the first orchestrator to detect milestone-complete owns the gate; siblings idle (logging `Idle — waiting on milestone M<n> deploy gate`) and resume when `.do-work/state/active-milestone.md` advances. `.do-work/state/gate-owner.md` records the gate owner.
 - The stale-slot prompt in pre-flight runs in whichever orchestrator finds the stale slot first.
 
-**State files added by parallel mode** (all under `.do-work/state/`):
+### State Files
 
-- `gate-owner.md` — the `agent-id` currently handling a milestone deploy gate (deleted on resolve).
-- `final-suite-running.md` (or `final-suite-M<n>-running.md` in milestone mode) — lockfile written by the orchestrator running the final cross-REQ test suite.
+All coordination state lives under `.do-work/state/`:
 
-**Implementation reference.** See `agents/run.md` `## Agent Identity`, `## Pre-flight Check`, `### Step 1: Claim the next REQ`, `## When the Backlog is Empty`, `### Step 7b`; `agents/run-worker.md` `## Isolation Mode`, `## Worktree Workflow`, `## Concurrent-Conflict Retry`.
+- `gate-owner.md` — agent-id currently handling a milestone deploy gate (deleted on resolve).
+- `final-suite-running.md` (or `final-suite-M<n>-running.md` in milestone mode) — lockfile for the final cross-REQ test suite.
+
+### Implementation Reference
+
+- Claim: `lib/pick-req.sh`, `lib/check-footprint.sh`, `lib/claim-req.sh`
+- Dependencies: `lib/check-deps.sh`, `lib/cycle-check.sh`
+- Liveness: `lib/heartbeat.sh`, `lib/scan-stale.sh`
+- Deadlock: `lib/deadlock-check.sh`
+- Orchestrator: `agents/run.md` §§ Agent Identity, Pre-flight Check, Step 1: Claim the next REQ, When the Backlog is Empty, Step 7b
+- Worker: `agents/run-worker.md` §§ Isolation Mode, Worktree Workflow, Concurrent-Conflict Retry
 
 ## Layers
 
@@ -219,6 +260,31 @@ Feature REQs that add new surface (anything callable or visible from outside the
 
 Capture inspects the codebase to draft answers and verifies each cited file/symbol exists before claiming high confidence. Verify enforces the Integration block on every non-`none` feature REQ.
 
+## REQ Header Schema
+
+Every REQ file carries a structured header immediately below the title. The canonical field list is:
+
+| Field | Required | Description |
+|---|---|---|
+| `**UR:**` | yes | Parent UR identifier (e.g. `UR-030`) |
+| `**Status:**` | yes | `backlog` / `in-progress` / `stopped` / `done` |
+| `**Created:**` | yes | ISO date (YYYY-MM-DD) |
+| `**Layer:**` | yes | Declared project layer, or `none` for bug-fix/refactor/test-only REQs |
+| `**Files:**` | yes | Space-separated list of primary output files — used by `lib/check-footprint.sh` for overlap detection |
+| `**Depends on:**` | optional | Space-separated REQ ids this REQ must not start before (e.g. `REQ-144 REQ-145`) — checked by `lib/check-deps.sh` |
+
+When a REQ is claimed by a worker, a claim block is inserted between the title and the first header field:
+
+```markdown
+<!-- claimed-start -->
+**Claimed by:** hostname.pid
+**Claimed at:** 2026-05-21T11:42:08Z
+**Heartbeat:** 2026-05-21T11:42:08Z
+<!-- claimed-end -->
+```
+
+The heartbeat timestamp is refreshed in-place by `lib/heartbeat.sh` — this is a filesystem-only operation, never a git commit. Canonical documentation: `.do-work/archive/REQ-144-extend-req-template-schema.md`.
+
 ## Commit Convention
 
 ```
@@ -228,6 +294,8 @@ REQ: .do-work/archive/REQ-NNN-slug.md
 UR: .do-work/user-requests/UR-NNN/input.md
 Output: path/to/primary/output
 ```
+
+Commits are created per-REQ on completion. The claim/heartbeat update path (`lib/heartbeat.sh`) is filesystem-only — it writes directly to the REQ file and does **not** produce a git commit. Unblock operations use `chore(REQ-NNN): unblock — return to backlog` as the commit message.
 
 ---
 
@@ -254,14 +322,26 @@ Create the do-work folder structure. Idempotent — safe to run multiple times.
 ```yaml
 # do-work configuration
 # Edit this file to customize agent behavior.
+# Full key reference: agents/config.md
 
 project:
   name: ""
 
+layers: []                 # declare project layers, e.g. [frontend, backend]
+
 log:
   enabled: true
-  platforms: []          # e.g. [x, linkedin]
+  platforms: []            # e.g. [x, linkedin]
   drafts_per_platform: 2
+
+feedback:
+  enabled: false           # set true to file GitHub issues on anomalies
+  repo: ""                 # target repo for feedback issues, e.g. myorg/myrepo
+  label: auto:do-work-feedback
+  project_repo: ""         # if different from repo
+
+parallel:
+  stale_threshold_seconds: 300   # heartbeat age (seconds) before a slot is flagged stale
 ```
 
 4. Report what was created vs already existed. Example:
@@ -396,16 +476,57 @@ Score REQ coverage against the original brief. List gaps and issues.
 
 ---
 
-### run
+### run [UR-NNN]
 
-Execute the backlog autonomously — one REQ at a time — until empty or a stopper is hit. The orchestrator dispatches a fresh worker subagent per REQ (see [agents/run-worker.md](agents/run-worker.md)) and reads its structured return report.
+Execute the backlog autonomously — one REQ at a time — until empty or a stopper is hit. The optional `UR-NNN` argument scopes execution to that UR's REQs only, ignoring all other backlog entries. The orchestrator dispatches a fresh worker subagent per REQ (see [agents/run-worker.md](agents/run-worker.md)) and reads its structured return report.
 
 1. Detect `{project}`.
-2. Pre-flight checks:
+2. Determine UR scope:
+   - If `UR-NNN` was provided, record it — the run agent will filter the backlog to that UR.
+   - If not provided, the full backlog is in scope.
+3. Pre-flight checks:
    - If a REQ file exists in `{project}/.do-work/working/`, report it and ask the user: resume or abort?
-   - If no `REQ-NNN-*.md` files exist in `{project}/.do-work/` (backlog root), report "Backlog is empty." and stop.
-3. Read [agents/run.md](agents/run.md) in full.
-4. Follow the run agent instructions exactly.
+   - If no `REQ-NNN-*.md` files exist in `{project}/.do-work/` (backlog root) within scope, report "Backlog is empty." and stop.
+4. Read [agents/run.md](agents/run.md) in full.
+5. Follow the run agent instructions exactly, passing through the UR scope if provided.
+
+---
+
+### status [UR-NNN]
+
+Render a read-only live situation room: all in-flight REQs, their claimers, heartbeat ages, and any deadlock warnings.
+
+1. Detect `{project}`.
+2. Determine UR scope:
+   - If `UR-NNN` was provided, pass it through to scope the report to that UR's REQs.
+   - If not provided, all in-flight REQs are reported.
+3. Confirm `{project}/.do-work/` exists. If not, report "do-work not installed." and stop.
+4. Read [agents/status.md](agents/status.md) in full.
+5. Follow the status agent instructions exactly. No state changes, no commits, no prompts.
+
+---
+
+### unblock REQ-NNN
+
+Force a stuck in-flight REQ out of `working/` and back into the backlog. Use when a worker died, a concurrent-conflict won't resolve, or scope creep needs human triage.
+
+1. Detect `{project}`.
+2. Confirm `REQ-NNN` was provided. If not, report "unblock requires a REQ id (e.g. /do-work unblock REQ-042)." and stop.
+3. Confirm `{project}/.do-work/working/REQ-NNN-*.md` exists. If not, report "REQ-NNN is not in working/ — nothing to unblock." and stop.
+4. Read [agents/unblock.md](agents/unblock.md) in full.
+5. Follow the unblock agent instructions exactly, including the judgment gate on partial commits (Step 3 in the agent file).
+
+---
+
+### resume REQ-NNN
+
+Re-dispatch a fresh worker for a stopped REQ without sending it back through the backlog. Preserves the existing claim stamp; only the heartbeat is refreshed.
+
+1. Detect `{project}`.
+2. Confirm `REQ-NNN` was provided. If not, report "resume requires a REQ id (e.g. /do-work resume REQ-042)." and stop.
+3. Confirm `{project}/.do-work/working/REQ-NNN-*.md` exists and its `**Status:**` is `stopped`. If not in `working/`, report "REQ-NNN is not in working/ — nothing to resume." If status is not `stopped`, report the actual status and stop.
+4. Read [agents/resume.md](agents/resume.md) in full.
+5. Follow the resume agent instructions exactly. Resume is a one-shot — do not loop back to the backlog after dispatch.
 
 ---
 
