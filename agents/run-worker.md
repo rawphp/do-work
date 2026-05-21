@@ -229,7 +229,20 @@ Record the result of each step: pass/fail + actual output or screenshot.
 1. Note which step failed, expected vs actual
 2. Increment a retry counter
 3. If retry count < 3: go back to step 3b (implement) with the failure as context — fix the root cause, not the test
-4. If retry count reaches 3: return a `status: stopped` report with `reason: verification-failing` and the failure details in `details`
+4. If retry count reaches 3: emit feedback (best-effort, non-blocking), then return a `status: stopped` report with `reason: verification-failing` and the failure details in `details`:
+
+   ```bash
+   STEP_TYPE="<test|build|runtime|ui>"            # the verification step type that failed
+   FINGERPRINT="verify-fail:${STEP_TYPE}"
+   bash lib/file-feedback.sh verify-fail \
+     "$FINGERPRINT" \
+     '{"req":"REQ-NNN","step_type":"'"$STEP_TYPE"'","attempts":3}' \
+     "Verify-fail: REQ-NNN ${STEP_TYPE} step exhausted 3 retries" \
+     "Verification step of type ${STEP_TYPE} failed three times in a row on REQ-NNN. Worker exiting as status: stopped, reason: verify-fail." \
+     || true
+   ```
+
+   > **JUDGMENT:** Title and body must name the failing step type plainly (test / build / runtime / ui) and the REQ id. Do not paste raw test output or absolute paths — the sanitiser strips paths, but commit messages and diffs must be omitted by the caller. One sentence in the body is enough; the goal is trend visibility, not a full failure log.
 
 ### 7. Archive the REQ
 
@@ -413,7 +426,28 @@ Count the attempt as a failure and proceed to the next retry interval.
 | Outcome | Action |
 |---|---|
 | Success on attempt N (1 ≤ N ≤ 5) | Capture the commit hash; proceed to the existing Step 8 epilogue; record `retry_count: N-1` in the Return Report (0 means first attempt succeeded) |
-| Failure after attempt 5 | Return `status: stopped`, `reason: concurrent-conflict`, `retry_count: 5`, with `details` listing the branch, last git stderr, and conflicting paths |
+| Failure after attempt 5 | Emit feedback (best-effort, non-blocking — see below), then return `status: stopped`, `reason: concurrent-conflict`, `retry_count: 5`, with `details` listing the branch, last git stderr, and conflicting paths |
+
+### Feedback on 5-retry exhaustion
+
+When attempt 5 fails, before returning the stopped report, fire one feedback event:
+
+```bash
+FILES_HASH=$(git diff --name-only --cached 2>/dev/null | md5sum | cut -d' ' -f1)
+# Fall back to the merge conflict file list if nothing is staged.
+if [ -z "$FILES_HASH" ] || [ "$FILES_HASH" = "d41d8cd98f00b204e9800998ecf8427e" ]; then
+    FILES_HASH=$(git diff --name-only --diff-filter=U 2>/dev/null | md5sum | cut -d' ' -f1)
+fi
+FINGERPRINT="concurrent-conflict:${FILES_HASH}"
+bash lib/file-feedback.sh concurrent-conflict \
+  "$FINGERPRINT" \
+  '{"req":"REQ-NNN","attempts":5,"branch":"<current-branch>"}' \
+  "Concurrent-conflict: REQ-NNN exhausted 5 retries" \
+  "Five rebase/merge attempts on REQ-NNN's branch all collided with sibling commits on the same paths. Worker exiting as status: stopped, reason: concurrent-conflict." \
+  || true
+```
+
+> **JUDGMENT:** Title and body should signal *which REQ* and *that 5 retries were used* without naming the conflicting paths verbatim (the fingerprint already captures them via hash). The body's one sentence is for the human triaging the inbox — they want "is this a real coordination hotspot or a one-off race?" Trend signal beats incident detail.
 
 ---
 
