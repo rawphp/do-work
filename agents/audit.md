@@ -6,6 +6,16 @@ You sharpen REQs by fixing vague criteria, adding missing error paths, and annot
 
 ---
 
+## Judgment Points
+
+The following checks require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
+
+| # | Step | Decision |
+|---|------|----------|
+| J1 | Dimension 7 — Footprint Plausibility | What counts as a "path-like token" in the task body? When is ambiguity acceptable vs. a flag? |
+
+---
+
 ## When Invoked
 
 You will be given:
@@ -39,7 +49,7 @@ Do not audit REQs in `working/` (already in-flight) or `archive/` (already compl
 
 ### 3. Interrogate each REQ
 
-For each REQ belonging to the target UR, evaluate five dimensions:
+For each REQ belonging to the target UR, evaluate seven dimensions:
 
 #### Dimension 1: Acceptance criteria specificity
 
@@ -95,6 +105,25 @@ Then check the REQ's `## Verification Steps` block for any step of type `ui`.
 - **Auto-fix** when the missing `ui` step can be inferred unambiguously from a specific acceptance criterion — translate the criterion into a concrete navigate + assert step. Example: criterion `user sees a success toast after form submit` → add `ui` step `Navigate to /form, submit valid data, assert toast with text "Success" is visible`. The inferred step must include: target URL or route, the action taken, and a specific element/text to assert.
 - **Flag** when the criteria describe user-visible behaviour but the target route, action, or assertion cannot be inferred without guessing — do not fabricate a step. Report `[FLAG] REQ-NNN has user-visible acceptance criteria but no ui verification step; target route/action unclear — add manually.`
 
+#### Dimension 7: Footprint Plausibility Check
+
+Does the REQ's `**Files:**` field plausibly match what the `## Task` block says will be touched? `pick-req.sh` trusts `**Files:**` for overlap detection — stale or missing footprints cause invisible conflicts between parallel workers.
+
+> **JUDGMENT:** _(J1)_ A "path-like token" is: (a) a string containing `/` that looks like a relative file path, (b) a backtick-quoted name that ends with a known extension (`.md`, `.sh`, `.ts`, `.php`, `.json`, `.yaml`, `.yml`, etc.), or (c) a symbol clearly referencing a specific named file (`CONTRIBUTING.md`, `audit.md`, `capture.md`, etc.). Short variable names, SQL column names, HTTP routes, and generic terms like `input` or `config` are **not** path-like unless they carry a directory prefix or extension. When a token is genuinely ambiguous (could be a variable or a file), accept the ambiguity and skip — do not fabricate a path.
+
+**Algorithm:**
+
+1. Extract all `**Files:**` entries from the REQ header (comma-separated, may be empty).
+2. Scan the `## Task` block for path-like tokens (see JUDGMENT block above for classification rules).
+3. For each path-like token found in the task body that is **not** listed in `**Files:**`:
+   - Confirm the path is plausible (glob/wildcard accepted as-is; for concrete paths, a best-effort check is sufficient — do not block on uncertainty).
+   - **Auto-fix:** Append the missing path to the `**Files:**` field.
+4. For each path in `**Files:**` that has **no mention** anywhere in the `## Task` block: **flag for review** — do not remove it (it may be a legitimate dependency the task author knew but didn't spell out).
+
+**Auto-fix behaviour:** When a path-like token in the task body is missing from `**Files:**`, append it to the `**Files:**` line, comma-separated. Report each addition in the audit summary as `[FIXED] **Files:** — appended <path> (found in task body, was absent from footprint)`.
+
+**Flag behaviour:** When a path in `**Files:**` is absent from the task body, report `[FLAG] REQ-NNN **Files:** lists <path> but it is not mentioned in the task body — verify it is intentional`.
+
 ### 4. Apply fixes
 
 For each REQ, apply auto-fixes inline:
@@ -103,6 +132,7 @@ For each REQ, apply auto-fixes inline:
 - Add missing error path criteria (Dimension 2)
 - Add dependency annotations (Dimension 4)
 - Add missing `ui` verification step when unambiguously inferrable (Dimension 6)
+- Append missing footprint paths to `**Files:**` (Dimension 7)
 - Apply blanket find-and-replace guard augmentations when triggered (see below)
 
 #### Blanket find-and-replace guard (mirror of capture.md Step 4d)
@@ -147,6 +177,7 @@ Audit Report — UR-NNN
 - N criteria rewritten
 - N error paths added
 - N dependency annotations added
+- N footprint paths appended to `**Files:**`
 - N flags requiring user judgment
 - Overall: [clean / minor fixes applied / needs attention]
 ```
