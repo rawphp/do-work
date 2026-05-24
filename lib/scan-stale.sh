@@ -14,7 +14,11 @@
 #        - present but unparseable → stale + diagnostic on stderr
 #        - present and (now - heartbeat) >= threshold → stale
 #   4. Prints one line per stale slot to stdout:
-#        <req-path> <heartbeat-iso-or-"absent">
+#        <req-path> <heartbeat-iso-or-"absent"> age=<seconds-or-"unknown">
+#
+#      The third token is a literal `age=` prefix followed by the integer
+#      seconds elapsed between the heartbeat ISO and NOW_EPOCH.  For slots
+#      with absent / unparseable heartbeats, `age=unknown` is emitted.
 #
 # Exit codes:
 #   0  Scan completed (zero or more stale slots printed).
@@ -120,7 +124,7 @@ for req in "$WORKING"/REQ-*.md; do
 
   if [ -z "$hb_line" ]; then
     # Heartbeat absent → legacy slot, treat as stale.
-    printf '%s absent\n' "$req"
+    printf '%s absent age=unknown\n' "$req"
     continue
   fi
 
@@ -129,7 +133,7 @@ for req in "$WORKING"/REQ-*.md; do
 
   if [ -z "$hb_val" ]; then
     printf 'scan-stale: %s heartbeat present but empty — treating as stale\n' "$req_id" >&2
-    printf '%s absent\n' "$req"
+    printf '%s absent age=unknown\n' "$req"
     continue
   fi
 
@@ -137,14 +141,14 @@ for req in "$WORKING"/REQ-*.md; do
   hb_epoch="$(iso_to_epoch "$hb_val" || true)"
   if [ -z "$hb_epoch" ]; then
     printf 'scan-stale: %s malformed heartbeat (%s) — treating as stale\n' "$req_id" "$hb_val" >&2
-    printf '%s %s\n' "$req" "$hb_val"
+    printf '%s %s age=unknown\n' "$req" "$hb_val"
     continue
   fi
 
   # Compute age.
   age=$(( NOW_EPOCH - hb_epoch ))
   if [ "$age" -ge "$THRESHOLD" ]; then
-    printf '%s %s\n' "$req" "$hb_val"
+    printf '%s %s age=%s\n' "$req" "$hb_val" "$age"
   fi
 done
 
