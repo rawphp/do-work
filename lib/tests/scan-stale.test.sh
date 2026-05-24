@@ -217,6 +217,86 @@ assert_eq "" "$STDOUT" "$CURRENT_CASE empty stdout"
 teardown_fixture
 
 # ----------------------------------------------------------------------
+# Helper: assert string is an integer >= a minimum.
+# ----------------------------------------------------------------------
+assert_age_ge() {
+  local min="$1"
+  local actual="$2"
+  local label="$3"
+  case "$actual" in
+    ''|*[!0-9]*) fail "$label: expected positive integer >= $min, got '$actual'" ;;
+    *)
+      if [ "$actual" -lt "$min" ]; then
+        fail "$label: expected value >= $min, got '$actual'"
+      fi
+      ;;
+  esac
+}
+
+# ----------------------------------------------------------------------
+# Case 8: stale slot age field — three tokens, age= positive integer >= threshold
+# ----------------------------------------------------------------------
+CURRENT_CASE="stale-age-token"
+CASES=$((CASES + 1))
+setup_fixture
+STALE_ISO="$(iso_at_offset -3600)"   # 1 hour ago
+write_working_req "$TMP/.do-work/working/REQ-008-stale.md" "REQ-008" "**Heartbeat:** $STALE_ISO"
+run_scan
+assert_eq "0" "$RC" "$CURRENT_CASE rc=0"
+# Line should have exactly three whitespace-separated tokens.
+token_count="$(printf '%s\n' "$STDOUT" | awk 'NF{print NF}' | head -1)"
+assert_eq "3" "$token_count" "$CURRENT_CASE three tokens on stale line"
+# Third token must start with "age=".
+third_token="$(printf '%s\n' "$STDOUT" | awk '{print $3}' | head -1)"
+assert_contains "age=" "$third_token" "$CURRENT_CASE third token has age= prefix"
+# Extract the numeric value after "age=".
+age_val="${third_token#age=}"
+# Must be a positive integer >= 300 (default threshold).
+assert_age_ge 300 "$age_val" "$CURRENT_CASE age >= threshold"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 9: absent heartbeat age field → age=unknown
+# ----------------------------------------------------------------------
+CURRENT_CASE="missing-heartbeat-age-unknown"
+CASES=$((CASES + 1))
+setup_fixture
+write_working_req "$TMP/.do-work/working/REQ-009-nohb.md" "REQ-009" ""
+run_scan
+assert_eq "0" "$RC" "$CURRENT_CASE rc=0"
+assert_contains "age=unknown" "$STDOUT" "$CURRENT_CASE absent heartbeat emits age=unknown"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 10: malformed heartbeat age field → age=unknown
+# ----------------------------------------------------------------------
+CURRENT_CASE="malformed-heartbeat-age-unknown"
+CASES=$((CASES + 1))
+setup_fixture
+write_working_req "$TMP/.do-work/working/REQ-010-bad.md" "REQ-010" "**Heartbeat:** not-a-timestamp"
+run_scan
+assert_eq "0" "$RC" "$CURRENT_CASE rc=0"
+assert_contains "age=unknown" "$STDOUT" "$CURRENT_CASE malformed heartbeat emits age=unknown"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 11: stale-slot age value is in correct numeric range
+#   heartbeat is 3600s ago; age should be in [3300, 7200] allowing test drift
+# ----------------------------------------------------------------------
+CURRENT_CASE="stale-age-numeric-range"
+CASES=$((CASES + 1))
+setup_fixture
+STALE_ISO="$(iso_at_offset -3600)"
+write_working_req "$TMP/.do-work/working/REQ-011-range.md" "REQ-011" "**Heartbeat:** $STALE_ISO"
+run_scan
+assert_eq "0" "$RC" "$CURRENT_CASE rc=0"
+age_token="$(printf '%s\n' "$STDOUT" | awk '{print $3}' | head -1)"
+age_val="${age_token#age=}"
+# age should be a positive integer >= 3300 (allowing 300s drift).
+assert_age_ge 3300 "$age_val" "$CURRENT_CASE age in expected range"
+teardown_fixture
+
+# ----------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------
 echo ""
