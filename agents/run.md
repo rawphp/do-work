@@ -131,7 +131,7 @@ AGENT_ID="$(hostname).$$"
 STALE_SLOTS=$(bash {skill-root}/lib/scan-stale.sh)
 ```
 
-`scan-stale.sh` (REQ-149) reads `parallel.stale_threshold_seconds` from `.do-work/config.yml` (default 300 s) and prints one line per stale slot in the form `<req-path> <heartbeat-iso>`. Slots with a missing or malformed `**Heartbeat:**` are treated as stale by the script. The orchestrator does not re-implement this logic inline.
+`scan-stale.sh` (REQ-149, extended in REQ-172) reads `parallel.stale_threshold_seconds` from `.do-work/config.yml` (default 300 s) and prints one line per stale slot in the form `<req-path> <heartbeat-iso-or-"absent"> age=<seconds-or-"unknown">`. Slots with a missing or malformed `**Heartbeat:**` are treated as stale by the script and emit `age=unknown`. The orchestrator does not re-implement this logic inline.
 
 **Ownership classification — inline (cheap deterministic read):**
 
@@ -144,16 +144,32 @@ Glob `{project}/.do-work/working/REQ-*.md`. For each file found, read its owners
 | **`out-of-milestone`** | Milestone mode is active (`.do-work/state/active-milestone.md` exists) AND the slot's milestone id (parsed from the filename: `REQ-M<n>-NNN-slug.md` → `M<n>`) differs from the active milestone | Silently ignore — treat the same as `sibling` (a previous-milestone REQ still in flight during a milestone transition is informational only) |
 | **`stale`** | Slot path appears in `$STALE_SLOTS` output | Collect into the stale list |
 
+### 3a. Timestamp reasoning rule
+
+All timestamps in REQ files (`**Claimed at:**`, `**Heartbeat:**`, and any
+`<ISO-8601 UTC>` value) are UTC with a `Z` suffix. The local wall-clock
+date may differ from the UTC date by ±1 day depending on the host's
+timezone. Do NOT decide whether a slot is fresh by comparing the
+heartbeat's calendar date to "today" — that reasoning will misclassify
+recent slots as stale across the UTC/local date boundary.
+
+Slot staleness is determined solely by `$STALE_SLOTS` (the output of
+`lib/scan-stale.sh`, which compares UTC epochs deterministically).
+When you need to surface "how long ago" to the user, use the `age=<seconds>`
+token from `scan-stale.sh`'s output — not the raw ISO timestamp.
+
 ### 4. Handle stale slots
 
 If one or more stale slots are found, **prompt the user once** (batch all stale slots into a single message — do NOT prompt per slot):
 
 ```
 N stale REQ(s) found in working/:
-  - REQ-NNN (claimed by <agent-id-or-unknown>, last activity <date>)
+  - REQ-NNN (claimed by <agent-id-or-unknown>, last activity <human-age> ago)
   - ...
 These appear abandoned. Reclaim into this run, return to backlog, or abort?
 ```
+
+Where `<human-age>` is derived from the `age=<seconds>` token in `$STALE_SLOTS` output: convert seconds to the coarsest human unit that is non-zero (e.g. `42s`, `7m`, `2h`, `3d`). When `age=unknown`, render `unknown` in place of a duration. Do NOT use the raw ISO heartbeat timestamp to fill this field.
 
 - **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
 
@@ -162,10 +178,12 @@ These appear abandoned. Reclaim into this run, return to backlog, or abort?
   ```bash
   LAST_COMMIT_AGE_SEC=$(($(date +%s) - $(git log -1 --format=%ct -- <files-from-REQ> 2>/dev/null || echo 0)))
   if [ "$LAST_COMMIT_AGE_SEC" -gt 3600 ] || [ "$LAST_COMMIT_AGE_SEC" -eq "$(date +%s)" ]; then
-      # Classify the reason. One of:
-      #   no-heartbeat      — Heartbeat field absent or malformed
-      #   heartbeat-frozen  — Heartbeat present but older than threshold
-      #   no-progress       — Heartbeat fresh-ish but no commits touching the REQ's files
+      # Classify the reason using the age=<seconds> token from $STALE_SLOTS — not the raw
+      # ISO heartbeat. One of:
+      #   no-heartbeat      — age=unknown AND heartbeat field absent or malformed in the REQ file
+      #   heartbeat-frozen  — age=<seconds> present (numeric) AND older than the stale threshold
+      #   no-progress       — age=<seconds> present and under threshold but no commits on REQ's files
+      # Do NOT decide reason class by comparing **Heartbeat:** calendar dates to "today".
       REASON_CLASS="<no-heartbeat|heartbeat-frozen|no-progress>"
       FINGERPRINT="stale-slot:${REASON_CLASS}"
       bash {skill-root}/lib/file-feedback.sh stale-slot \
