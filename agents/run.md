@@ -107,6 +107,8 @@ The stamp is a filesystem-visible, human-readable contract. Archived REQs do not
 
 ## Pre-flight Check
 
+> **Default behaviour:** By default the orchestrator claims unblocked backlog work; stale-slot triage is a fallback that fires only when the backlog is empty for this agent. The `working/` scan at §3 is informational — it populates buckets used by the picker's overlap exclusion and, if the backlog is drained, the fallback prompt. It is NOT a gate on starting work.
+
 Before starting the loop:
 
 ### 1. Branch and working-directory checks
@@ -123,7 +125,7 @@ Compute `AGENT_ID` per `## Agent Identity`:
 AGENT_ID="$(hostname).$$"
 ```
 
-### 3. Scan and classify working/ slots
+### 3. Scan and classify working/ slots (informational — hold all buckets in memory, do not prompt)
 
 **Staleness detection — delegate to `lib/scan-stale.sh`:**
 
@@ -135,14 +137,14 @@ STALE_SLOTS=$(bash {skill-root}/lib/scan-stale.sh)
 
 **Ownership classification — inline (cheap deterministic read):**
 
-Glob `{project}/.do-work/working/REQ-*.md`. For each file found, read its ownership stamp (the `<!-- claimed-start --> … <!-- claimed-end -->` block) and classify the slot into one of three buckets:
+Glob `{project}/.do-work/working/REQ-*.md`. For each file found, read its ownership stamp (the `<!-- claimed-start --> … <!-- claimed-end -->` block) and classify the slot into one of three buckets. **Retain all three buckets in memory. Do not prompt at this stage regardless of what the stale bucket contains.**
 
 | Bucket | Condition | Action |
 |---|---|---|
 | **`mine`** | `**Claimed by:**` in the stamp matches `AGENT_ID` | Resume this REQ — skip the claim step and jump directly to worker dispatch for it |
-| **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND the slot path is NOT in `$STALE_SLOTS` | Silently ignore — another live orchestrator owns it |
+| **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND the slot path is NOT in `$STALE_SLOTS` | Leave alone — another live orchestrator owns it |
 | **`out-of-milestone`** | Milestone mode is active (`.do-work/state/active-milestone.md` exists) AND the slot's milestone id (parsed from the filename: `REQ-M<n>-NNN-slug.md` → `M<n>`) differs from the active milestone | Silently ignore — treat the same as `sibling` (a previous-milestone REQ still in flight during a milestone transition is informational only) |
-| **`stale`** | Slot path appears in `$STALE_SLOTS` output | Collect into the stale list |
+| **`stale`** | Slot path appears in `$STALE_SLOTS` output | Hold in memory — surface only as fallback when backlog has no claimable REQ |
 
 ### 3a. Timestamp reasoning rule
 
@@ -158,56 +160,81 @@ Slot staleness is determined solely by `$STALE_SLOTS` (the output of
 When you need to surface "how long ago" to the user, use the `age=<seconds>`
 token from `scan-stale.sh`'s output — not the raw ISO timestamp.
 
-### 4. Handle stale slots
+### 4. Resume any `mine` slot
 
-If one or more stale slots are found, **prompt the user once** (batch all stale slots into a single message — do NOT prompt per slot):
+If the `mine` bucket is non-empty, resume that REQ — skip the claim step and jump directly to worker dispatch for it.
 
+### 5. Try the backlog (primary path)
+
+No `mine` slot is present. Immediately attempt `lib/pick-req.sh`:
+
+```bash
+PICK_STDERR=$(mktemp)
+REQ_PATH=$(bash {skill-root}/lib/pick-req.sh "$SCOPE" "$AGENT_ID" 2>"$PICK_STDERR")
 ```
-N stale REQ(s) found in working/:
-  - REQ-NNN (claimed by <agent-id-or-unknown>, last activity <human-age> ago)
-  - ...
-These appear abandoned. Reclaim into this run, return to backlog, or abort?
-```
 
-Where `<human-age>` is derived from the `age=<seconds>` token in `$STALE_SLOTS` output: convert seconds to the coarsest human unit that is non-zero (e.g. `42s`, `7m`, `2h`, `3d`). When `age=unknown`, render `unknown` in place of a duration. Do NOT use the raw ISO heartbeat timestamp to fill this field.
+`pick-req.sh` already excludes any REQ whose `**Files:**` overlaps with a slot in `working/` — **both `sibling` and `stale` slots are treated as in-flight** for the purpose of footprint exclusion. You do not need to communicate the stale list to the picker separately; it reads `working/` directly.
 
-- **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
+- **If `pick-req.sh` returns a path:** claim it (proceed to The Loop, Step 1 claim sequence). **Do not surface any stale-slot prompt**, regardless of what `$STALE_SLOTS` contains.
+- **If `pick-req.sh` returns nothing:** continue to §6.
 
-  Before rewriting the stamp, classify *why* the slot went stale and emit feedback (best-effort, non-blocking) iff there has been **no commit activity** touching any path under the REQ's `**Files:**` declaration in the last hour:
+### 6. Fallback: backlog drained — evaluate working set
 
-  ```bash
-  LAST_COMMIT_AGE_SEC=$(($(date +%s) - $(git log -1 --format=%ct -- <files-from-REQ> 2>/dev/null || echo 0)))
-  if [ "$LAST_COMMIT_AGE_SEC" -gt 3600 ] || [ "$LAST_COMMIT_AGE_SEC" -eq "$(date +%s)" ]; then
-      # Classify the reason using the age=<seconds> token from $STALE_SLOTS — not the raw
-      # ISO heartbeat. One of:
-      #   no-heartbeat      — age=unknown AND heartbeat field absent or malformed in the REQ file
-      #   heartbeat-frozen  — age=<seconds> present (numeric) AND older than the stale threshold
-      #   no-progress       — age=<seconds> present and under threshold but no commits on REQ's files
-      # Do NOT decide reason class by comparing **Heartbeat:** calendar dates to "today".
-      REASON_CLASS="<no-heartbeat|heartbeat-frozen|no-progress>"
-      FINGERPRINT="stale-slot:${REASON_CLASS}"
-      bash {skill-root}/lib/file-feedback.sh stale-slot \
-        "$FINGERPRINT" \
-        '{"req":"REQ-NNN","prior_owner":"<previous-agent-id>","reason_class":"'"$REASON_CLASS"'","last_commit_age_sec":'"$LAST_COMMIT_AGE_SEC"'}' \
-        "Stale-slot reclaim: REQ-NNN (${REASON_CLASS})" \
-        "REQ-NNN sat in working/ with no commit progress in over an hour before reclaim. Prior owner appears abandoned; this orchestrator is taking the slot." \
-        || true
-  fi
+Reached only when `pick-req.sh` returned no candidate AND the `mine` bucket is empty. Now the stale bucket matters:
+
+- **`stale` is non-empty:** prompt the user once (batch all stale slots into a single message — do NOT prompt per slot):
+
+  ```
+  N stale REQ(s) found in working/:
+    - REQ-NNN (claimed by <agent-id-or-unknown>, last activity <human-age> ago)
+    - ...
+  These appear abandoned. Reclaim into this run, return to backlog, or abort?
   ```
 
-  > **JUDGMENT:** The title carries the REQ id and the reason class so an inbox skim tells you whether agents are dying silently (no-heartbeat) versus making progress without committing (no-progress). The body is one sentence — a single stale reclaim is routine; the inbox's fingerprint dedup surfaces the recurrence pattern.
-- **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ. Stage **only** that REQ's file path — do not sweep `.do-work/`. Example:
-  ```bash
-  git mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/REQ-NNN-slug.md
-  # edit the file to strip the claim block and reset Status
-  git add {project}/.do-work/REQ-NNN-slug.md
-  git commit -m "chore(REQ-NNN): return stale claim to backlog"
-  ```
-- **Abort:** Exit pre-flight and halt this orchestrator.
+  Where `<human-age>` is derived from the `age=<seconds>` token in `$STALE_SLOTS` output: convert seconds to the coarsest human unit that is non-zero (e.g. `42s`, `7m`, `2h`, `3d`). When `age=unknown`, render `unknown` in place of a duration. Do NOT use the raw ISO heartbeat timestamp to fill this field.
 
-### 5. Backlog emptiness check
+  - **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
 
-After handling stale slots, if the backlog root has no `REQ-*.md` files AND there are no `mine` slots to resume, fall through to `## When the Backlog is Empty`.
+    Before rewriting the stamp, classify *why* the slot went stale and emit feedback (best-effort, non-blocking) iff there has been **no commit activity** touching any path under the REQ's `**Files:**` declaration in the last hour:
+
+    ```bash
+    LAST_COMMIT_AGE_SEC=$(($(date +%s) - $(git log -1 --format=%ct -- <files-from-REQ> 2>/dev/null || echo 0)))
+    if [ "$LAST_COMMIT_AGE_SEC" -gt 3600 ] || [ "$LAST_COMMIT_AGE_SEC" -eq "$(date +%s)" ]; then
+        # Classify the reason using the age=<seconds> token from $STALE_SLOTS — not the raw
+        # ISO heartbeat. One of:
+        #   no-heartbeat      — age=unknown AND heartbeat field absent or malformed in the REQ file
+        #   heartbeat-frozen  — age=<seconds> present (numeric) AND older than the stale threshold
+        #   no-progress       — age=<seconds> present and under threshold but no commits on REQ's files
+        # Do NOT decide reason class by comparing **Heartbeat:** calendar dates to "today".
+        REASON_CLASS="<no-heartbeat|heartbeat-frozen|no-progress>"
+        FINGERPRINT="stale-slot:${REASON_CLASS}"
+        bash {skill-root}/lib/file-feedback.sh stale-slot \
+          "$FINGERPRINT" \
+          '{"req":"REQ-NNN","prior_owner":"<previous-agent-id>","reason_class":"'"$REASON_CLASS"'","last_commit_age_sec":'"$LAST_COMMIT_AGE_SEC"'}' \
+          "Stale-slot reclaim: REQ-NNN (${REASON_CLASS})" \
+          "REQ-NNN sat in working/ with no commit progress in over an hour before reclaim. Prior owner appears abandoned; this orchestrator is taking the slot." \
+          || true
+    fi
+    ```
+
+    > **JUDGMENT:** The title carries the REQ id and the reason class so an inbox skim tells you whether agents are dying silently (no-heartbeat) versus making progress without committing (no-progress). The body is one sentence — a single stale reclaim is routine; the inbox's fingerprint dedup surfaces the recurrence pattern.
+
+  - **Return to backlog:** For each stale REQ, `git mv` it back to the backlog root, strip its ownership stamp, reset `**Status:**` to `backlog`, and commit per REQ. Stage **only** that REQ's file path — do not sweep `.do-work/`. Example:
+    ```bash
+    git mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/REQ-NNN-slug.md
+    # edit the file to strip the claim block and reset Status
+    git add {project}/.do-work/REQ-NNN-slug.md
+    git commit -m "chore(REQ-NNN): return stale claim to backlog"
+    ```
+  - **Abort:** Exit pre-flight and halt this orchestrator.
+
+- **`stale` is empty AND `sibling` is non-empty:** fall through to `## When the Backlog is Empty` — siblings are still doing the remaining work.
+
+- **`stale` is empty AND `sibling` is empty:** fall through to `## When the Backlog is Empty`.
+
+### 7. Backlog emptiness check
+
+If both `pick-req.sh` returned nothing (§5) AND the stale set is empty (§6 fallback was not triggered or returned to backlog), fall through to `## When the Backlog is Empty`.
 
 ---
 
