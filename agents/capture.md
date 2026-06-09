@@ -140,6 +140,15 @@ Hold `layers_in_scope` (the per-UR list) in context for downstream steps.
 
 ### 3. Decompose the brief
 
+For feature-class briefs, decompose by **reachable path first**. A path is a user journey, caller flow, command invocation, API use, scheduled trigger, or other reachable slice of intent with:
+
+- an **entry point** — how a user, caller, command, or system starts the path
+- a **terminal state** — the observable end state that proves the path closed
+
+For each feature path, plan one top-level **path-unit REQ** whose `**Entry point:**` and `**Terminal state:**` fields are non-empty. Then decompose the work needed to make that path true into layer-tagged child REQs whose `**Parent:**` points at the path-unit REQ id. Layer detection still matters, but it runs inside each path-unit instead of across the whole brief.
+
+For bug-fix, pure refactor, docs, config, or test-only briefs with no discernible reachable path, keep the legacy decomposition: write ordinary REQs with empty `**Entry point:**`, empty `**Terminal state:**`, and empty `**Parent:**`.
+
 Break the brief into discrete tasks. A task is the right size when it meets ALL three criteria:
 1. **Single commit:** It can be implemented and committed in one git commit (typically touching 1-5 files)
 2. **Independent:** It does not require another uncommitted REQ to be complete first (read-only dependencies on existing code are fine)
@@ -152,27 +161,40 @@ If `ideate.md` was loaded in Step 1, use its observations as advisory context wh
 - **Challenger** observations (edge cases, failure modes) help you identify acceptance criteria that might otherwise be missed. Include a Challenger edge case as an acceptance criterion only when it directly applies to the specific REQ — do not blanket-add every Challenger observation to every REQ.
 
 **Rules:**
-- One REQ = one discrete change or deliverable
+- One top-level path-unit REQ = one reachable path with a named entry point and terminal state
+- One child REQ = one discrete layer task needed by the parent path-unit
 - Do not bundle unrelated concerns into a single REQ
 - If a task has a clear dependency chain, order the REQ numbers to reflect it (lower numbers first)
-- Each REQ must address exactly one user-visible behavior change or one internal component. If a REQ description contains the word "and" joining two unrelated outcomes, split it into two REQs. When in doubt, split.
+- Each child REQ must address exactly one layer-specific behavior change or one internal component. If a REQ description contains the word "and" joining two unrelated outcomes, split it into two REQs. When in doubt, split.
+- A path-unit REQ may be documentation/state only: it defines the path, owns closure semantics, and depends on its child layer REQs.
 
 ### 3b. Verify full coverage before writing
 
-Before writing any REQ files, build a requirement-to-REQ mapping to confirm every distinct requirement in the brief is covered and every layer is explicitly considered.
+Before writing any REQ files, build a path-to-layer mapping to confirm every distinct requirement in the brief is covered and every layer is explicitly considered inside each path-unit.
 
 **Defining frontend.** For the purposes of this mapping, "frontend" means any UI component, page or route, form or input, user-facing state (loading / empty / error / success), styling, or client-side validation — anything a user directly sees or interacts with in a browser or client app. Backend-leaning briefs (config keys, internal refactors, CLI commands, API-only endpoints with no caller) often genuinely have no frontend — the layer check below lets you declare that explicitly instead of silently dropping UI work.
 
-1. List every distinct requirement from the brief (a requirement is a user-visible behavior, data flow, or constraint). Number them R1, R2, R3, etc. **Tag each R-number with exactly one value from this list:**
-   - One of the project's declared layers (read from `layers_in_scope` in context — e.g. `frontend`, `backend`, `commands`, `core`, `output`).
-   - `none` — meta or process requirements that produce no code (e.g. "document the decision"), OR pure refactor/test-only changes with no new surface.
+1. List every reachable path from the brief. Number them P1, P2, P3, etc. For each path, record:
+   - **Entry point** — route, command, API caller, scheduled trigger, library export, parent component, or human workflow step
+   - **Terminal state** — visible state, response, artifact, persisted data, report, or other observable closure condition
+   - **Requirements** — the distinct user-visible behavior, data flow, or constraint covered by this path
 
-   If a requirement seems to need two layers (e.g. form validation that inherently runs client-side and server-side), split it into two R-numbers (`R2a` client validation, `R2b` server validation), each tagged with one layer. The "both" tag is gone.
-2. **Layer scope decision.** After tagging, for each layer in `layers_in_scope`, check whether any R-number carries that layer's tag:
-   - If **yes** for every layer in scope, continue — every layer is enumerated and will be decomposed into REQs.
-   - If **no** for any layer in scope, you have a gap. Either (a) you missed a requirement and need to add R-numbers for that layer, or (b) the brief genuinely doesn't touch that layer in this UR. The Step 4c layer-coverage prompt (introduced in Task 9) will surface this — for now, proceed to Step 4 and let the prompt drive the decision.
-3. For each planned REQ, note which requirement(s) it addresses.
-4. Check: does every R-number appear in at least one REQ? If any R-number is unmapped, create a REQ for it.
+2. Under each path, list the layer-tasks required to make the path true. Tag each task with exactly one value:
+   - One of the project's declared layers (read from `layers_in_scope` in context — e.g. `frontend`, `backend`, `commands`, `core`, `output`).
+   - `none` — meta or process requirements that produce no code, OR pure refactor/test-only changes with no new surface.
+
+   If a requirement seems to need two layers (e.g. form validation that inherently runs client-side and server-side), split it into two child tasks (`P1-T2a` client validation, `P1-T2b` server validation), each tagged with one layer. The "both" tag is gone.
+
+3. **Layer scope decision inside each path.** For each path-unit and each layer in `layers_in_scope`, check whether any child task under that path carries the layer's tag:
+   - If **yes**, that layer is represented inside the path.
+   - If **no**, decide whether the path genuinely does not touch that layer. If uncertain, the Step 4c layer-coverage prompt surfaces this. Proceed to Step 4 with the gap recorded so the prompt can drive the decision.
+
+4. Plan REQs:
+   - One path-unit REQ per path. It carries non-empty `**Entry point:**` and `**Terminal state:**`.
+   - One child REQ per layer-task. It carries `**Parent:** <path-unit REQ id>`.
+   - Child REQs should depend on their parent path-unit only when they need the parent schema/state to exist first; otherwise the parent can depend on children to close the path. Use hard dependencies only.
+
+5. Check: does every requirement appear under exactly one path and at least one child task or path-unit? If any requirement is unmapped, create or adjust a path-unit/task before writing files.
 
 **Example** (project with `layers: [frontend, backend]`):
 
@@ -188,13 +210,27 @@ R5:  Show success message after submission               [frontend]
 
 All declared layers covered: frontend (R1, R2a, R5), backend (R2b, R3, R4). ✓
 
+Paths:
+  P1 Contact form submission
+     Entry point: /contact page form submit
+     Terminal state: user sees success message and submission is stored/emailed
+
+Layer tasks inside P1:
+  P1-T1 Form UI (name, email, message fields)            [frontend]
+  P1-T2a Form validation — client side                   [frontend]
+  P1-T2b Form validation — server side                   [backend]
+  P1-T3 Store submissions in database                    [backend]
+  P1-T4 Email submissions to sales@example.com           [backend]
+  P1-T5 Show success message after submission            [frontend]
+
 Planned REQs:
-  REQ-001 form-ui              → R1   layer: frontend
-  REQ-002 client-validation    → R2a  layer: frontend
-  REQ-003 server-validation    → R2b  layer: backend
-  REQ-004 store-submissions    → R3   layer: backend
-  REQ-005 email-submissions    → R4   layer: backend
-  REQ-006 success-message      → R5   layer: frontend
+  REQ-001 contact-form-path       → P1      layer: none      entry+terminal set
+  REQ-002 form-ui                 → P1-T1   layer: frontend  parent: REQ-001
+  REQ-003 client-validation       → P1-T2a  layer: frontend  parent: REQ-001
+  REQ-004 server-validation       → P1-T2b  layer: backend   parent: REQ-001
+  REQ-005 store-submissions       → P1-T3   layer: backend   parent: REQ-001
+  REQ-006 email-submissions       → P1-T4   layer: backend   parent: REQ-001
+  REQ-007 success-message         → P1-T5   layer: frontend  parent: REQ-001
 ```
 
 For projects with `layers: [agents, commands, templates]` (do-work itself), tags would be `agents`, `commands`, `templates`, or `none` — same machinery, different vocabulary.
@@ -224,6 +260,11 @@ Use this format exactly:
 **Status:** backlog
 **Created:** YYYY-MM-DD
 **Layer:** <one of the project's declared layers, or `none` for bug-fix / pure refactor / test-only>
+**Entry point:** <for path-unit REQs: how the user/caller reaches this; empty for child layer-tasks or legacy-style REQs>
+**Terminal state:** <for path-unit REQs: observable end state that proves closure; empty for child layer-tasks or legacy-style REQs>
+**Parent:** <parent path-unit REQ id for child layer-tasks; empty for top-level path-units and legacy-style REQs>
+**Closure proof:**
+**Criteria approved:** agent-drafted
 **Files:** <comma-separated project-relative paths or globs of files this REQ will touch; globs allowed>
 **Depends on:** <comma-separated REQ-NNN ids that must be done before this REQ starts; empty if none>
 
@@ -267,6 +308,8 @@ Use this format exactly:
 - A layer name from `.do-work/config.yml`'s `layers:` list, OR
 - The literal `none` for bug-fix REQs, pure refactor REQs (no new surface), or test-only REQs.
 
+The `**Entry point:**`, `**Terminal state:**`, and `**Parent:**` fields are additive path-unit metadata. A REQ with both `**Entry point:**` and `**Terminal state:**` non-empty is a top-level path-unit. A child layer-task leaves those two fields empty and sets `**Parent:**` to the parent path-unit REQ id. Legacy-style REQs may leave all three fields empty.
+
 A REQ has exactly one layer. If a REQ feels like it spans multiple layers, that is a signal to split it into two REQs — capture must split rather than concatenate. The two REQs share the same UR and may reference each other in their bodies.
 
 Capture decides the layer when it writes each REQ. If capture is unsure which layer a REQ belongs to, it asks the user at generation time rather than guessing.
@@ -283,7 +326,9 @@ The Integration block is the load-bearing check that catches "feature built but 
 
 ### Writing effective Verification Steps
 
-Each step must be typed. Use the right type for the task:
+Each step must be typed and ordered. Treat the list as checkpoints in the path to closure: step 1 must pass before step 2, and a failure must identify the last good checkpoint plus the failing handoff.
+
+Use the right type for the task:
 
 | Type | When to use | Example |
 |------|-------------|---------|
@@ -301,6 +346,8 @@ Each step must be typed. Use the right type for the task:
 - **Pure refactors:** `test` steps only are sufficient if behaviour is unchanged.
 - **New pages/components:** Include `build` + `ui` steps minimum.
 - Steps must be specific enough that a pass/fail verdict is unambiguous — "looks good" is not a valid expected outcome.
+- Steps must be ordered so a worker can record `step N of M`, `last_good_step`, and `failed_step` in the checkpoint log.
+- When a step crosses a boundary (for example API -> render, command -> file, input -> persistence), name that handoff in the Expected outcome so failures localize cleanly.
 
 ### 4b. Check acceptance criteria quality
 

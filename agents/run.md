@@ -51,6 +51,8 @@ Scope is an **in-memory filter, NOT a hard reservation**. Other orchestrators la
 
 Read and follow the **Load Config** section of [config.md](config.md).
 
+Keep `model.default`, `model.escalation`, `cost.budget`, and `ledger.enabled` in context for the run. Use `model.default` for ordinary worker dispatch and `model.escalation` for high-risk or retry-worthy work as described in model selection. If `cost.budget` is non-empty, surface the configured budget in the run summary and ledger; do not silently exceed an explicit user-provided budget without stopping for human direction.
+
 ---
 
 ## Agent Identity
@@ -445,6 +447,31 @@ Read all of [agents/run-worker.md](run-worker.md) — that is the worker's full 
 Determine `subagent_type` using the rules in `## REQ Classification` above. Default to `general-purpose`.
 Determine `model` using the rules in `## Model Selection` above. Default to `sonnet`.
 
+#### Step 2a: Human approval gate for agent-drafted criteria
+
+Before dispatching the worker, read the REQ header's `**Criteria approved:**` value.
+
+| Value | Action |
+|---|---|
+| Missing | Treat as `agent-drafted` for safety. |
+| `agent-drafted` | Stop before worker dispatch and surface the REQ's `## Acceptance Criteria` to the user for approval. |
+| Starts with `human` | Criteria are approved; continue to worker dispatch without prompting. |
+
+This gate is non-delegable. The orchestrator must not auto-approve, and the worker must never approve criteria on the user's behalf.
+
+When approval is required:
+
+1. Print the REQ id, title, and full `## Acceptance Criteria` checklist.
+2. Ask the user: `Approve these acceptance criteria as the closure oracle for REQ-NNN? (y/n)`
+3. If the user answers yes, update the header in place:
+   ```markdown
+   **Criteria approved:** human <agent-id> <YYYY-MM-DD>
+   ```
+   Use the local `AGENT_ID` as the approver token unless the user provides a specific approver name.
+4. If the user answers no, transition the REQ to `**Status:** stopped`, add `**Reason:** criteria-not-approved`, and surface: `REQ-NNN stopped: acceptance criteria need revision before run.`
+
+After approval, continue to worker dispatch. REQs already marked `human` skip this gate.
+
 Identify the **prior-REQ archived paths** for the same UR — these provide the worker context about what has already been built:
 
 1. Read the REQ's `**UR:**` field
@@ -495,13 +522,62 @@ The worker's final message is a fenced YAML block matching the schema defined in
 
 If the worker's report is missing or unparseable, treat as `status: failed` with `reason: unknown-error` and surface the raw output to the user.
 
+If the worker reports `status: stopped` with `reason: verification-failing`, parse `last_good_step`, `failed_step`, and `checkpoint_log` from the report. Include the localized failure in the user-facing stopper report, e.g. `Verification failed at step <failed_step>; last good step was <last_good_step>; handoff: <handoff-or-unknown>.`
+
+If the worker reports `status: done`, validate acceptance evidence before Step 4 integration:
+
+```bash
+bash lib/check-acceptance-evidence.sh {project}/.do-work/working/REQ-NNN-slug.md <worker-report-yml>
+```
+
+If validation fails, treat the result as `status: stopped`, `reason: verification-failing`, surface the validator diagnostics, and do not merge, write closure proof, review, or archive. This gate extends the checkpoint/closure-proof model; it does not replace `closure_proof`.
+
+After acceptance evidence validation passes, invoke the post-build review gate in [review.md](review.md) before Step 4 integration. Pass the working REQ path, UR path, worker report YAML, implementation diff or commit reference, and any policy-check output. If review returns `status: failed`, treat the result as `status: stopped`, `reason: review-failed`, surface the review findings, leave the REQ in `working/`, and do not merge, write closure proof, archive, or record completion. Worker says done is not final until this evidence gate and review gate both pass.
+
+Before invoking review, run deterministic policy checks using changed files, command evidence, and REQ metadata:
+
+```bash
+bash lib/check-policy.sh \
+  --project {project} \
+  --files <changed-files-list> \
+  --commands <worker-command-log> \
+  --req {project}/.do-work/working/REQ-NNN-slug.md
+```
+
+If `check-policy.sh` exits `1`, treat the result as `status: stopped`, `reason: policy-blocked`, surface the blocked path or blocked command diagnostics, leave the REQ in `working/`, and do not review, merge, archive, or write completion state. If it exits `2`, continue into review and pass the `review_required` diagnostics as mandatory review context. If it exits `0`, continue into review normally. The helper reads `security.blocked_paths`, `security.blocked_commands`, and `risk.require_review` from `.do-work/config.yml`.
+
+### Step 3b: Run Ledger
+
+When `ledger.enabled` is true, record one append-only run ledger entry per worker attempt under `{project}/.do-work/runs/RUN-NNN.yml` using `lib/run-ledger.sh`. Collect the ledger inputs while the run progresses: REQ id, agent id, selected model, branch, started and ended timestamps, command evidence, test evidence, changed files, result, cost estimate or budget note, review outcome, and derived proof status.
+
+Finalize the ledger after the attempt reaches a terminal outcome:
+
+```bash
+bash lib/run-ledger.sh \
+  --project {project} \
+  --req <working-or-archived-REQ-path> \
+  --agent <agent-id> \
+  --model <selected-model> \
+  --branch <branch-name> \
+  --started <iso8601> \
+  --ended <iso8601> \
+  --result <done|stopped:reason|failed> \
+  --review <passed|failed|not-run> \
+  --cost <estimate-or-budget-note> \
+  --commands <command-evidence-list> \
+  --tests <test-evidence-list> \
+  --changed-files <changed-files-list>
+```
+
+For stopped workers, write the ledger before returning control to the user, with `result: stopped:<reason>` and the best available evidence lists. For policy-blocked or acceptance-evidence failures before review, use `review: not-run`. If `ledger.enabled` is false, skip ledger creation.
+
 The worker also reports `milestone_complete` (boolean) and `milestone` (id when true). Step 7b uses these.
 
 ### Step 4: Integrate (worker = code, orchestrator = state)
 
 > **JUDGMENT:** J4 — The integration sequence below is the orchestrator's responsibility BECAUSE workers run in isolated worktrees. The worker has committed implementation files to `req/REQ-NNN`; the orchestrator now merges that branch into the base branch, archives the REQ, tears down the worktree, and commits the metadata change. This is the only place where `.do-work/` lifecycle writes happen.
 
-Reached only when `status: done`. Execute these substeps in order; each must succeed before the next.
+Reached only when `status: done` and both acceptance evidence validation and post-build review passed. Execute these substeps in order; each must succeed before the next.
 
 #### 4a. Merge the feature branch
 
@@ -521,12 +597,15 @@ On text-level conflict (any file contains `<<<<<<<`):
 
 #### 4b. Archive the REQ file
 
-Read the worker's YAML report's `outputs:` list. Rewrite the REQ file in place under `.do-work/working/REQ-NNN-slug.md`:
+Read the worker's YAML report's `outputs:` list and `closure_proof` value. Rewrite the REQ file in place under `.do-work/working/REQ-NNN-slug.md`:
 
-1. Strip the ownership stamp (`<!-- claimed-start --> … <!-- claimed-end -->`).
-2. Update `**Status:**` to `done`.
-3. Append a `## Outputs` section based on the `outputs:` array from the worker's YAML report. One bullet per entry: `- <path> — <description>`.
-4. Move the file to `archive/`:
+0. **Path-unit closure guard.** Before any archive mutation, read `**Entry point:**` and `**Terminal state:**` from the REQ file. If either field is present, both must be present and non-empty. If a path-unit is missing either value, do not archive it. Transition the REQ to `**Status:** stopped`, add `**Reason:** path-unit-incomplete`, and surface: `REQ-NNN cannot close: path-unit requires non-empty Entry point and Terminal state.` Non-path REQs with both fields absent are unaffected.
+1. Require non-empty `closure_proof` when the worker returned `status: done`. If it is missing or empty, transition the REQ to `**Status:** stopped`, add `**Reason:** missing-closure-proof`, and do not archive.
+2. Strip the ownership stamp (`<!-- claimed-start --> … <!-- claimed-end -->`).
+3. Update `**Status:**` to `done`.
+4. Write the worker's `closure_proof` value into `**Closure proof:**`. If the header is absent, insert it before `**Files:**`.
+5. Append a `## Outputs` section based on the `outputs:` array from the worker's YAML report. One bullet per entry: `- <path> — <description>`.
+6. Move the file to `archive/`:
    ```bash
    mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/archive/REQ-NNN-slug.md
    ```

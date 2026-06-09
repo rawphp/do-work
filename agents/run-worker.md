@@ -98,6 +98,8 @@ Read the REQ file in full. Understand:
 - The Verification Steps
 - Any referenced assets
 
+Check the REQ header's `**Criteria approved:**` value. If it is missing or `agent-drafted`, return `status: stopped`, `reason: ambiguous-criteria`, with details: `Acceptance criteria are not human-approved.` The orchestrator owns the non-delegable approval gate before dispatch; the worker must not approve, infer approval, or proceed against an unapproved oracle. If the value starts with `human`, treat the acceptance criteria as the closure oracle for this REQ.
+
 ### 1b. Start background heartbeat
 
 Immediately after reading the REQ, start a background heartbeat loop. This refreshes the REQ's `**Heartbeat:**` timestamp every 60 seconds so that sibling agents and the pre-flight scanner know this slot is alive. Without this loop, the worker would appear stale after 5 minutes and a sibling could attempt to re-claim the slot.
@@ -204,15 +206,15 @@ Read `## Verification Steps` from the REQ. Execute each step in order:
 | `runtime` | Ensure the dev server is running (start in background if not, wait healthy), run the command, compare output to expected |
 | `ui` | Playwright: navigate to the URL, take a snapshot, confirm the specified element/text |
 
-Record the result of each step: pass/fail + actual output or screenshot.
+Record the result of each step in an ordered checkpoint log. Each checkpoint entry must include `step`, `total`, `type`, command/action, expected result, pass/fail status, and a short actual-output summary. If the step crosses a boundary, include the handoff name (for example `input -> persistence`, `API -> render`, or `command -> file`).
 
 **If all steps pass:** proceed to step 7.
 
 **If any step fails:**
-1. Note which step failed, expected vs actual
+1. Note which step failed, expected vs actual, and the last good checkpoint before the failure.
 2. Increment a retry counter
 3. If retry count < 3: go back to step 3b (implement) with the failure as context — fix the root cause, not the test
-4. If retry count reaches 3: emit feedback (best-effort, non-blocking), then return a `status: stopped` report with `reason: verification-failing` and the failure details in `details`:
+4. If retry count reaches 3: emit feedback (best-effort, non-blocking), then return a `status: stopped` report with `reason: verification-failing`, the checkpoint log, `last_good_step`, `failed_step`, and the failure details in `details`:
 
    ```bash
    STEP_TYPE="<test|build|runtime|ui>"            # the verification step type that failed
@@ -226,6 +228,8 @@ Record the result of each step: pass/fail + actual output or screenshot.
    ```
 
    > **JUDGMENT:** Title and body must name the failing step type plainly (test / build / runtime / ui) and the REQ id. Do not paste raw test output or absolute paths — the sanitiser strips paths, but commit messages and diffs must be omitted by the caller. One sentence in the body is enough; the goal is trend visibility, not a full failure log.
+
+On full pass, include the complete checkpoint log in the Return Report. The success case should be able to say `all N checkpoints passed`; this log is the evidence source later referenced by `closure_proof`.
 
 ### 7. (Reserved — archive moved to orchestrator)
 
@@ -384,6 +388,26 @@ reason: ""              # required when status is "stopped" or "failed"
                         #         unknown-error, concurrent-conflict
 details: ""             # free-text context for the orchestrator/user
 isolation: same-branch  # or "worktree" — from ## Isolation Mode heuristic
+closure_proof: ""       # non-empty only when status: done; references checkpoint_log and commit
+last_good_step: 0       # highest verification checkpoint that passed before failure; total count when all pass
+failed_step: 0          # failing checkpoint number; 0 when status: done
+checkpoint_log:
+  status: passed        # or "failed"
+  checkpoints:
+    - step: 1
+      total: 1
+      type: test
+      command: ""
+      expected: ""
+      actual: ""
+      status: passed
+      handoff: ""
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - type: test       # one of test, command, file, runtime_check, ui
+        ref: ""
 milestone_complete: false
 milestone: ""           # active milestone id when milestone_complete is true
 retry_count: 0          # integer — number of conflict retries consumed (0 = no retries)
@@ -394,10 +418,13 @@ outputs:
 
 Field rules:
 - `status: done` → `commit` must be set; `reason` empty
+- `status: done` → `closure_proof` must be non-empty and reference the checkpoint log plus completing commit (for example `checkpoint_log:passed commit:abcdef1`)
 - `status: stopped` → `reason` must match the enum above; `commit` empty
 - `status: failed` → unrecoverable error (exception thrown, file write failed); `reason: unknown-error` or specific
 - Always include `milestone_complete` (defaults to `false`)
 - Always include `retry_count` (defaults to `0`; set to 5 when exiting via `concurrent-conflict`)
+- Always include `checkpoint_log`, `last_good_step`, and `failed_step`. On verification failure, `details` must name the failing step and handoff. On full pass, `last_good_step` equals the total checkpoint count and `failed_step` is `0`.
+- Always include `acceptance`. It is a map keyed by acceptance criterion order (`AC1`, `AC2`, ...). Every criterion must have `status: passed` and at least one evidence item (`test`, `command`, `file`, `runtime_check`, or `ui`). This evidence must align with the checkpoint log and `closure_proof`; do not invent evidence.
 
 ---
 
@@ -409,6 +436,7 @@ Field rules:
 - **Never commit without running tests.** Never use `--no-verify`. Never skip hooks.
 - **Never edit files in the skill clone (`~/.claude/skills/...`).** All edits happen in the project repo.
 - **Deploy gate is non-delegable.** You MUST NOT auto-confirm any deploy gate. You MUST NOT run deployment commands. You MUST NOT attempt to verify deployment success. Signal milestone completion via `milestone_complete: true` in your report; the orchestrator owns the y/n prompt with the user.
+- **Criteria approval is non-delegable.** You MUST NOT approve acceptance criteria or proceed when `**Criteria approved:**` is missing or `agent-drafted`. Return a stopped report and let the orchestrator/user approve or revise the REQ.
 - **You cannot ask the user questions.** You have no user-interaction surface. Every blocker exits as a `status: stopped` report with a structured `reason`. The orchestrator surfaces user-facing prompts on your behalf.
 - **Stay in scope.** If the REQ would require changes outside its stated scope, return `status: stopped` with `reason: scope-creep`.
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.

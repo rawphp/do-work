@@ -33,6 +33,22 @@ Print stdout verbatim to the user.
 
 If `lib/synth-status.sh` is missing, report `"lib/synth-status.sh not found — cannot render status."` and stop.
 
+Then render a proof-backed status view. Glob REQ files in backlog, `working/`, and `archive/` (respecting `UR-NNN` scope when provided), and run:
+
+```bash
+bash lib/derive-status.sh <req-path>...
+```
+
+Print the result under a `Proven` heading. This is a derived view: `proven` means the REQ is done/archived and has a non-empty `**Closure proof:**`; `unproven` means either proof is missing or the REQ is not done. If `lib/derive-status.sh` is missing, report `"lib/derive-status.sh not found — skipping proven view."` and continue.
+
+Then render the intended-vs-proven Coverage section:
+
+```bash
+bash lib/coverage-rollup.sh [UR-NNN]
+```
+
+Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>` and any `unproven_ids`. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `lib/coverage-rollup.sh` is missing, report `"lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
+
 ### 2. Check for deadlock
 
 Run:

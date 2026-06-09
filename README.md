@@ -1,6 +1,6 @@
 # Do Work
 
-A Claude Code skill that turns natural-language briefs into discrete, traceable tasks and executes them autonomously — with TDD and a git commit per task.
+A Claude Code and Codex skill that turns natural-language briefs into discrete, traceable tasks and executes them autonomously — with TDD, evidence gates, review, and a git commit per task.
 
 Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 
@@ -10,17 +10,27 @@ Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 
 ### One-liner
 
+Choose the target assistant environment explicitly:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash
+# Claude Code
+curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash -s -- --env claude
+
+# Codex
+curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash -s -- --env codex
 ```
 
 ### Or clone manually
 
 ```bash
+# Claude Code
 git clone https://github.com/rawphp/do-work.git ~/.claude/skills/do-work
+
+# Codex
+git clone https://github.com/rawphp/do-work.git ~/.codex/skills/do-work
 ```
 
-That's it. Claude Code picks up the `/do-work` slash command automatically.
+Claude Code or Codex picks up the `/do-work` slash command from the environment you installed into.
 
 ---
 
@@ -44,7 +54,7 @@ Ideate now ends with an interactive gate — after surfacing gaps, it asks wheth
 /do-work go UR-001
 ```
 
-Verifies REQ coverage against your brief. If confidence >= 90%, auto-executes the backlog. Each REQ gets TDD'd and committed individually.
+Verifies REQ coverage against your brief. If confidence >= 90%, auto-executes the backlog. Each REQ gets TDD'd, evidence-checked, reviewed, committed, and archived individually.
 
 Flags:
 - `--force` — run regardless of confidence score
@@ -71,7 +81,7 @@ Flags:
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections. |
 | `/do-work verify [UR-NNN]` | Scores REQ coverage (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
-| `/do-work run` | Executes backlog: TDD loop, one REQ at a time. |
+| `/do-work run` | Executes backlog: TDD loop, acceptance evidence, policy checks, review, archive/ledger. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
 | `/do-work` | Show help. |
 
@@ -84,9 +94,11 @@ Flags:
 3. **Capture** — Classifies the brief (bug-fix vs feature), assigns each REQ to one of the project's declared layers, prompts on uncovered layers, and writes an `## Integration` block on every new-surface REQ with codebase-verified file references
 4. **Verify** — Scores REQ coverage against the original brief, plus three structural checks: layer coverage, Integration block presence, and partial-confidence acknowledgement
 5. **Audit** *(always-on)* — Interrogates every REQ's acceptance criteria, auto-fixes vague spots, reports what changed
-6. **Run** — Executes each REQ with TDD: failing test first, implement, verify, commit
+6. **Run** — Executes each REQ with TDD, then gates completion through acceptance evidence, policy checks, post-build review, closure proof, archive, and ledger recording
 
 `start` = intake + ideate (with gate) + capture. `go` = verify + audit + run.
+
+Normal completion is proof-backed. Capture marks generated criteria as `agent-drafted`; run requires human-approved criteria before dispatch. Workers return checkpointed evidence and per-criterion acceptance evidence, but the orchestrator still validates that evidence, runs policy checks for blocked paths or commands, invokes post-build review, writes `**Closure proof:**`, derives `proven` / `unproven`, and records `.do-work/runs/RUN-NNN.yml` when the ledger is enabled. A worker report is only an input to completion, not the archive/proof decision.
 
 ---
 
@@ -106,7 +118,8 @@ This skill is multi-file. `SKILL.md` is the entrypoint and routes commands to ag
 │   ├── ideate.md         ← surfaces assumptions & risks
 │   ├── capture.md        ← decomposes into REQ files
 │   ├── verify.md         ← scores coverage
-│   ├── run.md            ← TDD execution loop
+│   ├── run.md            ← TDD execution loop with evidence/review gates
+│   ├── review.md         ← post-build scope, evidence, policy, and regression review
 │   ├── log.md            ← build-in-public draft posts
 │   └── config.md         ← reusable config loading
 ├── install.sh
@@ -173,6 +186,39 @@ test:
 
 next_steps:
   enabled: false
+
+review:
+  required: true
+
+acceptance:
+  evidence_required: true
+
+risk:
+  require_review:
+    - migrations
+    - auth
+    - billing
+    - payments
+    - files_changed_over: 8
+    - acceptance_criteria_over: 6
+
+security:
+  blocked_paths:
+    - .env
+    - .env.*
+  blocked_commands:
+    - rm -rf
+    - production
+
+model:
+  default: sonnet
+  escalation: opus
+
+cost:
+  budget: ""
+
+ledger:
+  enabled: true
 ```
 
 | Key | Type | Default | Description |
@@ -188,6 +234,15 @@ next_steps:
 | `log.max_chars` | map | `{x: 280, blog: 500, linkedin: 1300}` | Per-platform character ceiling the log agent enforces on every draft. Keys are platform slugs; values are integer char limits. Drafts exceeding the ceiling are rewritten, then truncated if still over. |
 | `test.suite_command` | string | `""` | Full test suite command (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, common defaults are attempted. |
 | `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase |
+| `review.required` | boolean | `true` | Require post-build review before archive completion |
+| `acceptance.evidence_required` | boolean | `true` | Require evidence for every acceptance criterion |
+| `risk.require_review` | list | see config | Signals that require explicit review |
+| `security.blocked_paths` | list | `[.env, .env.*]` | Paths workers must not modify |
+| `security.blocked_commands` | list | `[rm -rf, production]` | Command fragments that stop the run/review path |
+| `model.default` | string | `sonnet` | Default worker model |
+| `model.escalation` | string | `opus` | Escalation model for high-risk or failed work |
+| `cost.budget` | string | `""` | Optional user-defined budget; empty means unset |
+| `ledger.enabled` | boolean | `true` | Write structured run records under `.do-work/runs/` |
 
 ---
 

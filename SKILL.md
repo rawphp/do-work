@@ -31,8 +31,9 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections in a brief. |
 | `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
-| `/do-work run [UR-NNN]` | Executes backlog: TDD loop, one REQ at a time, commit per REQ. Optional UR-NNN scopes the run to that UR's REQs only. |
-| `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings. Optional UR-NNN scopes the report. |
+| `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional UR-NNN scopes the run to that UR's REQs only. |
+| `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion. |
+| `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
@@ -54,11 +55,14 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/verify.md](agents/verify.md) — Scores REQ coverage against brief
 - [agents/run.md](agents/run.md) — Orchestrator: dispatches a worker subagent per REQ
 - [agents/run-worker.md](agents/run-worker.md) — Worker: TDD-and-commits a single REQ in a fresh subagent session
-- [agents/status.md](agents/status.md) — Read-only situation room: REQs, claimers, heartbeats, deadlock warnings
+- [agents/review.md](agents/review.md) — Post-build gate: reviews scope, acceptance evidence, tests, secrets, docs, and regression risk before archive
+- [agents/status.md](agents/status.md) — Read-only situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup
 - [agents/unblock.md](agents/unblock.md) — Force a stuck in-flight REQ back to the backlog
 - [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
 - [agents/config.md](agents/config.md) — Reusable config loading instructions
+
+Run ledger: when `ledger.enabled: true`, `/do-work run` writes append-only `.do-work/runs/RUN-NNN.yml` records with model, cost, commands, tests, changed files, review outcome, result, and proof status. Set `ledger.enabled: false` to disable ledger writes.
 
 ---
 
@@ -260,6 +264,17 @@ Feature REQs that add new surface (anything callable or visible from outside the
 
 Capture inspects the codebase to draft answers and verifies each cited file/symbol exists before claiming high confidence. Verify enforces the Integration block on every non-`none` feature REQ.
 
+## Path Units
+
+For feature-class briefs, capture decomposes by reachable path first. A path-unit is a top-level REQ that names:
+
+- `**Entry point:**` — how a user, caller, command, or system reaches the path.
+- `**Terminal state:**` — the observable end state that proves the path closed.
+
+Layer-specific work is captured as child REQs underneath the path-unit. Child REQs carry the normal `**Layer:**` value and point back to the path-unit with `**Parent:** REQ-NNN`. Layers therefore operate inside path-units: they still prevent frontend/backend/command/template gaps, but the closure unit is the reachable path.
+
+Migration is additive. Legacy REQs without `**Entry point:**`, `**Terminal state:**`, or `**Parent:**` remain valid. New path-units must have both entry point and terminal state before they can verify or archive as complete.
+
 ## REQ Header Schema
 
 Every REQ file carries a structured header immediately below the title. The canonical field list is:
@@ -270,8 +285,19 @@ Every REQ file carries a structured header immediately below the title. The cano
 | `**Status:**` | yes | `backlog` / `in-progress` / `stopped` / `done` |
 | `**Created:**` | yes | ISO date (YYYY-MM-DD) |
 | `**Layer:**` | yes | Declared project layer, or `none` for bug-fix/refactor/test-only REQs |
+| `**Entry point:**` | optional | How a user, caller, command, or system reaches this path-unit. Required to be non-empty for top-level path-unit REQs. |
+| `**Terminal state:**` | optional | The observable end state that proves this path-unit is complete. Required to be non-empty for top-level path-unit REQs. |
+| `**Parent:**` | optional | Parent path-unit REQ id for child layer-tasks. Empty or absent on top-level path-units and legacy REQs. |
+| `**Closure proof:**` | optional | Evidence reference proving verification passed, such as `checkpoint:.do-work/runs/RUN-001.yml#REQ-123` or `commit:abc123 tests:passed`; empty until proven. |
+| `**Criteria approved:**` | yes | Acceptance-criteria provenance: `agent-drafted` until a human approves it, or `human <approver> <YYYY-MM-DD>` after approval. |
 | `**Files:**` | yes | Space-separated list of primary output files — used by `lib/check-footprint.sh` for overlap detection |
 | `**Depends on:**` | optional | Space-separated REQ ids this REQ must not start before (e.g. `REQ-144 REQ-145`) — checked by `lib/check-deps.sh` |
+
+A **path-unit** is a REQ whose `**Entry point:**` and `**Terminal state:**` are both non-empty. Path-units describe a vertical, reachable slice of intent. Child layer-tasks point back to a path-unit with `**Parent:**`; legacy REQs without these fields remain valid because the migration is additive.
+
+`**Status:**` remains writable and authoritative for coordination (`backlog`, `working/`, dependency gating, stale checks, and archive flow). `**Closure proof:**` is a separate evidence signal used to derive whether a done REQ is proven; it does not replace the coordination status field.
+
+`**Criteria approved:** agent-drafted` means capture generated the acceptance criteria. A human can approve the oracle by changing it to `human <approver> <YYYY-MM-DD>` or by using the run-time approval gate. Agents must not auto-approve their own criteria.
 
 When a REQ is claimed by a worker, a claim block is inserted between the title and the first header field:
 
@@ -296,6 +322,31 @@ Output: path/to/primary/output
 ```
 
 Commits are created per-REQ on completion. The claim/heartbeat update path (`lib/heartbeat.sh`) is filesystem-only — it writes directly to the REQ file and does **not** produce a git commit. Unblock operations use `chore(REQ-NNN): unblock — return to backlog` as the commit message.
+
+## Checkpointed Verification
+
+REQ `## Verification Steps` are ordered checkpoints. Workers execute them in sequence and record a checkpoint log that localizes both success and failure:
+
+```yaml
+req: REQ-NNN
+status: passed | failed
+checkpoints:
+  - step: 1
+    total: 3
+    type: test
+    command: "npm test -- --filter settings"
+    status: passed
+  - step: 2
+    total: 3
+    type: runtime
+    command: "curl http://localhost:3000/settings"
+    status: failed
+    handoff: "route -> render"
+last_good_step: 1
+failed_step: 2
+```
+
+On failure, the log must answer: which step failed, at which handoff, and what the last good step was. On success, the full passed checkpoint log becomes the natural target for `**Closure proof:**`.
 
 ---
 
@@ -343,6 +394,39 @@ feedback:
 
 parallel:
   stale_threshold_seconds: 300   # heartbeat age (seconds) before a slot is flagged stale
+
+review:
+  required: true
+
+acceptance:
+  evidence_required: true
+
+risk:
+  require_review:
+    - migrations
+    - auth
+    - billing
+    - payments
+    - files_changed_over: 8
+    - acceptance_criteria_over: 6
+
+security:
+  blocked_paths:
+    - .env
+    - .env.*
+  blocked_commands:
+    - rm -rf
+    - production
+
+model:
+  default: sonnet
+  escalation: opus
+
+cost:
+  budget: ""
+
+ledger:
+  enabled: true
 ```
 
 4. Report what was created vs already existed. Example:
@@ -496,7 +580,7 @@ Execute the backlog autonomously — one REQ at a time — until empty or a stop
 
 ### status [UR-NNN]
 
-Render a read-only live situation room: all in-flight REQs, their claimers, heartbeat ages, and any deadlock warnings.
+Render a read-only live situation room: all in-flight REQs, their claimers, heartbeat ages, any deadlock warnings, and a Coverage section showing intended/proven/unproven REQs.
 
 1. Detect `{project}`.
 2. Determine UR scope:

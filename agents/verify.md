@@ -166,6 +166,26 @@ For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog
 
    Apply the chosen action per dep before re-scoring.
 
+### 4f. Path-unit closure precondition
+
+For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog ∪ working/ ∪ archive/) for the path-unit header fields:
+
+- `**Entry point:**`
+- `**Terminal state:**`
+
+A REQ is a **path-unit candidate** when either field is present. A path-unit is valid only when both fields are present and non-empty after trimming whitespace.
+
+1. For each path-unit candidate:
+   - If `**Entry point:**` is missing or empty, flag a path-unit closure gap.
+   - If `**Terminal state:**` is missing or empty, flag a path-unit closure gap.
+   - If both are non-empty, the path-unit closure precondition is covered.
+
+2. Non-path REQs are unaffected. If both fields are absent, treat the REQ as a legacy, child, bug-fix, pure-refactor, or test-only REQ and do not flag it here.
+
+3. List each path-unit closure gap with the REQ id and missing field names. Each gap reduces the confidence score by 5 points (capped at -20 total across all path-unit closure gaps).
+
+4. Auto-fix does not invent entry points or terminal states. With `--auto-fix`, surface these gaps and stop; the user or capture re-run must fill the missing path-unit fields.
+
 ### 5. Produce the report
 
 Output to console (do not write to file unless asked):
@@ -194,6 +214,10 @@ Issues
 Dangling dependencies
 ─────────────────────
 [REQ-NNN → unresolved: REQ-XXX, REQ-YYY — or omit section if none]
+
+Path-unit closure
+─────────────────
+[REQ-NNN → missing Entry point / Terminal state — or omit section if none]
 
 Summary
 ───────

@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Feature completeness model (2026-06-09)
+
+**Added**
+- Path-unit capture model: feature work is organized around reachable paths with `**Entry point:**`, `**Terminal state:**`, and child `**Parent:**` REQs.
+- Closure proof field: `**Closure proof:**` records evidence from passed verification/checkpoint logs while writable `**Status:**` remains coordination state.
+- Derived proof view: `lib/derive-status.sh` computes `proven` / `unproven`; `lib/coverage-rollup.sh` summarizes intended vs proven REQs by UR.
+- Criteria provenance: `**Criteria approved:** agent-drafted` marks agent-written acceptance criteria until a human approval gate flips them to `human`.
+- Checkpointed closure: verification steps are ordered checkpoints that report the last good step and failing handoff.
+- Dual install target: `install.sh --env claude` installs into `~/.claude/skills/do-work`; `install.sh --env codex` installs into `~/.codex/skills/do-work`.
+- Governance gates: `/do-work run` validates per-criterion acceptance evidence, deterministic policy checks, post-build review, and run ledger records before archive completion.
+- Policy and ledger helpers: `lib/check-policy.sh` enforces `security.blocked_paths`, `security.blocked_commands`, and `risk.require_review`; `lib/run-ledger.sh` writes `.do-work/runs/RUN-NNN.yml`.
+
+**Why**
+- The goal is to prevent feature-completeness drift: built-but-unwired work, unproven closure, and vague completion reports should surface as explicit unproven state rather than relying on a human to notice.
+- Worker output is treated as evidence for the orchestrator and review gate; archive/proof state is assigned only after acceptance evidence, review, policy, and closure-proof checks pass.
+
 ## REQ-scoped commits (2026-05-18)
 
 Workers and orchestrators no longer use broad git-add sweeps. Every commit stages only paths keyed to its own REQ (or, for orchestrator-owned commits, the single state file the orchestrator is changing). Under parallel execution this prevents a worker from accidentally including a sibling's claim file, in-flight working/ slot, or unrelated state edits in its REQ commit.

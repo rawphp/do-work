@@ -52,9 +52,42 @@ feedback:
 
 parallel:
   stale_threshold_seconds: 300  # seconds of heartbeat silence before a working/ slot is considered stale
+
+review:
+  required: true          # post-build review gate must pass before archive
+
+acceptance:
+  evidence_required: true # each acceptance criterion needs passing evidence
+
+risk:
+  require_review:
+    - migrations
+    - auth
+    - billing
+    - payments
+    - files_changed_over: 8
+    - acceptance_criteria_over: 6
+
+security:
+  blocked_paths:
+    - .env
+    - .env.*
+  blocked_commands:
+    - rm -rf
+    - production
+
+model:
+  default: sonnet
+  escalation: opus
+
+cost:
+  budget: ""             # optional user-defined budget/limit; empty means unset
+
+ledger:
+  enabled: true          # write .do-work/runs/RUN-NNN.yml records
 ```
 
-4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`) and each key within those sections:
+4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`) and each key within those sections:
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
    - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
@@ -88,3 +121,12 @@ parallel:
 | `feedback.label` | string | `"auto:do-work-feedback"` | GitHub issue label applied to every issue filed by `lib/file-feedback.sh`. The label must exist in the target repo before the first event fires; the script will not create it automatically. Consumers: `lib/file-feedback.sh`. |
 | `feedback.project_repo` | string | `""` | Target GitHub repo (`owner/name`) for **project-class** events: `ambiguous-criteria`, `verify-fail`. When non-empty, these events are filed here instead of `feedback.repo`. When empty, falls back to `feedback.repo`. Consumers: `lib/file-feedback.sh`. |
 | `parallel.stale_threshold_seconds` | integer | `300` | Number of seconds of heartbeat silence after which a `working/REQ-*.md` slot is declared stale. Must be a positive integer; non-integer or absent values fall back to the default. Consumers: `lib/scan-stale.sh` (called by `agents/run.md` pre-flight and `lib/deadlock-check.sh`). |
+| `review.required` | boolean | `true` | When true, post-build review must pass before a REQ archives. Consumers: `agents/run.md`, `agents/review.md`. |
+| `acceptance.evidence_required` | boolean | `true` | When true, every acceptance criterion needs passing evidence in the worker report before integration. Consumers: `lib/check-acceptance-evidence.sh`, `agents/run.md`. |
+| `risk.require_review` | list | `[migrations, auth, billing, payments, files_changed_over: 8, acceptance_criteria_over: 6]` | Signals that force explicit review even if implementation checks pass. Consumers: `lib/check-policy.sh`, `agents/review.md`. |
+| `security.blocked_paths` | list | `[.env, .env.*]` | Paths that must not be modified by workers. Consumers: `lib/check-policy.sh`. |
+| `security.blocked_commands` | list | `[rm -rf, production]` | Command fragments that must stop the run/review path. Consumers: `lib/check-policy.sh`. |
+| `model.default` | string | `sonnet` | Default worker model for ordinary REQs. Consumers: `agents/run.md`. |
+| `model.escalation` | string | `opus` | Escalation model for high-risk or failed REQs. Consumers: `agents/run.md`. |
+| `cost.budget` | string | `""` | Optional user-defined model/cost budget. Empty means no configured budget. Consumers: `agents/run.md`, `lib/run-ledger.sh`. |
+| `ledger.enabled` | boolean | `true` | When true, write structured run records under `.do-work/runs/`. Consumers: `lib/run-ledger.sh`, `agents/run.md`. |

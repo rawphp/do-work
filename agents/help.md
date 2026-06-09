@@ -61,6 +61,12 @@ Suggested next steps:
 
 Replace `N` with the actual count and `UR-NNN` with the most recent UR number.
 
+If backlog REQs include `**Entry point:**`, `**Terminal state:**`, or `**Parent:**`, add one short note after the suggestions:
+
+```
+path-unit backlog detected: top-level path REQs define reachable flows; child REQs point back with Parent.
+```
+
 **If URs exist but backlog is empty:**
 
 ```
