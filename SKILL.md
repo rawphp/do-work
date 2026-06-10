@@ -289,7 +289,7 @@ Every REQ file carries a structured header immediately below the title. The cano
 | `**Terminal state:**` | optional | The observable end state that proves this path-unit is complete. Required to be non-empty for top-level path-unit REQs. |
 | `**Parent:**` | optional | Parent path-unit REQ id for child layer-tasks. Empty or absent on top-level path-units and legacy REQs. |
 | `**Closure proof:**` | optional | Evidence reference proving verification passed, such as `checkpoint:.do-work/runs/RUN-001.yml#REQ-123` or `commit:abc123 tests:passed`; empty until proven. |
-| `**Criteria approved:**` | yes | Acceptance-criteria provenance: `agent-drafted` until a human approves it, or `human <approver> <YYYY-MM-DD>` after approval. |
+| `**Criteria approved:**` | optional | Acceptance-criteria provenance: `agent-drafted` when capture generated it, or `human <approver> <YYYY-MM-DD>` when a human previously reviewed it. This field does not block run. |
 | `**Files:**` | yes | Space-separated list of primary output files — used by `lib/check-footprint.sh` for overlap detection |
 | `**Depends on:**` | optional | Space-separated REQ ids this REQ must not start before (e.g. `REQ-144 REQ-145`) — checked by `lib/check-deps.sh` |
 
@@ -297,7 +297,7 @@ A **path-unit** is a REQ whose `**Entry point:**` and `**Terminal state:**` are 
 
 `**Status:**` remains writable and authoritative for coordination (`backlog`, `working/`, dependency gating, stale checks, and archive flow). `**Closure proof:**` is a separate evidence signal used to derive whether a done REQ is proven; it does not replace the coordination status field.
 
-`**Criteria approved:** agent-drafted` means capture generated the acceptance criteria. A human can approve the oracle by changing it to `human <approver> <YYYY-MM-DD>` or by using the run-time approval gate. Agents must not auto-approve their own criteria.
+`**Criteria approved:** agent-drafted` means capture generated the acceptance criteria. It is informational provenance, not a run gate. Existing backlog REQs should run unless dependencies, footprint, policy, tests, verification, review, or genuinely ambiguous criteria stop them.
 
 When a REQ is claimed by a worker, a claim block is inserted between the title and the first header field:
 

@@ -4,13 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+**Changed**
+- `**Criteria approved:** agent-drafted` no longer stops dispatch. Criteria provenance remains visible, but existing backlog REQs run unless dependencies, footprint, policy, tests, verification, review, or genuinely ambiguous criteria stop them.
+
 ## Feature completeness model (2026-06-09)
 
 **Added**
 - Path-unit capture model: feature work is organized around reachable paths with `**Entry point:**`, `**Terminal state:**`, and child `**Parent:**` REQs.
 - Closure proof field: `**Closure proof:**` records evidence from passed verification/checkpoint logs while writable `**Status:**` remains coordination state.
 - Derived proof view: `lib/derive-status.sh` computes `proven` / `unproven`; `lib/coverage-rollup.sh` summarizes intended vs proven REQs by UR.
-- Criteria provenance: `**Criteria approved:** agent-drafted` marks agent-written acceptance criteria until a human approval gate flips them to `human`.
+- Criteria provenance: `**Criteria approved:** agent-drafted` marks agent-written acceptance criteria; it is provenance rather than a run-blocking requirement.
 - Checkpointed closure: verification steps are ordered checkpoints that report the last good step and failing handoff.
 - Dual install target: `install.sh --env claude` installs into `~/.claude/skills/do-work`; `install.sh --env codex` installs into `~/.codex/skills/do-work`.
 - Governance gates: `/do-work run` validates per-criterion acceptance evidence, deterministic policy checks, post-build review, and run ledger records before archive completion.

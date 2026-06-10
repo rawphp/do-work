@@ -98,7 +98,9 @@ Read the REQ file in full. Understand:
 - The Verification Steps
 - Any referenced assets
 
-Check the REQ header's `**Criteria approved:**` value. If it is missing or `agent-drafted`, return `status: stopped`, `reason: ambiguous-criteria`, with details: `Acceptance criteria are not human-approved.` The orchestrator owns the non-delegable approval gate before dispatch; the worker must not approve, infer approval, or proceed against an unapproved oracle. If the value starts with `human`, treat the acceptance criteria as the closure oracle for this REQ.
+Read the REQ header's `**Criteria approved:**` value when present. Treat it as provenance only: `agent-drafted` means capture generated the criteria, and `human ...` means a human has previously reviewed them. Do not stop merely because criteria are `agent-drafted` or the field is missing.
+
+Use the REQ's acceptance criteria as the closure oracle unless they are missing, contradictory, impossible to verify, or become invalid during implementation. In those unexpected cases, return `status: stopped`, `reason: ambiguous-criteria`, with details that identify the specific criteria problem.
 
 ### 1b. Start background heartbeat
 
@@ -436,7 +438,7 @@ Field rules:
 - **Never commit without running tests.** Never use `--no-verify`. Never skip hooks.
 - **Never edit files in the skill clone (`~/.claude/skills/...`).** All edits happen in the project repo.
 - **Deploy gate is non-delegable.** You MUST NOT auto-confirm any deploy gate. You MUST NOT run deployment commands. You MUST NOT attempt to verify deployment success. Signal milestone completion via `milestone_complete: true` in your report; the orchestrator owns the y/n prompt with the user.
-- **Criteria approval is non-delegable.** You MUST NOT approve acceptance criteria or proceed when `**Criteria approved:**` is missing or `agent-drafted`. Return a stopped report and let the orchestrator/user approve or revise the REQ.
+- **Criteria provenance is informational.** You MUST NOT rewrite `**Criteria approved:**` or claim human approval. You may proceed when it is missing or `agent-drafted`; stop only when the criteria themselves are missing, contradictory, or unverifiable.
 - **You cannot ask the user questions.** You have no user-interaction surface. Every blocker exits as a `status: stopped` report with a structured `reason`. The orchestrator surfaces user-facing prompts on your behalf.
 - **Stay in scope.** If the REQ would require changes outside its stated scope, return `status: stopped` with `reason: scope-creep`.
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.

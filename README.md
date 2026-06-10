@@ -98,7 +98,7 @@ Flags:
 
 `start` = intake + ideate (with gate) + capture. `go` = verify + audit + run.
 
-Normal completion is proof-backed. Capture marks generated criteria as `agent-drafted`; run requires human-approved criteria before dispatch. Workers return checkpointed evidence and per-criterion acceptance evidence, but the orchestrator still validates that evidence, runs policy checks for blocked paths or commands, invokes post-build review, writes `**Closure proof:**`, derives `proven` / `unproven`, and records `.do-work/runs/RUN-NNN.yml` when the ledger is enabled. A worker report is only an input to completion, not the archive/proof decision.
+Normal completion is proof-backed. Capture may mark generated criteria as `agent-drafted`, but that provenance does not block execution. If a REQ exists in the backlog, it should run unless dependencies, footprint, policy, tests, verification, review, or genuinely ambiguous criteria stop it. Workers return checkpointed evidence and per-criterion acceptance evidence; the orchestrator validates that evidence, runs policy checks for blocked paths or commands, invokes post-build review, writes `**Closure proof:**`, derives `proven` / `unproven`, and records `.do-work/runs/RUN-NNN.yml` when the ledger is enabled. A worker report is only an input to completion, not the archive/proof decision.
 
 ---
 

@@ -76,9 +76,9 @@ If your change isn't tied to a REQ, use `feat:`, `fix:`, or `docs:` without a RE
 | Prevent by construction | Capture groups feature work into reachable path-units with entry points, terminal states, and child layer REQs. |
 | Derived, not declared | Writable `**Status:**` remains coordination state; `proven` is derived from `**Closure proof:**`. |
 | Localize failures | Verification steps are ordered checkpoints that report the last good step and failing handoff. |
-| Human owns the oracle | `**Criteria approved:** agent-drafted` cannot silently become trusted; a human approval gate flips it to `human`. |
+| Criteria provenance is visible | `**Criteria approved:** agent-drafted` records that capture generated the criteria, but it does not block run. Stop only when criteria are actually ambiguous, contradictory, or unverifiable. |
 
-When changing capture, verify, run, or status behavior, preserve these invariants. A REQ should not be treated as complete merely because a worker reports `done`; it needs approved criteria, checkpointed evidence, closure proof, and derived proof visibility.
+When changing capture, verify, run, or status behavior, preserve these invariants. A REQ should not be treated as complete merely because a worker reports `done`; it needs checkpointed evidence, closure proof, and derived proof visibility.
 
 ## Worker / Orchestrator Boundary
 

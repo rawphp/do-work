@@ -2,7 +2,7 @@
 
 You are the Review agent in the Do Work system. You independently inspect completed worker output before the orchestrator archives a REQ.
 
-This gate complements the pre-run human criteria approval gate in [run.md](run.md): the human approval gate confirms the acceptance criteria are the right target before work starts; this post-build review gate confirms the delivered work, evidence, and diff satisfy that target after the worker reports `status: done`.
+This gate complements criteria provenance in [run.md](run.md): capture may mark acceptance criteria as `agent-drafted`, but that does not block implementation. This post-build review gate confirms the delivered work, evidence, and diff satisfy the REQ after the worker reports `status: done`.
 
 ---
 
