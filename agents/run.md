@@ -129,6 +129,54 @@ Compute `AGENT_ID` per `## Agent Identity`:
 AGENT_ID="$(hostname).$$"
 ```
 
+### 2a. Resolve `{skill-root}` to a concrete absolute path
+
+`{skill-root}` is the directory these agent instructions were loaded from — the root of the do-work skill clone (the directory containing `agents/`, `lib/`, `SKILL.md`). The lib invocations throughout this file (`{skill-root}/lib/scan-stale.sh`, etc.) and in `agents/run-worker.md` (heartbeat, file-feedback) only resolve when `{skill-root}` is a real absolute path. A worker `cd`'d into a consumer project's worktree has no `lib/` of its own, so the orchestrator must resolve `{skill-root}` **once here** and substitute the concrete path into every `{skill-root}/lib/...` call it makes, and pass it to the worker (Step 2 dispatch) so the worker substitutes it too.
+
+Resolve it from the absolute path of the loaded agent file:
+
+```bash
+# These instructions live at {skill-root}/agents/run.md, so the parent of agents/ is the root.
+SKILL_ROOT="$(cd "$(dirname "<absolute path of this run.md>")/.." && pwd)"
+# Example: /Users/you/.claude/skills/do-work
+```
+
+When this project IS the do-work skill itself, `SKILL_ROOT` resolves to the project root and the lib calls work directly. When the project is any other repo, `SKILL_ROOT` points back at the skill clone where `lib/` actually lives. Use the resolved `$SKILL_ROOT` value everywhere the steps below write `{skill-root}`.
+
+### 2b. Generate or refresh the project context pack
+
+Workers run context-starved by design (their "When Invoked" rule). To raise implementation quality without making each worker re-explore the repo, the orchestrator maintains **one** project context pack at `{project}/.do-work/state/context-pack.md` and passes its path to every worker. One orchestrator-level scan amortises across every worker in every run.
+
+**Staleness rule (documented, pick-one): the pack is stale when it is older than 14 days OR more than 50 commits behind `HEAD`.** Regenerate only when stale or absent — a fresh pack costs no per-run scan.
+
+```bash
+PACK="{project}/.do-work/state/context-pack.md"
+REGEN=0
+if [ ! -f "$PACK" ]; then
+    REGEN=1                                   # absent → must generate
+else
+    PACK_MTIME=$(stat -f %m "$PACK" 2>/dev/null || stat -c %Y "$PACK")
+    AGE_DAYS=$(( ($(date +%s) - PACK_MTIME) / 86400 ))
+    # Commits landed on HEAD since the pack was last written.
+    COMMITS_SINCE=$(git rev-list --count --since="@$PACK_MTIME" HEAD 2>/dev/null || echo 0)
+    if [ "$AGE_DAYS" -ge 14 ] || [ "$COMMITS_SINCE" -ge 50 ]; then
+        REGEN=1                               # stale → refresh
+    fi
+fi
+```
+
+**If `REGEN=0` (pack is fresh): skip generation entirely.** Do not scan, do not rewrite the file. This is the common case and it must carry zero per-run scan cost.
+
+**If `REGEN=1` (absent or stale): scan the project once and write a ~200-line pack.** Keep it to roughly 200 lines — a map, not a copy of the codebase. Cover:
+
+- **Architecture** — the top-level shape of the system (layers, services, entry points) in a few sentences.
+- **Directory roles** — one line per significant top-level directory (what lives there, what it is for).
+- **Key services / modules** — the handful of files or modules a worker is most likely to touch or extend, with a one-line role each.
+- **Naming & test conventions** — how files, tests, and symbols are named; where tests live; the dominant test idiom.
+- **How to run the suite** — the exact command(s) to run the project's tests (mirror `config.test.suite_command` when set).
+
+Write the result to `$PACK` (filesystem only — `.do-work/state/` is orchestrator-owned; do not commit it from here). The pack is project-level state, regenerated on the staleness cadence above, and read by every dispatched worker.
+
 ### 3. Scan and classify working/ slots (informational — hold all buckets in memory, do not prompt)
 
 **Staleness detection — delegate to `lib/scan-stale.sh`:**
@@ -456,7 +504,7 @@ Identify the **prior-REQ archived paths** for the same UR — these provide the 
 3. For each archived REQ, read its `**UR:**` field and keep only those matching the current UR
 4. Pass the resulting absolute paths to the worker
 
-Dispatch via the `Agent` tool. Pass the worker the **three inputs only** — REQ path, UR path, prior-REQ paths — plus the run-worker.md instructions inline:
+Dispatch via the `Agent` tool. Pass the worker **five named inputs** — REQ path, UR path, prior-REQ paths, the project context-pack path (from Pre-flight Step 2b), and the resolved skill-root (from Pre-flight Step 2a) — plus the run-worker.md instructions inline. Substitute the concrete `$SKILL_ROOT` value for `{skill-root}` in the instructions you paste so the worker's `{skill-root}/lib/...` calls resolve to a real path:
 
 ```
 Agent(
@@ -464,18 +512,20 @@ Agent(
   subagent_type: <classified type>,
   model: <selected model>,
   prompt: """
-You are the Run Worker. Follow the instructions below exactly. Do not search beyond the inputs given.
+You are the Run Worker. Follow the instructions below exactly. Prefer the inputs given; bounded exploration of files your implementation genuinely touches is allowed (see your When Invoked rule). Do not load other REQs or URs.
 
 <inputs>
-REQ: {absolute path to working/REQ-NNN-slug.md}
-UR:  {absolute path to user-requests/UR-NNN/input.md}
+REQ:         {absolute path to working/REQ-NNN-slug.md}
+UR:          {absolute path to user-requests/UR-NNN/input.md}
 Prior REQs from this UR (may be empty):
   - {absolute path}
   - {absolute path}
+Context pack: {absolute path to .do-work/state/context-pack.md}
+Skill root:   {resolved absolute $SKILL_ROOT — the directory containing lib/; your {skill-root}/lib/... calls use this value}
 </inputs>
 
 <instructions>
-{full contents of agents/run-worker.md verbatim}
+{full contents of agents/run-worker.md verbatim, with {skill-root} replaced by the resolved $SKILL_ROOT}
 </instructions>
 
 Return your structured YAML report as your final message. Nothing else.
