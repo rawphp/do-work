@@ -300,6 +300,29 @@ Layer-specific work is captured as child REQs underneath the path-unit. Child RE
 
 Migration is additive. Legacy REQs without `**Entry point:**`, `**Terminal state:**`, or `**Parent:**` remain valid. New path-units must have both entry point and terminal state before they can verify or archive as complete.
 
+## Decisions Memory
+
+`.do-work/decisions.md` is an append-only, cross-UR record of standing decisions (ADR-lite). It gives capture, ideate, and workers a shared institutional memory so a call made in one UR ("validation lives server-side") is not re-litigated or contradicted in the next.
+
+**Format** — one line per decision, no paragraphs (this is a memory, not documentation; anything needing prose belongs in a design doc):
+
+```
+YYYY-MM-DD | UR/REQ ref | decision | rationale
+```
+
+- `YYYY-MM-DD` — the date the decision was recorded.
+- `UR/REQ ref` — the UR or REQ the decision was made under (e.g. `UR-035` or `REQ-224`).
+- `decision` — the standing choice, stated as a constraint.
+- `rationale` — one phrase explaining why.
+
+**Discipline:**
+
+- **Append-only.** Never rewrite or delete an existing line.
+- **Supersede with a new line.** To reverse or change a decision, append a fresh line that references the superseded one (e.g. `... | supersedes 2026-06-01 entry | ...`). The old line stays as history.
+- **The file is optional.** No agent creates it; it comes into being when the first decision is appended. An absent file is silently fine everywhere it is read.
+
+**Writers:** capture appends a line at judgment points where a choice shapes the decomposition (a layer opt-out, a split-vs-merge call, a layer-coverage user answer). **Readers:** capture (Step 1), ideate (Step 2 project context), run-worker (Step 2 — treats standing decisions as constraints), and question all read it when present.
+
 ## REQ Header Schema
 
 Every REQ file carries a structured header immediately below the title. The canonical field list is:

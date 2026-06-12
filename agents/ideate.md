@@ -34,6 +34,8 @@ Read every file in `UR-NNN/assets/` if it exists.
 
 Scan the project folder for existing code, REQs in the archive, and any documentation that gives you context on what already exists.
 
+Read `{project}/.do-work/decisions.md` if it exists — the append-only cross-UR decisions memory (format in SKILL.md § Decisions Memory). Each line is a standing decision from a prior UR. Use these to ground Connector observations (reuse, overlap) and to flag when the brief contradicts a recorded decision. If the file is absent (no decision recorded yet), continue without it — never create it.
+
 Read at most 10 files (excluding node_modules, vendor, and build artifacts). Stop scanning after you have enough context to ground your observations — do not audit the whole codebase.
 
 ### 3. Apply the three modes

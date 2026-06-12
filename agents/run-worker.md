@@ -145,6 +145,8 @@ Keep this in mind during implementation so you do not:
 
 If the prior-REQ list is empty, skip this substep.
 
+**Read the decisions memory.** Read `{project}/.do-work/decisions.md` if it exists — the append-only cross-UR decisions memory (format in SKILL.md § Decisions Memory). Each line is a **standing decision** and is a constraint on your implementation, not advisory context: do not contradict one. If your REQ's task or acceptance criteria require you to act against a recorded decision line (e.g. the REQ asks you to add client-side validation but a decision line reads `... | validation lives server-side | ...`), do not silently override it — return `status: stopped` with `reason: scope-creep` (if the REQ pushes new behaviour past a standing boundary) or `reason: ambiguous-criteria` (if the REQ and the decision are in direct conflict and you cannot tell which governs), naming the specific decision line verbatim in your report details so the orchestrator can route it for human resolution. If the file is absent (no decision recorded yet), this substep is silently a no-op — never create the file.
+
 ### 3. Execute TDD — red first
 
 **This is mandatory. No exceptions.**

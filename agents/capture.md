@@ -41,6 +41,8 @@ Read `UR-NNN/ideate.md` if it exists. Keep ideate observations in context as adv
 
 Read `{project}/.do-work/state/calibration.md` if it exists. Keep its guidance bullets in context as advisory calibration — they inform how you size REQs, scope `**Files:**`, and split acceptance criteria, but they never block decomposition and are not hard requirements. This parallel mirrors the ideate.md pattern above: both are advisory; the brief always wins; absence is silently ignored. If the file is absent (no `/do-work retro` has run yet, or the project is new), continue without it.
 
+Read `{project}/.do-work/decisions.md` if it exists — the append-only cross-UR decisions memory (format and discipline in SKILL.md § Decisions Memory). Each line records a standing decision (`YYYY-MM-DD | UR/REQ ref | decision | rationale`). Hold these in context while decomposing: they are prior calls that should shape how you split and scope REQs so this UR does not contradict them (e.g. a recorded "validation lives server-side" decision tells you which layer a validation REQ belongs to). If the file is absent (no decision has been recorded yet), continue without it — never create it just to read it.
+
 ### 1b. Detect milestone mode
 
 Inspect the brief (`UR-NNN/input.md`) for the milestone-mode trigger. Milestone mode is active if BOTH:
@@ -140,6 +142,14 @@ when they don't apply (e.g. internal CLI scripts).
 
 Hold `layers_in_scope` (the per-UR list) in context for downstream steps.
 
+If `--no-layers` produced a deliberate per-UR opt-out (a `feature` brief proceeding with `layers_in_scope: []`), append one line to `{project}/.do-work/decisions.md` in the documented format (SKILL.md § Decisions Memory), creating the file if absent:
+
+```
+YYYY-MM-DD | UR-NNN | layer-coverage checks skipped for this UR | --no-layers opt-out
+```
+
+This is a judgment-point choice that shapes the whole decomposition. Append-only; do not write this line when layers are in scope normally.
+
 ### 3. Decompose the brief
 
 For feature-class briefs, decompose by **reachable path first**. A path is a user journey, caller flow, command invocation, API use, scheduled trigger, or other reachable slice of intent with:
@@ -168,6 +178,7 @@ If `ideate.md` was loaded in Step 1, use its observations as advisory context wh
 - Do not bundle unrelated concerns into a single REQ
 - If a task has a clear dependency chain, order the REQ numbers to reflect it (lower numbers first)
 - Each child REQ must address exactly one layer-specific behavior change or one internal component. If a REQ description contains the word "and" joining two unrelated outcomes, split it into two REQs. When in doubt, split.
+- If you make a non-obvious split-vs-merge call that shapes the decomposition (e.g. deliberately keeping two related concerns in one REQ, or splitting where the brief implied one unit), append a one-line record to `{project}/.do-work/decisions.md` in the documented format (SKILL.md § Decisions Memory), creating the file if absent: `YYYY-MM-DD | UR-NNN | <the split/merge decision> | <one-phrase rationale>`. Routine, obvious splits do not need a line — only choices a future capture might otherwise re-litigate.
 - A path-unit REQ may be documentation/state only: it defines the path, owns closure semantics, and depends on its child layer REQs.
 
 ### 3b. Verify full coverage before writing
@@ -407,6 +418,14 @@ Options:
 **Yes path follow-ups:** ask the user (one at a time, through plain prompts) for: which screens/routes/commands the layer should cover, what the layer's piece of the work looks like in plain language. Then generate one or more REQs tagged with the layer, following the Step 4 template, and append them to the backlog. Re-run Step 4b's quality check on the new REQ(s).
 
 **No path:** record the decision in working state. The actual frontmatter write happens later in Step 6b. For now, hold `layer_decisions[<layer>] = no` in context.
+
+Also append the decision to the cross-UR decisions memory (this is a judgment-point choice that shapes the decomposition — the layer is being deliberately left out of this UR). Append one line to `{project}/.do-work/decisions.md` in the documented format (SKILL.md § Decisions Memory), creating the file if it does not yet exist:
+
+```
+YYYY-MM-DD | UR-NNN | layer "<layer>" out of scope | user answered "No" at layer-coverage prompt
+```
+
+Use today's date and the actual UR id and layer name. This is the only place capture creates the file — append-only, one line per "No" answer, never rewrite existing lines.
 
 **Loop:** after each layer is resolved (yes or no), continue to the next uncovered layer until none remain.
 
