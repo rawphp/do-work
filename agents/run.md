@@ -240,6 +240,33 @@ Slot staleness is determined solely by `$STALE_SLOTS` (the output of
 When you need to surface "how long ago" to the user, use the `age=<seconds>`
 token from `scan-stale.sh`'s output — not the raw ISO timestamp.
 
+### 3b. Legacy stranded REQ triage (advisory — no automatic state change)
+
+While classifying `working/` slots in §3, also identify **legacy stranded REQs**: files whose `**Status:**` is `stopped` and whose `**Reason:**` value is not in the documented stopper enum (`tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). The canonical example is `awaiting-human-verification`, an improvised reason used before the `pending-validation` state existed.
+
+**Detection:** for each `working/REQ-*.md` file, read `**Status:**` and `**Reason:**`. If `**Status:** stopped` AND `**Reason:**` is non-empty AND the reason does not match any enum value above, record the file as a **legacy stranded slot**.
+
+**Advisory output (emit once per run, immediately after §3 classification — do NOT block the run or prompt):**
+
+If any legacy stranded slots were found, print a triage notice before proceeding to §4:
+
+```
+⚠ Legacy stranded REQ(s) detected in working/:
+  - REQ-NNN  reason: <raw-reason-value>  (<slug>)
+  ...
+These REQs stopped with an unrecognized reason and were never migrated to the
+pending-validation state. Triage guidance (advisory — take the appropriate action manually):
+  • If the code for this REQ was already merged into the base branch:
+      → Move the REQ to .do-work/pending/ (set Status: pending-validation, strip the claim
+        block, empty the Closure proof field) and resolve via /do-work approve REQ-NNN or
+        /do-work reject REQ-NNN.
+  • If the code was NOT merged (the req/ branch still exists with unmerged commits):
+      → Unblock the REQ: /do-work unblock REQ-NNN  (returns it to backlog for re-dispatch).
+Run continues — no automatic state change was made.
+```
+
+This triage report is informational only. The orchestrator does NOT automatically move files, rewrite status fields, or modify any REQ. The human (or a subsequent operator) takes the appropriate action based on the guidance. The legacy slots are classified into the `stale` bucket for footprint exclusion purposes (same as any stopped slot).
+
 ### 4. Resume any `mine` slot
 
 If the `mine` bucket is non-empty, resume that REQ — skip the claim step and jump directly to worker dispatch for it.

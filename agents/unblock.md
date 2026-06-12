@@ -37,9 +37,20 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 Check whether `{project}/.do-work/working/REQ-NNN-*.md` exists.
 
-- If **no match**: report `"REQ-NNN is not in working/ — nothing to unblock."` and stop. Do not search `archive/` or backlog root. Unblock only operates on in-flight REQs.
-- If **multiple matches**: report the ambiguity and stop. Do not guess.
-- If **exactly one match**: record the absolute path as `REQ_PATH` and continue.
+- If **no match**: check whether the REQ is in `.do-work/pending/`:
+  - **Found in `pending/`**: refuse with:
+    ```
+    REQ-NNN is in pending-validation state — it cannot be unblocked.
+    Unblock's contract is "force out of working/ back to the backlog", which would
+    orphan an already-merged REQ's bookkeeping. The code is merged; only human
+    sign-off remains.
+    To return to backlog (the pending-validation equivalent of unblock): /do-work reject REQ-NNN <note>
+    To close: /do-work approve REQ-NNN
+    ```
+    Stop. Do not strip claim stamps, do not move the file, do not commit.
+  - **Not in `pending/` either**: report `"REQ-NNN is not in working/ — nothing to unblock."` and stop.
+- If **multiple matches** in `working/`: report the ambiguity and stop. Do not guess.
+- If **exactly one match** in `working/`: record the absolute path as `REQ_PATH` and continue.
 
 ### 2. Detect implementation commits
 
@@ -134,6 +145,7 @@ Stop. Do not invoke run, verify, or any next-step prompt.
 
 ## Rules
 
+- **Never unblock a pending-validation REQ.** A REQ in `.do-work/pending/` has already had its code merged — unblock would orphan its bookkeeping. The sanctioned return-to-backlog path is `/do-work reject REQ-NNN <note>`, which carries a note and leaves the merged code intact. Refuse with that guidance and stop without touching claim stamps or files.
 - Refuse to unblock a REQ that is not in `working/`. Backlog REQs are not blocked; archived REQs are done — neither needs unblocking.
 - Refuse to operate on multiple REQs in one invocation. One REQ per call.
 - Always surface implementation commits before discarding them — never silently revert.
