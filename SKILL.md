@@ -331,7 +331,7 @@ Every REQ file carries a structured header immediately below the title. The cano
 | Field | Required | Description |
 |---|---|---|
 | `**UR:**` | yes | Parent UR identifier (e.g. `UR-030`) |
-| `**Status:**` | yes | `backlog` / `in-progress` / `stopped` / `done` |
+| `**Status:**` | yes | `backlog` / `in-progress` / `stopped` / `done` / `pending-validation` |
 | `**Created:**` | yes | ISO date (YYYY-MM-DD) |
 | `**Layer:**` | yes | Declared project layer, or `none` for bug-fix/refactor/test-only REQs |
 | `**Entry point:**` | optional | How a user, caller, command, or system reaches this path-unit. Required to be non-empty for top-level path-unit REQs. |
@@ -347,6 +347,8 @@ Every REQ file carries a structured header immediately below the title. The cano
 A **path-unit** is a REQ whose `**Entry point:**` and `**Terminal state:**` are both non-empty. Path-units describe a vertical, reachable slice of intent. Child layer-tasks point back to a path-unit with `**Parent:**`; legacy REQs without these fields remain valid because the migration is additive.
 
 `**Status:**` remains writable and authoritative for coordination (`backlog`, `working/`, dependency gating, stale checks, and archive flow). `**Closure proof:**` is a separate evidence signal used to derive whether a done REQ is proven; it does not replace the coordination status field.
+
+`pending-validation` is a terminal **delivered-but-unclosed** state. When a worker's automated gates all pass but a human or device sign-off still remains, `/do-work run` merges the code and tears down the worktree anyway (never stranding work on a branch), then parks the REQ in `.do-work/pending/` with `**Status:** pending-validation` and an empty `**Closure proof:**` — the outstanding checklist lives in the REQ's `## Post-merge validation` section. `/do-work approve REQ-NNN` later completes closure (writing the proof and archiving). A REQ parked in `.do-work/pending/` counts as a **satisfied dependency** — its code is already merged, so dependents stay claimable (`lib/check-deps.sh` globs `.do-work/pending/` alongside `.do-work/archive/`). The `.do-work/pending/` directory is created on demand by `agents/run.md` on the first park, so `/do-work install` does not pre-create it.
 
 `**Criteria approved:** agent-drafted` means capture generated the acceptance criteria. It is informational provenance, not a run gate. Existing backlog REQs should run unless dependencies, footprint, policy, tests, verification, review, or genuinely ambiguous criteria stop them.
 
