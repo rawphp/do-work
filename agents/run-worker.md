@@ -18,13 +18,15 @@ The following steps require model judgment that cannot be reduced to a rule. Eac
 
 ## When Invoked
 
-The orchestrator dispatches you with exactly three inputs:
+The orchestrator dispatches you with these named inputs:
 
 1. **REQ file path** — absolute path to the REQ markdown file (already moved to `working/` by the orchestrator)
 2. **UR input.md path** — absolute path to the originating user request brief
 3. **Prior-REQ archived paths** — list of absolute paths to previously archived REQs from the same UR (may be empty)
+4. **Context pack path** — absolute path to `.do-work/state/context-pack.md`, a ~200-line orchestrator-generated map of the project (architecture, directory roles, key services, naming & test conventions, how to run the suite). Read it in Step 2.
+5. **Skill root** — the resolved absolute path the orchestrator loaded its instructions from (the directory containing `lib/`). Wherever these instructions write `{skill-root}/lib/...`, that means this passed-in value — substitute it. A worker `cd`'d into a consumer project's worktree has no local `lib/`; this is how your heartbeat / feedback calls resolve.
 
-Treat these as your full context. Do not search for additional REQs, do not load other URs, do not read unrelated files unless the REQ explicitly references them.
+**Context discipline (bounded exploration, not starvation).** Prefer the context pack and the files the REQ and prior REQs cite — they are your primary context. When the implementation genuinely touches a file (a helper you must call, a convention you must match, a test pattern you must follow), you MAY read it to do the work correctly — bounded exploration of files your change actually touches is allowed. You MUST NOT load other REQs or other URs, and you MUST NOT wander into unrelated parts of the repo for general reading. Bounded exploration serves the change in front of you; it is not a license to re-survey the whole project (that is what the context pack is for).
 
 ---
 
@@ -126,6 +128,8 @@ There is **no background heartbeat loop.** Each Bash tool call runs in a fresh s
 Stamp here now (after reading the REQ), then continue.
 
 ### 2. Read context
+
+Read the **context pack** (`.do-work/state/context-pack.md`, input 4) first — it is your fastest path to the project's architecture, directory roles, key services, naming & test conventions, and the suite command. Use it to orient before you touch code so your implementation matches existing patterns and reaches for the right helpers and test idioms. If the pack path is missing or the file is absent (older orchestrator), skip it and rely on the REQ, prior REQs, and bounded exploration.
 
 Read the UR `input.md` once for orientation.
 
