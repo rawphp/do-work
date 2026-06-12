@@ -11,7 +11,7 @@ Points where the orchestrator must apply judgment rather than follow a determini
 | # | Location | Question |
 |---|---|---|
 | J1 | Pre-flight → staleness | Stale slots found: reclaim, return to backlog, or abort? |
-| J2 | REQ Classification | Which `subagent_type` fits this REQ when no signal clearly matches? |
+| J2 | REQ Classification | Which `config.routing` rule (if any) fits this REQ; fall back to `general-purpose` when none match. |
 | J3 | Model Selection | Escalate to `opus` when signals are borderline? |
 | J4 | Step 1.0a idle-wait | Gate-owner stuck after 30 min: continue waiting or abort? |
 | J5 | Step 1 idle-wait (deps/overlap/scope) | Deadlock vs slow-but-live: continue waiting or surface to user? |
@@ -244,34 +244,28 @@ If both `pick-req.sh` returned nothing (§5) AND the stale set is empty (§6 fal
 
 ## REQ Classification
 
-Before dispatching a worker for a REQ, classify the REQ to pick the most appropriate `subagent_type` for the `Agent` tool. Classification is a heuristic over signals already in the REQ — there is no explicit field to read.
+Before dispatching a worker for a REQ, classify the REQ to pick the most appropriate `subagent_type` for the `Agent` tool. Classification is config-driven: the routing rules live in `config.routing` (see `agents/config.md`), not hard-coded here, so the stock skill ships portable and each user routes specialist work to whatever subagents exist on their own machine.
 
-### Signals → subagent_type
+### Apply the routing config
 
-Scan the REQ's `## Task`, `## Context`, `## Acceptance Criteria`, and `## Verification Steps` for the following signals (first match wins, top to bottom):
+Read `config.routing` — the ordered list of `{match, agent}` rules loaded at startup (see `## Load Config` in `agents/config.md`). Then:
 
-| Signal in REQ | subagent_type |
-|---|---|
-| Verification Steps reference `pest`, `phpunit`, `vitest`, `playwright`, or `npx test` AND the REQ task is "write tests" / "improve coverage" / "test X" | `laravel-test-expert` |
-| File paths under `app/`, `resources/`, `routes/`, or task mentions `Laravel`, `Eloquent`, `Vue`, `Inertia`, `Pinia` | `laravel-vue-architect` |
-| Acceptance criteria contain phrases like `user sees`, `page renders`, `form displays`, `responsive`, `mobile`, `layout`, `CSS`, `Tailwind`, `UX`, `accessibility` | `saas-ux-designer` |
-| Task is a new feature spanning multiple layers (controller + view + model) and no specialist above matches | `feature-dev:code-architect` |
-| Task is "find code", "search for X", "where is Y defined", or pure exploration | `Explore` |
-| Task is a code review or "review the implementation against the plan" | `feature-dev:code-reviewer` |
-| File paths under `~/.claude/skills/`, `~/.claude/agents/`, `.do-work/agents/`, OR task mentions "skill", "agent file", "SKILL.md", "slash command", "trigger description" | `skill-author` |
-| File imports `anthropic`, `@anthropic-ai/sdk`, `openai`, or a vector DB client (pinecone, qdrant, weaviate, chroma, pgvector); OR task mentions "prompt", "eval", "RAG", "embeddings", "tool use", "function calling", "LLM", or "agent loop" | `llm-app-engineer` |
-| Anything else (markdown edits, config tweaks, scripting, generic refactors) | `general-purpose` |
+1. Scan the REQ's `## Task`, `## Context`, `## Acceptance Criteria`, and `## Verification Steps`.
+2. Walk the `routing` rules **top to bottom, first match wins**. Each rule's `match` is a signal description or keyword list; if the REQ's content fits it, the chosen `subagent_type` is that rule's `agent`, and you stop scanning.
+3. If no rule matches — or `routing` is empty (the shipped default) — the `subagent_type` is `general-purpose`.
+
+There are no hard-coded specialist agents in this section. Portable agents (`Explore` for pure exploration, `feature-dev:*` for architecture/review) are routed only when a `routing` rule names them — they are not assumed present. `agents/config.md` ships a commented example `routing` block reproducing the original specialist table; a user restores that behaviour by uncommenting it and confirming each named agent exists locally.
 
 ### Fallback rule
 
-When no signal matches with confidence, **fall back to `general-purpose` silently**. Never block, never ask the user, never stop the loop on classification ambiguity. The cost of picking `general-purpose` for a specialist task is small; the cost of stalling the loop is large.
+When no `routing` rule matches with confidence — or none is configured — **fall back to `general-purpose` silently**. Never block, never ask the user, never stop the loop on classification ambiguity. The cost of picking `general-purpose` for a specialist task is small; the cost of stalling the loop is large.
 
 ### Logging
 
 Include the chosen `subagent_type` in the per-REQ progress line so the user can see routing decisions:
 
 ```
-Starting REQ-NNN [type=laravel-vue-architect]: [title]
+Starting REQ-NNN [type=general-purpose]: [title]
 ```
 
 This is the only "progress" signal the orchestrator emits before the worker returns — the worker runs in a separate session and its output does not stream back. Plan accordingly.

@@ -91,9 +91,44 @@ ledger:
 
 verify:
   threshold: 90          # minimum confidence score (0-100) for go to auto-run without --force
+
+# Subagent routing for the run orchestrator. Ordered list of {match, agent}
+# rules: the classifier scans each REQ top-to-bottom and dispatches the first
+# rule whose `match` fits; if none match it falls back to `general-purpose`
+# silently. Ships EMPTY so the stock skill routes every REQ to the universally
+# available `general-purpose` agent — portable on any machine. Add rules to
+# route specialist work to your own subagents. `match` is a natural-language
+# signal description or keyword list the classifier interprets against the REQ's
+# Task / Context / Acceptance Criteria / Verification Steps.
+routing: []
+
+# Example routing block (commented). This reproduces do-work's original
+# hard-coded classification table. Uncomment and adapt to restore specialist
+# dispatch — every `agent` below must exist as a subagent_type on your machine,
+# or that rule's REQs will fail to dispatch. Rules are first-match-wins, so the
+# order here matters; `general-purpose` is the implicit fallback and never needs
+# a rule.
+#
+# routing:
+#   - match: "Verification Steps reference pest/phpunit/vitest/playwright/npx test AND the task is write-tests / improve-coverage / test-X"
+#     agent: laravel-test-expert
+#   - match: "file paths under app/ resources/ routes/, or task mentions Laravel/Eloquent/Vue/Inertia/Pinia"
+#     agent: laravel-vue-architect
+#   - match: "acceptance criteria mention user-sees / page-renders / form-displays / responsive / mobile / layout / CSS / Tailwind / UX / accessibility"
+#     agent: saas-ux-designer
+#   - match: "new feature spanning multiple layers (controller + view + model) with no specialist above matching"
+#     agent: feature-dev:code-architect
+#   - match: "task is find-code / search-for-X / where-is-Y-defined / pure exploration"
+#     agent: Explore
+#   - match: "task is a code review or 'review the implementation against the plan'"
+#     agent: feature-dev:code-reviewer
+#   - match: "file paths under ~/.claude/skills/ ~/.claude/agents/ .do-work/agents/, or task mentions skill / agent file / SKILL.md / slash command / trigger description"
+#     agent: skill-author
+#   - match: "file imports anthropic / @anthropic-ai/sdk / openai / a vector DB client (pinecone/qdrant/weaviate/chroma/pgvector), or task mentions prompt / eval / RAG / embeddings / tool use / function calling / LLM / agent loop"
+#     agent: llm-app-engineer
 ```
 
-4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `verify`) and each key within those sections:
+4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `verify`, `routing`) and each key within those sections:
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
    - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
@@ -137,3 +172,4 @@ verify:
 | `cost.budget` | string | `""` | Optional user-defined model/cost budget. Empty means no configured budget. Consumers: `agents/run.md`, `lib/run-ledger.sh`. |
 | `ledger.enabled` | boolean | `true` | When true, write structured run records under `.do-work/runs/`. Consumers: `lib/run-ledger.sh`, `agents/run.md`. |
 | `verify.threshold` | integer | `90` | Minimum confidence score (0-100) that `agents/go.md` requires before auto-running without `--force`. Consumers: `agents/verify.md`, `agents/go.md`. |
+| `routing` | list of `{match, agent}` maps | `[]` | Ordered subagent-routing rules for the run orchestrator's REQ classification. Each entry is `{match: <signal description or keyword list>, agent: <subagent_type>}`. The classifier scans rules top-to-bottom (first match wins) and dispatches the matching `agent`; if no rule matches — or the list is empty — it falls back to `general-purpose` silently. Ships empty so the stock skill is portable (no machine-specific agents). A commented example block in the template above reproduces the original specialist table for users who want to restore it. Consumers: `agents/run.md`, `agents/resume.md`. |
