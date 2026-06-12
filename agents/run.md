@@ -796,6 +796,14 @@ Runs **instead of 4b** when 4.0 detected a pending-validation-bound REQ. The mer
    mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/pending/REQ-NNN-slug.md
    ```
 
+7. **Fire the pending-validation notification hook.** Read `config.notifications.on_pending_validation`. If non-empty, substitute placeholders and run the command **once**, best-effort:
+
+   - `{req}` → the REQ id (e.g. `REQ-234`)
+   - `{title}` → first non-blank line of the REQ's `## Task` section (strip leading `##`)
+   - `{checks}` → newline-joined text of every unchecked bullet (`- [ ] ...`) from `## Post-merge validation` in the now-parked REQ file; empty string when there are none
+
+   Execute via `bash -c "<substituted command>"`. A non-zero exit code or missing binary logs a one-line warning (`⚠ pending-notification: <REQ id> — <error>`) and continues — it never stops the park flow or surfaces a stopper. If `config.notifications.on_pending_validation` is empty or absent, skip this step entirely with no output.
+
 Then run 4c (teardown — identical) and 4d (metadata commit), with the 4d commit message and staged paths adjusted for the park as noted in 4d.
 
 #### 4c. Tear down the worktree
@@ -889,7 +897,7 @@ Capture the PR URL printed by `gh pr create`.
 
 **4-pr.4 Archive the REQ — or park it (pending-validation-bound).** For a fully-done REQ, apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the UR-drain PR opens.
 
-For a **pending-validation-bound** REQ (detected in 4.0), apply the **same** park logic as **4b-pending** instead (path-unit guard, empty closure proof, strip ownership stamp, set `**Status:** pending-validation`, consolidate the worker's `pending_validation:` steps into `## Post-merge validation`, append `## Outputs`, `mkdir -p` + `mv` to `pending/`) — with the same addition: append the PR URL to `## Outputs` as a `- PR — <pr-url>` bullet. The PR has already opened (4-pr.3) and delivers the code; only human sign-off waits, exactly as in merge mode. There is **no fallback to a local merge** — PR mode parks the REQ but never changes its delivery vehicle.
+For a **pending-validation-bound** REQ (detected in 4.0), apply the **same** park logic as **4b-pending** instead (path-unit guard, empty closure proof, strip ownership stamp, set `**Status:** pending-validation`, consolidate the worker's `pending_validation:` steps into `## Post-merge validation`, append `## Outputs`, `mkdir -p` + `mv` to `pending/`, fire the `on_pending_validation` notification hook) — with the same addition: append the PR URL to `## Outputs` as a `- PR — <pr-url>` bullet. The PR has already opened (4-pr.3) and delivers the code; only human sign-off waits, exactly as in merge mode. There is **no fallback to a local merge** — PR mode parks the REQ but never changes its delivery vehicle.
 
 **4-pr.5 Tear down the worktree — but keep the branch.** Remove the worktree; do **not** delete the branch (the PR owns it):
 
