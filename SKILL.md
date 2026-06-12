@@ -32,7 +32,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
 | `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional UR-NNN scopes the run to that UR's REQs only. |
-| `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion. |
+| `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md. |
 | `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
@@ -208,7 +208,7 @@ Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that d
 
 ### Isolation per REQ
 
-The worker chooses `same-branch` (default) or `worktree` at dispatch time based on REQ scope. Worktree mode triggers when the REQ task mentions `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, or `restructure`; when the Integration block lists ≥ 3 distinct service dependencies; or when the REQ has > 6 acceptance criteria. Worktree REQs work in `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch and merge back into the base branch on completion.
+Workers always run in isolated git worktrees at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch. The orchestrator merges the branch back into the base branch and tears down the worktree after integration. See [agents/run-worker.md](agents/run-worker.md) `## Isolation Mode` and `## Worktree Workflow` for the canonical procedure.
 
 ### Recovery Commands
 
@@ -571,7 +571,7 @@ Execute the backlog autonomously — one REQ at a time — until empty or a stop
    - If `UR-NNN` was provided, record it — the run agent will filter the backlog to that UR.
    - If not provided, the full backlog is in scope.
 3. Pre-flight checks:
-   - If a REQ file exists in `{project}/.do-work/working/`, report it and ask the user: resume or abort?
+   - Working/ files are classified by agents/run.md's pre-flight (mine/sibling/stale buckets); stale slots are surfaced only when the backlog has no claimable REQ — do not prompt merely because working/ is non-empty.
    - If no `REQ-NNN-*.md` files exist in `{project}/.do-work/` (backlog root) within scope, report "Backlog is empty." and stop.
 4. Read [agents/run.md](agents/run.md) in full.
 5. Follow the run agent instructions exactly, passing through the UR scope if provided.
