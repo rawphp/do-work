@@ -47,7 +47,7 @@ Then render the intended-vs-proven Coverage section:
 bash lib/coverage-rollup.sh [UR-NNN]
 ```
 
-Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>` and any `unproven_ids`. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `lib/coverage-rollup.sh` is missing, report `"lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
+Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the UR has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the UR has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the UR declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `lib/coverage-rollup.sh` is missing, report `"lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
 
 ### 2. Check for deadlock
 
