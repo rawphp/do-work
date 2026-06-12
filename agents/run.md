@@ -25,7 +25,7 @@ Points where the orchestrator must apply judgment rather than follow a determini
 ## When Invoked
 
 ```
-/do-work run [UR-NNN] [--parallel N]
+/do-work run [UR-NNN] [--parallel N] [--budget <amount>]
 ```
 
 You will be given a project do-work path:
@@ -56,13 +56,30 @@ Scope is an **in-memory filter, NOT a hard reservation**. Other orchestrators la
 3. **`N == 1` (default — absent flag, `--parallel 1`, or `parallel.max_workers: 1`) ⇒ the existing serial `## The Loop` runs byte-for-byte unchanged.** Do not enter the parallel path. Everything below in `## The Loop`, `## When the Backlog is Empty`, and the gates is exactly as written.
 4. **`N > 1` ⇒ follow `## Parallel Run Mode`** instead of the serial `## The Loop`. That section reuses every existing step (claim, dispatch, gates, integrate, recover, drain) and changes only the *shape* of the hot path: window-fill instead of one-at-a-time claim, and a serialized merge queue instead of inline integration.
 
+### Budget (`--budget <amount>`)
+
+`--budget <amount>` sets a cumulative spend ceiling for this run. Resolve the effective budget **once at startup**, before the first claim:
+
+1. If `--budget <amount>` is passed, take that value. Otherwise read `cost.budget` from `.do-work/config.yml`. The flag **overrides config for this invocation only**; it does not write back to disk.
+2. **Empty / unset budget ⇒ unlimited** (today's behaviour, no regression). The budget gate below is inert: never compute a sum, never stop for budget. Only a non-empty budget arms the gate.
+3. `<amount>` is a **bare number** in the budget unit defined below (e.g. `--budget 5.00`). Strip a leading currency symbol if present; reject a non-numeric value with a one-line notice and run unlimited.
+
+#### Budget unit and per-attempt cost estimation
+
+The budget unit is **estimated US-dollar model spend**, recorded per worker attempt in the ledger's numeric `cost_estimate_num` field (`lib/run-ledger.sh --cost-estimate`). It is an **estimate, not a metered bill** — the harness does not expose per-call token counts to the orchestrator, so the orchestrator derives the estimate from two signals it *does* control:
+
+- **Model tier** of the dispatched worker (`## Model Selection`): a per-attempt base cost — `sonnet` cheaper, `opus` more expensive (opus ≈ 5× sonnet as a rough tier multiplier).
+- **Worker turn volume**: a small multiplier for retries / long attempts (a `stopped`-then-`opus`-retry attempt costs more than a clean first pass).
+
+Compute a single per-attempt dollar estimate from `tier_base × turn_factor` and pass it to `run-ledger.sh --cost-estimate <amount>` at Step 3b. **Document the imprecision honestly in the budget-stop report**: this is a tier-weighted estimate, not a token meter, so the stop fires when the *estimated* cumulative spend crosses the budget. Round per-attempt estimates conservatively (round up) so the gate trips early rather than overshooting silently — the promise is "do not silently exceed", and an estimate that errs toward stopping honours it.
+
 ---
 
 ## Load Config
 
 Read and follow the **Load Config** section of [config.md](config.md).
 
-Keep `model.default`, `model.escalation`, `cost.budget`, and `ledger.enabled` in context for the run. Use `model.default` for ordinary worker dispatch and `model.escalation` for high-risk or retry-worthy work as described in model selection. If `cost.budget` is non-empty, surface the configured budget in the run summary and ledger; do not silently exceed an explicit user-provided budget without stopping for human direction.
+Keep `model.default`, `model.escalation`, `cost.budget`, and `ledger.enabled` in context for the run. Use `model.default` for ordinary worker dispatch and `model.escalation` for high-risk or retry-worthy work as described in model selection. Resolve the **effective budget** once at startup per `## When Invoked → Budget (--budget <amount>)`: the `--budget` flag overrides `cost.budget` for this invocation; empty/unset means unlimited. If the effective budget is non-empty, surface it in the run summary and ledger, and **enforce it at the Step 3b budget gate** — do not silently exceed an explicit user-provided budget; stop gracefully at the next REQ boundary with the budget-stop report.
 
 ---
 
@@ -664,6 +681,7 @@ bash lib/run-ledger.sh \
   --result <done|stopped:reason|failed> \
   --review <passed|failed|not-run> \
   --cost <estimate-or-budget-note> \
+  --cost-estimate <numeric-dollar-estimate-for-this-attempt> \
   --pr <pr-url-when-delivery-mode-pr-else-omit> \
   --commands <command-evidence-list> \
   --tests <test-evidence-list> \
@@ -673,6 +691,39 @@ bash lib/run-ledger.sh \
 For stopped workers, write the ledger before returning control to the user, with `result: stopped:<reason>` and the best available evidence lists. For policy-blocked or acceptance-evidence failures before review, use `review: not-run`. If `ledger.enabled` is false, skip ledger creation.
 
 The worker also reports `milestone_complete` (boolean) and `milestone` (id when true). Step 7b uses these.
+
+#### Step 3b.1: Budget gate (enforcement hook)
+
+Run this **immediately after** the ledger write above, on every worker attempt — serial mode here, and at the same point inside the merge queue's Stage B for parallel mode (P3 reuses Step 3b verbatim; the gate rides along).
+
+**Inert unless armed.** If the effective budget (resolved at startup) is empty/unset, **skip this gate entirely** — never sum, never stop. This preserves today's unlimited behaviour with zero overhead. Likewise skip when `ledger.enabled` is false (no ledger to sum).
+
+When the budget is non-empty:
+
+1. Sum cumulative estimated spend for this run from the ledger:
+   ```bash
+   SPENT="$(bash lib/run-ledger.sh --sum-run {project}/.do-work/runs)"
+   ```
+2. Compare `SPENT` against the effective `BUDGET` (numeric, same dollar unit):
+   - **`SPENT < BUDGET` ⇒ under budget.** Continue normally to Step 4 (Integrate) and loop.
+   - **`SPENT >= BUDGET` ⇒ budget exhausted.** Do **not** abandon the current attempt. **Finish the current REQ's integration first** (complete Step 4 fully — merge/archive/teardown/commit, or the PR delivery sequence — so the loop never stops mid-merge or mid-archive). Then, at the REQ boundary (where Step 8 would normally claim the next REQ), **stop gracefully** instead of looping: emit the **budget-stop report** and end the run.
+
+> **JUDGMENT:** The gate trips *after* the attempt that crossed the line, never mid-attempt. An in-flight integration always completes — abandoning a half-merged REQ would corrupt state, which is a worse failure than a small budget overshoot. The estimate is tier-weighted (see budget unit above), so the report names spend as an estimate, not a metered total.
+
+**Budget-stop report** (print before ending; under `next_steps.enabled` + standalone, surface via `AskUserQuestion` like a stopper, else print and stop):
+
+```
+Budget reached — stopping at REQ boundary.
+
+Estimated spend: $<SPENT> / budget $<BUDGET>   (tier-weighted estimate, not a metered bill)
+REQs completed this run: <N>
+REQs remaining in backlog: <M>
+Last integrated: REQ-NNN
+
+Re-run with a higher --budget (or raise cost.budget) to continue.
+```
+
+The in-parallel variant is identical: when the gate trips inside Stage B, finish that report's Step 4 integration, then **stop admitting new reports to Stage B and stop refilling the window (P2)** — let live workers drain naturally (their integrations still complete), then emit the budget-stop report. No worker is killed mid-attempt; the window simply stops being refilled past the budget boundary.
 
 ### Step 4: Integrate (worker = code, orchestrator = state)
 
@@ -907,7 +958,7 @@ Contents: a single line — the gate-owner's `AGENT_ID`. No header, no trailing 
 
 ### Step 8: Loop
 
-Go back to Step 1 and claim the next REQ.
+If the Step 3b.1 budget gate tripped on the REQ just integrated, **do not loop** — the budget-stop report has already been emitted and the run ends here. Otherwise, go back to Step 1 and claim the next REQ.
 
 ---
 
@@ -1093,6 +1144,8 @@ Full suite: [passed / skipped — no test runner found]
 All outputs committed.
 Archive: {project}/.do-work/archive/
 ```
+
+When the effective budget is armed (non-empty), append a budget line to this report: `Estimated spend: $<SPENT> / budget $<BUDGET> (tier-weighted estimate)`. This is the natural-exhaustion case (backlog emptied before the budget was hit); the **budget-stop report** (Step 3b.1) is the distinct early-stop case where the budget was reached with REQs still remaining.
 
 **Then, immediately after the report**, check whether to present next-step options:
 

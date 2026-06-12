@@ -140,6 +140,79 @@ write_ledger "done" "passed" ""
 grep -q '^pr_url: ""$' "$OUT" || fail "$CURRENT_CASE pr_url empty"
 teardown_project
 
+# --cost-estimate writes a numeric field distinct from the freeform --cost note.
+CURRENT_CASE="cost-estimate-numeric-field"
+CASES=$((CASES + 1))
+setup_project
+OUT="$(bash "$SCRIPT" --project "$TMP" --req "$REQ" --agent agent-1 --model sonnet \
+  --branch req/REQ-001 --started 2026-06-09T00:00:00Z --ended 2026-06-09T00:01:00Z \
+  --result done --review passed --cost "under budget" --cost-estimate "0.42" \
+  --commands "$COMMANDS" --tests "$TESTS" --changed-files "$FILES")"
+RC=$?
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+grep -q '^cost_estimate_num: 0.42$' "$OUT" || fail "$CURRENT_CASE numeric field"
+grep -q '^cost_estimate: "under budget"$' "$OUT" || fail "$CURRENT_CASE freeform note preserved"
+teardown_project
+
+# Unset --cost-estimate defaults the numeric field to 0 (treated as no spend).
+CURRENT_CASE="cost-estimate-default-zero"
+CASES=$((CASES + 1))
+setup_project
+write_ledger "done" "passed" ""
+grep -q '^cost_estimate_num: 0$' "$OUT" || fail "$CURRENT_CASE default zero"
+teardown_project
+
+# --sum-run sums cost_estimate_num across all RUN-*.yml in a runs dir.
+CURRENT_CASE="sum-run-cumulative"
+CASES=$((CASES + 1))
+setup_project
+bash "$SCRIPT" --project "$TMP" --req "$REQ" --result done --cost-estimate "0.50" >/dev/null
+bash "$SCRIPT" --project "$TMP" --req "$REQ" --result done --cost-estimate "1.25" >/dev/null
+bash "$SCRIPT" --project "$TMP" --req "$REQ" --result done --cost-estimate "0.25" >/dev/null
+SUM="$(bash "$SCRIPT" --sum-run "$TMP/.do-work/runs")"
+RC=$?
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "2.00" "$SUM" "$CURRENT_CASE sum"
+teardown_project
+
+# --sum-run on a runs dir with no numeric costs returns 0.00.
+CURRENT_CASE="sum-run-empty"
+CASES=$((CASES + 1))
+setup_project
+SUM="$(bash "$SCRIPT" --sum-run "$TMP/.do-work/runs")"
+RC=$?
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "0.00" "$SUM" "$CURRENT_CASE empty sum"
+teardown_project
+
+# --sum-run errors when the runs dir is missing.
+CURRENT_CASE="sum-run-missing-dir"
+CASES=$((CASES + 1))
+setup_project
+SUM="$(bash "$SCRIPT" --sum-run "$TMP/.do-work/nonexistent" 2>/dev/null)"
+RC=$?
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+teardown_project
+
+# Budget gate fixture: cumulative ledger spend crossing a budget is detectable
+# via --sum-run. Demonstrates the run-loop gate's arithmetic (spent >= budget).
+CURRENT_CASE="budget-gate-crosses"
+CASES=$((CASES + 1))
+setup_project
+BUDGET="3.00"
+# REQ 1 completes: spend 2.00 (still under budget) -> loop continues.
+bash "$SCRIPT" --project "$TMP" --req "$REQ" --result done --cost-estimate "2.00" >/dev/null
+SUM1="$(bash "$SCRIPT" --sum-run "$TMP/.do-work/runs")"
+awk -v s="$SUM1" -v b="$BUDGET" 'BEGIN { exit (s+0 < b+0) ? 0 : 1 }' \
+  || fail "$CURRENT_CASE expected under-budget after REQ1 (sum=$SUM1)"
+# REQ 2 completes: spend +1.50 -> cumulative 3.50 crosses budget -> gate trips.
+bash "$SCRIPT" --project "$TMP" --req "$REQ" --result done --cost-estimate "1.50" >/dev/null
+SUM2="$(bash "$SCRIPT" --sum-run "$TMP/.do-work/runs")"
+assert_eq "3.50" "$SUM2" "$CURRENT_CASE cumulative"
+awk -v s="$SUM2" -v b="$BUDGET" 'BEGIN { exit (s+0 >= b+0) ? 0 : 1 }' \
+  || fail "$CURRENT_CASE expected budget crossed after REQ2 (sum=$SUM2)"
+teardown_project
+
 echo ""
 echo "run-ledger tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then

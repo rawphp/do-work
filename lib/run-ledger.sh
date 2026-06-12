@@ -13,10 +13,12 @@ ENDED=""
 RESULT=""
 REVIEW=""
 COST=""
+COST_ESTIMATE=""
 PR_URL=""
 COMMANDS_PATH=""
 TESTS_PATH=""
 CHANGED_FILES_PATH=""
+SUM_RUN_DIR=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -30,6 +32,8 @@ while [ "$#" -gt 0 ]; do
     --result) RESULT="${2:-}"; shift 2 ;;
     --review) REVIEW="${2:-}"; shift 2 ;;
     --cost) COST="${2:-}"; shift 2 ;;
+    --cost-estimate) COST_ESTIMATE="${2:-}"; shift 2 ;;
+    --sum-run) SUM_RUN_DIR="${2:-}"; shift 2 ;;
     --pr) PR_URL="${2:-}"; shift 2 ;;
     --commands) COMMANDS_PATH="${2:-}"; shift 2 ;;
     --tests) TESTS_PATH="${2:-}"; shift 2 ;;
@@ -45,8 +49,40 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# --sum-run mode: sum cost_estimate_num across every RUN-*.yml in a runs dir.
+# Used by the run loop's budget gate to compare cumulative spend vs the budget.
+# Prints the total formatted to 2 decimal places (0.00 when no entries/costs).
+if [ -n "$SUM_RUN_DIR" ]; then
+  if [ ! -d "$SUM_RUN_DIR" ]; then
+    echo "run-ledger.sh: --sum-run dir not found: $SUM_RUN_DIR" >&2
+    exit 1
+  fi
+  RUN_FILES="$(find "$SUM_RUN_DIR" -maxdepth 1 -name 'RUN-[0-9][0-9][0-9].yml' -print 2>/dev/null | sort)"
+  if [ -z "$RUN_FILES" ]; then
+    printf '%.2f\n' 0
+    exit 0
+  fi
+  printf '%s\n' "$RUN_FILES" | tr '\n' '\0' | xargs -0 awk '
+    /^cost_estimate_num:[[:space:]]*/ {
+      v = $2
+      if (v ~ /^-?[0-9]+(\.[0-9]+)?$/) total += v
+    }
+    END { printf "%.2f\n", total }
+  '
+  exit 0
+fi
+
 if [ -z "$PROJECT" ] || [ -z "$REQ_PATH" ] || [ -z "$RESULT" ]; then
   echo "run-ledger.sh: --project, --req, and --result are required" >&2
+  exit 1
+fi
+
+# Normalize the numeric cost estimate. Empty/unset means no spend recorded (0).
+# Non-numeric input is rejected so the budget gate never sums garbage.
+if [ -z "$COST_ESTIMATE" ]; then
+  COST_ESTIMATE="0"
+elif ! printf '%s' "$COST_ESTIMATE" | grep -Eq '^-?[0-9]+(\.[0-9]+)?$'; then
+  echo "run-ledger.sh: --cost-estimate must be numeric, got: $COST_ESTIMATE" >&2
   exit 1
 fi
 
@@ -115,6 +151,7 @@ write_list() {
   echo "review_outcome: \"$(yaml_scalar "$REVIEW")\""
   echo "proof_status: \"$PROOF_STATUS\""
   echo "cost_estimate: \"$(yaml_scalar "$COST")\""
+  echo "cost_estimate_num: $COST_ESTIMATE"
   echo "pr_url: \"$(yaml_scalar "$PR_URL")\""
   write_list "commands" "$COMMANDS_PATH"
   write_list "tests" "$TESTS_PATH"
