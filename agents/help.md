@@ -27,6 +27,7 @@ Check the following conditions in order:
 5. Are there REQ files in `{project}/.do-work/archive/`?
 6. Are there `RUN-NNN.yml` files in `{project}/.do-work/runs/`? (Retro heuristic: runs exist but no `calibration.md` → suggest retro.)
 7. Do any archived REQs have a non-empty `**Entry point:**` field (path-unit REQs) for a given UR, and does that UR lack a `closure.md` in `{project}/.do-work/user-requests/UR-NNN/`? (Close heuristic: run has drained for a UR with path-units but no closure report yet.)
+8. Are there `REQ-NNN-*.md` files in `{project}/.do-work/pending/`? (Approve heuristic: REQs merged and awaiting human validation.)
 
 ### 2. Print contextual suggestions
 
@@ -94,6 +95,14 @@ Suggest close alongside other applicable suggestions (add it when this condition
 
 ```
   /do-work close UR-NNN                             — Walk path-unit entry points end-to-end and write the UR closure report
+```
+
+**If REQs exist in `pending/` (awaiting human validation):**
+
+Suggest approve alongside other applicable suggestions (add it when this condition is true and the 4-suggestion cap allows). Replace `N` with the actual count:
+
+```
+  /do-work approve REQ-NNN                          — N REQ(s) awaiting human validation — confirm and archive
 ```
 
 **If do-work exists but is empty (no URs, no REQs):**
