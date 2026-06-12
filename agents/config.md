@@ -51,7 +51,7 @@ feedback:
   project_repo: ""       # GitHub repo for project-class events; falls back to feedback.repo when empty
 
 parallel:
-  stale_threshold_seconds: 300  # seconds of heartbeat silence before a working/ slot is considered stale
+  stale_threshold_seconds: 900  # seconds of heartbeat silence before a working/ slot is considered stale; workers stamp at checkpoints (per TDD cycle / verification step), so 900s (15 min) comfortably spans the gap between stamps
 
 review:
   required: true          # post-build review gate must pass before archive
@@ -123,7 +123,7 @@ verify:
 | `feedback.repo` | string | `"tomkaczocha/do-work"` | Target GitHub repo (`owner/name`) for **system-class** events: `deadlock`, `footprint-miss`, `concurrent-conflict`, `cap-cycle`, `stale-slot`. Must exist and have the label specified in `feedback.label`. Consumers: `lib/file-feedback.sh`. |
 | `feedback.label` | string | `"auto:do-work-feedback"` | GitHub issue label applied to every issue filed by `lib/file-feedback.sh`. The label must exist in the target repo before the first event fires; the script will not create it automatically. Consumers: `lib/file-feedback.sh`. |
 | `feedback.project_repo` | string | `""` | Target GitHub repo (`owner/name`) for **project-class** events: `ambiguous-criteria`, `verify-fail`. When non-empty, these events are filed here instead of `feedback.repo`. When empty, falls back to `feedback.repo`. Consumers: `lib/file-feedback.sh`. |
-| `parallel.stale_threshold_seconds` | integer | `300` | Number of seconds of heartbeat silence after which a `working/REQ-*.md` slot is declared stale. Must be a positive integer; non-integer or absent values fall back to the default. Consumers: `lib/scan-stale.sh` (called by `agents/run.md` pre-flight and `lib/deadlock-check.sh`). |
+| `parallel.stale_threshold_seconds` | integer | `900` | Number of seconds of heartbeat silence after which a `working/REQ-*.md` slot is declared stale. Workers stamp the heartbeat at checkpoints (after each TDD cycle and verification step), not on a fixed timer, so the default is `900` s (15 min) to comfortably span the gap between stamps. Must be a positive integer; non-integer or absent values fall back to the default. Consumers: `lib/scan-stale.sh` (called by `agents/run.md` pre-flight and `lib/deadlock-check.sh`). |
 | `review.required` | boolean | `true` | When true, post-build review must pass before a REQ archives. Consumers: `agents/run.md`, `agents/review.md`. |
 | `acceptance.evidence_required` | boolean | `true` | When true, every acceptance criterion needs passing evidence in the worker report before integration. Consumers: `lib/check-acceptance-evidence.sh`, `agents/run.md`. |
 | `risk.require_review` | list | `[migrations, auth, billing, payments, files_changed_over: 8, acceptance_criteria_over: 6]` | Signals that force explicit review even if implementation checks pass. Consumers: `lib/check-policy.sh`, `agents/review.md`. |
