@@ -55,6 +55,7 @@ parallel:
 
 review:
   required: true          # post-build review gate must pass before archive
+  adversarial: false      # when true AND check-policy.sh exits 2 (risk.require_review), dispatch 3 lens-scoped reviewers (correctness/security/regression) with a 2-of-3 majority gate; default false until run-level budget enforcement (REQ-226) caps multi-reviewer token cost
 
 acceptance:
   evidence_required: true # each acceptance criterion needs passing evidence
@@ -163,6 +164,7 @@ routing: []
 | `feedback.project_repo` | string | `""` | Target GitHub repo (`owner/name`) for **project-class** events: `ambiguous-criteria`, `verify-fail`. When non-empty, these events are filed here instead of `feedback.repo`. When empty, falls back to `feedback.repo`. Consumers: `lib/file-feedback.sh`. |
 | `parallel.stale_threshold_seconds` | integer | `900` | Number of seconds of heartbeat silence after which a `working/REQ-*.md` slot is declared stale. Workers stamp the heartbeat at checkpoints (after each TDD cycle and verification step), not on a fixed timer, so the default is `900` s (15 min) to comfortably span the gap between stamps. Must be a positive integer; non-integer or absent values fall back to the default. Consumers: `lib/scan-stale.sh` (called by `agents/run.md` pre-flight and `lib/deadlock-check.sh`). |
 | `review.required` | boolean | `true` | When true, post-build review must pass before a REQ archives. Consumers: `agents/run.md`, `agents/review.md`. |
+| `review.adversarial` | boolean | `false` | When true **and** `lib/check-policy.sh` exits `2` (a `risk.require_review` signal), `agents/run.md` dispatches three lens-scoped reviewers (correctness, security, regression) instead of one and applies a 2-of-3 majority gate; any reviewer's blocker finding still fails the gate regardless of the majority. Defaults `false` to contain multi-reviewer token cost until run-level budget enforcement (REQ-226) lands — that REQ adds the cost ceiling that makes adversarial mode safe to enable by default. Consumers: `agents/run.md`. |
 | `acceptance.evidence_required` | boolean | `true` | When true, every acceptance criterion needs passing evidence in the worker report before integration. Consumers: `lib/check-acceptance-evidence.sh`, `agents/run.md`. |
 | `risk.require_review` | list | `[migrations, auth, billing, payments, files_changed_over: 8, acceptance_criteria_over: 6]` | Signals that force explicit review even if implementation checks pass. Consumers: `lib/check-policy.sh`, `agents/review.md`. |
 | `security.blocked_paths` | list | `[.env, .env.*]` | Paths that must not be modified by workers. Consumers: `lib/check-policy.sh`. |
