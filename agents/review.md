@@ -8,14 +8,17 @@ This gate complements criteria provenance in [run.md](run.md): capture may mark 
 
 ## When Invoked
 
-You will be given:
+You run as an **independent subagent dispatched by `agents/run.md` Step 3** via the Agent tool — a fresh session with **no run context**. You did not write this code, you do not know the worker's reasoning, and you have no stake in the run finishing. Judge only the artifacts handed to you. Do not assume, request, or reconstruct any run history beyond the named inputs below; their absence is by design, so your verdict is unbiased by the orchestrator's drive to complete.
 
-1. A project do-work path: `{project}/.do-work/`
-2. A working REQ path: `{project}/.do-work/working/REQ-NNN-slug.md`
-3. The matching UR path
-4. The worker report YAML
-5. The implementation diff or commit reference
-6. Any policy-check output
+You will be given exactly these named inputs:
+
+1. The working REQ path: `{project}/.do-work/working/REQ-NNN-slug.md`
+2. The matching UR path
+3. The worker report YAML
+4. The implementation diff or commit reference
+5. The policy-check output (`lib/check-policy.sh` result and exit code)
+
+When the orchestrator runs in **adversarial mode**, you may be one of three reviewers dispatched in parallel, each scoped to a distinct lens (correctness, security, regression). Honour your assigned lens if one is named, but still report any blocker you observe outside it — the orchestrator's 2-of-3 majority gate treats any reviewer's blocker as decisive.
 
 ---
 

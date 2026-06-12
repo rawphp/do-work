@@ -559,9 +559,9 @@ bash lib/check-acceptance-evidence.sh {project}/.do-work/working/REQ-NNN-slug.md
 
 If validation fails, treat the result as `status: stopped`, `reason: verification-failing`, surface the validator diagnostics, and do not merge, write closure proof, review, or archive. This gate extends the checkpoint/closure-proof model; it does not replace `closure_proof`.
 
-After acceptance evidence validation passes, invoke the post-build review gate in [review.md](review.md) before Step 4 integration. Pass the working REQ path, UR path, worker report YAML, implementation diff or commit reference, and any policy-check output. If review returns `status: failed`, treat the result as `status: stopped`, `reason: review-failed`, surface the review findings, leave the REQ in `working/`, and do not merge, write closure proof, archive, or record completion. Worker says done is not final until this evidence gate and review gate both pass.
+After acceptance evidence validation passes, run the post-build review gate before Step 4 integration. **Review is dispatched as a fresh, independent subagent — never followed inline in the orchestrator's own context.** The orchestrator that wants the run to finish must not grade its own work; the reviewer runs cold, with no run history, seeing only the artifacts you hand it. Worker says done is not final until this evidence gate and the review gate both pass.
 
-Before invoking review, run deterministic policy checks using changed files, command evidence, and REQ metadata:
+Before dispatching review, run deterministic policy checks using changed files, command evidence, and REQ metadata:
 
 ```bash
 bash lib/check-policy.sh \
@@ -571,7 +571,59 @@ bash lib/check-policy.sh \
   --req {project}/.do-work/working/REQ-NNN-slug.md
 ```
 
-If `check-policy.sh` exits `1`, treat the result as `status: stopped`, `reason: policy-blocked`, surface the blocked path or blocked command diagnostics, leave the REQ in `working/`, and do not review, merge, archive, or write completion state. If it exits `2`, continue into review and pass the `review_required` diagnostics as mandatory review context. If it exits `0`, continue into review normally. The helper reads `security.blocked_paths`, `security.blocked_commands`, and `risk.require_review` from `.do-work/config.yml`.
+Capture both the exit code and stdout/stderr — they are an input to the review dispatch.
+
+- **Exit `1`:** treat the result as `status: stopped`, `reason: policy-blocked`, surface the blocked path or blocked command diagnostics, leave the REQ in `working/`, and do not review, merge, archive, or write completion state.
+- **Exit `2`:** a `risk.require_review` signal fired. Continue into review and pass the `review_required` diagnostics as mandatory review context. This exit code is also the trigger for **adversarial mode** (below).
+- **Exit `0`:** continue into review normally.
+
+The helper reads `security.blocked_paths`, `security.blocked_commands`, and `risk.require_review` from `.do-work/config.yml`.
+
+#### 3a. Dispatch the review subagent
+
+Read all of [agents/review.md](review.md) — that is the reviewer's full instruction set. Pass it inline to the dispatched subagent, exactly as Step 2 does for the worker. The reviewer receives **five named inputs and nothing else** — no run narrative, no prior-REQ context, no memory of the worker's reasoning:
+
+```
+Agent(
+  description: "Post-build review for REQ-NNN",
+  subagent_type: general-purpose,
+  model: <model>,
+  prompt: """
+You are the Review agent. Follow the instructions below exactly. You run as an independent subagent with no run history — judge only the artifacts handed to you.
+
+<inputs>
+Working REQ:    {absolute path to working/REQ-NNN-slug.md}
+UR:             {absolute path to user-requests/UR-NNN/input.md}
+Worker report:  {the worker's returned YAML report, inline}
+Diff / commit:  {the implementation diff, or the feature-branch commit reference}
+Policy check:   {the captured check-policy.sh output and exit code}
+</inputs>
+
+<instructions>
+{full contents of agents/review.md verbatim}
+</instructions>
+
+Return your structured YAML review report as your final message. Nothing else.
+"""
+)
+```
+
+Parse the reviewer's returned YAML (schema in [agents/review.md](review.md) `## Output`). Branch on its `status`:
+
+- **`status: passed`:** continue to Step 4 (Integrate).
+- **`status: failed`:** treat the result as `status: stopped`, `reason: review-failed`, surface the review `findings`, leave the REQ in `working/`, and do not merge, write closure proof, archive, or record completion.
+
+#### 3b. Adversarial mode (config-gated, risk-triggered)
+
+Read `review.adversarial` (loaded at startup; default `false`).
+
+- **`review.adversarial` is `false` (default), OR `check-policy.sh` exited `0`:** dispatch exactly **one** reviewer as in §3a. This is the shipped path.
+- **`review.adversarial` is `true` AND `check-policy.sh` exited `2`:** dispatch **three** reviewers in parallel, each scoped to a distinct lens — **correctness**, **security**, **regression**. Use the same §3a dispatch shape per reviewer, adding a line to the prompt naming the lens (e.g. `Review lens: security — weight your findings toward this lens; still report blockers you see outside it.`). Aggregate the three returned reports into one verdict:
+  1. **Majority gate:** the gate passes only when at least **2 of 3** reviewers return `status: passed`.
+  2. **Blocker override:** any `severity: blocker` finding from **any** reviewer fails the gate regardless of the majority outcome. Blockers are never out-voted.
+  3. On failure (majority not met OR any blocker present), apply the same handling as a single failed review: `status: stopped`, `reason: review-failed`, surface the union of all three reviewers' `findings`, leave the REQ in `working/`.
+
+  Default stays single-reviewer to contain token cost until run-level budget enforcement (REQ-226) exists.
 
 ### Step 3b: Run Ledger
 
