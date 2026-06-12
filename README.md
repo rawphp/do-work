@@ -275,9 +275,9 @@ Three guarantees keep the parallel terminals from stepping on each other:
 
 **When parallel mode shines.** Backlogs of 5+ independent REQs — the work-sharing payoff grows with the backlog size. For single-REQ work, tightly-coupled REQs, or milestone deploy gates (which stay single-agent by design), the simplicity of one terminal is often the better trade-off.
 
-**Isolation per REQ.** Large REQs (migrations, refactors, schema changes) automatically use `git worktree` on a `req/REQ-NNN` branch and merge back when done; small REQs (most of them) work directly on the base branch.
+**Isolation per REQ.** Every REQ runs in a dedicated `git worktree` on a `req/REQ-NNN` branch. The orchestrator creates the worktree before dispatch and tears it down after merging — no REQ ever touches the base branch directly.
 
-See `SKILL.md` `## Parallel Execution` for the full behavioural reference, including state files (`gate-owner.md`, `final-suite-running.md`) and the worktree-vs-same-branch heuristic.
+See `SKILL.md` `## Parallel Execution` for the full behavioural reference, including state files (`gate-owner.md`, `final-suite-running.md`).
 
 ---
 
