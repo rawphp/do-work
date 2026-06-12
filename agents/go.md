@@ -82,6 +82,21 @@ Let the run agent execute until the backlog is empty or a stopper is hit. The ru
 
 When run completes without a stopper, archive and ledger writes are owned by [run.md](run.md). Do not log until run has finished its evidence gate, review gate, archive move, and any enabled ledger write.
 
+### 4b. Closure Offer
+
+> This step is **not gated** by `config.next_steps.enabled`. Skip it only when the run was stopped early (stopper hit).
+
+After run drains without a stopper:
+
+1. Check whether the UR has any archived path-unit REQs — scan `{project}/.do-work/archive/` for REQs whose `**UR:**` is `UR-NNN` and whose `**Layer:**` is `none` with non-empty `**Entry point:**` and `**Terminal state:**`.
+2. If ≥1 path-unit REQ is found **and** `{project}/.do-work/user-requests/UR-NNN/closure.md` does not yet exist:
+   - Use `AskUserQuestion` with the prompt: "Run `close` for UR-NNN to validate the integrated result against your brief? This walks every path-unit's entry point in the merged app and writes a closure report." with options **"Yes — run close now"** and **"No — skip closure"**.
+   - If the user chooses "Yes": read [close.md](close.md) in full and follow it exactly, passing `{project}/.do-work/`, `UR-NNN`, and the current branch. Record the close outcome (`overall` field from the closure report) for inclusion in the Step 6 completion report.
+   - If the user chooses "No": record `close_outcome: "skipped — user declined"` for the completion report.
+3. If no archived path-unit REQs are found, or `closure.md` already exists: record `close_outcome: "skipped — no path-units"` or `"skipped — already closed"` respectively. Do not offer close again.
+
+**Closure gaps do not block the log step.** A `gaps` closure verdict (not-reached / terminal-mismatch rows) is surfaced in the Step 6 completion report and by the close agent itself — it does not prevent the run from completing or the log from running.
+
 ### 5. MANDATORY — Log Check
 
 > **STOP. Do not skip this step. Do not jump to the report.**
@@ -115,6 +130,7 @@ Go complete for UR-NNN
 Verify: NN% confidence
 Audit: [N fixes applied / clean / skipped]
 Run: [N REQs processed / stopped at verify — score below threshold]
+Close: [closed (overall: closed) / gaps (N not-reached, N terminal-mismatch) / skipped — user declined / skipped — no path-units / skipped — already closed / skipped — stopper hit]
 
 Archive: {project}/.do-work/archive/
 ```
