@@ -40,6 +40,8 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work retro` | Mines the run ledger and feedback fingerprints to produce a human report and regenerate `.do-work/state/calibration.md` — advisory capture guidance derived from historical patterns. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
+| `/do-work approve REQ-NNN` | Confirms a pending-validation REQ's human checks and archives it with human closure proof. |
+| `/do-work reject REQ-NNN [note]` | Returns a pending-validation REQ to the backlog with the rejection note as rework context. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
 | `/do-work` | Show this help. |
 
@@ -64,6 +66,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/close.md](agents/close.md) — Validates the integrated result of a UR against its verbatim brief; walks path-unit entry points in the merged app; writes `UR-NNN/closure.md`
 - [agents/unblock.md](agents/unblock.md) — Force a stuck in-flight REQ back to the backlog
 - [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
+- [agents/approve.md](agents/approve.md) — Approve or reject a pending-validation REQ: approve archives it with human closure proof; reject returns it to the backlog with a rejection note
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
 - [agents/retro.md](agents/retro.md) — Mines the run ledger to produce a learning report and regenerate `calibration.md`
 - [agents/config.md](agents/config.md) — Reusable config loading instructions
@@ -243,6 +246,7 @@ Workers always run in isolated git worktrees at `{project}/.worktrees/req-NNN` o
 | REQ is stuck / worker died / heartbeat stale | `/do-work unblock REQ-NNN` — strips claim, returns REQ to backlog |
 | REQ stopped (concurrent-conflict / transient error) | `/do-work resume REQ-NNN` — refreshes heartbeat, re-dispatches worker |
 | Deadlock or unclear state | `/do-work status [UR-NNN]` — renders live situation room, deadlock banner |
+| REQ merged, awaiting human validation | `/do-work approve REQ-NNN` / `/do-work reject REQ-NNN` |
 
 See `agents/status.md`, `agents/unblock.md`, `agents/resume.md` for agent-level instructions.
 
@@ -673,6 +677,30 @@ Re-dispatch a fresh worker for a stopped REQ without sending it back through the
 3. Confirm `{project}/.do-work/working/REQ-NNN-*.md` exists and its `**Status:**` is `stopped`. If not in `working/`, report "REQ-NNN is not in working/ — nothing to resume." If status is not `stopped`, report the actual status and stop.
 4. Read [agents/resume.md](agents/resume.md) in full.
 5. Follow the resume agent instructions exactly. Resume is a one-shot — do not loop back to the backlog after dispatch.
+
+---
+
+### approve REQ-NNN
+
+Complete closure on a REQ parked in `.do-work/pending/` — confirm the Post-merge validation checklist and archive the REQ with human closure proof.
+
+1. Detect `{project}`.
+2. Confirm `REQ-NNN` was provided. If not, report "approve requires a REQ id (e.g. /do-work approve REQ-042)." and stop.
+3. Confirm `{project}/.do-work/pending/REQ-NNN-*.md` exists. If not, report "REQ-NNN is not in pending/ — nothing to approve." and stop.
+4. Read [agents/approve.md](agents/approve.md) in full.
+5. Follow the approve agent instructions exactly, passing verb `approve`.
+
+---
+
+### reject REQ-NNN [note]
+
+Return a pending-validation REQ to the backlog with a rejection note as rework context for the next worker. Merged code is NOT reverted.
+
+1. Detect `{project}`.
+2. Confirm `REQ-NNN` was provided. If not, report "reject requires a REQ id (e.g. /do-work reject REQ-042 <note>)." and stop.
+3. Confirm `{project}/.do-work/pending/REQ-NNN-*.md` exists. If not, report "REQ-NNN is not in pending/ — nothing to reject." and stop.
+4. Read [agents/approve.md](agents/approve.md) in full.
+5. Follow the approve agent instructions exactly, passing verb `reject` and any note supplied after the REQ id.
 
 ---
 
