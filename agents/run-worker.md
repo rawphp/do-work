@@ -102,20 +102,28 @@ Read the REQ header's `**Criteria approved:**` value when present. Treat it as p
 
 Use the REQ's acceptance criteria as the closure oracle unless they are missing, contradictory, impossible to verify, or become invalid during implementation. In those unexpected cases, return `status: stopped`, `reason: ambiguous-criteria`, with details that identify the specific criteria problem.
 
-### 1b. Start background heartbeat
+### 1b. Stamp the heartbeat at checkpoints (no background loop)
 
-Immediately after reading the REQ, start a background heartbeat loop. This refreshes the REQ's `**Heartbeat:**` timestamp every 60 seconds so that sibling agents and the pre-flight scanner know this slot is alive. Without this loop, the worker would appear stale after 5 minutes and a sibling could attempt to re-claim the slot.
+There is **no background heartbeat loop.** Each Bash tool call runs in a fresh shell, so a `( ... ) &` loop with an `EXIT` trap is killed the instant its originating tool call returns — it cannot keep stamping. Instead, you stamp the heartbeat yourself at natural progress checkpoints by running `{skill-root}/lib/heartbeat.sh` once at each point:
 
 ```bash
-# Background heartbeat — refreshes **Heartbeat:** every 60s so siblings know we're alive.
-( while sleep 60; do {skill-root}/lib/heartbeat.sh "$REQ_PATH" || break; done ) &
-HEARTBEAT_PID=$!
-trap 'kill "$HEARTBEAT_PID" 2>/dev/null' EXIT
+# Checkpoint stamp — refreshes **Heartbeat:** to "now" so siblings know we're alive.
+{skill-root}/lib/heartbeat.sh "$REQ_PATH"
 ```
 
-`REQ_PATH` is the absolute path to the REQ file in `working/`. The `trap ... EXIT` ensures the background process is cleaned up even if the worker exits early (stop, error, or normal completion). `{skill-root}/lib/heartbeat.sh` writes the current UTC timestamp into the `**Heartbeat:**` field of the REQ file; stale-slot detection in the pre-flight scan uses this timestamp to decide whether a claimed slot is dead.
+`REQ_PATH` is the absolute path to the REQ file in `working/`. `{skill-root}/lib/heartbeat.sh` writes the current UTC timestamp into the `**Heartbeat:**` field of the REQ file (filesystem-only, no commit); stale-slot detection in the pre-flight scan reads this timestamp to decide whether a claimed slot is dead.
 
-**Why these numbers.** The 60-second refresh interval pairs with the pre-flight scanner's 300-second stale threshold — a 5× safety factor that absorbs transient slow ticks (long test runs, paused subagents) without falsely declaring the slot dead. The `EXIT` trap is what makes the loop *safe*: any exit path (normal return, stopped report, thrown error, signal) tears down the background process so it cannot keep stamping a REQ the worker has abandoned.
+**Stamp the heartbeat at every one of these checkpoints (minimum):**
+
+- After Step 1 (reading the REQ) — the stamp you run right here.
+- After Step 3a (red — failing tests/checks confirmed).
+- After each Step 3b/3c implement → verify-green cycle.
+- After each Step 6 verification step.
+- Immediately before the Step 8 commit.
+
+**Why checkpoints, not a timer.** Checkpoint stamping is harness-proof: it relies on no background process surviving between tool calls, only on the worker running one short command at known progress points. The pre-flight scanner's stale threshold is raised to `900` seconds (15 minutes, `parallel.stale_threshold_seconds`) to comfortably span the gap between checkpoints — even a long test run or a paused subagent stays inside the window. If a stamp is ever skipped, the worst case is an over-eager staleness flag for human triage, never a leaked process stamping an abandoned REQ.
+
+Stamp here now (after reading the REQ), then continue.
 
 ### 2. Read context
 
@@ -158,6 +166,8 @@ Before writing any implementation code:
 
 The REQ's `## Verification Steps` section often serves as this checklist directly — use it.
 
+**Heartbeat checkpoint:** once red is confirmed, stamp the heartbeat — `{skill-root}/lib/heartbeat.sh "$REQ_PATH"` — before starting implementation.
+
 #### 3b. Implement
 
 Write the minimum code or content to make the tests/checks pass.
@@ -169,6 +179,8 @@ Write the minimum code or content to make the tests/checks pass.
 #### 3c. Verify green
 
 Re-run the tests/checks. All must pass.
+
+**Heartbeat checkpoint:** after each implement → verify-green cycle, stamp the heartbeat — `{skill-root}/lib/heartbeat.sh "$REQ_PATH"`.
 
 If any fail, fix the implementation — not the tests — unless the test itself is genuinely wrong.
 
@@ -210,6 +222,8 @@ Read `## Verification Steps` from the REQ. Execute each step in order:
 
 Record the result of each step in an ordered checkpoint log. Each checkpoint entry must include `step`, `total`, `type`, command/action, expected result, pass/fail status, and a short actual-output summary. If the step crosses a boundary, include the handoff name (for example `input -> persistence`, `API -> render`, or `command -> file`).
 
+**Heartbeat checkpoint:** after each verification step, stamp the heartbeat — `{skill-root}/lib/heartbeat.sh "$REQ_PATH"` — so a long verification sequence never lets the slot drift stale.
+
 **If all steps pass:** proceed to step 7.
 
 **If any step fails:**
@@ -240,6 +254,8 @@ Earlier worker versions archived the REQ here. Under the worker = code / orchest
 Skip directly to Step 8.
 
 ### 8. Commit
+
+**Heartbeat checkpoint:** immediately before committing, stamp the heartbeat one final time — `{skill-root}/lib/heartbeat.sh "$REQ_PATH"` — so the slot reads fresh right up to the moment the work lands.
 
 Commit your implementation files to the feature branch (`req/REQ-NNN`) from inside the worktree directory (`{project}/.worktrees/req-NNN`). The orchestrator merges this branch into the base branch after you return.
 

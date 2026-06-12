@@ -195,7 +195,7 @@ Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that d
 <!-- claimed-end -->
 ```
 
-**Heartbeat-based liveness.** Each worker refreshes the `**Heartbeat:**` timestamp in its REQ file while active via `lib/heartbeat.sh`. `lib/scan-stale.sh` (called during pre-flight and by `/do-work status`) flags REQs whose heartbeat is older than `parallel.stale_threshold_seconds` (default 300 s / 5 minutes) as potentially dead. Stale REQs surface in the status report for human triage — they are not automatically unblocked.
+**Checkpoint-based liveness.** Each worker stamps the `**Heartbeat:**` timestamp in its REQ file via `lib/heartbeat.sh` at natural progress checkpoints — after reading the REQ, after each TDD cycle, after each verification step, and before commit — rather than from a background timer (a backgrounded loop cannot survive a fresh-shell-per-call harness). `lib/scan-stale.sh` (called during pre-flight and by `/do-work status`) flags REQs whose heartbeat is older than `parallel.stale_threshold_seconds` (default 900 s / 15 minutes — sized to span the gap between checkpoints) as potentially dead. Stale REQs surface in the status report for human triage — they are not automatically unblocked.
 
 **Deadlock detection.** `lib/deadlock-check.sh` checks for circular wait chains across the `working/` set: does REQ-A depend on REQ-B which depends on REQ-A (both in-flight)? Any cycle found is reported immediately by `/do-work status` under a `DEADLOCK DETECTED` banner. Recovery is manual: use `/do-work unblock REQ-NNN` to break the cycle.
 
