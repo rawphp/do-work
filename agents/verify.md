@@ -58,7 +58,7 @@ If `{project}/.do-work/user-requests/UR-NNN/ideate.md` exists:
 3. For each Challenger risk and Connector overlap, check whether at least one REQ addresses it — look in the REQ's `## Task`, `## Context`, or `## Acceptance Criteria` sections for evidence that the observation was considered
 4. Track unaddressed observations for reporting in Step 4
 
-**Score impact:** Each unaddressed ideate flag reduces the confidence score by 5 points, capped at a maximum deduction of -20 points total. This is advisory — unaddressed flags do not block the pipeline.
+**Score impact:** Count the unaddressed ideate flags. They feed the score as the `--ideate-flags` category (-5 each, capped at -20 total). The arithmetic authority is `lib/score-coverage.sh`, invoked in Step 5 — do not compute the deduction by hand here. This is advisory — unaddressed flags do not block the pipeline.
 
 If `ideate.md` does not exist for this UR, skip this step silently.
 
@@ -107,7 +107,7 @@ For all other URs:
    - If no REQ matches, check `layer_decisions[<layer>]`. If it equals `no`, the gap is acknowledged — not flagged.
    - Otherwise, this is a layer-coverage gap.
 
-2. List each layer-coverage gap. Each gap reduces the confidence score by 10 points (capped at -30 total deduction across all layer-coverage gaps).
+2. Count the layer-coverage gaps. They feed the score as the `--layer-gaps` category (-10 each, capped at -30 total); `lib/score-coverage.sh` in Step 5 does the arithmetic.
 
 3. Auto-fix integration: a layer-coverage gap with `--auto-fix` triggers a re-invocation of capture's Step 4c (layer-coverage prompt) scoped to that single layer.
 
@@ -126,7 +126,7 @@ For all other URs (`feature` or `other-as-feature`), iterate through `reqs:` in 
    - If the section is present but any of the three sub-question lines (`**Reachability:**`, `**Data dependencies:**`, `**Service dependencies:**`) is missing or empty → flag as gap.
    - If all three are present and non-empty → covered.
 
-3. List each Integration block gap with the REQ id and which sub-questions are missing. Each gap reduces the confidence score by 5 points (capped at -25 total).
+3. List each Integration block gap with the REQ id and which sub-questions are missing. Count them: they feed the score as the `--integration-gaps` category (-5 each, capped at -25 total) via `lib/score-coverage.sh` in Step 5.
 
 4. Auto-fix integration: an Integration block gap with `--auto-fix` triggers a re-invocation of capture's Step 5 (Integration question pass) scoped to that single REQ.
 
@@ -140,7 +140,7 @@ For all other URs, iterate through `reqs:` in the frontmatter:
    - If the REQ id appears in `acknowledged_partials`, treat as resolved — no flag.
    - Otherwise, flag as partial-confidence gap.
 
-2. List each partial-confidence gap with the REQ id. Each gap reduces the confidence score by 3 points (capped at -15 total).
+2. List each partial-confidence gap with the REQ id. Count them: they feed the score as the `--partial-conf-gaps` category (-3 each, capped at -15 total) via `lib/score-coverage.sh` in Step 5.
 
 3. **Auto-fix does NOT auto-resolve partials.** Re-running the integration question on the same codebase typically produces the same partial result. The user must either:
    - Edit the REQ's `## Integration` block manually to upgrade to high confidence, then capture's idempotent re-run will pick up the improvement, OR
@@ -158,7 +158,7 @@ For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog
 
 3. If the id resolves nowhere, it is a **dangling dependency**. Record the source REQ id and the unresolved id.
 
-4. Each dangling dep deducts 5 points from the confidence score (capped at -20 total across all dangling deps).
+4. Count the dangling deps. They feed the score as the `--dangling-deps` category (-5 each, capped at -20 total); `lib/score-coverage.sh` in Step 5 does the arithmetic.
 
 5. **Auto-fix integration.** With `--auto-fix`, for each dangling dep present an `AskUserQuestion` with two options:
    - **"Remove reference"** — strip the unresolved id from the source REQ's `**Depends on:**` line (delete the line entirely if it becomes empty).
@@ -182,13 +182,45 @@ A REQ is a **path-unit candidate** when either field is present. A path-unit is 
 
 2. Non-path REQs are unaffected. If both fields are absent, treat the REQ as a legacy, child, bug-fix, pure-refactor, or test-only REQ and do not flag it here.
 
-3. List each path-unit closure gap with the REQ id and missing field names. Each gap reduces the confidence score by 5 points (capped at -20 total across all path-unit closure gaps).
+3. List each path-unit closure gap with the REQ id and missing field names. Count them: they feed the score as the `--path-unit-gaps` category (-5 each, capped at -20 total) via `lib/score-coverage.sh` in Step 5.
 
 4. Auto-fix does not invent entry points or terminal states. With `--auto-fix`, surface these gaps and stop; the user or capture re-run must fill the missing path-unit fields.
 
-### 5. Produce the report
+### 5. Score the coverage, then produce the report
 
-Output to console (do not write to file unless asked):
+#### 5a. Build the gap manifest (judgment)
+
+From Steps 2b–4f you have already counted each category. Your job is to produce the manifest; the arithmetic belongs to the script. Assemble these counts:
+
+| Manifest field | Source | Script flag |
+|---|---|---|
+| full requirements | Step 3 (fully covered) | `--full` |
+| partial requirements | Step 3 (partially covered) | `--partial` |
+| missing requirements | Step 3 (no REQ) | `--missing` |
+| unaddressed ideate flags | Step 2b | `--ideate-flags` |
+| layer-coverage gaps | Step 4b | `--layer-gaps` |
+| integration-block gaps | Step 4c | `--integration-gaps` |
+| partial-confidence gaps | Step 4d | `--partial-conf-gaps` |
+| dangling deps | Step 4e | `--dangling-deps` |
+| path-unit closure gaps | Step 4f | `--path-unit-gaps` |
+
+Skipped checks contribute zero — omit the flag (it defaults to 0). For legacy/bug-fix URs, the layer/integration/partial-confidence categories are skipped, so leave those flags off.
+
+#### 5b. Invoke the scorer (arithmetic)
+
+Run `{skill-root}/lib/score-coverage.sh` with the manifest flags and use its printed integer as the Confidence Score. Do **not** compute the deductions or base ratio by hand — the script is the single arithmetic authority. Example for an 8-full / 1-partial / 1-missing backlog with 2 layer-coverage gaps:
+
+```
+{skill-root}/lib/score-coverage.sh --full 8 --partial 1 --missing 1 --layer-gaps 2
+# → 65
+```
+
+**Composition formula (stated once, implemented by `lib/score-coverage.sh`):**
+`total = full + partial + missing`; `base = (full + 0.5×partial) / total × 100` (0 when `total` is 0); for each category `deduction = min(count × per_item, cap)`; `score = round(max(0, base − Σ deductions))`. Per-category per-item/cap: ideate -5/-20, layer -10/-30, integration -5/-25, partial-confidence -3/-15, dangling -5/-20, path-unit -5/-20. These deductions are the same numbers cited in Steps 2b–4f; the script is where they compose.
+
+#### 5c. Produce the report
+
+Use the script's number as `Confidence Score`. Output to console (do not write to file unless asked):
 
 ```
 Verify Report — UR-NNN vs backlog
@@ -228,24 +260,20 @@ Confidence: NN%
 Recommendation: [Approved — run the loop / Fix gaps first — re-run capture / Auto-fix available]
 ```
 
-**Confidence score formula:**
-- Full coverage = 1 point per requirement
-- Partial coverage = 0.5 points
-- Missing = 0 points
-- Score = (points / total requirements) × 100, rounded to nearest integer
+The Confidence Score is whatever `lib/score-coverage.sh` printed in Step 5b. Do not recompute it — see the composition formula documented there.
 
 **Then, immediately after the report**, check whether to present next-step options:
 
 If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
 
-**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with score-dependent options:
+**Use the `AskUserQuestion` tool** (do NOT just print the options as text) with options that depend on whether the score clears the gate. The gate is `config.verify.threshold` (the threshold loaded in Step 0; default 90 if unset).
 
-**Score >= 90%:**
+**Score >= `config.verify.threshold`:**
 1. **"Run the loop"** — Proceed to run agent
 2. **"Review REQs"** — Inspect backlog before running
 3. **"Skip"** — End the interaction
 
-**Score < 90%:**
+**Score < `config.verify.threshold`:**
 1. **"Auto-fix gaps"** — Re-run verify with --auto-fix
 2. **"Re-run Capture"** — Go back to capture to fill gaps
 3. **"Skip"** — End the interaction
@@ -310,5 +338,5 @@ Cases that do **not** reach the bail-out rule:
 - Never modify `input.md` or any file in `user-requests/`
 - Never modify REQs that are in `working/` (already in-flight)
 - Auto-fix only when explicitly requested — do not modify REQs silently
-- A confidence score of 90%+ means the backlog is ready to run
+- A confidence score at or above `config.verify.threshold` (default 90) means the backlog is ready to run
 - A score below 70% should trigger a recommendation to re-run capture
