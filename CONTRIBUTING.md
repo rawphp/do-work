@@ -268,6 +268,19 @@ The following steps require model judgment that cannot be reduced to a rule. Eac
 
 **Why this matters:** without explicit markers, future edits to agent files silently lose the judgment context. New agent authors see a step but not the decision it asks for. The index makes them impossible to miss; the inline marker makes them impossible to edit around.
 
+## Doc-drift lint
+
+Agent and doc `.md` files have no compiler. When a fix retires a term, a flag, or a default, every other doc that still describes the old behavior becomes a silent contradiction the next worker can act on. `lib/doc-lint.sh` converts those contradictions into a failing check.
+
+```bash
+bash lib/doc-lint.sh              # scan the live docs; exit 1 with file:line on any drift
+bash lib/tests/doc-lint.test.sh   # run its tests
+```
+
+It scans the live, normative docs only — `SKILL.md`, `README.md`, `docs/`, `agents/` — and **never** scans `.do-work/`, `CHANGELOG.md`, `.git/`, or `docs/superpowers/` (the dated spec/plan tree). Those locations legitimately preserve retired terminology; scanning them would reproduce the UR-029 over-broad find-and-replace failure.
+
+**The rule: when you fix a doc conflict, add its pattern to the lint in the same commit.** A fix that doesn't also guard against regression is half a fix — the contradiction can drift back the next time someone edits an adjacent file. Add the new check to `scan_file` (or `scan_judgment_markers`) in `lib/doc-lint.sh` and a planted-violation case to `lib/tests/doc-lint.test.sh`, then confirm `bash lib/doc-lint.sh` is still clean against the repo. If a stale term is legitimately used inside an explicit retirement note, exclude that case narrowly (as the `same-branch` check skips lines that also say `retired`) rather than dropping the pattern.
+
 ## Questions?
 
 Open an issue — we're happy to help.
