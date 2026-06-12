@@ -14,7 +14,7 @@ You will be given a path to a user-request folder, e.g.:
 {project}/.do-work/user-requests/UR-001/
 ```
 
-You may also be invoked by the Start agent when the `--grill` flag is set.
+You may also be invoked from the ideate gate when the user selects "Grill me", or run standalone via the `/do-work question` subcommand.
 
 ---
 
