@@ -13,6 +13,7 @@ ENDED=""
 RESULT=""
 REVIEW=""
 COST=""
+PR_URL=""
 COMMANDS_PATH=""
 TESTS_PATH=""
 CHANGED_FILES_PATH=""
@@ -29,6 +30,7 @@ while [ "$#" -gt 0 ]; do
     --result) RESULT="${2:-}"; shift 2 ;;
     --review) REVIEW="${2:-}"; shift 2 ;;
     --cost) COST="${2:-}"; shift 2 ;;
+    --pr) PR_URL="${2:-}"; shift 2 ;;
     --commands) COMMANDS_PATH="${2:-}"; shift 2 ;;
     --tests) TESTS_PATH="${2:-}"; shift 2 ;;
     --changed-files) CHANGED_FILES_PATH="${2:-}"; shift 2 ;;
@@ -113,6 +115,7 @@ write_list() {
   echo "review_outcome: \"$(yaml_scalar "$REVIEW")\""
   echo "proof_status: \"$PROOF_STATUS\""
   echo "cost_estimate: \"$(yaml_scalar "$COST")\""
+  echo "pr_url: \"$(yaml_scalar "$PR_URL")\""
   write_list "commands" "$COMMANDS_PATH"
   write_list "tests" "$TESTS_PATH"
   write_list "changed_files" "$CHANGED_FILES_PATH"

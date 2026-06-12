@@ -90,6 +90,11 @@ cost:
 ledger:
   enabled: true          # write .do-work/runs/RUN-NNN.yml records
 
+delivery:
+  mode: merge            # how run.md Step 4 delivers a passing REQ: "merge" (default — merge req/REQ-NNN into base locally, as today) or "pr" (push the branch and open a GitHub PR instead of merging). pr mode requires a configured git remote and the `gh` CLI; missing either stops with a missing-creds stopper — it NEVER silently falls back to merge.
+  pr:
+    granularity: req     # only consulted when mode: pr. "req" (default) opens one PR per REQ off req/REQ-NNN; "ur" accumulates each REQ branch onto a shared ur/UR-NNN branch and opens a single PR when that UR's backlog drains.
+
 verify:
   threshold: 90          # minimum confidence score (0-100) for go to auto-run without --force
 
@@ -129,7 +134,7 @@ routing: []
 #     agent: llm-app-engineer
 ```
 
-4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `verify`, `routing`) and each key within those sections:
+4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `delivery`, `verify`, `routing`) and each key within those sections:
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
    - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
@@ -173,5 +178,7 @@ routing: []
 | `model.escalation` | string | `opus` | Escalation model for high-risk or failed REQs. Consumers: `agents/run.md`. |
 | `cost.budget` | string | `""` | Optional user-defined model/cost budget. Empty means no configured budget. Consumers: `agents/run.md`, `lib/run-ledger.sh`. |
 | `ledger.enabled` | boolean | `true` | When true, write structured run records under `.do-work/runs/`. Consumers: `lib/run-ledger.sh`, `agents/run.md`. |
+| `delivery.mode` | string | `merge` | How `agents/run.md` Step 4 delivers a passing REQ. `merge` (default) reproduces today's behaviour byte-for-byte: merge `req/REQ-NNN` into the base branch locally, archive, tear down the worktree, delete the branch. `pr` replaces the local merge with a GitHub PR: push the branch, open a PR via `gh pr create`, record the PR URL in the archived REQ's `## Outputs` and the ledger entry, archive, tear down the worktree — but leave the branch alive (the PR owns it). `pr` mode requires a configured git remote and the `gh` CLI; if either is missing the run stops with a `missing-creds` stopper and the REQ stays in `working/` — it **never** silently falls back to `merge`. Consumers: `agents/run.md`. |
+| `delivery.pr.granularity` | string | `req` | Only consulted when `delivery.mode` is `pr`. `req` (default) opens one PR per REQ directly off `req/REQ-NNN`. `ur` accumulates each completed REQ branch onto a shared `ur/UR-NNN` integration branch and opens a single PR when that UR's backlog drains, so a whole UR ships as one reviewable PR. Consumers: `agents/run.md`. |
 | `verify.threshold` | integer | `90` | Minimum confidence score (0-100) that `agents/go.md` requires before auto-running without `--force`. Consumers: `agents/verify.md`, `agents/go.md`. |
 | `routing` | list of `{match, agent}` maps | `[]` | Ordered subagent-routing rules for the run orchestrator's REQ classification. Each entry is `{match: <signal description or keyword list>, agent: <subagent_type>}`. The classifier scans rules top-to-bottom (first match wins) and dispatches the matching `agent`; if no rule matches — or the list is empty — it falls back to `general-purpose` silently. Ships empty so the stock skill is portable (no machine-specific agents). A commented example block in the template above reproduces the original specialist table for users who want to restore it. Consumers: `agents/run.md`, `agents/resume.md`. |
