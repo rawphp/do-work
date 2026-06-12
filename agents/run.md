@@ -78,6 +78,7 @@ When the orchestrator claims a REQ into `working/`, it inserts the following blo
 <!-- claimed-start -->
 **Claimed by:** <agent-id>
 **Claimed at:** <ISO-8601 UTC>
+**Heartbeat:** <ISO-8601 UTC>
 <!-- claimed-end -->
 ```
 
@@ -89,6 +90,7 @@ Example of a claimed REQ header:
 <!-- claimed-start -->
 **Claimed by:** mbp-tom.42137
 **Claimed at:** 2026-05-15T14:03:22Z
+**Heartbeat:** 2026-05-15T14:03:22Z
 <!-- claimed-end -->
 
 **UR:** UR-025
@@ -556,7 +558,7 @@ The worker also reports `milestone_complete` (boolean) and `milestone` (id when 
 
 ### Step 4: Integrate (worker = code, orchestrator = state)
 
-> **JUDGMENT:** J4 — The integration sequence below is the orchestrator's responsibility BECAUSE workers run in isolated worktrees. The worker has committed implementation files to `req/REQ-NNN`; the orchestrator now merges that branch into the base branch, archives the REQ, tears down the worktree, and commits the metadata change. This is the only place where `.do-work/` lifecycle writes happen.
+> **JUDGMENT:** The integration sequence below is the orchestrator's responsibility BECAUSE workers run in isolated worktrees. The worker has committed implementation files to `req/REQ-NNN`; the orchestrator now merges that branch into the base branch, archives the REQ, tears down the worktree, and commits the metadata change. This is the only place where `.do-work/` lifecycle writes happen.
 
 Reached only when `status: done` and both acceptance evidence validation and post-build review passed. Execute these substeps in order; each must succeed before the next.
 
@@ -626,6 +628,8 @@ For `reason: concurrent-conflict` after Step 4a's 5-retry exhaustion: leave the 
 For other stoppers: surface to the user via `AskUserQuestion` (existing stopping-rules behaviour).
 
 Do not proceed to Step 7.
+
+### Step 6 — (reserved; removed in an earlier revision)
 
 ### Step 7: Report progress
 
@@ -896,7 +900,7 @@ When the worker returns `status: stopped`, `reason: ambiguous-criteria`:
 
 ## Rules
 
-- One REQ in `working/` at a time — never more
+- One REQ per orchestrator in `working/` at a time — multiple in-flight REQs across parallel orchestrators are normal
 - TDD is not optional: failing tests must exist before implementation begins
 - Never skip tests because "it's a simple change"
 - Never modify REQs in `archive/` after they are committed
