@@ -286,6 +286,24 @@ while IFS= read -r candidate; do
       if [ "$found" -eq 0 ] && [ -e "$DOWORK/archive/$dep.md" ]; then
         found=1
       fi
+      # Also check pending/ — a dep parked in pending-validation is satisfied
+      # (its code is merged; only human sign-off is outstanding).
+      # An absent pending/ directory is handled gracefully via nullglob.
+      if [ "$found" -eq 0 ] && [ -d "$DOWORK/pending" ]; then
+        # shellcheck disable=SC2206
+        pending=( "$DOWORK"/pending/"$dep"-*.md )
+        if [ "${#pending[@]}" -gt 0 ]; then
+          for p in "${pending[@]}"; do
+            if [ -e "$p" ]; then
+              found=1
+              break
+            fi
+          done
+        fi
+        if [ "$found" -eq 0 ] && [ -e "$DOWORK/pending/$dep.md" ]; then
+          found=1
+        fi
+      fi
       if [ "$found" -eq 0 ]; then
         printf 'dep:%s\n' "$dep" >&2
         dep_blocked=1
