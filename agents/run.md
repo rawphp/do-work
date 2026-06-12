@@ -664,6 +664,7 @@ bash lib/run-ledger.sh \
   --result <done|stopped:reason|failed> \
   --review <passed|failed|not-run> \
   --cost <estimate-or-budget-note> \
+  --pr <pr-url-when-delivery-mode-pr-else-omit> \
   --commands <command-evidence-list> \
   --tests <test-evidence-list> \
   --changed-files <changed-files-list>
@@ -677,7 +678,14 @@ The worker also reports `milestone_complete` (boolean) and `milestone` (id when 
 
 > **JUDGMENT:** The integration sequence below is the orchestrator's responsibility BECAUSE workers run in isolated worktrees. The worker has committed implementation files to `req/REQ-NNN`; the orchestrator now merges that branch into the base branch, archives the REQ, tears down the worktree, and commits the metadata change. This is the only place where `.do-work/` lifecycle writes happen.
 
-Reached only when `status: done` and both acceptance evidence validation and post-build review passed. Execute these substeps in order; each must succeed before the next.
+Reached only when `status: done` and both acceptance evidence validation and post-build review passed.
+
+**Delivery mode dispatch.** Read `config.delivery.mode` (default `merge`):
+
+- **`merge`** (default) — execute substeps **4a → 4b → 4c → 4d** below, in order; each must succeed before the next. This is the historical local-merge behaviour, unchanged.
+- **`pr`** — skip 4a–4d entirely and execute the **PR delivery** sequence (`#### 4-pr`) instead. PR mode never runs the local merge.
+
+The archive guards in 4b (path-unit closure, non-empty closure proof) and the closure-proof model are identical in both modes — only the delivery vehicle differs. Whichever path runs, proceed to Step 7 when it completes.
 
 #### 4a. Merge the feature branch
 
@@ -733,6 +741,69 @@ UR: {project}/.do-work/user-requests/UR-NNN/input.md"
 ```
 
 If `.do-work/` is gitignored: skip this commit silently. The archive move is filesystem-only, and the worker's `feat(REQ-NNN): ...` commit (now on the base branch via the merge) is the authoritative record.
+
+Proceed to Step 7.
+
+#### 4-pr. PR delivery (delivery.mode: pr)
+
+Runs *instead of* 4a–4d when `config.delivery.mode` is `pr`. The closure-proof model is unchanged — evidence still gates archive; the PR is the delivery vehicle, not the proof. Execute these substeps in order; each must succeed before the next.
+
+**4-pr.0 Precondition — remote + `gh` (never a silent merge fallback).** Before any push, verify both:
+
+```bash
+git remote get-url origin    # a remote must be configured
+gh auth status               # the gh CLI must be installed and authenticated
+```
+
+If a remote is missing **or** `gh` is absent/unauthenticated, **stop**: do NOT merge, do NOT push, do NOT archive. Leave the REQ in `working/` (and the branch alive), transition it to `**Status:** stopped`, `**Reason:** missing-creds`, and surface to the user per `## Stopping Rules`. PR mode must **never** silently fall back to `merge` mode.
+
+**4-pr.1 Push the REQ branch.** With the precondition met, push the worker's branch to the remote:
+
+```bash
+git push -u origin req/REQ-NNN
+```
+
+**4-pr.2 Determine the PR target by granularity.** Read `config.delivery.pr.granularity` (default `req`):
+
+- **`req`** (default) — open the PR immediately, from `req/REQ-NNN` into the base branch. Continue to 4-pr.3.
+- **`ur`** — do NOT open a per-REQ PR. Instead accumulate this REQ onto the UR's shared integration branch:
+  1. Resolve the UR id from the REQ's `**UR:**` field → integration branch `ur/UR-NNN`.
+  2. If `ur/UR-NNN` does not yet exist on the remote, create it from the base branch and push it.
+  3. Merge `req/REQ-NNN` into `ur/UR-NNN` (`git merge --no-ff`, applying the same conflict/retry policy as 4a) and push `ur/UR-NNN`.
+  4. Archive this REQ now (4-pr.4) recording the `ur/UR-NNN` branch, but **defer PR creation**: the single PR opens at UR drain. After the last REQ for this UR archives and the UR's backlog is empty (see `## When the Backlog is Empty` drain check), open one PR from `ur/UR-NNN` into the base branch using the same title/body shape as 4-pr.3 (title/body keyed to the UR rather than a single REQ; the body links the UR and lists each integrated REQ). Record that PR's URL on the UR. Then continue past 4-pr.5 to Step 7.
+
+**4-pr.3 Open the PR (`req` granularity, or the single UR-drain PR).**
+
+```bash
+gh pr create \
+  --base <base-branch> \
+  --head req/REQ-NNN \
+  --title "<REQ title>" \
+  --body "<body — see below>"
+```
+
+PR body mirrors the commit convention (see SKILL.md / README `## Commit Convention`) and ends with the standard generated-with footer:
+
+```
+REQ: .do-work/archive/REQ-NNN-slug.md
+UR: .do-work/user-requests/UR-NNN/input.md
+Output: <primary output path>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+Capture the PR URL printed by `gh pr create`.
+
+**4-pr.4 Archive the REQ.** Apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the UR-drain PR opens.
+
+**4-pr.5 Tear down the worktree — but keep the branch.** Remove the worktree; do **not** delete the branch (the PR owns it):
+
+```bash
+git worktree remove {project}/.worktrees/req-NNN
+# NO `git branch -d` — the open PR owns req/REQ-NNN (or it lives on in ur/UR-NNN).
+```
+
+**4-pr.6 Record the PR URL in the ledger.** When `ledger.enabled` is true, pass the captured URL to the ledger via `--pr` (see Step 3b) so the run record's `pr_url` field carries it. If the metadata commit (4d-equivalent) runs for a tracked `.do-work/`, stage and commit the archive move with the same `chore(REQ-NNN): archive` message as 4d.
 
 Proceed to Step 7.
 

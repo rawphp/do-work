@@ -120,6 +120,26 @@ grep -q '^result: "stopped:policy-blocked"$' "$OUT" || fail "$CURRENT_CASE resul
 grep -q '^proof_status: "unproven"$' "$OUT" || fail "$CURRENT_CASE proof"
 teardown_project
 
+CURRENT_CASE="pr-url-recorded"
+CASES=$((CASES + 1))
+setup_project
+OUT="$(bash "$SCRIPT" --project "$TMP" --req "$REQ" --agent agent-1 --model sonnet \
+  --branch req/REQ-001 --started 2026-06-09T00:00:00Z --ended 2026-06-09T00:01:00Z \
+  --result done --review passed --cost "" \
+  --pr "https://github.com/owner/repo/pull/42" \
+  --commands "$COMMANDS" --tests "$TESTS" --changed-files "$FILES")"
+RC=$?
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+grep -q '^pr_url: "https://github.com/owner/repo/pull/42"$' "$OUT" || fail "$CURRENT_CASE pr_url"
+teardown_project
+
+CURRENT_CASE="pr-url-absent"
+CASES=$((CASES + 1))
+setup_project
+write_ledger "done" "passed" ""
+grep -q '^pr_url: ""$' "$OUT" || fail "$CURRENT_CASE pr_url empty"
+teardown_project
+
 echo ""
 echo "run-ledger tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then
