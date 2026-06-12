@@ -34,6 +34,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional UR-NNN scopes the run to that UR's REQs only. |
 | `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md. |
 | `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
+| `/do-work close UR-NNN` | Validates the integrated result of a UR against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
@@ -57,6 +58,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/run-worker.md](agents/run-worker.md) — Worker: TDD-and-commits a single REQ in a fresh subagent session
 - [agents/review.md](agents/review.md) — Post-build gate: reviews scope, acceptance evidence, tests, secrets, docs, and regression risk before archive
 - [agents/status.md](agents/status.md) — Read-only situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup
+- [agents/close.md](agents/close.md) — Validates the integrated result of a UR against its verbatim brief; walks path-unit entry points in the merged app; writes `UR-NNN/closure.md`
 - [agents/unblock.md](agents/unblock.md) — Force a stuck in-flight REQ back to the backlog
 - [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
@@ -549,6 +551,18 @@ Render a read-only live situation room: all in-flight REQs, their claimers, hear
 3. Confirm `{project}/.do-work/` exists. If not, report "do-work not installed." and stop.
 4. Read [agents/status.md](agents/status.md) in full.
 5. Follow the status agent instructions exactly. No state changes, no commits, no prompts.
+
+---
+
+### close UR-NNN
+
+Validate the integrated result of a UR against its verbatim brief — walking every path-unit's entry point to its terminal state in the merged app — and write a per-path-unit closure report.
+
+1. Detect `{project}`.
+2. Confirm `UR-NNN` was provided. If not, report "close requires a UR id (e.g. /do-work close UR-042)." and stop.
+3. Confirm `{project}/.do-work/user-requests/UR-NNN/input.md` exists. If not, report "UR-NNN not found at {project}/.do-work/user-requests/UR-NNN/. Check the UR number and try again." and stop.
+4. Read [agents/close.md](agents/close.md) in full.
+5. Follow the close agent instructions exactly. The close agent is dispatched as a fresh subagent — pass only the project do-work path, the UR reference, and the merged branch.
 
 ---
 
