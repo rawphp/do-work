@@ -217,6 +217,8 @@ Review each acceptance criterion in the REQ. Mark each `- [x]` as you verify it.
 
 ### 6. Execute verification steps
 
+**Section scope.** Only `## Verification Steps` items are part of the checkpoint loop. The `## Post-merge validation` section (if present in the REQ) is **never executed by the worker** — those items run after the orchestrator merges and are the `/do-work close` or approval flow's responsibility, not yours.
+
 Read `## Verification Steps` from the REQ. Execute each step in order:
 
 | Type | How to execute |
@@ -230,9 +232,21 @@ Record the result of each step in an ordered checkpoint log. Each checkpoint ent
 
 **Heartbeat checkpoint:** after each verification step, stamp the heartbeat — `{skill-root}/lib/heartbeat.sh "$REQ_PATH"` — so a long verification sequence never lets the slot drift stale.
 
-**If all steps pass:** proceed to step 7.
+**Deferred checkpoint status.** Some verification steps are *inherently* non-executable in a worktree — not because the implementation is wrong, but because running them is structurally impossible regardless of retries:
 
-**If any step fails:**
+- **`human`** — the step explicitly requires human judgment or confirmation ("Confirm the badge looks correct", "Ask the user to approve").
+- **`device`** — the step requires a physical device or external hardware not available in the worktree (mobile device, IoT sensor, etc.).
+- **`environment`** — the step requires an environment the worker genuinely cannot provision after a real attempt (a dev server that has no runtime in this worktree, external credentials that are not present, a third-party sandbox that cannot be reached).
+
+When you encounter such a step, mark it `status: deferred` in the checkpoint log with a `category` field (`human`, `device`, or `environment`) and a one-sentence `reason` explaining why it cannot be executed here. Add the step to `pending_validation:` in the Return Report. Then **continue** with the remaining steps.
+
+**Critical distinction — deferred vs. failing:**
+- A step that is *executable* but currently failing (test red, endpoint 500s, build broken) is **not** eligible for deferral. It follows the normal retry path and, after 3 retries, returns `verification-failing`.
+- Deferral is only for steps that *no retry could ever make executable* in this worktree. If you are unsure, attempt the step at least once before classifying it as deferred.
+
+**If all non-deferred steps pass:** proceed to step 7 (even if some steps were deferred — deferred steps do not block progress).
+
+**If any non-deferred step fails:**
 1. Note which step failed, expected vs actual, and the last good checkpoint before the failure.
 2. Increment a retry counter
 3. If retry count < 3: go back to step 3b (implement) with the failure as context — fix the root cause, not the test
@@ -251,7 +265,7 @@ Record the result of each step in an ordered checkpoint log. Each checkpoint ent
 
    > **JUDGMENT:** Title and body must name the failing step type plainly (test / build / runtime / ui) and the REQ id. Do not paste raw test output or absolute paths — the sanitiser strips paths, but commit messages and diffs must be omitted by the caller. One sentence in the body is enough; the goal is trend visibility, not a full failure log.
 
-On full pass, include the complete checkpoint log in the Return Report. The success case should be able to say `all N checkpoints passed`; this log is the evidence source later referenced by `closure_proof`.
+On full pass (or pass + deferred), include the complete checkpoint log in the Return Report. The success case should be able to say `all N checkpoints passed (M deferred)`; this log is the evidence source later referenced by `closure_proof`.
 
 ### 7. (Reserved — archive moved to orchestrator)
 
@@ -424,8 +438,12 @@ checkpoint_log:
       command: ""
       expected: ""
       actual: ""
-      status: passed
+      status: passed    # or "deferred" for inherently non-executable steps
       handoff: ""
+pending_validation: []  # list of deferred verification steps; empty list when nothing deferred
+                        # each entry: { step: "<step text>", category: human|device|environment, reason: "<why>" }
+                        # example: [{ step: "Confirm badge renders on user's phone", category: device,
+                        #              reason: "Requires physical iOS device not available in worktree" }]
 acceptance:
   AC1:
     status: passed
@@ -443,6 +461,9 @@ outputs:
 Field rules:
 - `status: done` → `commit` must be set; `reason` empty
 - `status: done` → `closure_proof` must be non-empty and reference the checkpoint log plus completing commit (for example `checkpoint_log:passed commit:abcdef1`)
+- `status: done` requires every acceptance criterion to carry `status: passed` with evidence — acceptance criteria can never be deferred. A REQ whose only AC is human-judgment-based has genuinely ambiguous criteria and must return `reason: ambiguous-criteria`, not defer the AC.
+- `status: done` with deferred verification steps is valid provided all non-deferred steps passed and all ACs have evidence. The deferred steps are listed in `pending_validation:` for the orchestrator to route.
+- `pending_validation:` is always present: empty list (`[]`) when nothing was deferred, populated list when one or more steps were deferred.
 - `status: stopped` → `reason` must match the enum above; `commit` empty
 - `status: failed` → unrecoverable error (exception thrown, file write failed); `reason: unknown-error` or specific
 - Always include `milestone_complete` (defaults to `false`)
@@ -465,3 +486,4 @@ Field rules:
 - **Stay in scope.** If the REQ would require changes outside its stated scope, return `status: stopped` with `reason: scope-creep`.
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.
 - **Worktree teardown belongs to the orchestrator.** Workers MUST NOT run `git worktree remove` or `git branch -d`. After you return `status: done`, the orchestrator merges the feature branch, archives the REQ, and tears down the worktree. Running teardown from the worker double-deletes the worktree and can corrupt the orchestrator's post-merge steps.
+- **Never invent stopper reasons.** The `reason` field in a stopped/failed report MUST be one of the documented enum values: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`. Do not improvise values outside this list (for example `awaiting-human-verification` is not a valid reason — if the worker hits an inherently non-executable verification step, use `status: deferred` in the checkpoint log and add the step to `pending_validation:` so the orchestrator can route it, then continue toward `status: done`). Inventing reasons outside the enum breaks downstream tooling (status, resume, unblock commands) that pattern-matches on these values.
