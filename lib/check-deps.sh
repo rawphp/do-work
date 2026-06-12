@@ -4,15 +4,17 @@
 # Usage: check-deps.sh <req-path>
 #   <req-path>  Path (relative or absolute) to a REQ file. The script parses
 #               its `**Depends on:**` field and reports any ids that are NOT
-#               yet archived.
+#               yet satisfied.
 #
 # Behavior:
 #   1. Parses this REQ's `**Depends on:**` field — comma-separated REQ ids,
 #      may be empty. The field line may be omitted entirely (treated as empty).
 #   2. Validates each id against `REQ-\d+` or `REQ-M\d+-\d+` (milestone form).
 #      Malformed ids are logged to stderr and NOT included in the missing-list.
-#   3. For each valid id, globs `{project}/.do-work/archive/<id>-*.md`. If no
-#      file matches, prints the id to stdout (one per line).
+#   3. For each valid id, globs `{project}/.do-work/archive/<id>-*.md` OR
+#      `{project}/.do-work/pending/<id>-*.md`. If no file matches either
+#      directory, prints the id to stdout (one per line). An absent `pending/`
+#      directory is treated as "no match" — never an error.
 #   4. Empty `**Depends on:**` → empty stdout. Exits 0 in all non-error cases.
 #
 # Notes:
@@ -103,15 +105,26 @@ is_valid_req_id() {
   return 1
 }
 
-# Check if a dep id has at least one archived file matching <id>-*.md.
-# Returns 0 if archived, 1 otherwise.
-is_archived() {
+# Check if a dep id is satisfied — i.e. at least one file matching <id>-*.md
+# exists in `.do-work/archive/` OR `.do-work/pending/`.
+# An absent `pending/` directory is handled gracefully (treated as no match).
+# Returns 0 if satisfied, 1 otherwise.
+is_satisfied() {
   local id="$1"
   shopt -s nullglob 2>/dev/null || true
+  # Check archive/ first.
   # shellcheck disable=SC2206
-  local matches=( "$DOWORK"/archive/"$id"-*.md )
-  if [ "${#matches[@]}" -gt 0 ]; then
+  local archive_matches=( "$DOWORK"/archive/"$id"-*.md )
+  if [ "${#archive_matches[@]}" -gt 0 ]; then
     return 0
+  fi
+  # Check pending/ — skip gracefully if the directory does not exist.
+  if [ -d "$DOWORK/pending" ]; then
+    # shellcheck disable=SC2206
+    local pending_matches=( "$DOWORK"/pending/"$id"-*.md )
+    if [ "${#pending_matches[@]}" -gt 0 ]; then
+      return 0
+    fi
   fi
   return 1
 }
@@ -130,7 +143,7 @@ while IFS= read -r dep; do
     printf 'check-deps: malformed REQ id ignored: %s\n' "$dep" >&2
     continue
   fi
-  if ! is_archived "$dep"; then
+  if ! is_satisfied "$dep"; then
     printf '%s\n' "$dep"
   fi
 done < <(split_csv "$DEPS_RAW")
