@@ -45,16 +45,18 @@ Capture the confidence score from the verify report.
 
 ### 2. Evaluate the score
 
+The gate is `config.verify.threshold` (loaded in Step 0; default 90 if unset). Substitute that value for `THRESHOLD` below.
+
 | Condition | Action |
 |-----------|--------|
-| Score >= 90% | Announce "Confidence NN% — proceeding to run." and continue to Step 3. |
-| Score < 90% and `--force` specified | Announce "Confidence NN% (below 90%) — force flag set, proceeding anyway." and continue to Step 3. |
-| Score < 90% and `--auto-fix` specified | Run verify with `--auto-fix` (which creates missing REQs and re-scores internally). If `--no-layers` was set on this go invocation, pass it through to verify so capture re-runs skip the layer-coverage check. Read the new score from verify's report. If now >= 90%, continue to Step 3. If still < 90% after auto-fix, stop: "Auto-fix raised score from NN% to NN%, but still below 90%. Manual review needed." Do NOT auto-fix more than once — one pass only. |
-| Score < 90% | Stop. Output the verify report and recommend: "Score is NN%. Review gaps above, then either fix manually and re-run, or use `--auto-fix`." |
+| Score >= THRESHOLD | Announce "Confidence NN% — proceeding to run." and continue to Step 3. |
+| Score < THRESHOLD and `--force` specified | Announce "Confidence NN% (below THRESHOLD) — force flag set, proceeding anyway." and continue to Step 3. |
+| Score < THRESHOLD and `--auto-fix` specified | Run verify with `--auto-fix` (which creates missing REQs and re-scores internally). If `--no-layers` was set on this go invocation, pass it through to verify so capture re-runs skip the layer-coverage check. Read the new score from verify's report. If now >= THRESHOLD, continue to Step 3. If still < THRESHOLD after auto-fix, stop: "Auto-fix raised score from NN% to NN%, but still below THRESHOLD. Manual review needed." Do NOT auto-fix more than once — one pass only. |
+| Score < THRESHOLD | Stop. Output the verify report and recommend: "Score is NN%. Review gaps above, then either fix manually and re-run, or use `--auto-fix`." |
 
 ### 2b. Run Audit (always-on)
 
-If execution will proceed (score >= 90%, or `--force` was used, or `--auto-fix` raised the score above threshold):
+If execution will proceed (score >= `config.verify.threshold`, or `--force` was used, or `--auto-fix` raised the score above threshold):
 
 Read and follow [audit.md](audit.md) in full.
 
@@ -64,7 +66,7 @@ The audit agent will interrogate each REQ's quality, auto-fix soft spots, and pr
 
 **Do not re-run verify after audit.** Audit only sharpens precision (criteria specificity, error paths) — it does not change scope or coverage, so the verify score remains valid.
 
-If execution will NOT proceed (score < 90% and no `--force`/`--auto-fix`), skip this step — audit only runs when work is about to begin.
+If execution will NOT proceed (score < `config.verify.threshold` and no `--force`/`--auto-fix`), skip this step — audit only runs when work is about to begin.
 
 Capture the audit outcome for the completion report: number of fixes applied, or "clean" if no fixes, or "skipped" if audit did not run.
 
@@ -112,7 +114,7 @@ Go complete for UR-NNN
 
 Verify: NN% confidence
 Audit: [N fixes applied / clean / skipped]
-Run: [N REQs processed / stopped at verify — score below 90%]
+Run: [N REQs processed / stopped at verify — score below threshold]
 
 Archive: {project}/.do-work/archive/
 ```
@@ -136,7 +138,7 @@ If `config.next_steps.enabled` is `false` or missing: skip the AskUserQuestion a
 ## Rules
 
 - Follow each sub-agent's rules exactly — this agent adds no new rules, only sequencing and the confidence gate
-- The confidence threshold is 90% — this matches verify's own "ready to run" threshold
+- The confidence threshold is `config.verify.threshold` (default 90, from config.md / REQ-201) — this matches verify's own "ready to run" threshold; both agents read the same key
 - Never skip Verify — it must run before any execution starts
 - The `--force` flag overrides the threshold but still runs verify (so you see the report)
 - If the run agent hits a stopper, respect it — do not retry or override
