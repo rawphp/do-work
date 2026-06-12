@@ -157,92 +157,44 @@ Everything is auditable — the brief, decomposed tasks, and outputs all live in
 
 Each project gets a `.do-work/config.yml` file, auto-created on first `/do-work start` or `/do-work install`. Edit it to customize agent behavior.
 
-```yaml
-# do-work configuration
-project:
-  name: "my-project"
+The full schema — every key, its type, default, and description — lives in [`agents/config.md`](agents/config.md). That file is also the canonical default template: on first agent run, the config loader migrates any missing sections and keys automatically, so you only need to set the keys you want to override.
 
-# Project layers — capture and verify use these to gap-check briefs.
-# Examples: [frontend, backend], [commands, core, output],
-#           [public_api, internal], [agents, commands, templates].
-# Empty list = opt out of layer-coverage checks (feature briefs will
-# halt until either a list is declared or --no-layers is passed).
-layers: []
+The most commonly customized keys at install time:
+
+```yaml
+project:
+  name: "my-project"    # display name
+
+layers: []              # e.g. [frontend, backend] — gap-checks briefs per layer
+
+test:
+  suite_command: ""     # e.g. "./vendor/bin/pest", "npx vitest run"
 
 log:
   enabled: true
   platforms: [x, linkedin]
-  drafts_per_platform: 2
-  batch_size: 2
-  audience: ""
-  voice: ""
-  max_chars:
-    x: 280
-    blog: 500
-    linkedin: 1300
-
-test:
-  suite_command: ""
-
-next_steps:
-  enabled: false
-
-review:
-  required: true
-
-acceptance:
-  evidence_required: true
-
-risk:
-  require_review:
-    - migrations
-    - auth
-    - billing
-    - payments
-    - files_changed_over: 8
-    - acceptance_criteria_over: 6
-
-security:
-  blocked_paths:
-    - .env
-    - .env.*
-  blocked_commands:
-    - rm -rf
-    - production
 
 model:
-  default: sonnet
+  default: sonnet       # sonnet | opus | haiku
   escalation: opus
 
-cost:
-  budget: ""
-
-ledger:
-  enabled: true
+verify:
+  threshold: 90         # minimum confidence score for go to auto-run without --force
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `project.name` | string | `""` | Project display name |
-| `layers` | list of strings | `[]` | Project's declared layers for gap-aware capture. Capture and verify check that REQs cover each declared layer. Empty = opt out (feature briefs will halt until declared or `--no-layers` is passed). |
+| `layers` | list of strings | `[]` | Project's declared layers for gap-aware capture. Empty = opt out. |
+| `test.suite_command` | string | `""` | Full test suite command (e.g. `./vendor/bin/pest`, `npx vitest run`). |
 | `log.enabled` | boolean | `true` | Whether the log step runs after `/do-work go` |
 | `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin, blog]`) |
-| `log.drafts_per_platform` | integer | `2` | Number of draft variations to generate per platform |
-| `log.batch_size` | integer | `2` | Drafts to show per batch in the selection prompt (max 2 for non-final batches, 3 for final) |
-| `log.audience` | string | `""` | Target audience for log posts (e.g. `"indie hackers"`, `"enterprise devs"`) |
-| `log.voice` | string | `""` | Writing style for log posts (e.g. `"casual and direct"`, `"thoughtful and technical"`) |
-| `log.max_chars` | map | `{x: 280, blog: 500, linkedin: 1300}` | Per-platform character ceiling the log agent enforces on every draft. Keys are platform slugs; values are integer char limits. Drafts exceeding the ceiling are rewritten, then truncated if still over. |
-| `test.suite_command` | string | `""` | Full test suite command (e.g. `./vendor/bin/pest`, `npx vitest run`). If empty, common defaults are attempted. |
-| `next_steps.enabled` | boolean | `false` | When true, agents present next-step options via AskUserQuestion after each phase |
-| `review.required` | boolean | `true` | Require post-build review before archive completion |
-| `acceptance.evidence_required` | boolean | `true` | Require evidence for every acceptance criterion |
-| `risk.require_review` | list | see config | Signals that require explicit review |
-| `security.blocked_paths` | list | `[.env, .env.*]` | Paths workers must not modify |
-| `security.blocked_commands` | list | `[rm -rf, production]` | Command fragments that stop the run/review path |
 | `model.default` | string | `sonnet` | Default worker model |
 | `model.escalation` | string | `opus` | Escalation model for high-risk or failed work |
-| `cost.budget` | string | `""` | Optional user-defined budget; empty means unset |
+| `verify.threshold` | integer | `90` | Minimum confidence score (0-100) for `go` to auto-run without `--force`. |
 | `ledger.enabled` | boolean | `true` | Write structured run records under `.do-work/runs/` |
+
+For the full key reference including `feedback`, `parallel`, `next_steps`, `review`, `acceptance`, `risk`, `security`, `cost`, and `ledger`, see [`agents/config.md`](agents/config.md).
 
 ---
 
