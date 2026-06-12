@@ -413,13 +413,13 @@ DEADLOCK_OUT=$(bash {skill-root}/lib/deadlock-check.sh)
 3. **Acquire the surfacing lock** via `flock -n` on `.do-work/state/feedback.lock` so only one orchestrator writes `deadlock.md` and surfaces to the user. Siblings that fail to acquire the lock skip steps 4–6 and exit the idle-wait loop quietly (they will pick up via their own timeout if the deadlock persists).
 4. **Lock-holder only:** write `{project}/.do-work/state/deadlock.md` containing the full `deadlock-check.sh` output plus a timestamp. This file is the cross-process signal that the deadlock has been surfaced.
 5. **Lock-holder only:** emit feedback by calling `bash {skill-root}/lib/file-feedback.sh deadlock "<fingerprint>" '<context-json>'` where `<context-json>` is a single-line JSON object with `signal`, `live-slots`, `stale-slots`, `backlog-size`, `last-commit-age`, `classification` (the idle-wait entry classification). The script handles its own enable/disable, deduplication, and lock-on-feedback.lock — call it best-effort and continue regardless of exit code.
-6. **Lock-holder only — surface to the user**, gated on `config.next_steps.enabled` and standalone mode (same gate as Stopping Rules):
-   - If gate passes: use the `AskUserQuestion` tool with options:
+6. **Lock-holder only — surface to the user**, gated on standalone mode only (recovery prompts are workflow-critical and must not depend on `config.next_steps.enabled`):
+   - **If standalone** (not running as a delegate inside go): use the `AskUserQuestion` tool with options:
      1. **"Reset stale slots"** — return any slots listed in `stale-slots` to the backlog (per the Pre-flight stale-slot return path).
      2. **"Show situation room"** — print the suggestion `Run /do-work status` and exit cleanly.
      3. **"Unblock a REQ"** — ask which REQ id; print `Run /do-work unblock REQ-NNN` and exit cleanly.
      4. **"Abort"** — exit this orchestrator cleanly.
-   - If gate fails (`next_steps.enabled` is `false` / missing, or running as a delegate): print the diagnosis block (the `deadlock-check.sh` output plus a one-line summary) and exit cleanly. Do not prompt.
+   - **If delegate** (running inside go): print the diagnosis block (the `deadlock-check.sh` output plus a one-line summary) and exit cleanly. Do not prompt.
 
 > **JUDGMENT:** The deadlock diagnosis must distinguish a stuck deadlock from a slow-but-live backlog. `deadlock-check.sh` returning a report is strong evidence (no commits in 5 min OR all slots stale OR runtime cycle) — trust it and surface. Empty output means heartbeats are still advancing or commits are landing; in that case the generic "continue waiting?" prompt is correct. Never silently keep idling past the 30-minute mark — either the deadlock path or the user prompt must fire.
 
@@ -855,7 +855,7 @@ The worker captures relevant details in the report's `details` field. The worker
 
 When the worker returns `status: stopped`, the orchestrator surfaces the stopper to the user. Recover the REQ from `working/` if it was not archived, then:
 
-If `config.next_steps.enabled` is `true` **and** this agent is running standalone (not as a delegate inside the go agent):
+If this agent is running **standalone** (not as a delegate inside the go agent):
 
 **Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
@@ -863,7 +863,7 @@ If `config.next_steps.enabled` is `true` **and** this agent is running standalon
 2. **"Retry current REQ"** — Re-dispatch the worker for the same REQ (fresh subagent session)
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: print the stopper and the worker's `details` field, then stop. Do not loop, do not silently retry, do not auto-resolve.
+If this agent is running as a **delegate** inside go: print the stopper and the worker's `details` field, then stop. Do not loop, do not silently retry, do not auto-resolve.
 
 ### Per-REQ retry counter (ambiguous-criteria recurrence)
 
