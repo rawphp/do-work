@@ -253,6 +253,11 @@ For each task, write a file to the backlog root:
 
 > **JUDGMENT:** [J2 — Depends on] Before writing the `**Depends on:**` line, scan the decomposition from Step 3 for hard ordering constraints: does this REQ assume another REQ's output file exists, or call a function that another REQ will write? If yes, list those REQ ids. If the REQ is independently implementable from HEAD, write an empty value (the field must still appear). Do not add soft ordering preferences — only blocking dependencies.
 
+**Deriving `**Priority:**` and `**Size:**` (defaults from REQ shape — never ask the user).** Both fields are *derived* from analysis you have already done; they follow HOW-IT-WORKS principle 5 — defaults come from the REQ's shape, a user override is allowed but never required, and an absent field is silently treated as its default. Do not prompt the user for either value.
+
+- **`**Priority:**` (1–3, default 2)** — derive from **dependency-graph depth**: the longer the chain of REQs that depend (transitively) on this one, the earlier it should start under parallelism. After the `**Depends on:**` edges are all written, compute each REQ's longest *dependent* chain (how many REQs sit downstream of it). Map: a REQ that unblocks the deepest chain in the backlog → `3`; a leaf REQ that nothing depends on → `1`; everything in between → `2`. When the graph is flat (no meaningful chains), leave it at the `2` default (or omit the line). A higher number means more urgent.
+- **`**Size:**` (S | M | L)** — derive from the decomposition signals you used to split this REQ: **file count** (`**Files:**` breadth), **layer span** (how many declared layers it crosses), and **acceptance-criteria count**. Rough mapping: 1 file / 1 layer / ≤2 criteria → `S`; a few files within 1–2 layers / 3–4 criteria → `M`; 4+ files OR 3+ layers OR 5+ criteria OR introduces new architecture → `L`. `Size: L` is later read by `agents/run.md`'s Model Selection as a primary opus-escalation signal, so size it honestly. If a REQ's shape is genuinely ambiguous, omit the field rather than guessing.
+
 Use this format exactly:
 
 ```markdown
@@ -267,6 +272,8 @@ Use this format exactly:
 **Parent:** <parent path-unit REQ id for child layer-tasks; empty for top-level path-units and legacy-style REQs>
 **Closure proof:**
 **Criteria approved:** agent-drafted
+**Priority:** <1-3, default 2; derived from dependency-graph depth — see derivation rules below; omit to mean 2>
+**Size:** <S | M | L; derived from decomposition signals — see derivation rules below; omit if unclear>
 **Files:** <comma-separated project-relative paths or globs of files this REQ will touch; globs allowed>
 **Depends on:** <comma-separated REQ-NNN ids that must be done before this REQ starts; empty if none>
 
