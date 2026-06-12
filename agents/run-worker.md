@@ -12,7 +12,7 @@ The following steps require model judgment that cannot be reduced to a rule. Eac
 
 | # | Step | Decision |
 |---|------|----------|
-| J1 | Step 2 (Isolation Mode) — choosing isolation mode | Which isolation mode applies: `same-branch` or `worktree`? Apply the table top-to-bottom; first match wins. The `--isolation=worktree` override (passed by the orchestrator) takes priority over all content signals. |
+| J2 | Step 8 (Footprint Verification) — footprint miss classification | Distinguish a legitimate adjacent file (test fixture, related helper, forgotten doc update) from genuine scope creep. If the extra staged path is clearly related to this REQ's stated task, continue-and-correct (update `**Files:**`, emit feedback). If it represents a new module or unrelated refactor outside the REQ's stated scope, return `status: stopped`, `reason: scope-creep`. |
 
 ---
 
@@ -108,12 +108,12 @@ Immediately after reading the REQ, start a background heartbeat loop. This refre
 
 ```bash
 # Background heartbeat — refreshes **Heartbeat:** every 60s so siblings know we're alive.
-( while sleep 60; do lib/heartbeat.sh "$REQ_PATH" || break; done ) &
+( while sleep 60; do {skill-root}/lib/heartbeat.sh "$REQ_PATH" || break; done ) &
 HEARTBEAT_PID=$!
 trap 'kill "$HEARTBEAT_PID" 2>/dev/null' EXIT
 ```
 
-`REQ_PATH` is the absolute path to the REQ file in `working/`. The `trap ... EXIT` ensures the background process is cleaned up even if the worker exits early (stop, error, or normal completion). `lib/heartbeat.sh` writes the current UTC timestamp into the `**Heartbeat:**` field of the REQ file; stale-slot detection in the pre-flight scan uses this timestamp to decide whether a claimed slot is dead.
+`REQ_PATH` is the absolute path to the REQ file in `working/`. The `trap ... EXIT` ensures the background process is cleaned up even if the worker exits early (stop, error, or normal completion). `{skill-root}/lib/heartbeat.sh` writes the current UTC timestamp into the `**Heartbeat:**` field of the REQ file; stale-slot detection in the pre-flight scan uses this timestamp to decide whether a claimed slot is dead.
 
 **Why these numbers.** The 60-second refresh interval pairs with the pre-flight scanner's 300-second stale threshold — a 5× safety factor that absorbs transient slow ticks (long test runs, paused subagents) without falsely declaring the slot dead. The `EXIT` trap is what makes the loop *safe*: any exit path (normal return, stopped report, thrown error, signal) tears down the background process so it cannot keep stamping a REQ the worker has abandoned.
 
@@ -221,7 +221,7 @@ Record the result of each step in an ordered checkpoint log. Each checkpoint ent
    ```bash
    STEP_TYPE="<test|build|runtime|ui>"            # the verification step type that failed
    FINGERPRINT="verify-fail:${STEP_TYPE}"
-   bash lib/file-feedback.sh verify-fail \
+   bash {skill-root}/lib/file-feedback.sh verify-fail \
      "$FINGERPRINT" \
      '{"req":"REQ-NNN","step_type":"'"$STEP_TYPE"'","attempts":3}' \
      "Verify-fail: REQ-NNN ${STEP_TYPE} step exhausted 3 retries" \
@@ -260,7 +260,7 @@ For any staged path NOT covered by the declared footprint (use `lib/check-footpr
 
    ```bash
    FINGERPRINT="footprint-miss:$(git diff --name-only --cached | md5sum | cut -d' ' -f1)"
-   bash lib/file-feedback.sh footprint-miss \
+   bash {skill-root}/lib/file-feedback.sh footprint-miss \
      "$FINGERPRINT" \
      '{"req":"REQ-NNN"}' \
      "Footprint miss: REQ-NNN" \
@@ -363,7 +363,7 @@ if [ -z "$FILES_HASH" ] || [ "$FILES_HASH" = "d41d8cd98f00b204e9800998ecf8427e" 
     FILES_HASH=$(git diff --name-only --diff-filter=U 2>/dev/null | md5sum | cut -d' ' -f1)
 fi
 FINGERPRINT="concurrent-conflict:${FILES_HASH}"
-bash lib/file-feedback.sh concurrent-conflict \
+bash {skill-root}/lib/file-feedback.sh concurrent-conflict \
   "$FINGERPRINT" \
   '{"req":"REQ-NNN","attempts":5,"branch":"<current-branch>"}' \
   "Concurrent-conflict: REQ-NNN exhausted 5 retries" \
@@ -389,7 +389,7 @@ reason: ""              # required when status is "stopped" or "failed"
                         #         scope-creep, dependency-missing,
                         #         unknown-error, concurrent-conflict
 details: ""             # free-text context for the orchestrator/user
-isolation: same-branch  # or "worktree" — from ## Isolation Mode heuristic
+isolation: worktree     # unconditional — same-branch mode is retired
 closure_proof: ""       # non-empty only when status: done; references checkpoint_log and commit
 last_good_step: 0       # highest verification checkpoint that passed before failure; total count when all pass
 failed_step: 0          # failing checkpoint number; 0 when status: done
@@ -442,4 +442,4 @@ Field rules:
 - **You cannot ask the user questions.** You have no user-interaction surface. Every blocker exits as a `status: stopped` report with a structured `reason`. The orchestrator surfaces user-facing prompts on your behalf.
 - **Stay in scope.** If the REQ would require changes outside its stated scope, return `status: stopped` with `reason: scope-creep`.
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.
-- **Worktree teardown is mandatory.** Workers in `worktree` mode must `git worktree remove` and `git branch -d` after a successful merge — failing to do so leaks worktree state across runs.
+- **Worktree teardown belongs to the orchestrator.** Workers MUST NOT run `git worktree remove` or `git branch -d`. After you return `status: done`, the orchestrator merges the feature branch, archives the REQ, and tears down the worktree. Running teardown from the worker double-deletes the worktree and can corrupt the orchestrator's post-merge steps.
