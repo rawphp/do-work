@@ -124,6 +124,34 @@ Does the REQ's `**Files:**` field plausibly match what the `## Task` block says 
 
 **Flag behaviour:** When a path in `**Files:**` is absent from the task body, report `[FLAG] REQ-NNN **Files:** lists <path> but it is not mentioned in the task body — verify it is intentional`.
 
+#### Dimension 8: Non-executable Verification Step Scan
+
+Does the REQ's `## Verification Steps` contain steps that violate the worker-executability rule? Such steps strand workers in `verification-failing` at run time — audit catches and relocates them before the run loop ever starts.
+
+**Indicator categories (single source of truth: `agents/capture.md` `### Writing effective Verification Steps` — do not maintain a separate copy; cite and apply the same four categories):**
+
+| Category | Example indicator phrases |
+|---|---|
+| **Human judgment** | "user confirms", "manually check", "looks correct", "[HUMAN]", "verify visually", "confirm the badge" |
+| **Physical device** | "on-device", "on the phone", "on iOS", "on Android", "on the watch" |
+| **Unprovisionable environment** | "in production", "requires login", "against the live API", "on-device build" |
+| **Explicit human-action phrasing** | "Ask the user to...", "Have someone...", "Check with the team..." |
+
+**Scan procedure:**
+
+1. Read the REQ's `## Verification Steps` block.
+2. For each numbered step, check whether its text matches any indicator phrase from the four categories above.
+3. If a match is found, record the REQ id, step number, matched indicator phrase, and category.
+
+**Auto-fix:**
+
+1. Move the offending step out of `## Verification Steps` entirely.
+2. Append it to `## Post-merge validation` as a checklist item: `- [ ] [original step text] — Observable outcome: [infer from step context or leave blank for manual fill]`.
+3. Create `## Post-merge validation` if absent, using the section header and comment block from `agents/capture.md`'s REQ template.
+4. Renumber any remaining `## Verification Steps` entries so numbering stays contiguous.
+
+Report each fix in the audit change report as: `[FIXED] REQ-NNN step N — non-executable step (category: <category>, indicator: "<phrase>") moved to ## Post-merge validation`.
+
 ### 4. Apply fixes
 
 For each REQ, apply auto-fixes inline:
@@ -133,6 +161,7 @@ For each REQ, apply auto-fixes inline:
 - Add dependency annotations (Dimension 4)
 - Add missing `ui` verification step when unambiguously inferrable (Dimension 6)
 - Append missing footprint paths to `**Files:**` (Dimension 7)
+- Move non-executable verification steps to `## Post-merge validation` (Dimension 8)
 - Apply blanket find-and-replace guard augmentations when triggered (see below)
 
 #### Blanket find-and-replace guard (mirror of capture.md Step 4d)
@@ -178,6 +207,7 @@ Audit Report — UR-NNN
 - N error paths added
 - N dependency annotations added
 - N footprint paths appended to `**Files:**`
+- N non-executable verification steps moved to `## Post-merge validation`
 - N flags requiring user judgment
 - Overall: [clean / minor fixes applied / needs attention]
 ```
