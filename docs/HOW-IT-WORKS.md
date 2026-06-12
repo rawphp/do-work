@@ -170,17 +170,17 @@ Executes the backlog autonomously, one REQ at a time, until empty or a stopper i
 
 #### The TDD loop (per REQ)
 
-The orchestrator dispatches a **fresh worker subagent** for each REQ (see `agents/run-worker.md`). The worker:
+The orchestrator claims the REQ (atomic `git mv` from backlog root into `working/`, plus a claim stamp written to the file via `lib/claim-req.sh`), then dispatches a **fresh worker subagent** for each REQ (see `agents/run-worker.md`). The worker:
 
-1. Claims the REQ (atomic `git mv` from backlog root into `working/`, plus a claim stamp written to the file)
-2. Chooses isolation mode — `same-branch` (default) or `worktree` (large/cross-cutting REQs)
-3. Writes a failing test for the first acceptance criterion
-4. Implements until the test passes
-5. Repeats for remaining criteria
-6. Runs the project's full test suite
-7. Commits with `feat(REQ-NNN): short title` and a body pointing back to the REQ, UR, and primary output
-8. Moves the REQ from `working/` to `archive/` with `Status: done`
-9. Returns a structured report to the orchestrator
+1. Creates a git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch
+2. Writes a failing test for the first acceptance criterion
+3. Implements until the test passes
+4. Repeats for remaining criteria
+5. Runs the project's full test suite
+6. Commits with `feat(REQ-NNN): short title` and a body pointing back to the REQ, UR, and primary output
+7. Returns a structured YAML report to the orchestrator
+
+The orchestrator then validates the report, merges the worktree branch, moves the REQ from `working/` to `archive/` with `Status: done`, tears down the worktree, and records the ledger entry.
 
 **Why a fresh subagent per REQ:** Context isolation. A worker that just finished implementing REQ-007 carries 30k tokens of context that are irrelevant — and often actively misleading — for REQ-008. Spawning a fresh subagent enforces a clean room per REQ. The orchestrator (the parent) only sees structured return reports, not the worker's internal monologue, so the parent's context stays small even across hundreds of REQs.
 
@@ -190,14 +190,9 @@ The orchestrator dispatches a **fresh worker subagent** for each REQ (see `agent
 
 #### Isolation mode
 
-The worker picks `worktree` mode when:
-- The REQ task mentions `migration`, `schema change`, `rename across`, `refactor across`, `extract module`, or `restructure`
-- The Integration block lists ≥ 3 distinct service dependencies
-- The REQ has > 6 acceptance criteria
+Every REQ runs in a dedicated git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch. The orchestrator creates the worktree before dispatch and tears it down after merging the worker's commit. Worktree-always is the canonical mode — same-branch execution is retired.
 
-Otherwise it stays on the base branch (`same-branch` mode). Worktree REQs work in `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch and merge back on completion.
-
-**Why heuristic-driven, not user-choice:** Most REQs are small and don't justify the overhead of a worktree. The minority that *do* justify it are predictable — they have specific lexical and structural signals. Encoding those signals as heuristics removes the per-REQ decision from the human.
+**Why worktree-always:** Uniform isolation removes a per-REQ judgment call and eliminates the class of conflicts that arises when two workers touch overlapping files on the same branch. The worktree overhead is negligible compared to the TDD loop.
 
 ---
 
@@ -327,7 +322,7 @@ The skill is autonomous *inside* well-bounded loops (one REQ → fresh subagent 
 
 ### 5. Heuristics replace per-task questions
 
-Defaults are picked from REQ shape (worktree-vs-same-branch, parallel claim ordering, layer enforcement). The user can override, but they almost never need to. Removing micro-decisions from the human is the only way the autonomous loop earns its name.
+Defaults are picked from REQ shape (parallel claim ordering, layer enforcement) and system-level policy (worktree-always isolation). The user can override, but they almost never need to. Removing micro-decisions from the human is the only way the autonomous loop earns its name.
 
 ---
 
