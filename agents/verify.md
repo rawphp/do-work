@@ -92,6 +92,7 @@ Also check for:
 - **Vague acceptance criteria** — criteria that can't be verified (apply capture.md's vague-qualifier scan: "correctly", "properly", "as expected", "works", "handles" without specific outcomes)
 - **Missing verification steps** — REQs without typed verification steps (test/build/runtime/ui) are not TDD-ready and will block the Run agent
 - **Unaddressed Ideate Flags** — Challenger risks or Connector overlaps from `ideate.md` (Step 2b) that no REQ addresses. List each unaddressed observation. Each reduces the confidence score by 5 points (capped at -20 total deduction).
+- **Non-executable verification steps** — verification steps in `## Verification Steps` that violate the worker-executability rule (Step 4g). Each hit is a named issue on the owning REQ, reported with step number and indicator matched.
 
 ### 4b. Layer-coverage check
 
@@ -186,11 +187,41 @@ A REQ is a **path-unit candidate** when either field is present. A path-unit is 
 
 4. Auto-fix does not invent entry points or terminal states. With `--auto-fix`, surface these gaps and stop; the user or capture re-run must fill the missing path-unit fields.
 
+### 4g. Non-executable verification step scan
+
+For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog ∪ working/ ∪ archive/) for verification steps in `## Verification Steps` that violate the worker-executability rule.
+
+**Indicator categories (single source of truth: `agents/capture.md` `### Writing effective Verification Steps` — do not maintain a separate copy; cite and apply the same four categories):**
+
+| Category | Example indicator phrases |
+|---|---|
+| **Human judgment** | "user confirms", "manually check", "looks correct", "[HUMAN]", "verify visually", "confirm the badge" |
+| **Physical device** | "on-device", "on the phone", "on iOS", "on Android", "on the watch" |
+| **Unprovisionable environment** | "in production", "requires login", "against the live API", "on-device build" |
+| **Explicit human-action phrasing** | "Ask the user to...", "Have someone...", "Check with the team..." |
+
+**Scan procedure:**
+
+1. Read the REQ's `## Verification Steps` block.
+2. For each numbered step, check whether its text matches any indicator phrase from the four categories above.
+3. If a match is found, record a named issue on that REQ: include the REQ id, the step number, the matched indicator phrase, and the category it falls under.
+4. The suggested fix for each hit: move the step out of `## Verification Steps` and into `## Post-merge validation` (creating the section if absent).
+
+**Scoring:** non-executable step hits are reported in the Issues section of the verify report. They lower confidence the same way other REQ-quality issues do (each counts as a gap; deduction formula is the same as vague-criteria hits — -5 per hit, capped at -20 total).
+
+**Auto-fix:** when invoked with `--auto-fix`:
+1. Move the offending step out of `## Verification Steps` and append it to `## Post-merge validation` as a checklist item: `- [ ] [original step text] — Observable outcome: [infer from step context or leave blank for manual fill]`.
+2. Renumber any remaining `## Verification Steps` entries so numbering stays contiguous.
+3. Create `## Post-merge validation` if absent, using the section header from `agents/capture.md`'s REQ template.
+4. Re-report the REQ as clean once all non-executable steps have been moved.
+
+Report each auto-fix action in the verify report as: `[AUTO-FIXED] REQ-NNN step N — moved "[indicator phrase]" to ## Post-merge validation`.
+
 ### 5. Score the coverage, then produce the report
 
 #### 5a. Build the gap manifest (judgment)
 
-From Steps 2b–4f you have already counted each category. Your job is to produce the manifest; the arithmetic belongs to the script. Assemble these counts:
+From Steps 2b–4g you have already counted each category. Your job is to produce the manifest; the arithmetic belongs to the script. Assemble these counts:
 
 | Manifest field | Source | Script flag |
 |---|---|---|
@@ -204,7 +235,7 @@ From Steps 2b–4f you have already counted each category. Your job is to produc
 | dangling deps | Step 4e | `--dangling-deps` |
 | path-unit closure gaps | Step 4f | `--path-unit-gaps` |
 
-Skipped checks contribute zero — omit the flag (it defaults to 0). For legacy/bug-fix URs, the layer/integration/partial-confidence categories are skipped, so leave those flags off.
+Non-executable step hits (Step 4g) are reported as named Issues on individual REQs (in the Issues section of the report); they do not have a dedicated `score-coverage.sh` flag — their effect on confidence flows through the Issues count. Skipped checks contribute zero — omit the flag (it defaults to 0). For legacy/bug-fix URs, the layer/integration/partial-confidence categories are skipped, so leave those flags off.
 
 #### 5b. Invoke the scorer (arithmetic)
 
