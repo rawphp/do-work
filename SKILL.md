@@ -369,64 +369,24 @@ Create the do-work folder structure. Idempotent — safe to run multiple times.
    - `{project}/.do-work/archive/`
    - `{project}/.do-work/logs/`
    - `{project}/.do-work/state/`
-3. Create `{project}/.do-work/config.yml` if it does not already exist, using the default template below:
+3. Create `{project}/.do-work/config.yml` if it does not already exist, using the bootstrap template below. This template contains the keys most commonly customised at install time. The full default template — including all sections, defaults, and inline documentation — is the canonical template in `agents/config.md`. On first agent run, the config loader in `agents/config.md` migrates any missing sections and keys from that canonical template automatically, so new installs receive all defaults without needing the full template written to disk by install.
 
 ```yaml
 # do-work configuration
 # Edit this file to customize agent behavior.
-# Full key reference: agents/config.md
+# Full schema and defaults: agents/config.md (canonical template)
 
 project:
   name: ""
 
-layers: []                 # declare project layers, e.g. [frontend, backend]
+# Declare your project's layers, e.g. [frontend, backend] for a web app,
+# [commands, core, output] for a CLI, [agents, commands, templates] for do-work.
+# Capture and verify use this list to gap-check briefs. Leave empty to
+# opt out of layer-coverage checks.
+layers: []
 
-log:
-  enabled: true
-  platforms: []            # e.g. [x, linkedin]
-  drafts_per_platform: 2
-
-feedback:
-  enabled: false           # set true to file GitHub issues on anomalies
-  repo: ""                 # target repo for feedback issues, e.g. myorg/myrepo
-  label: auto:do-work-feedback
-  project_repo: ""         # if different from repo
-
-parallel:
-  stale_threshold_seconds: 300   # heartbeat age (seconds) before a slot is flagged stale
-
-review:
-  required: true
-
-acceptance:
-  evidence_required: true
-
-risk:
-  require_review:
-    - migrations
-    - auth
-    - billing
-    - payments
-    - files_changed_over: 8
-    - acceptance_criteria_over: 6
-
-security:
-  blocked_paths:
-    - .env
-    - .env.*
-  blocked_commands:
-    - rm -rf
-    - production
-
-model:
-  default: sonnet
-  escalation: opus
-
-cost:
-  budget: ""
-
-ledger:
-  enabled: true
+test:
+  suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
 ```
 
 4. Report what was created vs already existed. Example:
