@@ -33,6 +33,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
 | `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional UR-NNN scopes the run to that UR's REQs only. |
 | `/do-work run [UR-NNN] --parallel N` | Single-session parallel mode: one terminal dispatches up to N concurrent workers (default 1 = serial, capped at 10), serializing merge/archive through a queue. Defaults from `parallel.max_workers`. |
+| `/do-work run [UR-NNN] --budget <amount>` | Caps cumulative estimated model spend for the run; overrides `cost.budget` for this invocation. When estimated spend reaches the budget, the loop finishes the in-flight REQ's integration then stops at the next REQ boundary with a budget-stop report. Empty budget = unlimited (default). |
 | `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md. |
 | `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
 | `/do-work close UR-NNN` | Validates the integrated result of a UR against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report. |
@@ -572,7 +573,7 @@ Score REQ coverage against the original brief. List gaps and issues.
 
 ---
 
-### run [UR-NNN] [--parallel N]
+### run [UR-NNN] [--parallel N] [--budget <amount>]
 
 Execute the backlog autonomously — until empty or a stopper is hit. The optional `UR-NNN` argument scopes execution to that UR's REQs only, ignoring all other backlog entries. The orchestrator dispatches a fresh worker subagent per REQ (see [agents/run-worker.md](agents/run-worker.md)) and reads its structured return report.
 
@@ -583,16 +584,22 @@ By default the orchestrator runs **serially** — one REQ at a time. The optiona
 - When `--parallel` is absent, the default comes from **`parallel.max_workers`** in `.do-work/config.yml` (default `1`). The flag overrides config per-run; config sets the project default.
 - A request above the cap (e.g. `--parallel 20`) is clamped to `10` with a one-line notice.
 
+**Budget (`--budget <amount>`).** `--budget` caps the run's cumulative **estimated** model spend (a tier-weighted dollar estimate per worker attempt, recorded in the ledger's `cost_estimate_num` field — not a metered bill). It overrides `cost.budget` from `.do-work/config.yml` for this invocation only.
+
+- **Stop semantics.** After each worker attempt's ledger write, the orchestrator sums estimated spend (`lib/run-ledger.sh --sum-run`) and compares it to the budget. When estimated spend reaches the budget, it **finishes the in-flight REQ's integration first** (never abandons a mid-merge), then stops gracefully at the next REQ boundary with a **budget-stop report** (estimated spend vs budget, REQs completed vs remaining). It never silently exceeds an explicit budget.
+- **Empty / unset budget ⇒ unlimited** (default behaviour, unchanged). The gate is inert and adds no per-run cost.
+- Under `--parallel N`, the same gate rides the merge queue: once the budget is reached the orchestrator stops refilling the window and lets live workers drain, then emits the budget-stop report.
+
 1. Detect `{project}`.
 2. Determine UR scope:
    - If `UR-NNN` was provided, record it — the run agent will filter the backlog to that UR.
    - If not provided, the full backlog is in scope.
-3. Resolve the parallel window width: `--parallel N` if given, else `parallel.max_workers` (default 1), clamped to 10. `N == 1` runs serial; `N > 1` runs `agents/run.md`'s `## Parallel Run Mode`.
+3. Resolve the parallel window width: `--parallel N` if given, else `parallel.max_workers` (default 1), clamped to 10. `N == 1` runs serial; `N > 1` runs `agents/run.md`'s `## Parallel Run Mode`. Resolve the effective budget: `--budget <amount>` if given, else `cost.budget` (empty = unlimited).
 4. Pre-flight checks:
    - Working/ files are classified by agents/run.md's pre-flight (mine/sibling/stale buckets); stale slots are surfaced only when the backlog has no claimable REQ — do not prompt merely because working/ is non-empty.
    - If no `REQ-NNN-*.md` files exist in `{project}/.do-work/` (backlog root) within scope, report "Backlog is empty." and stop.
 5. Read [agents/run.md](agents/run.md) in full.
-6. Follow the run agent instructions exactly, passing through the UR scope and the resolved parallel window width.
+6. Follow the run agent instructions exactly, passing through the UR scope, the resolved parallel window width, and the effective budget.
 
 ---
 
