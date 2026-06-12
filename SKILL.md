@@ -32,6 +32,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
 | `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional UR-NNN scopes the run to that UR's REQs only. |
+| `/do-work run [UR-NNN] --parallel N` | Single-session parallel mode: one terminal dispatches up to N concurrent workers (default 1 = serial, capped at 10), serializing merge/archive through a queue. Defaults from `parallel.max_workers`. |
 | `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md. |
 | `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
 | `/do-work close UR-NNN` | Validates the integrated result of a UR against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report. |
@@ -181,7 +182,27 @@ Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that d
 
 ## Parallel Execution
 
-`/do-work run [UR-NNN]` is safe to launch from multiple terminals simultaneously. Up to 10 orchestrators can run in parallel — each claims a different REQ from the backlog. Coordination is handled by a dedicated library layer; no flag, no daemon, no in-memory state is required.
+do-work offers parallelism two complementary ways. **Multi-terminal mode** (below) needs no flag — launch `/do-work run` from several terminals and the coordination layer keeps them from colliding. **Single-session parallel mode** (`--parallel N`) lets one terminal fan out N concurrent workers itself. The two compose: one `--parallel 3` orchestrator and two plain `/do-work run` terminals are just three agent-ids in the same claim arbitration.
+
+`/do-work run [UR-NNN]` is safe to launch from multiple terminals simultaneously. Up to 10 orchestrators can run in parallel — each claims a different REQ from the backlog. Coordination is handled by a dedicated library layer; no flag, no daemon, no in-memory state is required for multi-terminal mode.
+
+### Single-session parallel mode (`--parallel N`)
+
+`/do-work run [UR-NNN] --parallel N` makes **one** orchestrator dispatch up to `N` concurrent workers from a single terminal, integrating their results through a serialized merge queue. It does not replace multi-terminal mode — it adds one-terminal parallelism on top of the same coordination primitives.
+
+- **Window width `N`.** The maximum number of concurrently dispatched workers. Effective `N = min(flag-or-config, 10)`.
+- **Default `N = 1`** (absent flag, `--parallel 1`, or `parallel.max_workers: 1`) ⇒ the serial loop runs byte-for-byte unchanged; the parallel code path is entered only when `N > 1`.
+- **Config default.** `parallel.max_workers` in `.do-work/config.yml` (default `1`, under the existing `parallel:` section alongside `parallel.stale_threshold_seconds`) sets the project default. The `--parallel` flag overrides it per-run.
+- **Cap `10`.** A request above 10 is clamped to 10 with a one-line notice, matching the 10-orchestrator design bound and protecting the shared main working tree, git object store, and the single `feedback.lock`.
+
+**How it works** (full spec: `agents/run.md` `## Parallel Run Mode`; design: `docs/design/single-session-parallel.md`):
+
+- **Fan-out** is N concurrent `Agent`-tool dispatches in one turn — the same dispatch surface serial mode uses, not a separate scheduler.
+- **Claim-as-slot-frees.** The orchestrator claims one REQ immediately before each dispatch (never a batch up front) so `pick-req.sh`'s footprint exclusion sees each claim before the next pick. The window refills one REQ each time a slot frees.
+- **Serialized merge queue.** Workers return on `req/REQ-NNN` branches in any order. Integration runs in two stages: **Stage A** (acceptance-evidence → policy → independent review) is read-only and may run N-wide; **Stage B** (ledger → merge → archive → teardown → metadata commit) is serial, single-writer — at most one merge/archive touches the main working tree and `.do-work/` at any instant, exactly as serial mode.
+- **Failure isolation.** One stopped worker (or a failed gate / a 5-retry merge exhaustion → `concurrent-conflict`) frees its slot and surfaces per-REQ in arrival order; the other workers and queued reports proceed. No new stopper reasons.
+- **Deploy gates stay single-flow.** Milestone deploy gates are not parallelised — the existing first-to-detect drain check and single y/n prompt are unchanged; fan-out pauses new claims while a gate is open.
+- **Coordination lib untouched.** `pick-req.sh`, `claim-req.sh`, `check-footprint.sh`, `scan-stale.sh` and the rest keep their contracts; this mode is a run-loop shape change, not a primitive change.
 
 ### Coordination Layer
 
@@ -526,19 +547,27 @@ Score REQ coverage against the original brief. List gaps and issues.
 
 ---
 
-### run [UR-NNN]
+### run [UR-NNN] [--parallel N]
 
-Execute the backlog autonomously — one REQ at a time — until empty or a stopper is hit. The optional `UR-NNN` argument scopes execution to that UR's REQs only, ignoring all other backlog entries. The orchestrator dispatches a fresh worker subagent per REQ (see [agents/run-worker.md](agents/run-worker.md)) and reads its structured return report.
+Execute the backlog autonomously — until empty or a stopper is hit. The optional `UR-NNN` argument scopes execution to that UR's REQs only, ignoring all other backlog entries. The orchestrator dispatches a fresh worker subagent per REQ (see [agents/run-worker.md](agents/run-worker.md)) and reads its structured return report.
+
+By default the orchestrator runs **serially** — one REQ at a time. The optional `--parallel N` flag enables **single-session parallel mode**: one orchestrator dispatches up to `N` concurrent workers from a single terminal, then serializes their integration through a merge queue. See `## Parallel Execution → Single-session parallel mode`.
+
+- `N` is the maximum number of concurrently dispatched workers (the window width). Effective `N = min(flag-or-config, 10)`.
+- **Default `N = 1`** (absent flag, `--parallel 1`, or `parallel.max_workers: 1`) ⇒ the serial loop runs byte-for-byte unchanged.
+- When `--parallel` is absent, the default comes from **`parallel.max_workers`** in `.do-work/config.yml` (default `1`). The flag overrides config per-run; config sets the project default.
+- A request above the cap (e.g. `--parallel 20`) is clamped to `10` with a one-line notice.
 
 1. Detect `{project}`.
 2. Determine UR scope:
    - If `UR-NNN` was provided, record it — the run agent will filter the backlog to that UR.
    - If not provided, the full backlog is in scope.
-3. Pre-flight checks:
+3. Resolve the parallel window width: `--parallel N` if given, else `parallel.max_workers` (default 1), clamped to 10. `N == 1` runs serial; `N > 1` runs `agents/run.md`'s `## Parallel Run Mode`.
+4. Pre-flight checks:
    - Working/ files are classified by agents/run.md's pre-flight (mine/sibling/stale buckets); stale slots are surfaced only when the backlog has no claimable REQ — do not prompt merely because working/ is non-empty.
    - If no `REQ-NNN-*.md` files exist in `{project}/.do-work/` (backlog root) within scope, report "Backlog is empty." and stop.
-4. Read [agents/run.md](agents/run.md) in full.
-5. Follow the run agent instructions exactly, passing through the UR scope if provided.
+5. Read [agents/run.md](agents/run.md) in full.
+6. Follow the run agent instructions exactly, passing through the UR scope and the resolved parallel window width.
 
 ---
 
