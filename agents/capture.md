@@ -39,6 +39,8 @@ Read every file in `UR-NNN/assets/` if it exists.
 
 Read `UR-NNN/ideate.md` if it exists. Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If the file does not exist (e.g. the user ran `--no-ideate` or capture is running standalone), continue without it.
 
+Read `{project}/.do-work/state/calibration.md` if it exists. Keep its guidance bullets in context as advisory calibration — they inform how you size REQs, scope `**Files:**`, and split acceptance criteria, but they never block decomposition and are not hard requirements. This parallel mirrors the ideate.md pattern above: both are advisory; the brief always wins; absence is silently ignored. If the file is absent (no `/do-work retro` has run yet, or the project is new), continue without it.
+
 ### 1b. Detect milestone mode
 
 Inspect the brief (`UR-NNN/input.md`) for the milestone-mode trigger. Milestone mode is active if BOTH:

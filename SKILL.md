@@ -35,6 +35,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md. |
 | `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
 | `/do-work close UR-NNN` | Validates the integrated result of a UR against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report. |
+| `/do-work retro` | Mines the run ledger and feedback fingerprints to produce a human report and regenerate `.do-work/state/calibration.md` — advisory capture guidance derived from historical patterns. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
@@ -62,6 +63,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/unblock.md](agents/unblock.md) — Force a stuck in-flight REQ back to the backlog
 - [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
+- [agents/retro.md](agents/retro.md) — Mines the run ledger to produce a learning report and regenerate `calibration.md`
 - [agents/config.md](agents/config.md) — Reusable config loading instructions
 
 Run ledger: when `ledger.enabled: true`, `/do-work run` writes append-only `.do-work/runs/RUN-NNN.yml` records with model, cost, commands, tests, changed files, review outcome, result, and proof status. Set `ledger.enabled: false` to disable ledger writes.
@@ -597,3 +599,14 @@ Generate build-in-public draft posts for configured social media platforms.
 1. Detect `{project}`.
 2. Read [agents/log.md](agents/log.md) in full.
 3. Follow the log agent instructions exactly.
+
+---
+
+### retro
+
+Mine the run ledger and feedback fingerprints; produce a human report; regenerate `.do-work/state/calibration.md` as advisory capture guidance.
+
+1. Detect `{project}`.
+2. Confirm `{project}/.do-work/` exists. If not, report "do-work not installed." and stop.
+3. Read [agents/retro.md](agents/retro.md) in full.
+4. Follow the retro agent instructions exactly. Pass the resolved `{project}/.do-work/` path as the project do-work path.
