@@ -25,6 +25,8 @@ Check the following conditions in order:
 3. Are there `REQ-NNN-*.md` files in `{project}/.do-work/working/`?
 4. Are there `UR-NNN/` folders in `{project}/.do-work/user-requests/`?
 5. Are there REQ files in `{project}/.do-work/archive/`?
+6. Are there `RUN-NNN.yml` files in `{project}/.do-work/runs/`? (Retro heuristic: runs exist but no `calibration.md` → suggest retro.)
+7. Do any archived REQs have a non-empty `**Entry point:**` field (path-unit REQs) for a given UR, and does that UR lack a `closure.md` in `{project}/.do-work/user-requests/UR-NNN/`? (Close heuristic: run has drained for a UR with path-units but no closure report yet.)
 
 ### 2. Print contextual suggestions
 
@@ -77,6 +79,22 @@ Suggested next steps:
 ```
 
 Replace `UR-NNN` with the most recent UR number.
+
+**If `runs/` has entries but `.do-work/state/calibration.md` does not exist:**
+
+Suggest retro alongside other applicable suggestions (do not replace them — add retro as one of the suggestions when this condition is true and the 4-suggestion cap allows):
+
+```
+  /do-work retro                                    — Mine run history and regenerate capture calibration guidance
+```
+
+**If archived path-unit REQs exist for a UR but that UR has no `closure.md`:**
+
+Suggest close alongside other applicable suggestions (add it when this condition is true and the 4-suggestion cap allows). Use the most recently completed UR:
+
+```
+  /do-work close UR-NNN                             — Walk path-unit entry points end-to-end and write the UR closure report
+```
 
 **If do-work exists but is empty (no URs, no REQs):**
 
