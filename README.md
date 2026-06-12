@@ -195,8 +195,9 @@ verify:
 | `model.escalation` | string | `opus` | Escalation model for high-risk or failed work |
 | `verify.threshold` | integer | `90` | Minimum confidence score (0-100) for `go` to auto-run without `--force`. |
 | `ledger.enabled` | boolean | `true` | Write structured run records under `.do-work/runs/` |
+| `notifications.on_pending_validation` | string | `""` | Shell command run once when a REQ parks as `pending-validation`. Supports `{req}`, `{title}`, `{checks}` placeholders. Empty = disabled. Failure produces a one-line warning and never blocks the loop. |
 
-For the full key reference including `feedback`, `parallel`, `next_steps`, `review`, `acceptance`, `risk`, `security`, `cost`, and `ledger`, see [`agents/config.md`](agents/config.md).
+For the full key reference including `feedback`, `parallel`, `next_steps`, `review`, `acceptance`, `risk`, `security`, `cost`, `ledger`, and `notifications`, see [`agents/config.md`](agents/config.md).
 
 ---
 
