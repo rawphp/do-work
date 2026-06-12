@@ -4,10 +4,14 @@
 # Usage:
 #   derive-status.sh <req-path> [<req-path> ...]
 #
-# Prints one line per REQ: "<REQ-ID> proven" or "<REQ-ID> unproven".
+# Prints one line per REQ: "<REQ-ID> proven", "<REQ-ID> pending", or
+# "<REQ-ID> unproven".
 # A REQ is proven only when it is done/archived and has a non-empty
-# `**Closure proof:**` field. This deliberately does not replace writable
-# `**Status:**`, which remains coordination state.
+# `**Closure proof:**` field. A REQ whose `**Status:**` is `pending-validation`
+# derives as `pending` — its code is merged and the worktree torn down, but
+# human/device sign-off is outstanding, so it is neither proven (no closure
+# proof) nor unproven-in-flight (work is delivered). This deliberately does not
+# replace writable `**Status:**`, which remains coordination state.
 
 set -u
 
@@ -52,7 +56,11 @@ for req_path in "$@"; do
     */.do-work/archive/REQ-*.md|.do-work/archive/REQ-*.md) archived=1 ;;
   esac
 
-  if { [ "$status" = "done" ] || [ "$archived" = "1" ]; } && [ -n "$proof" ]; then
+  if [ "$status" = "pending-validation" ]; then
+    # Merged-and-parked: delivered, sign-off outstanding. A distinct state,
+    # governed by the Status field rather than the file's directory.
+    printf '%s pending\n' "$req_id"
+  elif { [ "$status" = "done" ] || [ "$archived" = "1" ]; } && [ -n "$proof" ]; then
     printf '%s proven\n' "$req_id"
   else
     printf '%s unproven\n' "$req_id"

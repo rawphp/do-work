@@ -27,7 +27,7 @@ assert_eq() {
 
 setup_fixture() {
   TMP="$(mktemp -d -t derive-status-test.XXXXXX)"
-  mkdir -p "$TMP/.do-work/archive" "$TMP/.do-work/working"
+  mkdir -p "$TMP/.do-work/archive" "$TMP/.do-work/working" "$TMP/.do-work/pending"
 }
 
 teardown_fixture() {
@@ -85,6 +85,29 @@ write_req "$TMP/.do-work/working/REQ-003-work.md" "REQ-003" "in-progress" "check
 run_case "$TMP/.do-work/working/REQ-003-work.md"
 assert_eq "0" "$RC" "$CURRENT_CASE rc"
 assert_eq "REQ-003 unproven" "$OUT" "$CURRENT_CASE output"
+teardown_fixture
+
+# A pending-validation REQ derives a distinct `pending` state — its code is
+# merged but human/device sign-off is outstanding, so it is neither proven
+# (no closure proof) nor unproven-in-flight (work is delivered).
+CURRENT_CASE="pending-validation"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/pending/REQ-006-park.md" "REQ-006" "pending-validation" ""
+run_case "$TMP/.do-work/pending/REQ-006-park.md"
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "REQ-006 pending" "$OUT" "$CURRENT_CASE output"
+teardown_fixture
+
+# A pending-validation REQ stays `pending` regardless of file location — the
+# Status field, not the directory, governs the derivation.
+CURRENT_CASE="pending-validation-non-pending-dir"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/working/REQ-007-park.md" "REQ-007" "pending-validation" ""
+run_case "$TMP/.do-work/working/REQ-007-park.md"
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "REQ-007 pending" "$OUT" "$CURRENT_CASE output"
 teardown_fixture
 
 echo ""
