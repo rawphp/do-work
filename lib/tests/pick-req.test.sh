@@ -65,6 +65,30 @@ write_req() {
 EOF
 }
 
+# Build a REQ file with an explicit **Priority:** field.
+# Args: $1=path $2=id $3=files $4=deps $5=ur $6=status $7=priority (1-3)
+write_req_pri() {
+  local path="$1"
+  local id="$2"
+  local files="$3"
+  local deps="$4"
+  local ur="$5"
+  local status="$6"
+  local priority="$7"
+  cat > "$path" <<EOF
+# $id: Test REQ
+
+**UR:** $ur
+**Status:** $status
+**Created:** 2026-05-21
+**Layer:** agents
+**Priority:** $priority
+**Size:** M
+**Files:** $files
+**Depends on:** $deps
+EOF
+}
+
 # Build a working/ REQ (with claim stamp) at $1 for id $2, files $3, ur $4
 write_working_req() {
   local path="$1"
@@ -266,6 +290,66 @@ run_picker "UR-001" "test-agent"
 assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
 assert_eq "$TMP/.do-work/REQ-071-target.md" "$PICK_STDOUT" "$CURRENT_CASE stdout"
 assert_contains "scope:UR-002" "$PICK_STDERR" "$CURRENT_CASE scope rejection logged"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 11: priority ordering — higher Priority claimed first even when its
+#          REQ number is higher. REQ-A (Priority 1, lower number) must lose
+#          to REQ-B (Priority 3, higher number).
+# ----------------------------------------------------------------------
+CURRENT_CASE="priority-beats-req-number"
+CASES=$((CASES + 1))
+setup_fixture
+write_req_pri "$TMP/.do-work/REQ-080-low-pri.md"  "REQ-080" "src/a.ts" "" "UR-001" "backlog" "1"
+write_req_pri "$TMP/.do-work/REQ-081-high-pri.md" "REQ-081" "src/b.ts" "" "UR-001" "backlog" "3"
+run_picker "any" "test-agent"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "$TMP/.do-work/REQ-081-high-pri.md" "$PICK_STDOUT" "$CURRENT_CASE picks higher Priority first"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 12: equal priority → fall back to lower REQ number (existing tiebreak).
+# ----------------------------------------------------------------------
+CURRENT_CASE="equal-priority-tiebreak-by-number"
+CASES=$((CASES + 1))
+setup_fixture
+write_req_pri "$TMP/.do-work/REQ-090-first.md"  "REQ-090" "src/a.ts" "" "UR-001" "backlog" "3"
+write_req_pri "$TMP/.do-work/REQ-091-second.md" "REQ-091" "src/b.ts" "" "UR-001" "backlog" "3"
+run_picker "any" "test-agent"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "$TMP/.do-work/REQ-090-first.md" "$PICK_STDOUT" "$CURRENT_CASE lower number wins on equal priority"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 13: all-legacy backlog (no Priority field) → order unchanged from
+#          today. Absent Priority must sort exactly as Priority 2, so the
+#          lowest REQ number is picked just like before this feature existed.
+# ----------------------------------------------------------------------
+CURRENT_CASE="all-legacy-order-unchanged"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/REQ-100-foo.md" "REQ-100" "src/a.ts" "" "UR-001" "backlog"
+write_req "$TMP/.do-work/REQ-101-bar.md" "REQ-101" "src/b.ts" "" "UR-001" "backlog"
+write_req "$TMP/.do-work/REQ-102-baz.md" "REQ-102" "src/c.ts" "" "UR-001" "backlog"
+run_picker "any" "test-agent"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "$TMP/.do-work/REQ-100-foo.md" "$PICK_STDOUT" "$CURRENT_CASE legacy picks lowest number"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 14: mixed legacy + prioritized — a legacy REQ (absent Priority == 2)
+#          must lose to an explicit Priority 3, but beat an explicit
+#          Priority 1, regardless of REQ number.
+# ----------------------------------------------------------------------
+CURRENT_CASE="absent-priority-sorts-as-2"
+CASES=$((CASES + 1))
+setup_fixture
+write_req_pri "$TMP/.do-work/REQ-110-explicit-low.md"  "REQ-110" "src/a.ts" "" "UR-001" "backlog" "1"
+write_req     "$TMP/.do-work/REQ-111-legacy.md"        "REQ-111" "src/b.ts" "" "UR-001" "backlog"
+write_req_pri "$TMP/.do-work/REQ-112-explicit-high.md" "REQ-112" "src/c.ts" "" "UR-001" "backlog" "3"
+run_picker "any" "test-agent"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "$TMP/.do-work/REQ-112-explicit-high.md" "$PICK_STDOUT" "$CURRENT_CASE Priority 3 wins overall"
 teardown_fixture
 
 # ----------------------------------------------------------------------

@@ -130,6 +130,27 @@ sort_key_from_path() {
   }'
 }
 
+# Extract the **Priority:** value from a REQ file as a sortable ascending key.
+# Priority is 1-3 (3 = most urgent). An absent or malformed Priority sorts
+# exactly as Priority 2 — so legacy REQs behave identically to today.
+# Returns an inverted, zero-padded key (higher Priority => smaller key) so a
+# plain ascending sort selects the most urgent REQ first.
+priority_sort_key_from_path() {
+  local path="$1"
+  local raw
+  raw="$(extract_field "Priority" "$path")"
+  # Trim whitespace.
+  raw="${raw#"${raw%%[![:space:]]*}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+  local pri=2
+  case "$raw" in
+    1|2|3) pri="$raw" ;;
+    *) pri=2 ;;  # absent or out-of-range => default Priority 2
+  esac
+  # Invert so descending Priority becomes ascending sort order.
+  printf '%d' "$(( 9 - pri ))"
+}
+
 # Expand a single Files entry into one path per line (resolved against CWD).
 # Globs that don't match anything yield the literal entry (so it can still be
 # compared verbatim against another REQ's literal entry).
@@ -191,15 +212,21 @@ if [ "${#CANDIDATES[@]}" -eq 0 ]; then
   exit 1
 fi
 
-# Sort ascending by numeric REQ id. Build "<key>\t<path>" then sort -k1n.
+# Order claimable candidates by Priority descending, then by numeric REQ id
+# ascending (the historical tiebreak). Build "<pri-key>\t<num-key>\t<path>"
+# then sort on the first two columns. The Priority key is inverted so a plain
+# ascending sort surfaces the most urgent REQ first; an absent **Priority:**
+# field maps to Priority 2, so a backlog with no Priority fields sorts purely
+# by REQ number exactly as before this feature existed.
 SORTED_LIST=""
 for c in "${CANDIDATES[@]}"; do
-  key="$(sort_key_from_path "$c")"
-  SORTED_LIST="${SORTED_LIST}${key}	${c}
+  pri_key="$(priority_sort_key_from_path "$c")"
+  num_key="$(sort_key_from_path "$c")"
+  SORTED_LIST="${SORTED_LIST}${pri_key}	${num_key}	${c}
 "
 done
-# Remove trailing newline-ambiguity via printf, then sort.
-SORTED_CANDIDATES="$(printf '%s' "$SORTED_LIST" | sort -k1,1 | cut -f2-)"
+# Remove trailing newline-ambiguity via printf, then sort on pri then number.
+SORTED_CANDIDATES="$(printf '%s' "$SORTED_LIST" | sort -k1,1 -k2,2 | cut -f3-)"
 
 # Precompute the set of files held by working/ slots.
 # Format: each line = "<req-id>\t<expanded-path>"

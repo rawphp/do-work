@@ -335,13 +335,23 @@ This is the only "progress" signal the orchestrator emits before the worker retu
 
 After classifying `subagent_type`, pick a `model` for the dispatch. Default to `sonnet` to save tokens. Escalate to `opus` only when the REQ shows signals of genuine difficulty.
 
-### Signals → model
+### Primary signals → model
 
-Scan the REQ's `## Task`, `## Context`, and `## Acceptance Criteria` (top to bottom; first match wins):
+Two structural signals are read directly from the REQ header and take precedence over everything below — check them first, in order:
 
-| Signal in REQ | model |
+| Primary signal | model |
 |---|---|
 | REQ has a previous `status: stopped` attempt recorded in its body (retry after Sonnet failed) | `opus` |
+| REQ header carries `**Size:** L` (capture sized this REQ large from its file count / layer span / criteria count) | `opus` |
+
+If either primary signal fires, select `opus` and skip the lexical scan. The `**Size:**` field, when present, is capture's own up-front difficulty estimate — trust it over re-deriving difficulty from prose.
+
+### Fallback signals → model (REQs without `**Size:**`)
+
+When the REQ has **no `**Size:**` field** (legacy REQs, or capture left it off because the shape was ambiguous), fall back to scanning the REQ's `## Task`, `## Context`, and `## Acceptance Criteria` (top to bottom; first match wins). When `**Size:** S` or `**Size:** M` is present, these lexical rules still apply as a secondary check but never downgrade a `Size: L`:
+
+| Fallback signal in REQ | model |
+|---|---|
 | Task touches 4+ distinct files, OR spans 3+ layers (e.g. controller + model + view + test) | `opus` |
 | Task introduces new architecture: new service, new abstraction, new module boundary, schema design, or "design X" | `opus` |
 | Task involves debugging across layers, race conditions, concurrency, or performance investigation | `opus` |
