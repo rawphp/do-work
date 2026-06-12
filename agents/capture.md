@@ -309,6 +309,14 @@ Use this format exactly:
 1. **[test|build|runtime|ui]** [exact command or action]
    - Expected: [what success looks like — be specific]
 
+## Post-merge validation
+
+> Optional. Human, device, or environment checks that cannot run in a worker's isolated worktree. Workers never execute this section; it is consumed after merge by `/do-work approve` and `/do-work close`. Each item states what to do and what observable outcome confirms it.
+>
+> Write this section on path-unit REQs (or the single REQ for legacy-style decompositions) only when the brief includes checks that require human judgment, a physical device, or an environment the worker cannot provision.
+
+- [ ] [Action: what a person should do] — Observable outcome: [what they should see or confirm]
+
 ## Integration
 
 > Required for REQs that add new surface (any layer except `none`). Omit for bug-fix REQs and pure-refactor / test-only REQs.
@@ -357,6 +365,19 @@ Use the right type for the task:
 | `runtime` | Call an endpoint or CLI and check output | `curl http://localhost:8000/api/leads` → expect 200 with `status: discarded` |
 | `ui` | Visual check in a running browser | Navigate to `/leads`, take snapshot, confirm "Discarded" tab is visible |
 
+**Executability rule (HARD RULE — never write non-executable steps into `## Verification Steps`):**
+
+Every verification step in `## Verification Steps` must be executable by a worker inside its isolated git worktree using only tools and runtimes the worker can start itself. A step is **non-executable** — and must therefore be placed in `## Post-merge validation` instead — if it falls into any of these four categories:
+
+| Category | Description | Example phrases to flag |
+|---|---|---|
+| **Human judgment** | Requires a human to make a visual or contextual call | "user confirms", "manually check", "looks correct", "[HUMAN]", "verify visually", "confirm the badge" |
+| **Physical device** | Requires a mobile phone, watch, hardware, IoT sensor, or other physical device | "on-device", "on the phone", "on iOS", "on Android", "on the watch" |
+| **Unprovisionable environment** | Requires external credentials, a live third-party sandbox, or a runtime the worker genuinely cannot start in the worktree (e.g. a native mobile app build, a production database, an external OAuth callback) | "in production", "requires login", "against the live API", "on-device build" |
+| **Explicit human-action phrasing** | The step wording is imperative toward a human, not a command | "Ask the user to...", "Have someone...", "Check with the team..." |
+
+If a brief describes a check that falls into one of these categories, **do not write it into `## Verification Steps`**. Write it into `## Post-merge validation` instead.
+
 **Rules for writing verification steps:**
 
 - **Bug fixes:** Step 1 must reproduce the original bug path and confirm it no longer occurs. Do not skip this.
@@ -371,7 +392,7 @@ Use the right type for the task:
 
 ### 4b. Check acceptance criteria quality
 
-After writing all REQ files, review each REQ's acceptance criteria for specificity. This is a self-correction step — fix issues inline before committing.
+After writing all REQ files, review each REQ's acceptance criteria for specificity **and** scan its verification steps for executability violations. This is a self-correction step — fix issues inline before committing.
 
 **Scan each criterion for vague qualifiers used without concrete definitions:**
 
@@ -388,6 +409,16 @@ After writing all REQ files, review each REQ's acceptance criteria for specifici
 2. Update the REQ file in place — rewrite the criterion directly, then continue
 
 **Do not** ask the user for clarification — infer the concrete outcome from the task description and context. If you genuinely cannot determine a specific outcome, add a `[NEEDS CLARIFICATION]` prefix to the criterion.
+
+**Executability scan — `## Verification Steps`:**
+
+After the criteria quality pass, scan each REQ's `## Verification Steps` for non-executable entries (see the executability rule in `### Writing effective Verification Steps` above). For each step that matches any of the four non-executable categories (human judgment, physical device, unprovisionable environment, explicit human-action phrasing):
+
+1. Move the step out of `## Verification Steps` entirely.
+2. Add it to the REQ's `## Post-merge validation` section as a checklist item (create the section if absent, following the template format).
+3. Renumber any remaining `## Verification Steps` entries so numbering stays contiguous.
+
+This corrects capture errors before they reach a worker. It is non-blocking and requires no user interaction.
 
 This step does not block the pipeline or require user intervention — it is immediate self-correction before commit.
 

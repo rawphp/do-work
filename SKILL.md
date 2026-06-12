@@ -350,6 +350,27 @@ A **path-unit** is a REQ whose `**Entry point:**` and `**Terminal state:**` are 
 
 `pending-validation` is a terminal **delivered-but-unclosed** state. When a worker's automated gates all pass but a human or device sign-off still remains, `/do-work run` merges the code and tears down the worktree anyway (never stranding work on a branch), then parks the REQ in `.do-work/pending/` with `**Status:** pending-validation` and an empty `**Closure proof:**` — the outstanding checklist lives in the REQ's `## Post-merge validation` section. `/do-work approve REQ-NNN` later completes closure (writing the proof and archiving). A REQ parked in `.do-work/pending/` counts as a **satisfied dependency** — its code is already merged, so dependents stay claimable (`lib/check-deps.sh` globs `.do-work/pending/` alongside `.do-work/archive/`). The `.do-work/pending/` directory is created on demand by `agents/run.md` on the first park, so `/do-work install` does not pre-create it.
 
+### `## Post-merge validation` section
+
+An optional REQ body section that holds human, device, or environment checks that cannot be executed by a worker in an isolated worktree.
+
+**Written by:** `agents/capture.md` on path-unit REQs (or the single REQ for legacy-style decompositions) when the brief includes checks that require a human, a physical device, or an environment the worker cannot provision. Capture writes this section — and its executability self-correction scan (Step 4b) moves any mis-classified `## Verification Steps` entries here automatically before committing REQ files.
+
+**Ignored by workers:** Workers never execute `## Post-merge validation` items. The section is explicitly outside the checkpoint loop. Workers do not mark these items passed, failed, or deferred — they are not part of the worker's checkpoint log.
+
+**Consumed post-merge:** After `/do-work run` parks a pending-validation REQ in `.do-work/pending/`, the `## Post-merge validation` checklist is the canonical list of outstanding human/device checks. It is consumed by:
+
+- `/do-work approve REQ-NNN` — the approver walks each item, records evidence, and closes the REQ.
+- `/do-work close UR-NNN` — includes pending-validation REQs in its walk, surfacing the `## Post-merge validation` checklist for each.
+
+**Format (each item):** a checklist line stating what a person should do and what observable outcome confirms it:
+
+```markdown
+## Post-merge validation
+
+- [ ] [Action: what a person should do] — Observable outcome: [what they should see or confirm]
+```
+
 `**Criteria approved:** agent-drafted` means capture generated the acceptance criteria. It is informational provenance, not a run gate. Existing backlog REQs should run unless dependencies, footprint, policy, tests, verification, review, or genuinely ambiguous criteria stop them.
 
 When a REQ is claimed by a worker, a claim block is inserted between the title and the first header field:
