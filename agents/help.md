@@ -39,6 +39,9 @@ Based on the detected state, print the most relevant suggestions:
 Suggested next steps:
   /do-work install                                  — Set up do-work in this project
   /do-work start "describe your feature or task"    — Install automatically and record your first brief
+
+Feature briefs need layers declared in .do-work/config.yml (e.g. layers: [frontend, backend])
+or pass --no-layers, otherwise capture will halt.
 ```
 
 **If REQs exist in `working/` (a REQ is in-progress):**

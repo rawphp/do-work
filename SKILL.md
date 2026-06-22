@@ -481,6 +481,9 @@ Created:
   .do-work/config.yml
 
 Ready. Run `/do-work start` to record your first brief.
+Feature work first needs layers declared in .do-work/config.yml
+(e.g. layers: [frontend, backend]), or run start with --no-layers.
+See the comment already in config.yml.
 ```
 
 If already installed, report "Already installed." and stop.
