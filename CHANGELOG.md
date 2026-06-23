@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**Added**
+- Archive-integrity guardrail: `lib/check-archive-integrity.sh` runs at the persistence boundary (`agents/run.md` Step 4b / 4-pr.4, `agents/approve.md` 3b) and rejects archiving a `done` REQ unless its on-disk state is internally consistent — `**Status:** done`, a non-empty `**Closure proof:**`, and zero unchecked `- [ ]` items inside `## Acceptance Criteria`. Replaces trust in worker/orchestrator prose (the worker is *instructed* to tick each `- [x]` and set status, but that is an LLM step it can silently skip). A failure stops the REQ with `**Reason:** archive-integrity` instead of archiving. Covered by `lib/tests/check-archive-integrity.test.sh`. Root-caused from a data-quality audit that found 37 archived REQs with stale (non-`done`) status and 50 archived `done` REQs with unchecked acceptance criteria.
+
 **Changed**
 - `**Criteria approved:** agent-drafted` no longer stops dispatch. Criteria provenance remains visible, but existing backlog REQs run unless dependencies, footprint, policy, tests, verification, review, or genuinely ambiguous criteria stop them.
 

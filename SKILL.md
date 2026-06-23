@@ -268,6 +268,7 @@ All coordination state lives under `.do-work/state/`:
 - Dependencies: `lib/check-deps.sh`, `lib/cycle-check.sh`
 - Liveness: `lib/heartbeat.sh`, `lib/scan-stale.sh`
 - Deadlock: `lib/deadlock-check.sh`
+- Archive integrity: `lib/check-archive-integrity.sh` — pre-archive gate enforcing Status `done` + non-empty Closure proof + zero unchecked acceptance criteria (`agents/run.md` Step 4b/4-pr.4, `agents/approve.md` 3b)
 - Orchestrator: `agents/run.md` §§ Agent Identity, Pre-flight Check, Step 1: Claim the next REQ, When the Backlog is Empty, Step 7b
 - Worker: `agents/run-worker.md` §§ Isolation Mode, Worktree Workflow, Concurrent-Conflict Retry
 
