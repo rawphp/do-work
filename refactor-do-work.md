@@ -61,7 +61,11 @@ single runner, bats removed, CI runs the runner.
 - [x] **S6 — CI.** `.github/workflows/test.yml` runs `run-all.sh` + `doc-lint.sh` on
       push to main and every PR. No bats install needed (dependency removed in S4).
       YAML validated; both steps simulated green locally.
-- [ ] **S7 — Docs sync.** CONTRIBUTING/README test layout; doc-lint clean.
+- [x] **S7 — Docs sync.** Added a "Running the tests" section to CONTRIBUTING
+      (runner command, single-home rule, plain-bash/no-bats, CI parity). No doc-lint
+      guard added: there was no doc *conflict* (normative docs were already bats-free),
+      and a `lib/*.test.sh` location guard would false-positive on legit retro examples
+      — adding a speculative pattern violates the project's UR-029 over-broad caution.
 - [ ] **S8 — Final.** Full suite green, `/code-review` whole diff, open PR.
 
 Each step: live-test → `/code-review` → commit.
