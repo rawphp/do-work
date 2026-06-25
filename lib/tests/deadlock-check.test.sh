@@ -120,8 +120,12 @@ setup_fixture() {
   git -C "$TMP" config user.name "Test"
   touch "$TMP/.do-work/.gitkeep"
   git -C "$TMP" add .
-  GIT_COMMITTER_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    git -C "$TMP" commit -q --allow-empty -m "init" 2>/dev/null || true
+  # Fail loudly if the fixture can't be prepared — a missing init commit would
+  # silently skew every commit-age assertion downstream.
+  if ! GIT_COMMITTER_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+         git -C "$TMP" commit -q --allow-empty -m "init"; then
+    fail "setup_fixture: initial git commit failed"
+  fi
 }
 
 teardown_fixture() {
@@ -133,8 +137,12 @@ teardown_fixture() {
 # Age the most recent commit to OLD_DATE so `git log --since` ignores it.
 age_last_commit() {
   local old_date="$1"
-  GIT_COMMITTER_DATE="$old_date" GIT_AUTHOR_DATE="$old_date" \
-    git -C "$TMP" commit -q --allow-empty --amend --no-edit 2>/dev/null || true
+  # Surface a failed amend — a stale commit date is what the no-progress-stall
+  # cases hinge on, so a silent failure here would make them misleading.
+  if ! GIT_COMMITTER_DATE="$old_date" GIT_AUTHOR_DATE="$old_date" \
+         git -C "$TMP" commit -q --allow-empty --amend --no-edit; then
+    fail "age_last_commit: amend to $old_date failed"
+  fi
 }
 
 # Run deadlock-check.sh inside $TMP, wiring the real scan-stale / cycle-check
