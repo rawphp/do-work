@@ -1,7 +1,10 @@
 # Refactor: do-work — test/tooling architecture
 
-Branch: `fix/prod-data-quality-loop` → working further on it, PR into `main` when done.
-Live-test harness: run every `lib/tests/*.test.sh` + `*.bats`; all must pass.
+Branch: `refactor/do-work-test-tooling`, based on `main` (rebased off the
+archive-integrity branch — zero file overlap); PR #2 into `main`.
+Live-test harness: `bash lib/tests/run-all.sh` (the runner this refactor adds);
+all suites must pass. (Early steps below predate the runner and used a manual
+`lib/tests/*.test.sh` glob — kept as the historical record of the work.)
 Autoreview: `/code-review` on each step's diff before commit.
 
 ## Baseline (2026-06-25)
