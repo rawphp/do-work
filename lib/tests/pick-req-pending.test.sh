@@ -10,7 +10,8 @@
 set -u
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PICKER="$SCRIPT_DIR/pick-req.sh"
+LIB_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+PICKER="$LIB_DIR/pick-req.sh"
 
 FAILED=0
 CASES=0

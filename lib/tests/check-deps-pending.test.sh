@@ -13,7 +13,8 @@
 set -u
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-CHECKER="$SCRIPT_DIR/check-deps.sh"
+LIB_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+CHECKER="$LIB_DIR/check-deps.sh"
 
 FAILED=0
 CASES=0

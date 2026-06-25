@@ -43,8 +43,11 @@ single runner, bats removed, CI runs the runner.
 - [x] **S2 — Single home.** Moved `coverage-rollup.test.sh` + `derive-status.test.sh`
       into `lib/tests/` (LIB_DIR convention); updated `ur-closure.md` path refs.
       Runner now at 22 green. doc-lint clean.
-- [ ] **S3 — Reconcile duplicates.** Merge any unique top-level cases into the `lib/tests/`
-      versions of `check-deps`/`pick-req`, then delete the stale top-level copies.
+- [x] **S3 — Reconcile duplicates.** Investigation overturned the "stale duplicate"
+      premise: the top-level `check-deps`/`pick-req` files are **pending-validation**
+      suites the `lib/tests/` versions don't cover at all, and run-all.sh wasn't running
+      them. Relocated as `check-deps-pending.test.sh` / `pick-req-pending.test.sh`
+      (distinct names avoid the basename collision). No coverage lost; runner 22→24.
 - [ ] **S4 — Converge to plain-bash.** Drop redundant `cycle-check.bats`; port
       `deadlock-check.bats` → `deadlock-check.test.sh`. Suite runs with no external dep.
 - [ ] **S5 — Shared harness (optional).** Extract `_harness.sh`; source from each test.
