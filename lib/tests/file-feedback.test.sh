@@ -235,7 +235,7 @@ rm -f "$MOCK_BIN/gh"
 # /usr/bin alongside the coreutils.
 NOGH_BIN="$TMP/nogh-bin"
 mkdir -p "$NOGH_BIN"
-for _t in bash sh env awk sed grep cat printf mktemp rm mkdir date head tail tr cut sort wc dirname basename flock; do
+for _t in bash sh env awk sed grep cat printf mktemp rm mkdir rmdir date head tail tr cut sort wc dirname basename flock; do
   _p="$(command -v "$_t" 2>/dev/null || true)"
   [ -n "$_p" ] && ln -sf "$_p" "$NOGH_BIN/$_t"
 done
