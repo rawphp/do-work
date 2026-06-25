@@ -149,6 +149,10 @@ EOF
 run_script
 assert_eq "1" "$RC" "$CURRENT_CASE rc"
 case "$STDERR" in *"unchecked acceptance criteria"*) : ;; *) fail "$CURRENT_CASE stderr: $STDERR" ;; esac
+# Diagnostic must pinpoint the offending item by line number and text so the
+# operator can fix it without re-scanning. The unchecked box is on line 9.
+case "$STDERR" in *"L9: "*) : ;; *) fail "$CURRENT_CASE expected line ref L9 in: $STDERR" ;; esac
+case "$STDERR" in *"Second criterion left unchecked"*) : ;; *) fail "$CURRENT_CASE expected item text in: $STDERR" ;; esac
 teardown
 
 # ---- Case 6: unchecked box OUTSIDE acceptance section must NOT trip -> rc 0 ---

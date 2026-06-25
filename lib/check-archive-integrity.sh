@@ -55,14 +55,19 @@ if [ -z "$PROOF" ]; then
 fi
 
 # 3. No unchecked acceptance criteria inside the Acceptance Criteria section.
-UNCHECKED="$(awk '
+#    Emit each offending item with its line number so the orchestrator/human
+#    can fix the REQ without re-scanning the file by hand.
+UNCHECKED_DETAIL="$(awk '
   /^## *Acceptance Criteria/ { in_ac=1; next }
   /^## / && in_ac { in_ac=0 }
-  in_ac && /^[[:space:]]*-[[:space:]]*\[[[:space:]]\]/ { count++ }
-  END { print count+0 }
+  in_ac && /^[[:space:]]*-[[:space:]]*\[[[:space:]]\]/ {
+    printf "  L%d: %s\n", NR, $0
+  }
 ' "$REQ_PATH")"
-if [ "$UNCHECKED" -gt 0 ]; then
-  echo "check-archive-integrity.sh: $REQ_ID unchecked acceptance criteria: $UNCHECKED" >&2
+if [ -n "$UNCHECKED_DETAIL" ]; then
+  UNCHECKED_COUNT="$(printf '%s\n' "$UNCHECKED_DETAIL" | grep -c '^')"
+  echo "check-archive-integrity.sh: $REQ_ID unchecked acceptance criteria: $UNCHECKED_COUNT" >&2
+  printf '%s\n' "$UNCHECKED_DETAIL" >&2
   FAILED=1
 fi
 
