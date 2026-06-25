@@ -42,6 +42,22 @@ git clone https://github.com/rawphp/do-work.git ~/do-work-dev
 ln -sf ~/do-work-dev ~/.claude/skills/do-work
 ```
 
+## Running the tests
+
+The coordination primitives in `lib/*.sh` are covered by a suite under
+`lib/tests/`. Every test is a self-contained, plain-bash `*.test.sh` script —
+no `bats` or other external dependency, compatible with macOS bash 3.2. Run the
+whole suite with the aggregate runner:
+
+```bash
+bash lib/tests/run-all.sh      # runs every lib/tests/*.test.sh; exits non-zero on any failure
+bash lib/tests/<name>.test.sh  # run one suite directly
+```
+
+`lib/tests/` is the single home for these tests — don't add `*.test.sh` files at
+the `lib/` top level. The runner is also what CI executes (`.github/workflows/test.yml`),
+alongside the doc-drift lint (see below), so a green local run matches a green CI run.
+
 ## Submitting Changes
 
 1. Fork the repo and create a feature branch.

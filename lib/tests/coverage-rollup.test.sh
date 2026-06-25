@@ -5,7 +5,8 @@
 set -u
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-SCRIPT="$SCRIPT_DIR/coverage-rollup.sh"
+LIB_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+SCRIPT="$LIB_DIR/coverage-rollup.sh"
 
 FAILED=0
 CASES=0

@@ -1,0 +1,21 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The lib/ coordination primitives are plain-bash with no external
+      # dependencies — the aggregate runner is the single source of truth.
+      - name: Run lib test suite
+        run: bash lib/tests/run-all.sh
+
+      # Doc-drift lint: normative docs must not contradict the code.
+      - name: Doc-drift lint
+        run: bash lib/doc-lint.sh
