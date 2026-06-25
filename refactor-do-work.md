@@ -40,8 +40,9 @@ single runner, bats removed, CI runs the runner.
 - [x] **S1 — Aggregate runner.** `lib/tests/run-all.sh`: run all `*.test.sh` (+ `*.bats`
       if present), summary, non-zero on any fail. The new live-test command.
       Verified: exit 0 green / exit 1 on fail (names suite) / bats-skip graceful.
-- [ ] **S2 — Single home.** Move `coverage-rollup.test.sh` + `derive-status.test.sh` into
-      `lib/tests/`; fix path resolution; update live doc refs.
+- [x] **S2 — Single home.** Moved `coverage-rollup.test.sh` + `derive-status.test.sh`
+      into `lib/tests/` (LIB_DIR convention); updated `ur-closure.md` path refs.
+      Runner now at 22 green. doc-lint clean.
 - [ ] **S3 — Reconcile duplicates.** Merge any unique top-level cases into the `lib/tests/`
       versions of `check-deps`/`pick-req`, then delete the stale top-level copies.
 - [ ] **S4 — Converge to plain-bash.** Drop redundant `cycle-check.bats`; port
