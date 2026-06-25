@@ -80,3 +80,8 @@ One test home (`lib/tests/`), one runner (`run-all.sh`), one framework (plain ba
 `bats` dependency removed), a closed coverage gap (pending-validation suites now run),
 and CI enforcing the suite + doc-lint on every PR. The agent layer was intentionally
 left untouched. S5 (shared harness) deliberately deferred as cosmetic churn.
+
+**CI immediately earned its keep.** Its first run went red on a pre-existing,
+never-CI-tested suite (`file-feedback.test.sh`): the `missing-gh` case assumed `gh`
+wasn't on `/usr/bin`, true on macOS but false on GitHub runners. Fixed by sandboxing
+that case to a gh-free PATH (test-only change). CI is now green end-to-end. PR: #2.
