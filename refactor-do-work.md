@@ -53,9 +53,14 @@ single runner, bats removed, CI runs the runner.
       Ported `deadlock-check.bats` → plain-bash `deadlock-check.test.sh` (all 7 cases,
       reviewer-confirmed faithful). Both `.bats` removed. Suite (23) now green with
       **bats absent** — external dependency eliminated.
-- [ ] **S5 — Shared harness (optional).** Extract `_harness.sh`; source from each test.
-      Only if it's a clear win without losing single-file runnability.
-- [ ] **S6 — CI.** `.github/workflows/test.yml` runs the runner on push/PR.
+- [~] **S5 — Shared harness — DEFERRED (deliberate).** Extracting `fail`/`assert_*`
+      would touch ~23 files for a benign 15-line duplication, and the assert sets differ
+      per file (`assert_age_ge`, `assert_not_contains`, …) so a single harness needs a
+      superset + per-file exceptions. Cosmetic DRY, not structural debt; conflicts with
+      the minimal-changes rule. Not worth the churn/risk. Left as-is.
+- [x] **S6 — CI.** `.github/workflows/test.yml` runs `run-all.sh` + `doc-lint.sh` on
+      push to main and every PR. No bats install needed (dependency removed in S4).
+      YAML validated; both steps simulated green locally.
 - [ ] **S7 — Docs sync.** CONTRIBUTING/README test layout; doc-lint clean.
 - [ ] **S8 — Final.** Full suite green, `/code-review` whole diff, open PR.
 
