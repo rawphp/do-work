@@ -104,6 +104,11 @@ Perform all edits to `REQ_PATH` in a single pass, then move it:
    ```
 4. Write `**Closure proof:** human-approved <APPROVER> <APPROVE_DATE>`.
 5. Check off every item in `## Post-merge validation` — replace each `- [ ]` with `- [x]`.
+5b. **Archive-integrity gate.** With `REQ_PATH` fully rewritten (Status done, Closure proof written, post-merge items checked), run the deterministic guardrail before the move:
+   ```bash
+   bash {skill-root}/lib/check-archive-integrity.sh "$REQ_PATH"
+   ```
+   It asserts `**Status:** done`, a non-empty `**Closure proof:**`, and zero unchecked `- [ ]` inside `## Acceptance Criteria`. **Exit non-zero ⇒ do not archive:** report the script's stderr diagnostics and stop, leaving the REQ in `pending/`. This is the same persistence-boundary gate run.md Step 4b uses, applied to the human-approval archive path so neither route can archive a malformed `done` REQ.
 6. Move the file to `archive/`:
    ```bash
    mv {project}/.do-work/pending/REQ-FILE {project}/.do-work/archive/REQ-FILE

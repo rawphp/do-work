@@ -802,6 +802,11 @@ Read the worker's YAML report's `outputs:` list and `closure_proof` value. Rewri
 3. Update `**Status:**` to `done`.
 4. Write the worker's `closure_proof` value into `**Closure proof:**`. If the header is absent, insert it before `**Files:**`.
 5. Append a `## Outputs` section based on the `outputs:` array from the worker's YAML report. One bullet per entry: `- <path> — <description>`.
+5b. **Archive-integrity gate.** With the working file now fully rewritten, run the deterministic guardrail on it before the move:
+   ```bash
+   bash {skill-root}/lib/check-archive-integrity.sh {project}/.do-work/working/REQ-NNN-slug.md
+   ```
+   It asserts the final on-disk state is internally consistent: `**Status:** done`, a non-empty `**Closure proof:**`, and zero unchecked `- [ ]` items inside `## Acceptance Criteria`. **Exit non-zero ⇒ do not archive:** transition the REQ to `**Status:** stopped`, add `**Reason:** archive-integrity`, surface the script's stderr diagnostics, and leave the file in `working/`. This is the persistence-boundary enforcement of the invariants steps 3–4 and the worker's acceptance-criteria ticking (`agents/run-worker.md` Step "Mark each `- [x]`") are supposed to satisfy — those are prose an LLM can silently skip; this gate cannot be skipped. (`archive-integrity` is an orchestrator-assigned reason like `path-unit-incomplete` and `missing-closure-proof`; it is not a worker reason.)
 6. Move the file to `archive/`:
    ```bash
    mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/archive/REQ-NNN-slug.md
@@ -922,7 +927,7 @@ Output: <primary output path>
 
 Capture the PR URL printed by `gh pr create`.
 
-**4-pr.4 Archive the REQ — or park it (pending-validation-bound).** For a fully-done REQ, apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the UR-drain PR opens.
+**4-pr.4 Archive the REQ — or park it (pending-validation-bound).** For a fully-done REQ, apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, **archive-integrity gate (4b step 5b — `bash {skill-root}/lib/check-archive-integrity.sh` on the rewritten file; non-zero ⇒ stop with `**Reason:** archive-integrity`, do not archive)**, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the UR-drain PR opens.
 
 For a **pending-validation-bound** REQ (detected in 4.0), apply the **same** park logic as **4b-pending** instead (path-unit guard, empty closure proof, strip ownership stamp, set `**Status:** pending-validation`, consolidate the worker's `pending_validation:` steps into `## Post-merge validation`, append `## Outputs`, `mkdir -p` + `mv` to `pending/`, fire the `on_pending_validation` notification hook) — with the same addition: append the PR URL to `## Outputs` as a `- PR — <pr-url>` bullet. The PR has already opened (4-pr.3) and delivers the code; only human sign-off waits, exactly as in merge mode. There is **no fallback to a local merge** — PR mode parks the REQ but never changes its delivery vehicle.
 
