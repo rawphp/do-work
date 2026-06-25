@@ -48,8 +48,11 @@ single runner, bats removed, CI runs the runner.
       suites the `lib/tests/` versions don't cover at all, and run-all.sh wasn't running
       them. Relocated as `check-deps-pending.test.sh` / `pick-req-pending.test.sh`
       (distinct names avoid the basename collision). No coverage lost; runner 22→24.
-- [ ] **S4 — Converge to plain-bash.** Drop redundant `cycle-check.bats`; port
-      `deadlock-check.bats` → `deadlock-check.test.sh`. Suite runs with no external dep.
+- [x] **S4 — Converge to plain-bash.** `cycle-check.test.sh` was already a strict
+      superset of `cycle-check.bats` (8 bats cases + 4 more) → dropped the bats.
+      Ported `deadlock-check.bats` → plain-bash `deadlock-check.test.sh` (all 7 cases,
+      reviewer-confirmed faithful). Both `.bats` removed. Suite (23) now green with
+      **bats absent** — external dependency eliminated.
 - [ ] **S5 — Shared harness (optional).** Extract `_harness.sh`; source from each test.
       Only if it's a clear win without losing single-file runnability.
 - [ ] **S6 — CI.** `.github/workflows/test.yml` runs the runner on push/PR.
