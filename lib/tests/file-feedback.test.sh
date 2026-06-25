@@ -142,7 +142,7 @@ run_script() {
 
   (
     cd "$TMP" && \
-    PATH="$MOCK_BIN:/usr/bin:/bin" \
+    PATH="${FF_TEST_PATH:-$MOCK_BIN:/usr/bin:/bin}" \
     FEEDBACK_LOCK_DIR="$TMP/.do-work/state" \
     "$SCRIPT" "$event_type" "$fingerprint" "$context_json" "$title" "$body" \
       > "$out_file" 2> "$err_file"
@@ -229,7 +229,18 @@ CASES=$((CASES + 1))
 setup_fixture
 write_config "true" "example/system-repo"
 rm -f "$MOCK_BIN/gh"
-run_script "deadlock" "fp:1:2:3" "{}" "Title" "Body"
+# Run against a sandbox PATH that has the coreutils the script needs but NO gh,
+# so `command -v gh` fails regardless of host. Simply removing the mock and
+# keeping /usr/bin on PATH is not enough on CI runners, which ship a real gh in
+# /usr/bin alongside the coreutils.
+NOGH_BIN="$TMP/nogh-bin"
+mkdir -p "$NOGH_BIN"
+for _t in bash sh env awk sed grep cat printf mktemp rm mkdir date head tail tr cut sort wc dirname basename flock; do
+  _p="$(command -v "$_t" 2>/dev/null || true)"
+  [ -n "$_p" ] && ln -sf "$_p" "$NOGH_BIN/$_t"
+done
+FF_TEST_PATH="$NOGH_BIN" run_script "deadlock" "fp:1:2:3" "{}" "Title" "Body"
+unset NOGH_BIN _t _p
 assert_eq "0" "$RC_" "$CURRENT_CASE rc"
 assert_contains "gh" "$STDERR_" "$CURRENT_CASE warning mentions gh"
 teardown_fixture
