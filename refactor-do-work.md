@@ -66,6 +66,17 @@ single runner, bats removed, CI runs the runner.
       guard added: there was no doc *conflict* (normative docs were already bats-free),
       and a `lib/*.test.sh` location guard would false-positive on legit retro examples
       — adding a speculative pattern violates the project's UR-029 over-broad caution.
-- [ ] **S8 — Final.** Full suite green, `/code-review` whole diff, open PR.
+- [x] **S8 — Final.** Suite green (22 on this base; 23 once the archive-integrity PR
+      lands). Final whole-diff review: no issues — no dropped coverage, correct path
+      resolution, CI Linux-safe, runner correct, CONTRIBUTING-compliant. Rebased onto
+      `main` as `refactor/do-work-test-tooling` (independent of the open archive-integrity
+      PR — zero file overlap), pushed, PR opened.
 
 Each step: live-test → `/code-review` → commit.
+
+## Outcome
+
+One test home (`lib/tests/`), one runner (`run-all.sh`), one framework (plain bash —
+`bats` dependency removed), a closed coverage gap (pending-validation suites now run),
+and CI enforcing the suite + doc-lint on every PR. The agent layer was intentionally
+left untouched. S5 (shared harness) deliberately deferred as cosmetic churn.
