@@ -70,6 +70,22 @@ git worktree add {project}/.worktrees/req-NNN -b req/REQ-NNN <base-branch>
 
 The REQ file in `{project}/.do-work/working/REQ-NNN-slug.md` is immediately visible from the worktree because `git worktree` shares the repository's object database and tracked index. No physical copy or move is required.
 
+### W3.5 Provision dependencies
+
+Before entering the worktree, run the dependency provisioner so that test tooling (Pest, vitest, etc.) can boot:
+
+```bash
+bash {skill-root}/lib/provision-worktree.sh {project} {project}/.worktrees/req-NNN
+```
+
+Capture its stdout summary and interpret each line:
+
+- `linked: <path>` — the dependency dir was symlinked from the main checkout into the worktree. Test tooling referencing that path should now boot.
+- `ran-setup: <path>` — the `worktree.setup_command` ran inside the worktree and produced the dependency dir. Test tooling should now boot.
+- `unprovisionable: <path>` — the dir is absent from the main checkout AND no `worktree.setup_command` resolved it. Carry these paths forward; the verification logic in Step 6 uses them to decide whether a failing `test`/`build` step is retryable or genuinely unprovisionable (see **Deferred checkpoint status** in Step 6).
+
+The provisioner always exits 0 — an `unprovisionable:` line is a reported outcome, not a fatal error.
+
 ### W4. Work inside the worktree
 
 `cd` into `{project}/.worktrees/req-NNN` before starting TDD. All edits and commits from `## Steps` Step 3 through Step 8 happen inside this directory.
@@ -236,9 +252,17 @@ Record the result of each step in an ordered checkpoint log. Each checkpoint ent
 
 - **`human`** — the step explicitly requires human judgment or confirmation ("Confirm the badge looks correct", "Ask the user to approve").
 - **`device`** — the step requires a physical device or external hardware not available in the worktree (mobile device, IoT sensor, etc.).
-- **`environment`** — the step requires an environment the worker genuinely cannot provision after a real attempt (a dev server that has no runtime in this worktree, external credentials that are not present, a third-party sandbox that cannot be reached).
+- **`environment`** — the step requires an environment the worker genuinely cannot provision after a real attempt (a dev server that has no runtime in this worktree, external credentials that are not present, a third-party sandbox that cannot be reached). **Missing or installable test/build tooling (`vendor/`, `node_modules/`, `.venv/`, etc.) is explicitly NOT a valid `environment` deferral** — step W3.5 runs `{skill-root}/lib/provision-worktree.sh` specifically to supply it; treat a missing dep dir as a provisioning gap to be resolved there, not as grounds for deferral here.
 
-When you encounter such a step, mark it `status: deferred` in the checkpoint log with a `category` field (`human`, `device`, or `environment`) and a one-sentence `reason` explaining why it cannot be executed here. Add the step to `pending_validation:` in the Return Report. Then **continue** with the remaining steps.
+When you encounter a genuinely non-executable step (`human`, `device`, or `environment` per the above), mark it `status: deferred` in the checkpoint log with a `category` field (`human`, `device`, or `environment`) and a one-sentence `reason` explaining why it cannot be executed here. Add the step to `pending_validation:` in the Return Report. Then **continue** with the remaining steps.
+
+**Unprovisionable test/build tooling — loud, human-tracked path.** When a `test` or `build` verification step cannot run because the W3.5 provisioner reported `unprovisionable:` for the required dependency dir AND `worktree.setup_command` did not resolve it, the worker MUST NOT mark the step `deferred`-and-pass as an `environment` deferral, and MUST NOT silently proceed to `done` as if the suite ran. Instead:
+
+1. Do NOT classify this as a `human`, `device`, or `environment` deferral.
+2. Route the un-run suite to `pending_validation:` in the Return Report with a plain-language entry such as: `Run the test suite — dependencies could not be provisioned in the worktree — confirm green`.
+3. Append a `## Post-merge validation` section to the REQ (or add to an existing one) with the un-run suite as an explicit checklist item — e.g. `- [ ] Run the test suite — dependencies could not be provisioned in the worktree — confirm green`.
+4. The REQ parks in `.do-work/pending/` (the orchestrator routes it there when `pending_validation:` is non-empty) rather than being archived as done. This is the **loud, human-tracked path**: a human or CI closes the outstanding checklist item after merge, keeping the loop moving.
+5. Continue to Step 7 and return `status: done` — pending-validation is not a stopper. The code merges; the un-run suite becomes the human's explicit responsibility. The documented stopper-reason enum is unchanged; no new stopper is introduced.
 
 **Critical distinction — deferred vs. failing:**
 - A step that is *executable* but currently failing (test red, endpoint 500s, build broken) is **not** eligible for deferral. It follows the normal retry path and, after 3 retries, returns `verification-failing`.
