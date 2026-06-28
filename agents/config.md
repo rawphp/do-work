@@ -95,6 +95,15 @@ delivery:
   pr:
     granularity: req     # only consulted when mode: pr. "req" (default) opens one PR per REQ off req/REQ-NNN; "ur" accumulates each REQ branch onto a shared ur/UR-NNN branch and opens a single PR when that UR's backlog drains.
 
+worktree:
+  link_paths: []         # extra dependency dirs to symlink from the main checkout into each
+                         # worker worktree (e.g. [server/vendor, web/node_modules]). Additive
+                         # to auto-detected dirs (composer.json -> vendor, package.json ->
+                         # node_modules, pyproject.toml/requirements.txt -> .venv).
+  setup_command: ""      # optional fallback run inside the worktree when a dependency dir is
+                         # absent from the main checkout and cannot be symlinked
+                         # (e.g. "composer install --no-interaction"). Empty = no fallback.
+
 verify:
   threshold: 90          # minimum confidence score (0-100) for go to auto-run without --force
 
@@ -147,7 +156,7 @@ routing: []
 #     agent: llm-app-engineer
 ```
 
-4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `delivery`, `verify`, `notifications`, `routing`) and each key within those sections:
+4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `delivery`, `worktree`, `verify`, `notifications`, `routing`) and each key within those sections:
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
    - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
@@ -196,3 +205,5 @@ routing: []
 | `verify.threshold` | integer | `90` | Minimum confidence score (0-100) that `agents/go.md` requires before auto-running without `--force`. Consumers: `agents/verify.md`, `agents/go.md`. |
 | `notifications.on_pending_validation` | string | `""` | Shell command template executed once when a REQ parks as `pending-validation`. Supports three placeholders: `{req}` (REQ id, e.g. `REQ-234`), `{title}` (first line of the REQ's Task section), `{checks}` (newline-joined outstanding `## Post-merge validation` items). Placeholders are substituted before execution. Empty or absent = disabled — no command runs and no warning prints. A non-zero exit or missing binary produces at most a one-line warning and never stops the loop. Typical uses: Telegram ping via `curl`, macOS `osascript` alert, webhook `curl`. Consumers: `agents/run.md` Step 4 park sequence. |
 | `routing` | list of `{match, agent}` maps | `[]` | Ordered subagent-routing rules for the run orchestrator's REQ classification. Each entry is `{match: <signal description or keyword list>, agent: <subagent_type>}`. The classifier scans rules top-to-bottom (first match wins) and dispatches the matching `agent`; if no rule matches — or the list is empty — it falls back to `general-purpose` silently. Ships empty so the stock skill is portable (no machine-specific agents). A commented example block in the template above reproduces the original specialist table for users who want to restore it. Consumers: `agents/run.md`, `agents/resume.md`. |
+| `worktree.link_paths` | list of strings | `[]` | Extra dependency directories to symlink from the main checkout into each worker worktree (e.g. `[server/vendor, web/node_modules]`). Additive to auto-detected dirs: `composer.json` → `vendor`, `package.json` → `node_modules`, `pyproject.toml` / `requirements.txt` → `.venv`. Use this for monorepo or subdir layouts where the auto-detection misses a directory. Consumers: `lib/provision-worktree.sh`. |
+| `worktree.setup_command` | string | `""` | Optional fallback command run inside the worktree when a dependency directory is absent from the main checkout and cannot be symlinked (e.g. `"composer install --no-interaction"`). The provisioner tries symlinking first (symlink-first semantics); this command runs only when a required dir is missing and symlinking fails. Empty = no fallback (the worktree is used as-is). Consumers: `lib/provision-worktree.sh`, `agents/run-worker.md`. |
