@@ -97,7 +97,7 @@ The Step 8 commit (`feat(REQ-NNN): ...`) lands on `req/REQ-NNN` inside the workt
 **Worker stops here.** Do NOT merge back. Do NOT tear down the worktree. Do NOT touch `.do-work/`. The orchestrator (see `agents/run.md` post-worker integration steps) is responsible for:
 
 - Merging `req/REQ-NNN` into `<base-branch>` with conflict-retry handling.
-- Moving the REQ file from `.do-work/working/` to `.do-work/archive/`, setting `**Status:** done`, appending the `## Outputs` section based on the YAML report you returned.
+- Moving the REQ file from `.do-work/working/` to `.do-work/archive/`, setting `**Status:** done`, adding the `## Outputs` section based on the YAML report you returned.
 - Tearing down the worktree (`git worktree remove`) and deleting the feature branch (`git branch -d`).
 - Committing the `.do-work/` metadata change.
 
@@ -233,7 +233,7 @@ Review each acceptance criterion in the REQ. Mark each `- [x]` as you verify it.
 
 ### 6. Execute verification steps
 
-**Section scope.** Only `## Verification Steps` items are part of the checkpoint loop. The `## Post-merge validation` section (if present in the REQ) is **never executed by the worker** — those items run after the orchestrator merges and are the `/do-work close` or approval flow's responsibility, not yours.
+**Section scope.** Only `## Verification Steps` items are part of the checkpoint loop. The `## Manual checks (advisory)` section (if present in the REQ) is **never executed by the worker** — those items are archived as advisory follow-up after automated closure, not worker responsibilities.
 
 Read `## Verification Steps` from the REQ. Execute each step in order:
 
@@ -254,15 +254,14 @@ Record the result of each step in an ordered checkpoint log. Each checkpoint ent
 - **`device`** — the step requires a physical device or external hardware not available in the worktree (mobile device, IoT sensor, etc.).
 - **`environment`** — the step requires an environment the worker genuinely cannot provision after a real attempt (a dev server that has no runtime in this worktree, external credentials that are not present, a third-party sandbox that cannot be reached). **Missing or installable test/build tooling (`vendor/`, `node_modules/`, `.venv/`, etc.) is explicitly NOT a valid `environment` deferral** — step W3.5 runs `{skill-root}/lib/provision-worktree.sh` specifically to supply it; treat a missing dep dir as a provisioning gap to be resolved there, not as grounds for deferral here.
 
-When you encounter a genuinely non-executable step (`human`, `device`, or `environment` per the above), mark it `status: deferred` in the checkpoint log with a `category` field (`human`, `device`, or `environment`) and a one-sentence `reason` explaining why it cannot be executed here. Add the step to `pending_validation:` in the Return Report. Then **continue** with the remaining steps.
+When you encounter a genuinely non-executable step (`human`, `device`, or `environment` per the above), mark it `status: deferred` in the checkpoint log with a `category` field (`human`, `device`, or `environment`) and a one-sentence `reason` explaining why it cannot be executed here. Add the step to `deferred_checks:` in the Return Report. Then **continue** with the remaining steps.
 
 **Unprovisionable test/build tooling — loud, human-tracked path.** When a `test` or `build` verification step cannot run because the W3.5 provisioner reported `unprovisionable:` for the required dependency dir AND `worktree.setup_command` did not resolve it, the worker MUST NOT mark the step `deferred`-and-pass as an `environment` deferral, and MUST NOT silently proceed to `done` as if the suite ran. Instead:
 
 1. Do NOT classify this as a `human`, `device`, or `environment` deferral.
-2. Route the un-run suite to `pending_validation:` in the Return Report with a plain-language entry such as: `Run the test suite — dependencies could not be provisioned in the worktree — confirm green`.
-3. Append a `## Post-merge validation` section to the REQ (or add to an existing one) with the un-run suite as an explicit checklist item — e.g. `- [ ] Run the test suite — dependencies could not be provisioned in the worktree — confirm green`.
-4. The REQ parks in `.do-work/pending/` (the orchestrator routes it there when `pending_validation:` is non-empty) rather than being archived as done. This is the **loud, human-tracked path**: a human or CI closes the outstanding checklist item after merge, keeping the loop moving.
-5. Continue to Step 7 and return `status: done` — pending-validation is not a stopper. The code merges; the un-run suite becomes the human's explicit responsibility. The documented stopper-reason enum is unchanged; no new stopper is introduced.
+2. Route the un-run suite to `deferred_checks:` in the Return Report with a plain-language entry such as: `Run the test suite — dependencies could not be provisioned in the worktree — confirm green`.
+3. The orchestrator consolidates that entry into the archived REQ's `## Manual checks (advisory)` section as an unchecked advisory item.
+4. Continue to Step 7 and return `status: done`. The code merges, the REQ archives as done, and the un-run suite becomes explicit advisory follow-up outside the blocking closure path. The documented stopper-reason enum is unchanged; no new stopper is introduced.
 
 **Critical distinction — deferred vs. failing:**
 - A step that is *executable* but currently failing (test red, endpoint 500s, build broken) is **not** eligible for deferral. It follows the normal retry path and, after 3 retries, returns `verification-failing`.
@@ -464,10 +463,10 @@ checkpoint_log:
       actual: ""
       status: passed    # or "deferred" for inherently non-executable steps
       handoff: ""
-pending_validation: []  # list of deferred verification steps; empty list when nothing deferred
-                        # each entry: { step: "<step text>", category: human|device|environment, reason: "<why>" }
-                        # example: [{ step: "Confirm badge renders on user's phone", category: device,
-                        #              reason: "Requires physical iOS device not available in worktree" }]
+deferred_checks: []  # list of deferred verification steps; empty list when nothing deferred
+                     # each entry: { step: "<step text>", category: human|device|environment, reason: "<why>" }
+                     # example: [{ step: "Confirm badge renders on user's phone", category: device,
+                     #              reason: "Requires physical iOS device not available in worktree" }]
 acceptance:
   AC1:
     status: passed
@@ -486,8 +485,8 @@ Field rules:
 - `status: done` → `commit` must be set; `reason` empty
 - `status: done` → `closure_proof` must be non-empty and reference the checkpoint log plus completing commit (for example `checkpoint_log:passed commit:abcdef1`)
 - `status: done` requires every acceptance criterion to carry `status: passed` with evidence — acceptance criteria can never be deferred. A REQ whose only AC is human-judgment-based has genuinely ambiguous criteria and must return `reason: ambiguous-criteria`, not defer the AC.
-- `status: done` with deferred verification steps is valid provided all non-deferred steps passed and all ACs have evidence. The deferred steps are listed in `pending_validation:` for the orchestrator to route.
-- `pending_validation:` is always present: empty list (`[]`) when nothing was deferred, populated list when one or more steps were deferred.
+- `status: done` with deferred verification steps is valid provided all non-deferred steps passed and all ACs have evidence. The deferred steps are listed in `deferred_checks:` for the orchestrator to consolidate into the archived REQ's advisory section.
+- `deferred_checks:` is always present: empty list (`[]`) when nothing was deferred, populated list when one or more steps were deferred.
 - `status: stopped` → `reason` must match the enum above; `commit` empty
 - `status: failed` → unrecoverable error (exception thrown, file write failed); `reason: unknown-error` or specific
 - Always include `milestone_complete` (defaults to `false`)
@@ -510,4 +509,4 @@ Field rules:
 - **Stay in scope.** If the REQ would require changes outside its stated scope, return `status: stopped` with `reason: scope-creep`.
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.
 - **Worktree teardown belongs to the orchestrator.** Workers MUST NOT run `git worktree remove` or `git branch -d`. After you return `status: done`, the orchestrator merges the feature branch, archives the REQ, and tears down the worktree. Running teardown from the worker double-deletes the worktree and can corrupt the orchestrator's post-merge steps.
-- **Never invent stopper reasons.** The `reason` field in a stopped/failed report MUST be one of the documented enum values: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`. Do not improvise values outside this list (for example `awaiting-human-verification` is not a valid reason — if the worker hits an inherently non-executable verification step, use `status: deferred` in the checkpoint log and add the step to `pending_validation:` so the orchestrator can route it, then continue toward `status: done`). Inventing reasons outside the enum breaks downstream tooling (status, resume, unblock commands) that pattern-matches on these values.
+- **Never invent stopper reasons.** The `reason` field in a stopped/failed report MUST be one of the documented enum values: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`. Do not improvise values outside this list (for example `awaiting-human-verification` is not a valid reason — if the worker hits an inherently non-executable verification step, use `status: deferred` in the checkpoint log and add the step to `deferred_checks:` so the orchestrator can route it into advisory archive data, then continue toward `status: done`). Inventing reasons outside the enum breaks downstream tooling (status, resume, unblock commands) that pattern-matches on these values.
