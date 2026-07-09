@@ -230,7 +230,7 @@ Glob `{project}/.do-work/working/REQ-*.md`. For each file found, read its owners
 
 All timestamps in REQ files (`**Claimed at:**`, `**Heartbeat:**`, and any
 `<ISO-8601 UTC>` value) are UTC with a `Z` suffix. The local wall-clock
-date may differ from the UTC date by ±1 day depending on the host's
+date may differ from the UTC date by ±1 day based on the host's
 timezone. Do NOT decide whether a slot is fresh by comparing the
 heartbeat's calendar date to "today" — that reasoning will misclassify
 recent slots as stale across the UTC/local date boundary.
@@ -242,7 +242,7 @@ token from `scan-stale.sh`'s output — not the raw ISO timestamp.
 
 ### 3b. Legacy stranded REQ triage (advisory — no automatic state change)
 
-While classifying `working/` slots in §3, also identify **legacy stranded REQs**: files whose `**Status:**` is `stopped` and whose `**Reason:**` value is not in the documented stopper enum (`tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). The canonical example is `awaiting-human-verification`, an improvised reason used before the `pending-validation` state existed.
+While classifying `working/` slots in §3, also identify **legacy stranded REQs**: files whose `**Status:**` is `stopped` and whose `**Reason:**` value is not in the documented stopper enum (`tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). The canonical example is `awaiting-human-verification`, an improvised reason from an older human-wait flow.
 
 **Detection:** for each `working/REQ-*.md` file, read `**Status:**` and `**Reason:**`. If `**Status:** stopped` AND `**Reason:**` is non-empty AND the reason does not match any enum value above, record the file as a **legacy stranded slot**.
 
@@ -255,13 +255,11 @@ If any legacy stranded slots were found, print a triage notice before proceeding
   - REQ-NNN  reason: <raw-reason-value>  (<slug>)
   ...
 These REQs stopped with an unrecognized reason and were never migrated to the
-pending-validation state. Triage guidance (advisory — take the appropriate action manually):
-  • If the code for this REQ was already merged into the base branch:
-      → Move the REQ to .do-work/pending/ (set Status: pending-validation, strip the claim
-        block, empty the Closure proof field) and resolve via /do-work approve REQ-NNN or
-        /do-work reject REQ-NNN.
-  • If the code was NOT merged (the req/ branch still exists with unmerged commits):
-      → Unblock the REQ: /do-work unblock REQ-NNN  (returns it to backlog for re-dispatch).
+current delivery flow. Triage guidance (advisory — take the appropriate action manually):
+  • If the req/ branch exists and still needs work:
+      → Resume it: /do-work resume REQ-NNN
+  • If the code was not delivered and no usable branch remains:
+      → Unblock it: /do-work unblock REQ-NNN  (returns it to backlog for re-dispatch).
 Run continues — no automatic state change was made.
 ```
 
@@ -609,7 +607,7 @@ The worker's final message is a fenced YAML block matching the schema defined in
 | `status` | Action |
 |---|---|
 | `done` | Capture `commit` hash and `outputs`. Continue to Step 4 (Integrate). |
-| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). Continue to Step 5 (Recover) — handle per `## Stopping Rules`. Skip Step 4. **Workers never report a human-wait stopper** — there is no `awaiting-human-verification` reason. Inherently non-executable verification steps are *deferred* by the worker (returned in `pending_validation:`, per REQ-231), which routes the REQ to the `pending-validation` Status at Step 4.0, not to a stopper. |
+| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). Continue to Step 5 (Recover) — handle per `## Stopping Rules`. Skip Step 4. **Workers never report a human-wait stopper** — there is no `awaiting-human-verification` reason. Inherently non-executable verification steps are *deferred* by the worker (returned in `deferred_checks:`) and are recorded as advisory manual checks during the normal archive path. |
 | `failed` | The worker crashed before completing. Treat as `stopped` with `reason: unknown-error`. |
 
 If the worker's report is missing or unparseable, treat as `status: failed` with `reason: unknown-error` and surface the raw output to the user.
@@ -717,7 +715,7 @@ bash lib/run-ledger.sh \
 
 For stopped workers, write the ledger before returning control to the user, with `result: stopped:<reason>` and the best available evidence lists. For policy-blocked or acceptance-evidence failures before review, use `review: not-run`. If `ledger.enabled` is false, skip ledger creation.
 
-For a **pending-validation-bound** REQ (detected in Step 4.0), write `result: pending-validation` with the normal review and evidence fields — delivery still happened and all automated gates passed, so the review and evidence lists are populated exactly as for a done REQ; only human/device sign-off remains. Write this ledger entry on the same path as a done REQ (after integration), not the stopped path.
+When `deferred_checks:` is non-empty, still write `result: done` with the normal review and evidence fields. Delivery happened and all automated gates passed; any human/device follow-up is advisory data in the archived REQ, not a distinct ledger result.
 
 The worker also reports `milestone_complete` (boolean) and `milestone` (id when true). Step 7b uses these.
 
@@ -760,21 +758,12 @@ The in-parallel variant is identical: when the gate trips inside Stage B, finish
 
 Reached only when `status: done` and both acceptance evidence validation and post-build review passed.
 
-#### 4.0 Detect pending-validation-bound REQs (before delivery)
-
-A REQ is **pending-validation-bound** when, after every automated gate above has passed (acceptance evidence, policy, review — all unchanged), human or device sign-off still remains. Detect it from either signal:
-
-1. The worker report's `pending_validation:` list is **non-empty** (the worker deferred one or more inherently non-executable verification steps — see [agents/run-worker.md](run-worker.md) `## Return Report`, added by REQ-231), **OR**
-2. The REQ file carries a **non-empty `## Post-merge validation`** section.
-
-If neither signal holds, the REQ is fully done — take the normal delivery-then-archive path below. If either holds, the REQ is pending-validation-bound: it still takes the **identical delivery** path (merge or PR, including worktree teardown — the code is never held back), but **parks instead of archives** (4b-pending replaces 4b in merge mode; the PR path parks in 4-pr.4). This is a terminal `pending-validation` Status, not a stopper — the loop continues afterward (Step 8). The `/do-work approve REQ-NNN` flow (REQ-236) consumes `.do-work/pending/` and completes closure later.
-
 **Delivery mode dispatch.** Read `config.delivery.mode` (default `merge`):
 
-- **`merge`** (default) — execute substeps **4a → 4b → 4c → 4d** below, in order; each must succeed before the next. This is the historical local-merge behaviour, unchanged. For a pending-validation-bound REQ, substitute **4b-pending** for 4b — delivery (4a), teardown (4c), and the metadata commit (4d) are otherwise identical.
-- **`pr`** — skip 4a–4d entirely and execute the **PR delivery** sequence (`#### 4-pr`) instead. PR mode never runs the local merge. A pending-validation-bound REQ follows 4-pr identically, parking in 4-pr.4 instead of archiving.
+- **`merge`** (default) — execute substeps **4a → 4b → 4c → 4d** below, in order; each must succeed before the next. This is the historical local-merge behaviour, unchanged.
+- **`pr`** — skip 4a–4d entirely and execute the **PR delivery** sequence (`#### 4-pr`) instead. PR mode never runs the local merge.
 
-The guards in 4b / 4b-pending (path-unit closure, non-empty closure proof for the done path) and the closure-proof model are identical in both delivery modes — only the delivery vehicle differs. Whichever path runs, proceed to Step 7 when it completes.
+The guards in 4b and 4-pr.4 (path-unit closure and non-empty closure proof) and the closure-proof model are identical in both delivery modes — only the delivery vehicle differs. Whichever path runs, proceed to Step 7 when it completes.
 
 #### 4a. Merge the feature branch
 
@@ -802,6 +791,7 @@ Read the worker's YAML report's `outputs:` list and `closure_proof` value. Rewri
 3. Update `**Status:**` to `done`.
 4. Write the worker's `closure_proof` value into `**Closure proof:**`. If the header is absent, insert it before `**Files:**`.
 5. Append a `## Outputs` section based on the `outputs:` array from the worker's YAML report. One bullet per entry: `- <path> — <description>`.
+5a. **Manual checks (advisory).** If the worker report's `deferred_checks:` list is non-empty OR the REQ already carries a `## Manual checks (advisory)` section, consolidate all deferred items into that section before archiving. Create the section if absent. Keep existing bullets, and add one unchecked bullet per worker item: `- [ ] <step text> (<category>: <reason>)`. This section is advisory only; it never blocks archive.
 5b. **Archive-integrity gate.** With the working file now fully rewritten, run the deterministic guardrail on it before the move:
    ```bash
    bash {skill-root}/lib/check-archive-integrity.sh {project}/.do-work/working/REQ-NNN-slug.md
@@ -811,32 +801,6 @@ Read the worker's YAML report's `outputs:` list and `closure_proof` value. Rewri
    ```bash
    mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/archive/REQ-NNN-slug.md
    ```
-
-#### 4b-pending. Park the REQ file (pending-validation-bound REQs only)
-
-Runs **instead of 4b** when 4.0 detected a pending-validation-bound REQ. The merge (4a) has already landed — the code is on the base branch — so the only difference from 4b is *where the REQ file goes and what state it carries*. Read the worker's YAML report's `outputs:` list. Rewrite the REQ file in place under `.do-work/working/REQ-NNN-slug.md`:
-
-0. **Path-unit closure guard.** Identical to 4b step 0 — if `**Entry point:**` / `**Terminal state:**` are partially present, do not park; transition to `**Status:** stopped`, `**Reason:** path-unit-incomplete`, and surface. Both-absent (non-path) REQs are unaffected.
-1. **No closure-proof requirement.** Closure proof is the *done* oracle; a pending REQ is delivered-but-unclosed, so leave `**Closure proof:**` **empty** — the `/do-work approve` flow writes it at sign-off.
-2. Strip the ownership stamp (`<!-- claimed-start --> … <!-- claimed-end -->`) — pending lives outside `working/`, so it carries no live claim or heartbeat.
-3. Update `**Status:**` to `pending-validation`.
-4. **Consolidate the outstanding checklist into `## Post-merge validation`.** Merge the worker report's `pending_validation:` entries into the REQ's `## Post-merge validation` section so the entire outstanding checklist lives in one place: append one unchecked bullet per deferred step, e.g. `- [ ] <step text> (<category>: <reason>)`. If the section does not exist, create it. If the REQ already had a `## Post-merge validation` section, keep its existing items and append the worker's. This section is what `/do-work approve` reads.
-5. Append a `## Outputs` section based on the `outputs:` array from the worker's YAML report. One bullet per entry: `- <path> — <description>`.
-6. Move the file to `pending/` (create the directory on first use):
-   ```bash
-   mkdir -p {project}/.do-work/pending
-   mv {project}/.do-work/working/REQ-NNN-slug.md {project}/.do-work/pending/REQ-NNN-slug.md
-   ```
-
-7. **Fire the pending-validation notification hook.** Read `config.notifications.on_pending_validation`. If non-empty, substitute placeholders and run the command **once**, best-effort:
-
-   - `{req}` → the REQ id (e.g. `REQ-234`)
-   - `{title}` → first non-blank line of the REQ's `## Task` section (strip leading `##`)
-   - `{checks}` → newline-joined text of every unchecked bullet (`- [ ] ...`) from `## Post-merge validation` in the now-parked REQ file; empty string when there are none
-
-   Execute via `bash -c "<substituted command>"`. A non-zero exit code or missing binary logs a one-line warning (`⚠ pending-notification: <REQ id> — <error>`) and continues — it never stops the park flow or surfaces a stopper. If `config.notifications.on_pending_validation` is empty or absent, skip this step entirely with no output.
-
-Then run 4c (teardown — identical) and 4d (metadata commit), with the 4d commit message and staged paths adjusted for the park as noted in 4d.
 
 #### 4c. Tear down the worktree
 
@@ -849,9 +813,9 @@ If `git branch -d` refuses (the merge somehow incomplete), surface to the user; 
 
 #### 4d. Commit the metadata change
 
-If `.do-work/` is tracked in this project, stage only the archive (or park) move and commit.
+If `.do-work/` is tracked in this project, stage only the archive move and commit.
 
-For the normal **archive** path (4b):
+For the **archive** path (4b):
 
 ```bash
 git add {project}/.do-work/archive/REQ-NNN-slug.md
@@ -859,17 +823,6 @@ git add {project}/.do-work/working/REQ-NNN-slug.md   # stages the removal
 git commit -m "chore(REQ-NNN): archive
 
 REQ: {project}/.do-work/archive/REQ-NNN-slug.md
-UR: {project}/.do-work/user-requests/UR-NNN/input.md"
-```
-
-For the **park** path (4b-pending), stage the `pending/` move and use the `pending validation` message:
-
-```bash
-git add {project}/.do-work/pending/REQ-NNN-slug.md
-git add {project}/.do-work/working/REQ-NNN-slug.md   # stages the removal
-git commit -m "chore(REQ-NNN): pending validation
-
-REQ: {project}/.do-work/pending/REQ-NNN-slug.md
 UR: {project}/.do-work/user-requests/UR-NNN/input.md"
 ```
 
@@ -927,9 +880,7 @@ Output: <primary output path>
 
 Capture the PR URL printed by `gh pr create`.
 
-**4-pr.4 Archive the REQ — or park it (pending-validation-bound).** For a fully-done REQ, apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, **archive-integrity gate (4b step 5b — `bash {skill-root}/lib/check-archive-integrity.sh` on the rewritten file; non-zero ⇒ stop with `**Reason:** archive-integrity`, do not archive)**, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the UR-drain PR opens.
-
-For a **pending-validation-bound** REQ (detected in 4.0), apply the **same** park logic as **4b-pending** instead (path-unit guard, empty closure proof, strip ownership stamp, set `**Status:** pending-validation`, consolidate the worker's `pending_validation:` steps into `## Post-merge validation`, append `## Outputs`, `mkdir -p` + `mv` to `pending/`, fire the `on_pending_validation` notification hook) — with the same addition: append the PR URL to `## Outputs` as a `- PR — <pr-url>` bullet. The PR has already opened (4-pr.3) and delivers the code; only human sign-off waits, exactly as in merge mode. There is **no fallback to a local merge** — PR mode parks the REQ but never changes its delivery vehicle.
+**4-pr.4 Archive the REQ.** Apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, consolidate `deferred_checks:` or an existing `## Manual checks (advisory)` section into advisory bullets, **archive-integrity gate (4b step 5b — `bash {skill-root}/lib/check-archive-integrity.sh` on the rewritten file; non-zero ⇒ stop with `**Reason:** archive-integrity`, do not archive)**, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the UR-drain PR opens.
 
 **4-pr.5 Tear down the worktree — but keep the branch.** Remove the worktree; do **not** delete the branch (the PR owns it):
 
@@ -938,7 +889,7 @@ git worktree remove {project}/.worktrees/req-NNN
 # NO `git branch -d` — the open PR owns req/REQ-NNN (or it lives on in ur/UR-NNN).
 ```
 
-**4-pr.6 Record the PR URL in the ledger.** When `ledger.enabled` is true, pass the captured URL to the ledger via `--pr` (see Step 3b) so the run record's `pr_url` field carries it. If the metadata commit (4d-equivalent) runs for a tracked `.do-work/`, stage and commit the move per 4d — `chore(REQ-NNN): archive` for the archived path, or `chore(REQ-NNN): pending validation` (staging the `pending/` move) for the parked path.
+**4-pr.6 Record the PR URL in the ledger.** When `ledger.enabled` is true, pass the captured URL to the ledger via `--pr` (see Step 3b) so the run record's `pr_url` field carries it. If the metadata commit (4d-equivalent) runs for a tracked `.do-work/`, stage and commit the archive move per 4d — `chore(REQ-NNN): archive`.
 
 Proceed to Step 7.
 
@@ -1044,9 +995,9 @@ Contents: a single line — the gate-owner's `AGENT_ID`. No header, no trailing 
 
 If the Step 3b.1 budget gate tripped on the REQ just integrated, **do not loop** — the budget-stop report has already been emitted and the run ends here. Otherwise, go back to Step 1 and claim the next REQ.
 
-A REQ parked as `pending-validation` (Step 4.0 / 4b-pending / 4-pr.4) is **not a stopper** — its code merged and its worktree was torn down, so the run continues looping exactly as it does after a fully-done REQ. Do not stop the loop, do not surface a stopper prompt; just proceed to the next claim.
+A REQ with `deferred_checks:` is not a stopper — its code merged, its advisory checks were recorded in the archive, and its worktree was torn down. Continue looping exactly as after any done REQ.
 
-**Dependency note.** A REQ whose `**Depends on:**` names a pending-validation REQ is **claimable** — the dependency's code is already merged to the base branch; only human sign-off is outstanding. `lib/check-deps.sh` treats a parked dep as satisfied by globbing `.do-work/pending/` alongside `.do-work/archive/` (REQ-239), so `lib/pick-req.sh` will hand out a dependent of a parked REQ at claim time just as it would a dependent of an archived REQ.
+**Dependency note.** Deferred manual checks do not change dependency flow. The REQ lands in `archive/`, so `lib/check-deps.sh` and `lib/pick-req.sh` treat it as satisfied through the normal archive-only path.
 
 ---
 
