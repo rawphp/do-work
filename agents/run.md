@@ -960,7 +960,7 @@ Let `<active>` be the trimmed contents of `{project}/.do-work/state/active-miles
 #### Step 7b.3 — Advance on `y`
 
 - Update `{project}/.do-work/state/milestones.md` to mark M<active> as `deployed`.
-- Identify the next not-yet-started milestone (lowest M<n+1> with that status in milestones.md).
+- Identify the next pending milestone (lowest M<n+1> with status `pending` in milestones.md).
   - **If one exists:** update `{project}/.do-work/state/active-milestone.md` to that milestone id. **This file change is the signal that wakes idle siblings** (see Step 1.0a).
   - **If none exists** (all milestones deployed): delete `{project}/.do-work/state/active-milestone.md` so idle siblings fall through to `## When the Backlog is Empty`.
 - Delete `{project}/.do-work/state/gate-owner.md`.
