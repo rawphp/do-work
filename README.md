@@ -4,6 +4,21 @@ A Claude Code and Codex skill that turns natural-language briefs into discrete, 
 
 Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/tests-219%2F219-brightgreen?style=flat-square" alt="Tests">
+</p>
+
+<p align="center">
+  <strong>Supported AI Providers</strong><br>
+  <a href=".claude/">
+    <img src="https://img.shields.io/badge/Claude_Code-Anthropic-orange?style=flat-square&logo=anthropic" alt="Claude Code">
+  </a>
+  <a href=".codex/">
+    <img src="https://img.shields.io/badge/Codex_CLI-OpenAI-412991?style=flat-square&logo=openai" alt="Codex CLI">
+  </a>
+</p>
+
 ---
 
 ## Installation
@@ -82,7 +97,14 @@ Flags:
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections. |
 | `/do-work verify [UR-NNN]` | Scores REQ coverage (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
-| `/do-work run` | Executes backlog: TDD loop, acceptance evidence, policy checks, review, archive/ledger. |
+| `/do-work run [UR-NNN]` | Executes backlog: TDD loop, acceptance evidence, policy checks, review, archive/ledger. Optional UR-NNN scopes the run. |
+| `/do-work run --parallel N` | Single-session parallel mode: dispatches up to N concurrent workers from one terminal. |
+| `/do-work run --budget <amount>` | Caps estimated model spend for the run; stops at the next REQ boundary when reached. |
+| `/do-work status [UR-NNN]` | Live situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup. |
+| `/do-work close UR-NNN` | Validates the integrated result of a UR against its verbatim brief; writes a closure report. |
+| `/do-work unblock REQ-NNN` | Forces a stuck REQ out of `working/` back to the backlog. |
+| `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ. |
+| `/do-work retro` | Mines the run ledger into a learning report + capture calibration guidance. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
 | `/do-work` | Show help. |
 
@@ -110,7 +132,7 @@ Normal completion is proof-backed. Capture may mark generated criteria as `agent
 This skill is multi-file. `SKILL.md` is the entrypoint and routes commands to agent files:
 
 ```
-.do-work/
+do-work/
 ├── SKILL.md              ← entrypoint and command router
 ├── agents/
 │   ├── start.md          ← orchestrator: intake + ideate + capture
@@ -122,10 +144,21 @@ This skill is multi-file. `SKILL.md` is the entrypoint and routes commands to ag
 │   ├── ideate.md         ← surfaces assumptions & risks
 │   ├── capture.md        ← decomposes into REQ files
 │   ├── verify.md         ← scores coverage
-│   ├── run.md            ← TDD execution loop with evidence/review gates
+│   ├── run.md            ← orchestrator: dispatches a worker per REQ
+│   ├── run-worker.md     ← worker: TDD-and-commits a single REQ
 │   ├── review.md         ← post-build scope, evidence, policy, and regression review
+│   ├── status.md         ← read-only situation room
+│   ├── close.md          ← validates a UR's integrated result against its brief
+│   ├── unblock.md        ← forces a stuck REQ back to the backlog
+│   ├── resume.md         ← re-dispatches a worker for a stopped REQ
+│   ├── retro.md          ← mines the run ledger into learning reports
 │   ├── log.md            ← build-in-public draft posts
-│   └── config.md         ← reusable config loading
+│   ├── help.md           ← command help
+│   └── config.md         ← reusable config loading + canonical config template
+├── lib/                  ← deterministic bash primitives (claiming, policy,
+│   │                       evidence, ledger, conformance scan, …)
+│   └── tests/            ← plain-bash test suites (run-all.sh)
+├── docs/
 ├── install.sh
 └── README.md
 ```
@@ -148,6 +181,8 @@ your-project/
     ├── working/                 ← current REQ in flight
     ├── archive/                 ← completed REQs
     ├── logs/                    ← build-in-public log drafts
+    ├── state/                   ← coordination state (milestones, calibration, …)
+    ├── runs/                    ← run ledger records (RUN-NNN.yml)
     └── REQ-001-slug.md          ← backlog tasks
         REQ-002-slug.md
         ...
@@ -198,7 +233,7 @@ verify:
 | `verify.threshold` | integer | `90` | Minimum confidence score (0-100) for `go` to auto-run without `--force`. |
 | `ledger.enabled` | boolean | `true` | Write structured run records under `.do-work/runs/` |
 
-For the full key reference including `feedback`, `parallel`, `next_steps`, `review`, `acceptance`, `risk`, `security`, `cost`, and `ledger`, see [`agents/config.md`](agents/config.md).
+For the full key reference including `feedback`, `parallel`, `next_steps`, `review`, `acceptance`, `risk`, `security`, `cost`, `ledger`, `delivery`, `routing`, and `worktree`, see [`agents/config.md`](agents/config.md).
 
 ---
 
@@ -221,7 +256,10 @@ Capture inspects the codebase to draft the answers, verifies cited files actuall
 
 ## Parallel Execution
 
-do-work supports parallel execution across multiple terminals. Open two or three terminals, run `/do-work run` in each, and the orchestrators pick disjoint REQs from the backlog and work in parallel. No flag is needed — parallel mode is implicit when a second terminal joins.
+do-work supports parallel execution in two forms:
+
+- **Multi-terminal.** Open two or three terminals, run `/do-work run` in each, and the orchestrators pick disjoint REQs from the backlog and work in parallel. No flag is needed — parallel mode is implicit when a second terminal joins.
+- **Single-session.** Run `/do-work run --parallel N` and one orchestrator dispatches up to N concurrent workers (capped at 10), serializing merge/archive through a queue. Defaults from `parallel.max_workers` in config.
 
 Three guarantees keep the parallel terminals from stepping on each other:
 
@@ -231,7 +269,7 @@ Three guarantees keep the parallel terminals from stepping on each other:
 
 **When parallel mode shines.** Backlogs of 5+ independent REQs — the work-sharing payoff grows with the backlog size. For single-REQ work, tightly-coupled REQs, or milestone deploy gates (which stay single-agent by design), the simplicity of one terminal is often the better trade-off.
 
-**Isolation per REQ.** Every REQ runs in a dedicated `git worktree` on a `req/REQ-NNN` branch. The orchestrator creates the worktree before dispatch and tears it down after merging — no REQ ever touches the base branch directly.
+**Isolation per REQ.** Every REQ runs in a dedicated `git worktree` on a `req/REQ-NNN` branch. The orchestrator creates the worktree before dispatch and tears it down after merging — no REQ ever touches the base branch directly. Dependency directories (`vendor`, `node_modules`, `.venv`) are symlinked from the main checkout into each worktree automatically; use `worktree.link_paths` and `worktree.setup_command` in config for monorepo layouts the auto-detection misses.
 
 See `SKILL.md` `## Parallel Execution` for the full behavioural reference, including state files (`gate-owner.md`, `final-suite-running.md`).
 
