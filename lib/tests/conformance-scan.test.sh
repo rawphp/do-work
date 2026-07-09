@@ -111,6 +111,16 @@ assert_eq "pending-dir destructive .do-work/pending/ exists (2 REQ files)" "$SCA
 assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
 teardown_fixture
 
+CURRENT_CASE="pending-dir-ignores-matching-directories"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/project/.do-work/pending/REQ-999-dir.md"
+run_scan "$TMP/project"
+assert_eq "1" "$SCAN_RC" "$CURRENT_CASE rc"
+assert_eq "pending-dir destructive .do-work/pending/ exists (0 REQ files)" "$SCAN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
+teardown_fixture
+
 CURRENT_CASE="usage-missing-arg"
 CASES=$((CASES + 1))
 setup_fixture

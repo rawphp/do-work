@@ -44,10 +44,8 @@ elif [ -d "$LEGACY_DIR" ] && [ ! -d "$DOT_DIR" ]; then
 fi
 
 if [ -d "$PENDING_DIR" ]; then
-  shopt -s nullglob
-  # shellcheck disable=SC2206
-  REQ_FILES=( "$PENDING_DIR"/REQ-*.md )
-  echo "pending-dir destructive .do-work/pending/ exists (${#REQ_FILES[@]} REQ files)"
+  REQ_COUNT="$(find "$PENDING_DIR" -maxdepth 1 -type f -name 'REQ-*.md' -print 2>/dev/null | awk 'END { print NR+0 }')"
+  echo "pending-dir destructive .do-work/pending/ exists ($REQ_COUNT REQ files)"
   DRIFT=1
 fi
 
