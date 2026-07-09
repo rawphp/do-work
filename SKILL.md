@@ -40,8 +40,6 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work retro` | Mines the run ledger and feedback fingerprints to produce a human report and regenerate `.do-work/state/calibration.md` — advisory capture guidance derived from historical patterns. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
-| `/do-work approve REQ-NNN` | Confirms a pending-validation REQ's human checks and archives it with human closure proof. |
-| `/do-work reject REQ-NNN [note]` | Returns a pending-validation REQ to the backlog with the rejection note as rework context. |
 | `/do-work log` | Generates build-in-public draft posts for configured platforms. |
 | `/do-work` | Show this help. |
 
@@ -66,7 +64,6 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/close.md](agents/close.md) — Validates the integrated result of a UR against its verbatim brief; walks path-unit entry points in the merged app; writes `UR-NNN/closure.md`
 - [agents/unblock.md](agents/unblock.md) — Force a stuck in-flight REQ back to the backlog
 - [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
-- [agents/approve.md](agents/approve.md) — Approve or reject a pending-validation REQ: approve archives it with human closure proof; reject returns it to the backlog with a rejection note
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
 - [agents/retro.md](agents/retro.md) — Mines the run ledger to produce a learning report and regenerate `calibration.md`
 - [agents/config.md](agents/config.md) — Reusable config loading instructions
@@ -246,7 +243,6 @@ Workers always run in isolated git worktrees at `{project}/.worktrees/req-NNN` o
 | REQ is stuck / worker died / heartbeat stale | `/do-work unblock REQ-NNN` — strips claim, returns REQ to backlog |
 | REQ stopped (concurrent-conflict / transient error) | `/do-work resume REQ-NNN` — refreshes heartbeat, re-dispatches worker |
 | Deadlock or unclear state | `/do-work status [UR-NNN]` — renders live situation room, deadlock banner |
-| REQ merged, awaiting human validation | `/do-work approve REQ-NNN` / `/do-work reject REQ-NNN` |
 
 See `agents/status.md`, `agents/unblock.md`, `agents/resume.md` for agent-level instructions.
 
@@ -268,7 +264,7 @@ All coordination state lives under `.do-work/state/`:
 - Dependencies: `lib/check-deps.sh`, `lib/cycle-check.sh`
 - Liveness: `lib/heartbeat.sh`, `lib/scan-stale.sh`
 - Deadlock: `lib/deadlock-check.sh`
-- Archive integrity: `lib/check-archive-integrity.sh` — pre-archive gate enforcing Status `done` + non-empty Closure proof + zero unchecked acceptance criteria (`agents/run.md` Step 4b/4-pr.4, `agents/approve.md` 3b)
+- Archive integrity: `lib/check-archive-integrity.sh` — pre-archive gate enforcing Status `done` + non-empty Closure proof + zero unchecked acceptance criteria (`agents/run.md` Step 4b/4-pr.4)
 - Orchestrator: `agents/run.md` §§ Agent Identity, Pre-flight Check, Step 1: Claim the next REQ, When the Backlog is Empty, Step 7b
 - Worker: `agents/run-worker.md` §§ Isolation Mode, Worktree Workflow, Concurrent-Conflict Retry
 
@@ -336,7 +332,7 @@ Every REQ file carries a structured header immediately below the title. The cano
 | Field | Required | Description |
 |---|---|---|
 | `**UR:**` | yes | Parent UR identifier (e.g. `UR-030`) |
-| `**Status:**` | yes | `backlog` / `in-progress` / `stopped` / `done` / `pending-validation` |
+| `**Status:**` | yes | `backlog` / `in-progress` / `stopped` / `done` |
 | `**Created:**` | yes | ISO date (YYYY-MM-DD) |
 | `**Layer:**` | yes | Declared project layer, or `none` for bug-fix/refactor/test-only REQs |
 | `**Entry point:**` | optional | How a user, caller, command, or system reaches this path-unit. Required to be non-empty for top-level path-unit REQs. |
@@ -353,25 +349,22 @@ A **path-unit** is a REQ whose `**Entry point:**` and `**Terminal state:**` are 
 
 `**Status:**` remains writable and authoritative for coordination (`backlog`, `working/`, dependency gating, stale checks, and archive flow). `**Closure proof:**` is a separate evidence signal used to derive whether a done REQ is proven; it does not replace the coordination status field.
 
-`pending-validation` is a terminal **delivered-but-unclosed** state. When a worker's automated gates all pass but a human or device sign-off still remains, `/do-work run` merges the code and tears down the worktree anyway (never stranding work on a branch), then parks the REQ in `.do-work/pending/` with `**Status:** pending-validation` and an empty `**Closure proof:**` — the outstanding checklist lives in the REQ's `## Post-merge validation` section. `/do-work approve REQ-NNN` later completes closure (writing the proof and archiving). A REQ parked in `.do-work/pending/` counts as a **satisfied dependency** — its code is already merged, so dependents stay claimable (`lib/check-deps.sh` globs `.do-work/pending/` alongside `.do-work/archive/`). The `.do-work/pending/` directory is created on demand by `agents/run.md` on the first park, so `/do-work install` does not pre-create it.
-
-### `## Post-merge validation` section
+### `## Manual checks (advisory)` section
 
 An optional REQ body section that holds human, device, or environment checks that cannot be executed by a worker in an isolated worktree.
 
 **Written by:** `agents/capture.md` on path-unit REQs (or the single REQ for legacy-style decompositions) when the brief includes checks that require a human, a physical device, or an environment the worker cannot provision. Capture writes this section — and its executability self-correction scan (Step 4b) moves any mis-classified `## Verification Steps` entries here automatically before committing REQ files.
 
-**Ignored by workers:** Workers never execute `## Post-merge validation` items. The section is explicitly outside the checkpoint loop. Workers do not mark these items passed, failed, or deferred — they are not part of the worker's checkpoint log.
+**Advisory only:** Workers never execute `## Manual checks (advisory)` items. The section is explicitly outside the checkpoint loop, never blocks archive, and is not part of the worker's checkpoint log.
 
-**Consumed post-merge:** After `/do-work run` parks a pending-validation REQ in `.do-work/pending/`, the `## Post-merge validation` checklist is the canonical list of outstanding human/device checks. It is consumed by:
+**Archived by run:** `/do-work run` consolidates worker-reported `deferred_checks:` and any existing `## Manual checks (advisory)` items into the archived REQ, then completes the normal `done` archive path once automated gates pass.
 
-- `/do-work approve REQ-NNN` — the approver walks each item, records evidence, and closes the REQ.
-- `/do-work close UR-NNN` — includes pending-validation REQs in its walk, surfacing the `## Post-merge validation` checklist for each.
+**Surfaced by close:** `/do-work close UR-NNN` reads archived REQs and surfaces any `## Manual checks (advisory)` items as informational follow-up. They are outside the system's validation gate.
 
 **Format (each item):** a checklist line stating what a person should do and what observable outcome confirms it:
 
 ```markdown
-## Post-merge validation
+## Manual checks (advisory)
 
 - [ ] [Action: what a person should do] — Observable outcome: [what they should see or confirm]
 ```
@@ -681,30 +674,6 @@ Re-dispatch a fresh worker for a stopped REQ without sending it back through the
 3. Confirm `{project}/.do-work/working/REQ-NNN-*.md` exists and its `**Status:**` is `stopped`. If not in `working/`, report "REQ-NNN is not in working/ — nothing to resume." If status is not `stopped`, report the actual status and stop.
 4. Read [agents/resume.md](agents/resume.md) in full.
 5. Follow the resume agent instructions exactly. Resume is a one-shot — do not loop back to the backlog after dispatch.
-
----
-
-### approve REQ-NNN
-
-Complete closure on a REQ parked in `.do-work/pending/` — confirm the Post-merge validation checklist and archive the REQ with human closure proof.
-
-1. Detect `{project}`.
-2. Confirm `REQ-NNN` was provided. If not, report "approve requires a REQ id (e.g. /do-work approve REQ-042)." and stop.
-3. Confirm `{project}/.do-work/pending/REQ-NNN-*.md` exists. If not, report "REQ-NNN is not in pending/ — nothing to approve." and stop.
-4. Read [agents/approve.md](agents/approve.md) in full.
-5. Follow the approve agent instructions exactly, passing verb `approve`.
-
----
-
-### reject REQ-NNN [note]
-
-Return a pending-validation REQ to the backlog with a rejection note as rework context for the next worker. Merged code is NOT reverted.
-
-1. Detect `{project}`.
-2. Confirm `REQ-NNN` was provided. If not, report "reject requires a REQ id (e.g. /do-work reject REQ-042 <note>)." and stop.
-3. Confirm `{project}/.do-work/pending/REQ-NNN-*.md` exists. If not, report "REQ-NNN is not in pending/ — nothing to reject." and stop.
-4. Read [agents/approve.md](agents/approve.md) in full.
-5. Follow the approve agent instructions exactly, passing verb `reject` and any note supplied after the REQ id.
 
 ---
 
