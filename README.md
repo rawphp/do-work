@@ -74,6 +74,7 @@ Flags:
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs. |
 | `/do-work go [UR-NNN] --no-layers` | Verifies + runs, but skips layer-coverage checks for this UR. |
 | `/do-work install` | Creates `.do-work/` folder structure in current project. |
+| `/do-work upgrade` | Brings `.do-work/` state into conformance with the current skill. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR into REQ files. |
 | `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
@@ -115,6 +116,7 @@ This skill is multi-file. `SKILL.md` is the entrypoint and routes commands to ag
 │   ├── start.md          ← orchestrator: intake + ideate + capture
 │   ├── go.md             ← orchestrator: verify + run
 │   ├── intake.md         ← records brief verbatim
+│   ├── upgrade.md        ← conformance manifest and fixes
 │   ├── question.md       ← interactive brief questioning (opt-in)
 │   ├── audit.md          ← autonomous REQ quality audit (always-on)
 │   ├── ideate.md         ← surfaces assumptions & risks
