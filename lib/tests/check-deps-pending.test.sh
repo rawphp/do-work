@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Tests for lib/check-deps.sh — pending-validation satisfaction cases.
+# Tests for lib/check-deps.sh — pending-only dependency cases.
 # Plain bash (no bats dependency). Compatible with macOS bash 3.2.
 #
 # Covers:
 #   (a) archive-only dep → satisfied
-#   (b) pending-only dep → satisfied
-#   (c) both archive + pending present → satisfied
-#   (d) absent from both → reported missing
+#   (b) pending-only dep → reported missing
+#   (c) both archive + pending present → satisfied via archive
+#   (d) absent from archive → reported missing
 #   (e) empty Depends on: → empty stdout, exit 0
 #   (f) absent pending/ directory → no error (graceful degradation)
 
@@ -127,20 +127,20 @@ assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty (archive dep satisfied)"
 teardown_fixture
 
 # -----------------------------------------------------------------------
-# Case (b): pending-only dep → satisfied (empty stdout)
+# Case (b): pending-only dep → reported missing
 # -----------------------------------------------------------------------
-CURRENT_CASE="pending-only-satisfied"
+CURRENT_CASE="pending-only-missing"
 CASES=$((CASES + 1))
 setup_fixture
 write_stub "$TMP/.do-work/pending/REQ-101-parked.md" "REQ-101"
 write_req  "$TMP/.do-work/REQ-201-target.md" "REQ-201" "REQ-101"
 run_checker ".do-work/REQ-201-target.md"
 assert_eq "0" "$CHK_RC" "$CURRENT_CASE rc"
-assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty (pending dep satisfied)"
+assert_eq "REQ-101" "$CHK_STDOUT" "$CURRENT_CASE stdout has missing dep"
 teardown_fixture
 
 # -----------------------------------------------------------------------
-# Case (c): dep present in both archive and pending → satisfied
+# Case (c): dep present in both archive and pending → satisfied via archive
 # -----------------------------------------------------------------------
 CURRENT_CASE="both-archive-and-pending-satisfied"
 CASES=$((CASES + 1))
@@ -150,11 +150,11 @@ write_stub "$TMP/.do-work/pending/REQ-102-parked.md" "REQ-102"
 write_req  "$TMP/.do-work/REQ-202-target.md" "REQ-202" "REQ-102"
 run_checker ".do-work/REQ-202-target.md"
 assert_eq "0" "$CHK_RC" "$CURRENT_CASE rc"
-assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty (dep satisfied via both)"
+assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty (dep satisfied via archive)"
 teardown_fixture
 
 # -----------------------------------------------------------------------
-# Case (d): dep absent from both archive/ and pending/ → printed as missing
+# Case (d): dep absent from archive/ → printed as missing
 # -----------------------------------------------------------------------
 CURRENT_CASE="absent-from-both-missing"
 CASES=$((CASES + 1))

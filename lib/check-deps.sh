@@ -11,10 +11,8 @@
 #      may be empty. The field line may be omitted entirely (treated as empty).
 #   2. Validates each id against `REQ-\d+` or `REQ-M\d+-\d+` (milestone form).
 #      Malformed ids are logged to stderr and NOT included in the missing-list.
-#   3. For each valid id, globs `{project}/.do-work/archive/<id>-*.md` OR
-#      `{project}/.do-work/pending/<id>-*.md`. If no file matches either
-#      directory, prints the id to stdout (one per line). An absent `pending/`
-#      directory is treated as "no match" — never an error.
+#   3. For each valid id, globs `{project}/.do-work/archive/<id>-*.md`.
+#      If no file matches, prints the id to stdout (one per line).
 #   4. Empty `**Depends on:**` → empty stdout. Exits 0 in all non-error cases.
 #
 # Notes:
@@ -106,25 +104,15 @@ is_valid_req_id() {
 }
 
 # Check if a dep id is satisfied — i.e. at least one file matching <id>-*.md
-# exists in `.do-work/archive/` OR `.do-work/pending/`.
-# An absent `pending/` directory is handled gracefully (treated as no match).
+# exists in `.do-work/archive/`.
 # Returns 0 if satisfied, 1 otherwise.
 is_satisfied() {
   local id="$1"
   shopt -s nullglob 2>/dev/null || true
-  # Check archive/ first.
   # shellcheck disable=SC2206
   local archive_matches=( "$DOWORK"/archive/"$id"-*.md )
   if [ "${#archive_matches[@]}" -gt 0 ]; then
     return 0
-  fi
-  # Check pending/ — skip gracefully if the directory does not exist.
-  if [ -d "$DOWORK/pending" ]; then
-    # shellcheck disable=SC2206
-    local pending_matches=( "$DOWORK"/pending/"$id"-*.md )
-    if [ "${#pending_matches[@]}" -gt 0 ]; then
-      return 0
-    fi
   fi
   return 1
 }
