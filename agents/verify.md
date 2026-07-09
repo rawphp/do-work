@@ -205,17 +205,17 @@ For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog
 1. Read the REQ's `## Verification Steps` block.
 2. For each numbered step, check whether its text matches any indicator phrase from the four categories above.
 3. If a match is found, record a named issue on that REQ: include the REQ id, the step number, the matched indicator phrase, and the category it falls under.
-4. The suggested fix for each hit: move the step out of `## Verification Steps` and into `## Post-merge validation` (creating the section if absent).
+4. The suggested fix for each hit: move the step out of `## Verification Steps` and into `## Manual checks (advisory)` (creating the section if absent).
 
 **Scoring:** non-executable step hits are reported in the Issues section of the verify report. They lower confidence the same way other REQ-quality issues do (each counts as a gap; deduction formula is the same as vague-criteria hits — -5 per hit, capped at -20 total).
 
 **Auto-fix:** when invoked with `--auto-fix`:
-1. Move the offending step out of `## Verification Steps` and append it to `## Post-merge validation` as a checklist item: `- [ ] [original step text] — Observable outcome: [infer from step context or leave blank for manual fill]`.
+1. Move the offending step out of `## Verification Steps` and append it to `## Manual checks (advisory)` as a checklist item: `- [ ] [original step text] — Observable outcome: [infer from step context or leave blank for manual fill]`.
 2. Renumber any remaining `## Verification Steps` entries so numbering stays contiguous.
-3. Create `## Post-merge validation` if absent, using the section header from `agents/capture.md`'s REQ template.
+3. Create `## Manual checks (advisory)` if absent, using the section header from `agents/capture.md`'s REQ template.
 4. Re-report the REQ as clean once all non-executable steps have been moved.
 
-Report each auto-fix action in the verify report as: `[AUTO-FIXED] REQ-NNN step N — moved "[indicator phrase]" to ## Post-merge validation`.
+Report each auto-fix action in the verify report as: `[AUTO-FIXED] REQ-NNN step N — moved "[indicator phrase]" to ## Manual checks (advisory)`.
 
 ### 5. Score the coverage, then produce the report
 
