@@ -29,23 +29,12 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 Check whether `{project}/.do-work/working/REQ-NNN-*.md` exists.
 
-- If **no match**: the REQ is not an in-flight working slot — check whether it is instead in `.do-work/pending/`:
-  - **Found in `pending/`**: refuse with:
-    ```
-    REQ-NNN is in pending-validation state — it cannot be resumed.
-    The code is already merged; only human sign-off remains.
-    Outstanding checklist items: <count items in ## Post-merge validation, or "none listed">
-    To close: /do-work approve REQ-NNN
-    To return to backlog: /do-work reject REQ-NNN <note>
-    ```
-    Stop. Do not dispatch a worker, do not modify the REQ, do not stamp a heartbeat.
-  - **Not in `pending/` either**: report `"REQ-NNN is not in working/ — nothing to resume."` and stop.
+- If **no match**: report `"REQ-NNN is not in working/ — nothing to resume."` and stop.
 - If **multiple matches** in `working/`: report the ambiguity and stop. Do not guess.
 - If **exactly one match** in `working/`: record the absolute path as `REQ_PATH` and continue.
 
 Read `REQ_PATH` and inspect `**Status:**`.
 
-- If `**Status:**` is `pending-validation`: refuse with the same guidance as above (the REQ was moved to `pending/` but a stale `working/` reference should not be resumed). Report the pending state, direct the user to `/do-work approve REQ-NNN` or `/do-work reject REQ-NNN`, and stop.
 - If `**Status:**` is **not** `stopped`: refuse — report `"REQ-NNN is <status>, not stopped — refusing to resume."` and stop. Resume is exclusively for stopped REQs. Running ones don't need resuming; backlog/archived ones aren't claimed.
 - If `**Status:**` is `stopped`: read and record `**Reason:**` (e.g. `concurrent-conflict`, `unknown-error`) and any associated context for the announce line. Continue.
 
@@ -115,7 +104,6 @@ Resume is a one-shot. Do not claim another REQ, do not invoke run, do not prompt
 
 ## Rules
 
-- **Never resume a pending-validation REQ.** A REQ in `.do-work/pending/` (or carrying `**Status:** pending-validation`) has already had its code merged and its worktree torn down — there is no worker to re-dispatch. The correct verb is `/do-work approve REQ-NNN` (to close) or `/do-work reject REQ-NNN` (to return to backlog with a note). Resume must refuse with that guidance and stop without touching claim stamps, heartbeats, or the REQ file.
 - Refuse to resume a REQ whose `**Status:**` is not `stopped`. Backlog REQs reclaim through `run.md`; archived REQs are done; `in-progress` REQs are either live or already abandoned (use `/do-work unblock` for those).
 - Preserve `**Claimed by:**` and `**Claimed at:**` exactly. Only `**Heartbeat:**` is refreshed.
 - For worktree-mode REQs, never delete or reset the `req/REQ-NNN` branch — the fresh worker continues on it.
