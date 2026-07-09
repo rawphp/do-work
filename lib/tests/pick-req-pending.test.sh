@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Tests for lib/pick-req.sh — pending-validation dep filter cases.
+# Tests for lib/pick-req.sh — pending-only dep filter cases.
 # Plain bash (no bats dependency). Compatible with macOS bash 3.2.
 #
 # Covers:
-#   (a) pending-only dep → candidate is claimable (pick-req returns it)
+#   (a) pending-only dep → candidate is rejected
 #   (b) archive-only dep → candidate is claimable (unchanged behaviour)
-#   (c) dep absent from both archive/ and pending/ → rejected (dep:<id> on stderr)
+#   (c) dep absent from archive/ → rejected (dep:<id> on stderr)
 
 set -u
 
@@ -114,9 +114,9 @@ run_picker() {
 }
 
 # -----------------------------------------------------------------------
-# Case (a): pending-only dep → candidate is claimable
+# Case (a): pending-only dep → candidate is rejected
 # -----------------------------------------------------------------------
-CURRENT_CASE="pending-only-dep-claimable"
+CURRENT_CASE="pending-only-dep-rejected"
 CASES=$((CASES + 1))
 setup_fixture
 # Dep parked in pending/ only — not in archive/
@@ -124,9 +124,9 @@ write_stub "$TMP/.do-work/pending/REQ-501-parked.md" "REQ-501"
 # Candidate depending on REQ-501
 write_candidate "REQ-502" "REQ-501"
 run_picker "any"
-assert_eq "0" "$PICK_RC" "$CURRENT_CASE exit code (0 = found claimable)"
-assert_contains "REQ-502" "$PICK_STDOUT" "$CURRENT_CASE candidate path returned"
-assert_not_contains "dep:REQ-501" "$PICK_STDERR" "$CURRENT_CASE no dep rejection on stderr"
+assert_eq "1" "$PICK_RC" "$CURRENT_CASE exit code (1 = nothing claimable)"
+assert_eq "" "$PICK_STDOUT" "$CURRENT_CASE no candidate returned"
+assert_contains "dep:REQ-501" "$PICK_STDERR" "$CURRENT_CASE dep rejection on stderr"
 teardown_fixture
 
 # -----------------------------------------------------------------------
@@ -146,7 +146,7 @@ assert_not_contains "dep:REQ-503" "$PICK_STDERR" "$CURRENT_CASE no dep rejection
 teardown_fixture
 
 # -----------------------------------------------------------------------
-# Case (c): dep absent from both archive/ and pending/ → rejected
+# Case (c): dep absent from archive/ → rejected
 # -----------------------------------------------------------------------
 CURRENT_CASE="dep-absent-from-both-rejected"
 CASES=$((CASES + 1))
