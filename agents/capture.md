@@ -309,9 +309,9 @@ Use this format exactly:
 1. **[test|build|runtime|ui]** [exact command or action]
    - Expected: [what success looks like — be specific]
 
-## Post-merge validation
+## Manual checks (advisory)
 
-> Optional. Human, device, or environment checks that cannot run in a worker's isolated worktree. Workers never execute this section; it is consumed after merge by `/do-work approve` and `/do-work close`. Each item states what to do and what observable outcome confirms it.
+> Optional. Human, device, or environment checks that cannot run in a worker's isolated worktree. Workers never execute this section; it never blocks archive. The checklist is preserved in the archived REQ as an advisory record for humans and surfaced by `/do-work close`. Each item states what to do and what observable outcome confirms it.
 >
 > Write this section on path-unit REQs (or the single REQ for legacy-style decompositions) only when the brief includes checks that require human judgment, a physical device, or an environment the worker cannot provision.
 
@@ -367,7 +367,7 @@ Use the right type for the task:
 
 **Executability rule (HARD RULE — never write non-executable steps into `## Verification Steps`):**
 
-Every verification step in `## Verification Steps` must be executable by a worker inside its isolated git worktree using only tools and runtimes the worker can start itself. A step is **non-executable** — and must therefore be placed in `## Post-merge validation` instead — if it falls into any of these four categories:
+Every verification step in `## Verification Steps` must be executable by a worker inside its isolated git worktree using only tools and runtimes the worker can start itself. A step is **non-executable** — and must therefore be placed in `## Manual checks (advisory)` instead — if it falls into any of these four categories:
 
 | Category | Description | Example phrases to flag |
 |---|---|---|
@@ -376,7 +376,7 @@ Every verification step in `## Verification Steps` must be executable by a worke
 | **Unprovisionable environment** | Requires external credentials, a live third-party sandbox, or a runtime the worker genuinely cannot start in the worktree (e.g. a native mobile app build, a production database, an external OAuth callback) | "in production", "requires login", "against the live API", "on-device build" |
 | **Explicit human-action phrasing** | The step wording is imperative toward a human, not a command | "Ask the user to...", "Have someone...", "Check with the team..." |
 
-If a brief describes a check that falls into one of these categories, **do not write it into `## Verification Steps`**. Write it into `## Post-merge validation` instead.
+If a brief describes a check that falls into one of these categories, **do not write it into `## Verification Steps`**. Write it into `## Manual checks (advisory)` instead.
 
 **Rules for writing verification steps:**
 
@@ -415,7 +415,7 @@ After writing all REQ files, review each REQ's acceptance criteria for specifici
 After the criteria quality pass, scan each REQ's `## Verification Steps` for non-executable entries (see the executability rule in `### Writing effective Verification Steps` above). For each step that matches any of the four non-executable categories (human judgment, physical device, unprovisionable environment, explicit human-action phrasing):
 
 1. Move the step out of `## Verification Steps` entirely.
-2. Add it to the REQ's `## Post-merge validation` section as a checklist item (create the section if absent, following the template format).
+2. Add it to the REQ's `## Manual checks (advisory)` section as a checklist item (create the section if absent, following the template format).
 3. Renumber any remaining `## Verification Steps` entries so numbering stays contiguous.
 
 This corrects capture errors before they reach a worker. It is non-blocking and requires no user interaction.
