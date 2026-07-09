@@ -27,6 +27,15 @@ assert_contains() {
   esac
 }
 
+assert_not_contains() {
+  local needle="$1"
+  local haystack="$2"
+  local label="$3"
+  case "$haystack" in
+    *"$needle"*) fail "$label: unexpected substring '$needle' in '$haystack'" ;;
+  esac
+}
+
 setup_fixture() {
   TMP="$(mktemp -d -t coverage-rollup-test.XXXXXX)"
   mkdir -p "$TMP/.do-work/archive" "$TMP/.do-work/working" "$TMP/.do-work/pending"
@@ -100,7 +109,8 @@ write_req "$TMP/.do-work/archive/REQ-001-a.md" "REQ-001" "UR-001" "done" "checkp
 write_req "$TMP/.do-work/REQ-002-b.md" "REQ-002" "UR-001" "backlog" ""
 write_req "$TMP/.do-work/working/REQ-003-c.md" "REQ-003" "UR-001" "in-progress" "checkpoint:RUN-003 commit:def"
 run_script
-assert_contains "UR-001 intended=3 proven=1 unproven=2 pending=0" "$OUT" "$CURRENT_CASE counts"
+assert_contains "UR-001 intended=3 proven=1 unproven=2" "$OUT" "$CURRENT_CASE counts"
+assert_not_contains "pending=" "$OUT" "$CURRENT_CASE no pending field"
 assert_contains "unproven_ids=REQ-002,REQ-003" "$OUT" "$CURRENT_CASE ids"
 # Additive: a UR with no path-unit REQs and no closure.md reports closed=n/a,
 # and the existing fields are unchanged.
@@ -158,33 +168,32 @@ run_script "UR-040"
 assert_contains "closed=n/a" "$OUT" "$CURRENT_CASE closure"
 teardown_fixture
 
-# --- Pending bucket (REQ-233): merged-but-unsigned-off REQs ---
+# --- Legacy pending-validation data (UR-039): no derived pending bucket ---
 
-# A UR with one merged-and-proven REQ plus one parked pending-validation REQ
-# reads as pending=1 — the pending REQ is its own bucket, NOT counted as an
-# unproven coverage gap. A UR with all code merged but sign-off outstanding
-# therefore reads as pending, not as a gap or a completion.
-CURRENT_CASE="pending-bucket"
+# A legacy Status value in an active scanned directory falls through to
+# unproven. The rollup has no pending bucket or output field.
+CURRENT_CASE="legacy-pending-validation-is-unproven"
 CASES=$((CASES + 1))
 setup_fixture
 write_req "$TMP/.do-work/archive/REQ-050-a.md" "REQ-050" "UR-050" "done" "checkpoint:RUN-050 commit:abc"
-write_req "$TMP/.do-work/pending/REQ-051-park.md" "REQ-051" "UR-050" "pending-validation" ""
+write_req "$TMP/.do-work/working/REQ-051-legacy.md" "REQ-051" "UR-050" "pending-validation" ""
 run_script "UR-050"
-assert_contains "UR-050 intended=2 proven=1 unproven=0 pending=1" "$OUT" "$CURRENT_CASE counts"
-# The parked REQ is NOT listed as an unproven gap.
-case "$OUT" in
-  *unproven_ids=*) fail "$CURRENT_CASE: pending REQ wrongly listed in unproven_ids ($OUT)" ;;
-esac
+assert_contains "UR-050 intended=2 proven=1 unproven=1" "$OUT" "$CURRENT_CASE counts"
+assert_contains "unproven_ids=REQ-051" "$OUT" "$CURRENT_CASE ids"
+assert_not_contains "pending=" "$OUT" "$CURRENT_CASE no pending field"
 teardown_fixture
 
-# A UR whose every REQ is pending-validation reads as all-pending: intended
-# equals pending, proven and unproven both zero.
-CURRENT_CASE="all-pending"
+# A stale .do-work/pending/ directory is ignored by rollup. Upgrade owns
+# migrating those files; status tooling must not scan that directory.
+CURRENT_CASE="pending-directory-ignored"
 CASES=$((CASES + 1))
 setup_fixture
-write_req "$TMP/.do-work/pending/REQ-060-park.md" "REQ-060" "UR-060" "pending-validation" ""
+write_req "$TMP/.do-work/archive/REQ-060-a.md" "REQ-060" "UR-060" "done" "checkpoint:RUN-060 commit:abc"
+write_req "$TMP/.do-work/pending/REQ-061-stale.md" "REQ-061" "UR-060" "pending-validation" ""
 run_script "UR-060"
-assert_contains "UR-060 intended=1 proven=0 unproven=0 pending=1" "$OUT" "$CURRENT_CASE counts"
+assert_contains "UR-060 intended=1 proven=1 unproven=0" "$OUT" "$CURRENT_CASE counts"
+assert_not_contains "REQ-061" "$OUT" "$CURRENT_CASE stale pending file ignored"
+assert_not_contains "pending=" "$OUT" "$CURRENT_CASE no pending field"
 teardown_fixture
 
 echo ""
@@ -193,4 +202,3 @@ if [ "$FAILED" -ne 0 ]; then
   exit 1
 fi
 exit 0
-

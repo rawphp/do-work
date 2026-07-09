@@ -156,8 +156,8 @@ case "$STDERR" in *"Second criterion left unchecked"*) : ;; *) fail "$CURRENT_CA
 teardown
 
 # ---- Case 6: unchecked box OUTSIDE acceptance section must NOT trip -> rc 0 ---
-# Pending-validation/post-merge checklists legitimately carry unchecked bullets;
-# the guardrail only governs the Acceptance Criteria section.
+# Manual advisory checklists legitimately carry unchecked bullets; the guardrail
+# only governs the Acceptance Criteria section.
 CURRENT_CASE="unchecked-outside-acceptance"
 CASES=$((CASES + 1))
 new_tmp
@@ -171,7 +171,7 @@ cat > "$REQ" <<'EOF'
 
 - [x] First criterion
 
-## Post-merge validation
+## Manual checks (advisory)
 
 - [ ] Manual device check deferred
 EOF

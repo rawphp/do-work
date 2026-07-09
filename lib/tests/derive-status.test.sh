@@ -28,7 +28,7 @@ assert_eq() {
 
 setup_fixture() {
   TMP="$(mktemp -d -t derive-status-test.XXXXXX)"
-  mkdir -p "$TMP/.do-work/archive" "$TMP/.do-work/working" "$TMP/.do-work/pending"
+  mkdir -p "$TMP/.do-work/archive" "$TMP/.do-work/working"
 }
 
 teardown_fixture() {
@@ -88,27 +88,15 @@ assert_eq "0" "$RC" "$CURRENT_CASE rc"
 assert_eq "REQ-003 unproven" "$OUT" "$CURRENT_CASE output"
 teardown_fixture
 
-# A pending-validation REQ derives a distinct `pending` state — its code is
-# merged but human/device sign-off is outstanding, so it is neither proven
-# (no closure proof) nor unproven-in-flight (work is delivered).
-CURRENT_CASE="pending-validation"
+# A legacy pending-validation REQ now falls through to unproven. The status no
+# longer has its own derived bucket, and an empty proof remains unproven.
+CURRENT_CASE="legacy-pending-validation"
 CASES=$((CASES + 1))
 setup_fixture
-write_req "$TMP/.do-work/pending/REQ-006-park.md" "REQ-006" "pending-validation" ""
-run_case "$TMP/.do-work/pending/REQ-006-park.md"
+write_req "$TMP/.do-work/working/REQ-006-park.md" "REQ-006" "pending-validation" ""
+run_case "$TMP/.do-work/working/REQ-006-park.md"
 assert_eq "0" "$RC" "$CURRENT_CASE rc"
-assert_eq "REQ-006 pending" "$OUT" "$CURRENT_CASE output"
-teardown_fixture
-
-# A pending-validation REQ stays `pending` regardless of file location — the
-# Status field, not the directory, governs the derivation.
-CURRENT_CASE="pending-validation-non-pending-dir"
-CASES=$((CASES + 1))
-setup_fixture
-write_req "$TMP/.do-work/working/REQ-007-park.md" "REQ-007" "pending-validation" ""
-run_case "$TMP/.do-work/working/REQ-007-park.md"
-assert_eq "0" "$RC" "$CURRENT_CASE rc"
-assert_eq "REQ-007 pending" "$OUT" "$CURRENT_CASE output"
+assert_eq "REQ-006 unproven" "$OUT" "$CURRENT_CASE output"
 teardown_fixture
 
 echo ""
@@ -117,4 +105,3 @@ if [ "$FAILED" -ne 0 ]; then
   exit 1
 fi
 exit 0
-
