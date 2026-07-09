@@ -5,14 +5,7 @@
 #   coverage-rollup.sh [UR-NNN]
 #
 # Prints one line per UR:
-#   UR-001 intended=3 proven=1 unproven=2 pending=0 unproven_ids=REQ-002,REQ-003 closed=n/a
-#
-# The `pending=<n>` field counts REQs whose `**Status:**` is `pending-validation`
-# (merged-and-parked in `.do-work/pending/`, sign-off outstanding) as their own
-# bucket — separate from proven and unproven. A UR with all code merged but a
-# human/device check still outstanding therefore reads as pending, not as a
-# coverage gap (unproven) and not as a completion (proven). Pending REQs are
-# never listed in `unproven_ids`.
+#   UR-001 intended=3 proven=1 unproven=2 unproven_ids=REQ-002,REQ-003 closed=n/a
 #
 # The trailing `closed=<yes|no|n/a>` field reports end-to-end UR closure
 # (per docs/design/ur-closure.md), derived from the UR's path-unit REQs
@@ -67,7 +60,7 @@ closure_overall() {
 TMP_ROWS="$(mktemp -t coverage-rollup.XXXXXX)"
 trap 'rm -f "$TMP_ROWS"' EXIT
 
-for dir in "$DOWORK" "$DOWORK/working" "$DOWORK/archive" "$DOWORK/pending"; do
+for dir in "$DOWORK" "$DOWORK/working" "$DOWORK/archive"; do
   [ -d "$dir" ] || continue
   for req in "$dir"/REQ-*.md; do
     [ -e "$req" ] || continue
@@ -108,9 +101,6 @@ $1 == "ROW" {
   if (pathunit == 1) has_pathunit[ur]=1
   if (state == "proven") {
     proven[ur]++
-  } else if (state == "pending") {
-    # Merged-and-parked: its own bucket, never an unproven coverage gap.
-    pending[ur]++
   } else {
     unproven[ur]++
     if (unproven_ids[ur] == "") unproven_ids[ur]=id
@@ -120,7 +110,7 @@ $1 == "ROW" {
 END {
   for (i=1; i<=n; i++) {
     ur=order[i]
-    printf "%s intended=%d proven=%d unproven=%d pending=%d", ur, intended[ur]+0, proven[ur]+0, unproven[ur]+0, pending[ur]+0
+    printf "%s intended=%d proven=%d unproven=%d", ur, intended[ur]+0, proven[ur]+0, unproven[ur]+0
     if ((unproven[ur]+0) > 0) printf " unproven_ids=%s", unproven_ids[ur]
     # End-to-end closure column (additive). See header comment for semantics.
     if (!(ur in has_pathunit)) {
@@ -136,4 +126,3 @@ END {
   }
 }
 ' "$TMP_ROWS"
-
