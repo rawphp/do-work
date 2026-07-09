@@ -24,6 +24,7 @@ File-based project management: Start → Go. (Or granular: Intake → Capture �
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs if >= 90%. |
 | `/do-work go [UR-NNN] --no-layers` | Verify + run, skipping layer-coverage checks for this UR. |
 | `/do-work install` | Creates `.do-work/` structure in current project. |
+| `/do-work upgrade` | Brings the project's .do-work/ state into conformance with the current skill — runs the manifest's detectors and applies fixes (interactive confirmation on destructive rows). Idempotent. |
 | `/do-work intake [brief]` | Records brief verbatim as next UR file. |
 | `/do-work capture [UR-NNN]` | Decomposes a UR brief into REQ files in the backlog. |
 | `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
@@ -52,6 +53,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/start.md](agents/start.md) — Orchestrator: intake + ideate + capture
 - [agents/go.md](agents/go.md) — Orchestrator: verify + conditional run
 - [agents/intake.md](agents/intake.md) — Records brief verbatim as next UR file
+- [agents/upgrade.md](agents/upgrade.md) — Brings project state into conformance with the current skill
 - [agents/question.md](agents/question.md) — Interactive brief questioning
 - [agents/audit.md](agents/audit.md) — Autonomous REQ quality audit
 - [agents/ideate.md](agents/ideate.md) — Surfaces assumptions, risks, and connections
@@ -83,74 +85,29 @@ git rev-parse --show-toplevel
 If this fails (not a git repo), use the current working directory.
 All references below use `{project}` to mean this resolved root.
 
-### Migration check
+### Conformance check
 
-Immediately after resolving `{project}` and before executing any subcommand-specific instructions, check whether this project's data folder needs migrating from the legacy `do-work/` location to `.do-work/`. Apply these four detection branches:
-
-| State at `{project}` | Action |
-|---|---|
-| `.do-work/` exists AND `do-work/` does not exist | Already migrated. Continue silently. |
-| `do-work/` exists AND `.do-work/` does not exist | Migrate (see below), then continue. |
-| Both `do-work/` and `.do-work/` exist | **Halt.** Output the conflict message below and stop the subcommand. |
-| Neither exists | No migration needed. Continue (the `install` flow handles fresh projects). |
-
-**Migration procedure** (legacy `do-work/` → `.do-work/`):
+Immediately after resolving `{project}` and before executing any subcommand-specific instructions, run the conformance detectors:
 
 ```bash
-# Prefer `git mv` so history follows the rename. Fall back to plain `mv` if the path is
-# gitignored or this is not a git repo (both make `git mv` fail).
-git mv {project}/do-work {project}/.do-work 2>/dev/null \
-  || mv {project}/do-work {project}/.do-work
+bash {skill-or-project}/lib/conformance-scan.sh {project}
 ```
 
-Then rewrite `.gitignore` if it contains a line matching `^do-work/?$`:
+The scanner is read-only and may exit `1` when drift is detected. Interpret each output line as `<row-id> <class> <detail>`:
 
-```bash
-if [ -f {project}/.gitignore ] && grep -Eq '^do-work/?$' {project}/.gitignore; then
-  sed -i.bak -E 's|^do-work/?$|.do-work/|' {project}/.gitignore && rm {project}/.gitignore.bak
-fi
-```
-
-After the directory rename and `.gitignore` rewrite succeed, scan the consumer project for hardcoded `do-work/` references and print a warning if any are found.
-
-**Consumer-ref scan targets:**
-
-- All `*.md` files in `{project}` (recursive), excluding: `.git/`, `node_modules/`, `vendor/`, `.worktrees/`, `dist/`, `build/`
-- `{project}/.gitignore` itself (in case it contains other `do-work/` patterns beyond the one already rewritten)
-
-**Pattern:** regex `(^|[^.])do-work/` — matches the literal legacy form; the leading `[^.]` guard excludes post-migration `.do-work/` references so only genuine stale references surface.
-
-If matches are found, print:
-
-```
-Migration warning: consumer files still reference the legacy do-work/ path.
-Review and update these manually — migration does NOT auto-rewrite consumer docs:
-
-  CLAUDE.md:14:  Run intake: read systems/do-work/agents/intake.md
-  CLAUDE.md:18:  Identify which project the work is for in {project}/do-work/
-  README.md:42:  See do-work/ for backlog state
-  ...
-
-(Total: N references across M files.)
-```
-
-If zero matches, print nothing — silent success.
-
-**Advisory only.** This warning is informational. Never auto-rewrite consumer files — that is a separate explicit user action.
-
-**Failure handling.** If the scan command itself fails (permission denied, regex error on a particular platform, or any other non-zero exit from the underlying grep), skip the warning step silently. Migration already succeeded; the consumer-ref scan is best-effort and must never block the user from completing migration.
-
-**Skill source exclusion.** When this skill is invoked against its own source clone (`~/.claude/skills/do-work/`), that clone intentionally gitignores `.do-work/` and is excluded from this scan — no self-referential warnings will fire.
-
-Output `Migrated do-work/ → .do-work/` and continue with the subcommand.
-
-**Both-exist conflict.** When both `{project}/do-work/` and `{project}/.do-work/` are present, do not migrate. Halt the subcommand with this exact text and exit:
+- `legacy-dir safe-blocking ...` — auto-apply the `legacy-dir` fix from [agents/upgrade.md](agents/upgrade.md)'s conformance manifest inline, preserving the existing legacy `do-work/` → `.do-work/` behaviour and advisory consumer-ref scan. Output `Migrated do-work/ → .do-work/` and continue.
+- `dir-conflict blocking ...` — halt with the existing verbatim conflict message:
 
 ```
 Migration conflict: both do-work/ and .do-work/ exist at {project}. Resolve manually before re-running.
 ```
 
-**No mid-flight protection.** This check does not inspect `working/` for in-flight REQs before migrating. Migration is rare in practice; the assumption is that the user runs it on an idle project. A migration that runs while a parallel `/do-work run` is mid-REQ will cause that worker to fail on the next file-system access — accept that risk rather than introducing a coordination layer for a once-per-project event.
+- `pending-dir destructive ...` — print `pending/ detected — run /do-work upgrade to archive & remove it` and continue.
+- Unknown row ids — print the scanner line verbatim and continue for forward compatibility.
+
+Startup never applies destructive fixes and never prompts. Destructive rows are handled only by explicit `/do-work upgrade`.
+
+**No mid-flight protection.** The `legacy-dir` safe-blocking fix does not inspect `working/` for in-flight REQs before migrating. Migration is rare in practice; the assumption is that the user runs it on an idle project. A migration that runs while a parallel `/do-work run` is mid-REQ will cause that worker to fail on the next file-system access — accept that risk rather than introducing a coordination layer for a once-per-project event.
 
 **Critical: skill directory is read-only at runtime.** The skill is loaded from `~/.claude/skills/do-work/` — this is a separate git clone. NEVER edit files, stage changes, or commit inside the skills directory. All edits and commits MUST happen in `{project}`. If a REQ targets agent files (e.g. `agents/log.md`), edit them at `{project}/agents/log.md`, not at the skill clone path.
 
@@ -481,6 +438,16 @@ See the comment already in config.yml.
 ```
 
 If already installed, report "Already installed." and stop.
+
+---
+
+### upgrade
+
+Bring the project's `.do-work/` state into conformance with the current skill.
+
+1. Detect `{project}`.
+2. Read [agents/upgrade.md](agents/upgrade.md) in full.
+3. Follow the upgrade agent instructions exactly.
 
 ---
 
