@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**Advisory manual-checks model replaces approve/reject**
+
+**Removed**
+- `/do-work approve` and `/do-work reject` commands.
+- The `pending-validation` REQ status and the `.do-work/pending/` directory.
+- The `notifications.on_pending_validation` config key.
+
+**Added**
+- `/do-work upgrade`: explicit conformance command for project maintenance. `lib/conformance-scan.sh` is a state-probing conformance manifest — it runs a read-only scan at startup; destructive fixes (e.g. removing a retired config key) run only inside `upgrade`, after confirmation.
+- `**Suite:** not-run` header marker: written on an archived REQ when its own test/build suite could not be provisioned in the worker's worktree. `lib/derive-status.sh` derives such a REQ `unproven`.
+
+**Changed**
+- `## Post-merge validation` renamed to `## Manual checks (advisory)`. Human/device checks are advisory only, never block archive, and are not surfaced by any command automatically.
+- `proven` semantics: a REQ whose own test/build suite could not be provisioned now derives `unproven` (via the `**Suite:** not-run` marker) even though it still archives as `done`. Human/device advisory items still never affect proven-ness.
+
+**Migration**
+- Nothing replaces `approve`/`reject`: REQs archive as `done` once automated gates (tests, verification, review, policy) pass; human follow-up now lives in the archived REQ's `## Manual checks (advisory)` checklist instead of a blocking pending state.
+- Nothing replaces the `notifications.on_pending_validation` hook. Remove the key from `.do-work/config.yml` — `/do-work upgrade` detects and removes retired keys automatically.
+- Scripted consumers of `pending-validation` status or `.do-work/pending/` must drop those code paths; both are gone.
+
 **Added**
 - Archive-integrity guardrail: `lib/check-archive-integrity.sh` runs at the persistence boundary (`agents/run.md` Step 4b / 4-pr.4) and rejects archiving a `done` REQ unless its on-disk state is internally consistent — `**Status:** done`, a non-empty `**Closure proof:**`, and zero unchecked `- [ ]` items inside `## Acceptance Criteria`. Replaces trust in worker/orchestrator prose (the worker is *instructed* to tick each `- [x]` and set status, but that is an LLM step it can silently skip). A failure stops the REQ with `**Reason:** archive-integrity` instead of archiving. Covered by `lib/tests/check-archive-integrity.test.sh`. Root-caused from a data-quality audit that found 37 archived REQs with stale (non-`done`) status and 50 archived `done` REQs with unchecked acceptance criteria.
 
