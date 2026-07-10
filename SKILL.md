@@ -103,6 +103,7 @@ Migration conflict: both do-work/ and .do-work/ exist at {project}. Resolve manu
 ```
 
 - `pending-dir destructive ...` — print `pending/ detected — run /do-work upgrade to archive & remove it` and continue.
+- `stale-config-key destructive ...` — print `stale config key(s) detected — run /do-work upgrade to remove retired config keys` and continue.
 - Unknown row ids — print the scanner line verbatim and continue for forward compatibility.
 
 Startup never applies destructive fixes and never prompts. Destructive rows are handled only by explicit `/do-work upgrade`.
