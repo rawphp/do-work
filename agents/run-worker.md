@@ -259,9 +259,9 @@ When you encounter a genuinely non-executable step (`human`, `device`, or `envir
 **Unprovisionable test/build tooling — loud, human-tracked path.** When a `test` or `build` verification step cannot run because the W3.5 provisioner reported `unprovisionable:` for the required dependency dir AND `worktree.setup_command` did not resolve it, the worker MUST NOT mark the step `deferred`-and-pass as an `environment` deferral, and MUST NOT silently proceed to `done` as if the suite ran. Instead:
 
 1. Do NOT classify this as a `human`, `device`, or `environment` deferral.
-2. Route the un-run suite to `deferred_checks:` in the Return Report with a plain-language entry such as: `Run the test suite — dependencies could not be provisioned in the worktree — confirm green`.
-3. The orchestrator consolidates that entry into the archived REQ's `## Manual checks (advisory)` section as an unchecked advisory item.
-4. Continue to Step 7 and return `status: done`. The code merges, the REQ archives as done, and the un-run suite becomes explicit advisory follow-up outside the blocking closure path. The documented stopper-reason enum is unchanged; no new stopper is introduced.
+2. Route the un-run suite to `deferred_checks:` in the Return Report with `category: suite-not-run` (distinct from `human` / `device` / `environment`) and a plain-language `reason` such as: `Run the test suite — dependencies could not be provisioned in the worktree — confirm green`.
+3. The orchestrator consolidates that entry into the archived REQ's `## Manual checks (advisory)` section as an unchecked advisory item, and — because the item carries `category: suite-not-run` — additionally stamps a `**Suite:** not-run` header on the archived REQ (see `agents/run.md` Step 4b sub-step 5a).
+4. Continue to Step 7 and return `status: done`. The code merges, the REQ archives as done, and the un-run suite becomes explicit advisory follow-up outside the blocking closure path — but the `**Suite:** not-run` marker makes `lib/derive-status.sh` derive the REQ `unproven` until the suite actually runs. The documented stopper-reason enum is unchanged; no new stopper is introduced.
 
 **Critical distinction — deferred vs. failing:**
 - A step that is *executable* but currently failing (test red, endpoint 500s, build broken) is **not** eligible for deferral. It follows the normal retry path and, after 3 retries, returns `verification-failing`.
@@ -464,7 +464,10 @@ checkpoint_log:
       status: passed    # or "deferred" for inherently non-executable steps
       handoff: ""
 deferred_checks: []  # list of deferred verification steps; empty list when nothing deferred
-                     # each entry: { step: "<step text>", category: human|device|environment, reason: "<why>" }
+                     # each entry: { step: "<step text>", category: human|device|environment|suite-not-run, reason: "<why>" }
+                     # human/device/environment are advisory only and never affect proven-ness.
+                     # suite-not-run is reserved for the W3.5-unprovisionable path (Step 6) and is the
+                     # only category that makes the orchestrator stamp `**Suite:** not-run` on archive.
                      # example: [{ step: "Confirm badge renders on user's phone", category: device,
                      #              reason: "Requires physical iOS device not available in worktree" }]
 acceptance:

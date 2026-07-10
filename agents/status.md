@@ -39,7 +39,7 @@ Then render a proof-backed status view. Glob REQ files in backlog, `working/`, a
 bash lib/derive-status.sh <req-path>...
 ```
 
-Print the result under a `Proven` heading. This is a derived view: `proven` means the REQ is done/archived and has a non-empty `**Closure proof:**`; `unproven` means either proof is missing or the REQ is not done. If `lib/derive-status.sh` is missing, report `"lib/derive-status.sh not found — skipping proven view."` and continue.
+Print the result under a `Proven` heading. This is a derived view: `proven` means the REQ is done/archived, has a non-empty `**Closure proof:**`, and does not carry `**Suite:** not-run`; `unproven` means proof is missing, the REQ is not done, or it carries the `**Suite:** not-run` marker (its own test/build suite could not be run — see `agents/run-worker.md` §6 and `agents/run.md` Step 4b sub-step 5a). If `lib/derive-status.sh` is missing, report `"lib/derive-status.sh not found — skipping proven view."` and continue.
 
 Then render the intended-vs-proven Coverage section:
 
