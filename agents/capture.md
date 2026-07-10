@@ -311,7 +311,7 @@ Use this format exactly:
 
 ## Manual checks (advisory)
 
-> Optional. Human, device, or environment checks that cannot run in a worker's isolated worktree. Workers never execute this section; it never blocks archive. The checklist is preserved in the archived REQ as an advisory record for humans and surfaced by `/do-work close`. Each item states what to do and what observable outcome confirms it.
+> Optional. Human, device, or environment checks that cannot run in a worker's isolated worktree. Workers never execute this section; it never blocks archive. The checklist is preserved in the archived REQ as an advisory record for humans, outside the validation gate, and is not surfaced by any command automatically. Each item states what to do and what observable outcome confirms it.
 >
 > Write this section on path-unit REQs (or the single REQ for legacy-style decompositions) only when the brief includes checks that require human judgment, a physical device, or an environment the worker cannot provision.
 
