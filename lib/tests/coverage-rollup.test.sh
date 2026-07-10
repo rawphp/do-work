@@ -67,6 +67,31 @@ write_req() {
 EOF
 }
 
+# write_req_with_suite adds a `**Suite:**` header line (REQ-263: guards
+# against a future consumer duplicating derive-status.sh's marker logic
+# instead of delegating to it — see decisions.md 2026-06-12 REQ-239/240).
+write_req_with_suite() {
+  local path="$1"
+  local id="$2"
+  local ur="$3"
+  local status="$4"
+  local proof="$5"
+  local suite="$6"
+  local layer="${7:-agents}"
+  cat > "$path" <<EOF
+# $id: Test
+
+**UR:** $ur
+**Status:** $status
+**Created:** 2026-06-09
+**Layer:** $layer
+**Closure proof:** $proof
+**Suite:** $suite
+**Files:** agents/run.md
+**Depends on:**
+EOF
+}
+
 # write_closure <ur> <overall> [closed-count] [gaps-count]
 # Writes a minimal UR-NNN/closure.md with the front-matter fields the rollup reads.
 write_closure() {
@@ -194,6 +219,19 @@ run_script "UR-060"
 assert_contains "UR-060 intended=1 proven=1 unproven=0" "$OUT" "$CURRENT_CASE counts"
 assert_not_contains "REQ-061" "$OUT" "$CURRENT_CASE stale pending file ignored"
 assert_not_contains "pending=" "$OUT" "$CURRENT_CASE no pending field"
+teardown_fixture
+
+# A `**Suite:** not-run` REQ (REQ-263) is counted in unproven= and listed in
+# unproven_ids= — rollup delegates to derive-status.sh for the marker logic,
+# it does not duplicate it.
+CURRENT_CASE="suite-not-run-counts-as-unproven"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-070-a.md" "REQ-070" "UR-070" "done" "checkpoint:RUN-070 commit:abc"
+write_req_with_suite "$TMP/.do-work/archive/REQ-071-marker.md" "REQ-071" "UR-070" "done" "checkpoint:RUN-071 commit:def" "not-run"
+run_script "UR-070"
+assert_contains "UR-070 intended=2 proven=1 unproven=1" "$OUT" "$CURRENT_CASE counts"
+assert_contains "unproven_ids=REQ-071" "$OUT" "$CURRENT_CASE ids"
 teardown_fixture
 
 echo ""

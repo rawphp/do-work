@@ -61,6 +61,28 @@ run_case() {
   RC=$?
 }
 
+# write_req_with_suite adds a `**Suite:**` header line (REQ-263: the
+# orchestrator-stamped un-run-suite marker).
+write_req_with_suite() {
+  local path="$1"
+  local id="$2"
+  local status="$3"
+  local proof="$4"
+  local suite="$5"
+  cat > "$path" <<EOF
+# $id: Test
+
+**UR:** UR-001
+**Status:** $status
+**Created:** 2026-06-09
+**Layer:** agents
+**Closure proof:** $proof
+**Suite:** $suite
+**Files:** agents/run.md
+**Depends on:**
+EOF
+}
+
 CURRENT_CASE="done-with-proof"
 CASES=$((CASES + 1))
 setup_fixture
@@ -68,6 +90,8 @@ write_req "$TMP/.do-work/archive/REQ-001-done.md" "REQ-001" "done" "checkpoint:R
 run_case "$TMP/.do-work/archive/REQ-001-done.md"
 assert_eq "0" "$RC" "$CURRENT_CASE rc"
 assert_eq "REQ-001 proven" "$OUT" "$CURRENT_CASE output"
+# This case also proves AC3: no `**Suite:**` field at all leaves proven
+# unchanged — write_req never emits a Suite header line.
 teardown_fixture
 
 CURRENT_CASE="done-without-proof"
@@ -97,6 +121,62 @@ write_req "$TMP/.do-work/working/REQ-006-park.md" "REQ-006" "pending-validation"
 run_case "$TMP/.do-work/working/REQ-006-park.md"
 assert_eq "0" "$RC" "$CURRENT_CASE rc"
 assert_eq "REQ-006 unproven" "$OUT" "$CURRENT_CASE output"
+teardown_fixture
+
+# --- Suite-not-run marker (REQ-263): un-run suite downgrades to unproven ---
+
+CURRENT_CASE="archived-suite-not-run"
+CASES=$((CASES + 1))
+setup_fixture
+write_req_with_suite "$TMP/.do-work/archive/REQ-007-marker.md" "REQ-007" "done" "checkpoint:RUN-007 commit:abc789" "not-run"
+run_case "$TMP/.do-work/archive/REQ-007-marker.md"
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "REQ-007 unproven" "$OUT" "$CURRENT_CASE output"
+teardown_fixture
+
+CURRENT_CASE="working-done-suite-not-run"
+CASES=$((CASES + 1))
+setup_fixture
+write_req_with_suite "$TMP/.do-work/working/REQ-008-marker.md" "REQ-008" "done" "checkpoint:RUN-008 commit:abc890" "not-run"
+run_case "$TMP/.do-work/working/REQ-008-marker.md"
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "REQ-008 unproven" "$OUT" "$CURRENT_CASE output"
+teardown_fixture
+
+# Any other **Suite:** value (not "not-run") leaves derivation unchanged.
+CURRENT_CASE="archived-suite-other-value"
+CASES=$((CASES + 1))
+setup_fixture
+write_req_with_suite "$TMP/.do-work/archive/REQ-009-marker.md" "REQ-009" "done" "checkpoint:RUN-009 commit:abc901" "passed"
+run_case "$TMP/.do-work/archive/REQ-009-marker.md"
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "REQ-009 proven" "$OUT" "$CURRENT_CASE output"
+teardown_fixture
+
+# Unchecked `## Manual checks (advisory)` items never downgrade proven-ness —
+# only the `**Suite:** not-run` marker does (human/device advisories are a
+# separate, non-blocking concern per UR-039).
+CURRENT_CASE="archived-manual-checks-advisory-no-marker"
+CASES=$((CASES + 1))
+setup_fixture
+cat > "$TMP/.do-work/archive/REQ-010-advisory.md" <<EOF
+# REQ-010: Test
+
+**UR:** UR-001
+**Status:** done
+**Created:** 2026-06-09
+**Layer:** agents
+**Closure proof:** checkpoint:RUN-010 commit:abc012
+**Files:** agents/run.md
+**Depends on:**
+
+## Manual checks (advisory)
+
+- [ ] Confirm badge renders on user's phone
+EOF
+run_case "$TMP/.do-work/archive/REQ-010-advisory.md"
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "REQ-010 proven" "$OUT" "$CURRENT_CASE output"
 teardown_fixture
 
 echo ""

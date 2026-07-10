@@ -8,6 +8,11 @@
 # A REQ is proven only when it is done/archived and has a non-empty
 # `**Closure proof:**` field. This deliberately does not replace writable
 # `**Status:**`, which remains coordination state.
+#
+# An orchestrator-stamped `**Suite:** not-run` header downgrades an
+# otherwise-proven REQ to unproven — its test/build suite never ran, so
+# "proven" would overclaim. Absent or any-other-value `**Suite:**` leaves
+# derivation unchanged. Human/device advisory items never affect this.
 
 set -u
 
@@ -44,6 +49,7 @@ for req_path in "$@"; do
   req_id="$(req_id_from_path "$req_path")"
   status="$(extract_field "Status" "$req_path")"
   proof="$(extract_field "Closure proof" "$req_path")"
+  suite="$(extract_field "Suite" "$req_path")"
 
   # Archive location is accepted as done even if an older file's Status line
   # has drifted. Backlog/working files must explicitly say done to be proven.
@@ -52,7 +58,7 @@ for req_path in "$@"; do
     */.do-work/archive/REQ-*.md|.do-work/archive/REQ-*.md) archived=1 ;;
   esac
 
-  if { [ "$status" = "done" ] || [ "$archived" = "1" ]; } && [ -n "$proof" ]; then
+  if { [ "$status" = "done" ] || [ "$archived" = "1" ]; } && [ -n "$proof" ] && [ "$suite" != "not-run" ]; then
     printf '%s proven\n' "$req_id"
   else
     printf '%s unproven\n' "$req_id"
