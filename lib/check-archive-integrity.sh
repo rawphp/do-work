@@ -14,7 +14,7 @@
 #
 # Exit 0 when all hold; exit 1 with a diagnostic on the first/each violation.
 #
-# This is the guardrail behind run.md Step 4b / 4-pr.4 and approve.md: the
+# This is the guardrail behind run.md Step 4b / 4-pr.4: the
 # worker is *instructed* (run-worker.md) to set status, write closure proof, and
 # tick each `- [x]`, but that is prose an LLM follows unreliably. This check is
 # the persistence-boundary enforcement that makes the bad write impossible.
