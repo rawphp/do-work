@@ -121,6 +121,69 @@ assert_eq "pending-dir destructive .do-work/pending/ exists (0 REQ files)" "$SCA
 assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
 teardown_fixture
 
+CURRENT_CASE="stale-config-key-present"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/project/.do-work"
+cat > "$TMP/project/.do-work/config.yml" <<'EOF'
+notifications:
+  on_pending_validation: ""
+EOF
+run_scan "$TMP/project"
+assert_eq "1" "$SCAN_RC" "$CURRENT_CASE rc"
+assert_eq "stale-config-key destructive notifications.on_pending_validation" "$SCAN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
+teardown_fixture
+
+CURRENT_CASE="stale-config-key-clean"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/project/.do-work"
+cat > "$TMP/project/.do-work/config.yml" <<'EOF'
+worktree:
+  link_paths: []
+  setup_command: ""
+
+routing: []
+EOF
+run_scan "$TMP/project"
+assert_eq "0" "$SCAN_RC" "$CURRENT_CASE rc"
+assert_eq "" "$SCAN_STDOUT" "$CURRENT_CASE stdout empty"
+assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
+teardown_fixture
+
+CURRENT_CASE="stale-config-key-user-custom"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/project/.do-work"
+cat > "$TMP/project/.do-work/config.yml" <<'EOF'
+notifications:
+  on_custom_hook: "echo hi"
+
+my_custom_section:
+  my_custom_key: true
+EOF
+run_scan "$TMP/project"
+assert_eq "0" "$SCAN_RC" "$CURRENT_CASE rc"
+assert_eq "" "$SCAN_STDOUT" "$CURRENT_CASE stdout empty"
+assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
+teardown_fixture
+
+CURRENT_CASE="stale-config-key-comment-only"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/project/.do-work"
+cat > "$TMP/project/.do-work/config.yml" <<'EOF'
+# notifications.on_pending_validation was removed in UR-039; do not re-add it.
+notifications:
+  on_new_hook: ""
+EOF
+run_scan "$TMP/project"
+assert_eq "0" "$SCAN_RC" "$CURRENT_CASE rc"
+assert_eq "" "$SCAN_STDOUT" "$CURRENT_CASE stdout empty"
+assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
+teardown_fixture
+
 CURRENT_CASE="usage-missing-arg"
 CASES=$((CASES + 1))
 setup_fixture
