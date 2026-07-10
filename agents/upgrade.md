@@ -33,6 +33,14 @@ to `lib/conformance-scan.sh` and add its fix contract here in the same change.
 | `dir-conflict` | `blocking` drift line from `bash lib/conformance-scan.sh {project}` when both `do-work/` and `.do-work/` exist | none — halt with the existing conflict message | manual |
 | `config-keys` | `safe-silent` missing or incomplete `.do-work/config.yml`, detected and migrated by the `agents/config.md` loader | load config per `agents/config.md`; its missing-key migration has already applied by Step 0 | auto-apply |
 | `pending-dir` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation | interactive confirm |
+| `stale-config-key` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when a tombstoned config key is present | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation | interactive confirm |
+
+**Tombstone list.** This manifest is the curated documentation of tombstoned
+`.do-work/config.yml` keys — key paths the skill itself has removed, which
+`stale-config-key` flags if still present. v1: `notifications.on_pending_validation`
+(removed by the UR-039 cleanup). The executable list lives in
+`lib/conformance-scan.sh` (`STALE_CONFIG_KEYS`); the two must be updated
+together whenever a key is tombstoned, per the accretion rule above.
 
 ---
 
@@ -56,7 +64,7 @@ bash lib/conformance-scan.sh "{project}"
 
 Interpret exit codes:
 
-- `0` with no output: no scanned drift. Continue to Step 6 so `config-keys`
+- `0` with no output: no scanned drift. Continue to Step 8 so `config-keys`
   still appears in the report.
 - `1`: parse stdout as drift lines. Each line is `<row-id> <class> <detail>`.
 - `2`: report the usage error and stop; this indicates an invocation bug.
@@ -248,11 +256,65 @@ git commit -m "chore(upgrade): archive pending/ REQs and remove directory"
 If `.do-work/` is gitignored or there are no tracked changes to commit, skip the
 commit silently.
 
-Do not record a `pending-dir` outcome here. Step 6's re-scan is the
+Do not record a `pending-dir` outcome here. Step 8's re-scan is the
 authoritative source of truth for whether `pending-dir` converged — the
 directory may still exist if `rmdir` failed above.
 
-### 6. Re-scan And Report
+### 6. Confirm Destructive Row: stale-config-key
+
+If the scan output contains `stale-config-key`, inspect
+`{project}/.do-work/config.yml` for each tombstoned key reported by the scan.
+
+Build the prompt body: for each reported `<dotted.key.path>`, show its exact
+key line and, if removing it would leave the parent section empty, the parent
+section header line too.
+
+Use one `AskUserQuestion` confirmation gate with the prompt:
+
+```text
+Remove stale config key(s) from .do-work/config.yml?
+
+Affected:
+<dotted.key.path>: <exact key line, and parent section line if it would go empty>
+```
+
+Use these options:
+
+1. **"Remove now"** - apply the destructive fix.
+2. **"Skip config cleanup"** - leave `.do-work/config.yml` unchanged.
+
+If the user declines, cancels, or gives no clear affirmative answer, do not
+modify `.do-work/config.yml`. Record `stale-config-key: skipped-by-user` and
+include `stale-config-key` in the outstanding rows.
+
+### 7. Apply Destructive Row: stale-config-key
+
+Only run this step after the affirmative `AskUserQuestion` answer from Step 6.
+
+For each tombstoned key reported by the scan:
+
+1. Remove the key's line from `.do-work/config.yml`.
+2. If removing the key leaves its parent section with no other nested keys,
+   remove the now-empty parent section header line too.
+3. Never touch a key that is not named in a `stale-config-key` scanner row —
+   this is a curated, opt-in removal, not a general prune of unrecognized
+   keys. User-added custom keys are never touched, even if unfamiliar.
+
+If `.do-work/` is tracked and the removal produced staged or unstaged tracked
+changes, commit them:
+
+```bash
+git add "{project}/.do-work/config.yml" 2>/dev/null || true
+git commit -m "chore(upgrade): remove stale config key(s)"
+```
+
+If `.do-work/` is gitignored or there are no tracked changes to commit, skip
+the commit silently.
+
+Do not record a `stale-config-key` outcome here. Step 8's re-scan and report
+converged is the authoritative source of truth for whether it converged.
+
+### 8. Re-scan And Report
 
 Run the scanner again:
 
@@ -267,6 +329,13 @@ line — meaning the `rmdir` in Step 5 failed because stray non-`REQ-*.md` files
 remain — record `pending-dir` as an outstanding row (not `converged`), and
 reference the remaining files listed in Step 5 so the user knows to remove
 them manually before re-running.
+
+`stale-config-key`'s outcome is likewise derived from this re-scan, never
+pre-declared in Step 7: if the re-scan output no longer contains a
+`stale-config-key` line for a given key, record `stale-config-key: converged`
+for it. If a `stale-config-key` line for that key was already recorded as
+`skipped-by-user` in Step 6, keep that outcome and include it in the
+outstanding rows instead.
 
 Build a per-row outcome report for every row in the manifest:
 
@@ -283,6 +352,7 @@ legacy-dir: <outcome>
 dir-conflict: <outcome>
 config-keys: <outcome>
 pending-dir: <outcome>
+stale-config-key: <outcome>
 ```
 
 If no outstanding rows remain, end with:
@@ -307,7 +377,8 @@ no drift lines, no files are modified, the row outcomes are
 ## Rules
 
 - Never apply a destructive fix without the explicit `AskUserQuestion`
-  confirmation in Step 4.
+  confirmation in its confirm step (Step 4 for `pending-dir`, Step 6 for
+  `stale-config-key`).
 - Never rewrite consumer docs during `legacy-dir`; the consumer-ref scan is
   advisory only.
 - Do not use a config version stamp. Detectors are ground truth.
@@ -318,6 +389,9 @@ no drift lines, no files are modified, the row outcomes are
   directories.
 - Pending archival keeps human validation outside the system: unchecked manual
   checks remain advisory and never block archive by themselves.
+- `stale-config-key` removal is curated and opt-in: only touch a key reported
+  by a scanner drift row. Never remove a key absent from the tombstone list,
+  even one that looks unfamiliar — that may be a user-added custom key.
 - Do not mark unchecked acceptance criteria as complete during upgrade. If
   `lib/check-archive-integrity.sh` rejects a parked REQ, stop and report the
   file instead of forcing archive.
