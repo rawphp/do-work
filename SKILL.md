@@ -296,6 +296,7 @@ Every REQ file carries a structured header immediately below the title. The cano
 | `**Terminal state:**` | optional | The observable end state that proves this path-unit is complete. Required to be non-empty for top-level path-unit REQs. |
 | `**Parent:**` | optional | Parent path-unit REQ id for child layer-tasks. Empty or absent on top-level path-units and legacy REQs. |
 | `**Closure proof:**` | optional | Evidence reference proving verification passed, such as `checkpoint:.do-work/runs/RUN-001.yml#REQ-123` or `commit:abc123 tests:passed`; empty until proven. |
+| `**Suite:**` | optional | Written by the run orchestrator during advisory-check consolidation when the worker's own test/build suite could not be provisioned; the only value is `not-run`. Consumed by `lib/derive-status.sh`, which derives such a REQ `unproven` regardless of an otherwise-passing closure proof. Absent on normal REQs. |
 | `**Criteria approved:**` | optional | Acceptance-criteria provenance: `agent-drafted` when capture generated it, or `human <approver> <YYYY-MM-DD>` when a human previously reviewed it. This field does not block run. |
 | `**Priority:**` | optional | Backlog urgency `1`–`3` (3 = most urgent), derived by capture from dependency-graph depth. Read by `lib/pick-req.sh` to order claimable candidates (Priority desc, then REQ number asc). Absent or out-of-range sorts as `2`, so legacy REQs are unaffected. |
 | `**Size:**` | optional | Effort estimate `S` / `M` / `L`, derived by capture from file count, layer span, and criteria count. `Size: L` is a primary opus-escalation signal in `agents/run.md` Model Selection. Absent falls back to the lexical heuristics. |
@@ -317,6 +318,8 @@ An optional REQ body section that holds human, device, or environment checks tha
 **Archived by run:** `/do-work run` consolidates worker-reported `deferred_checks:` and any existing `## Manual checks (advisory)` items into the archived REQ, then completes the normal `done` archive path once automated gates pass.
 
 **Advisory record only:** `## Manual checks (advisory)` items are preserved in the archived REQ as an advisory record for humans. They sit outside the system's validation gate and are not surfaced by any command automatically.
+
+**One exception — the un-run suite:** human and device advisory items never affect proven-ness. An un-run test/build suite is different: alongside its advisory bullet, the run orchestrator also stamps `**Suite:** not-run` on the archived REQ, which `lib/derive-status.sh` reads to derive the REQ `unproven`.
 
 **Format (each item):** a checklist line stating what a person should do and what observable outcome confirms it:
 
