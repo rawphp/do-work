@@ -316,7 +316,7 @@ An optional REQ body section that holds human, device, or environment checks tha
 
 **Archived by run:** `/do-work run` consolidates worker-reported `deferred_checks:` and any existing `## Manual checks (advisory)` items into the archived REQ, then completes the normal `done` archive path once automated gates pass.
 
-**Surfaced by close:** `/do-work close UR-NNN` reads archived REQs and surfaces any `## Manual checks (advisory)` items as informational follow-up. They are outside the system's validation gate.
+**Advisory record only:** `## Manual checks (advisory)` items are preserved in the archived REQ as an advisory record for humans. They sit outside the system's validation gate and are not surfaced by any command automatically.
 
 **Format (each item):** a checklist line stating what a person should do and what observable outcome confirms it:
 
