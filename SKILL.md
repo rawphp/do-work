@@ -90,7 +90,7 @@ All references below use `{project}` to mean this resolved root.
 Immediately after resolving `{project}` and before executing any subcommand-specific instructions, run the conformance detectors:
 
 ```bash
-bash {skill-or-project}/lib/conformance-scan.sh {project}
+bash lib/conformance-scan.sh {project}
 ```
 
 The scanner is read-only and may exit `1` when drift is detected. Interpret each output line as `<row-id> <class> <detail>`:
