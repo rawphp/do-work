@@ -217,11 +217,25 @@ For each parked REQ file under `{project}/.do-work/pending/` matching
      || mv "<pending-req-path>" "{project}/.do-work/archive/"
    ```
 
-After all parked REQ files are archived, remove the empty directory:
+After all parked REQ files are archived, attempt to remove the now-empty
+directory:
 
 ```bash
 rmdir "{project}/.do-work/pending/"
 ```
+
+Check the exit status. `rmdir` only succeeds when the directory is empty:
+
+- **Success (exit `0`):** the directory is gone. Continue below.
+- **Failure (nonzero exit):** stray non-`REQ-*.md` files remain (for example
+  `.DS_Store`, which Finder creates near-universally once the directory has
+  been opened, or arbitrary user notes). **Never force-delete them — a
+  recursive, forced removal of `.do-work/pending/` or its contents is
+  forbidden; they may be user files.** Leave the directory and its remaining
+  contents exactly as found. List every remaining entry
+  (`ls -a "{project}/.do-work/pending/"`, excluding `.` and `..`) in the
+  report body so the user knows what to remove manually before re-running
+  `upgrade`.
 
 If `.do-work/` is tracked and the archive/delete operation produced staged or
 unstaged tracked changes, commit them:
@@ -234,7 +248,9 @@ git commit -m "chore(upgrade): archive pending/ REQs and remove directory"
 If `.do-work/` is gitignored or there are no tracked changes to commit, skip the
 commit silently.
 
-Record `pending-dir: converged`.
+Do not record a `pending-dir` outcome here. Step 6's re-scan is the
+authoritative source of truth for whether `pending-dir` converged — the
+directory may still exist if `rmdir` failed above.
 
 ### 6. Re-scan And Report
 
@@ -243,6 +259,14 @@ Run the scanner again:
 ```bash
 bash lib/conformance-scan.sh "{project}"
 ```
+
+`pending-dir`'s outcome is derived from this re-scan, never pre-declared in
+Step 5: if the re-scan output no longer contains a `pending-dir` line, record
+`pending-dir: converged`. If the re-scan output still contains a `pending-dir`
+line — meaning the `rmdir` in Step 5 failed because stray non-`REQ-*.md` files
+remain — record `pending-dir` as an outstanding row (not `converged`), and
+reference the remaining files listed in Step 5 so the user knows to remove
+them manually before re-running.
 
 Build a per-row outcome report for every row in the manifest:
 
