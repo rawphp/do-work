@@ -282,6 +282,61 @@ assert_contains "Claim recorded" "$PICK_STDERR" "$CURRENT_CASE stderr explains u
 teardown_fixture
 
 # ----------------------------------------------------------------------
+# Case 7: session correlation — marker match stamps **Session:** into the block
+# ----------------------------------------------------------------------
+CURRENT_CASE="session-stamped-on-marker-match"
+CASES=$((CASES + 1))
+setup_tracked_fixture
+write_req "$TMP/.do-work/REQ-007-foo.md" "REQ-007"
+(
+  cd "$TMP"
+  git add .do-work/REQ-007-foo.md
+  git commit -q -m "add REQ-007"
+)
+# Seed a session.start carrying the terminal marker "mk7".
+mkdir -p "$TMP/.do-work/state"
+EMIT_EVENT_TS="2026-07-11T00:00:07Z" \
+  bash "$LIB_DIR/emit-event.sh" "$TMP" session.start "sess-claim-7" '{"marker":"mk7"}' >/dev/null
+# Claim with the matching marker exported (as the run orchestrator would).
+claim_err="$TMP/.stderr.$$"
+( cd "$TMP" && DO_WORK_UI_MARKER="mk7" "$CLAIMER" ".do-work/REQ-007-foo.md" "test-agent.7" >/dev/null 2>"$claim_err" )
+PICK_RC=$?
+rm -f "$claim_err"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+moved_content="$(cat "$TMP/.do-work/working/REQ-007-foo.md")"
+assert_contains "**Session:** sess-claim-7" "$moved_content" "$CURRENT_CASE Session line stamped"
+# The Session line must sit INSIDE the claim fences.
+between="$(awk '/<!-- claimed-start -->/{f=1} f{print} /<!-- claimed-end -->/{f=0}' "$TMP/.do-work/working/REQ-007-foo.md")"
+assert_contains "**Session:** sess-claim-7" "$between" "$CURRENT_CASE Session inside claim fences"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 8: no events.jsonl (pre-REQ-037 project) — Session omitted, claim succeeds
+# ----------------------------------------------------------------------
+CURRENT_CASE="session-omitted-without-events"
+CASES=$((CASES + 1))
+setup_tracked_fixture
+write_req "$TMP/.do-work/REQ-008-foo.md" "REQ-008"
+(
+  cd "$TMP"
+  git add .do-work/REQ-008-foo.md
+  git commit -q -m "add REQ-008"
+)
+# No events.jsonl exists in this fixture.
+run_claim ".do-work/REQ-008-foo.md" "test-agent.8"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc (claim still succeeds)"
+assert_file_exists "$TMP/.do-work/working/REQ-008-foo.md" "$CURRENT_CASE moved into working/"
+moved_content="$(cat "$TMP/.do-work/working/REQ-008-foo.md")"
+case "$moved_content" in
+  *"**Session:**"*) fail "$CURRENT_CASE: Session line must be omitted when no session resolvable" ;;
+  *) : ;;
+esac
+# Sanity: the rest of the stamp is intact.
+assert_contains "**Claimed by:** test-agent.8" "$moved_content" "$CURRENT_CASE Claimed by intact"
+assert_contains "**Heartbeat:**" "$moved_content" "$CURRENT_CASE Heartbeat intact"
+teardown_fixture
+
+# ----------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------
 echo ""
