@@ -33,6 +33,8 @@
 
 set -u
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # --- args -------------------------------------------------------------------
 
 if [ "$#" -lt 2 ]; then
@@ -124,6 +126,16 @@ fi
 # `-u +%Y-%m-%dT%H:%M:%SZ`.
 NOW_ISO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# --- resolve session (optional) ---------------------------------------------
+
+# Correlate this claim with the current do-work session so the extension can
+# map REQ → session for its resume flow. The project root is the parent of the
+# backlog-root `.do-work/` directory (REQ_PARENT). resolve-session.sh prints
+# the session id, or nothing when it cannot be determined without guessing;
+# the `**Session:**` line is stamped only when non-empty.
+PROJECT_ROOT="$(dirname "$REQ_PARENT")"
+SESSION_ID="$(bash "$SCRIPT_DIR/resolve-session.sh" "$PROJECT_ROOT" 2>/dev/null || true)"
+
 # --- move -------------------------------------------------------------------
 
 if [ "$TRACKED_MODE" = "1" ]; then
@@ -187,13 +199,18 @@ revert_move() {
 # Write the stamp block to a temp file (avoids passing multi-line strings to
 # awk via -v, which BSD awk on macOS rejects).
 STAMP_FILE="$(mktemp -t claim-req-stamp.XXXXXX)"
-cat > "$STAMP_FILE" <<EOF
-<!-- claimed-start -->
-**Claimed by:** $AGENT_ID
-**Claimed at:** $NOW_ISO
-**Heartbeat:** $NOW_ISO
-<!-- claimed-end -->
-EOF
+{
+  printf '%s\n' '<!-- claimed-start -->'
+  printf '%s\n' "**Claimed by:** $AGENT_ID"
+  printf '%s\n' "**Claimed at:** $NOW_ISO"
+  printf '%s\n' "**Heartbeat:** $NOW_ISO"
+  # Session line is omitted entirely when no session could be resolved (older
+  # do-work versions and marker-less/ambiguous cases) — absence stays valid.
+  if [ -n "$SESSION_ID" ]; then
+    printf '%s\n' "**Session:** $SESSION_ID"
+  fi
+  printf '%s\n' '<!-- claimed-end -->'
+} > "$STAMP_FILE"
 
 # Insert the stamp block immediately under the first `# REQ-` heading.
 # Algorithm:

@@ -176,8 +176,11 @@ do-work offers parallelism two complementary ways. **Multi-terminal mode** (belo
 **Claimed by:** hostname.pid
 **Claimed at:** 2026-05-21T11:42:08Z
 **Heartbeat:** 2026-05-21T11:42:08Z
+**Session:** 9f3c1a20-1b2c-4d5e-8f90-a1b2c3d4e5f6
 <!-- claimed-end -->
 ```
+
+**`**Session:**`** is an **optional** claim-block field (last line before `<!-- claimed-end -->`) correlating the REQ with the live do-work session, so the extension can re-adopt a session after a restart (see the event-stream telemetry, `lib/session-hook.sh`). `lib/claim-req.sh` resolves it via `lib/resolve-session.sh`: the `session.start` whose `data.marker` matches `$DO_WORK_UI_MARKER`, else the single un-ended session for the project. When no session can be determined without guessing — no marker match with multiple live sessions, or no `events.jsonl` at all (older projects) — the line is **omitted entirely**, and its absence is valid everywhere. Heartbeat refreshes leave it untouched; `unblock` strips it with the rest of the stamp; a `resume` that re-resolves a session updates it.
 
 **Checkpoint-based liveness.** Each worker stamps the `**Heartbeat:**` timestamp in its REQ file via `lib/heartbeat.sh` at natural progress checkpoints — after reading the REQ, after each TDD cycle, after each verification step, and before commit — rather than from a background timer (a backgrounded loop cannot survive a fresh-shell-per-call harness). `lib/scan-stale.sh` (called during pre-flight and by `/do-work status`) flags REQs whose heartbeat is older than `parallel.stale_threshold_seconds` (default 900 s / 15 minutes — sized to span the gap between checkpoints) as potentially dead. Stale REQs surface in the status report for human triage — they are not automatically unblocked.
 
@@ -339,10 +342,11 @@ When a REQ is claimed by a worker, a claim block is inserted between the title a
 **Claimed by:** hostname.pid
 **Claimed at:** 2026-05-21T11:42:08Z
 **Heartbeat:** 2026-05-21T11:42:08Z
+**Session:** 9f3c1a20-1b2c-4d5e-8f90-a1b2c3d4e5f6
 <!-- claimed-end -->
 ```
 
-The heartbeat timestamp is refreshed in-place by `lib/heartbeat.sh` — this is a filesystem-only operation, never a git commit. Canonical documentation: `.do-work/archive/REQ-144-extend-req-template-schema.md`.
+The heartbeat timestamp is refreshed in-place by `lib/heartbeat.sh` — this is a filesystem-only operation, never a git commit. The optional `**Session:**` line (see the **Atomic claim** description above) correlates the REQ with the live session and is omitted when no session can be resolved. Canonical documentation: `.do-work/archive/REQ-144-extend-req-template-schema.md`.
 
 ## Commit Convention
 

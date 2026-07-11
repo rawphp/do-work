@@ -77,7 +77,7 @@ Execute the chosen action before continuing:
 
 Read `REQ_PATH`. Locate the block delimited by `<!-- claimed-start -->` and `<!-- claimed-end -->` (inclusive of both markers).
 
-Remove the entire block, including the trailing blank line if one separates it from the next content. The strip must be atomic — never leave a half-removed stamp (e.g. dangling `claimed-end` marker, orphaned `**Heartbeat:**` line).
+Remove the entire block, including the trailing blank line if one separates it from the next content. The block includes any optional `**Session:**` line (stamped by `lib/claim-req.sh` to correlate the REQ with a live session) — it is removed along with `**Claimed by:**`, `**Claimed at:**`, and `**Heartbeat:**`. The strip must be atomic — never leave a half-removed stamp (e.g. dangling `claimed-end` marker, orphaned `**Heartbeat:**` or `**Session:**` line).
 
 If no stamp is present, continue silently — the REQ may already have been partially cleaned up.
 
