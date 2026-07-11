@@ -422,7 +422,26 @@ test:
   suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
 ```
 
-4. Report what was created vs already existed. Example:
+4. Wire the do-work **session telemetry hooks** into the project's Claude Code
+   settings so session start/stop is captured (the resume / terminal-adoption
+   flow depends on the `session.start` event carrying the session id). Run the
+   idempotent installer — where `{skill-root}` is this skill's install directory
+   (the folder containing `lib/`):
+
+   ```bash
+   bash {skill-root}/lib/install-hooks.sh {project}
+   ```
+
+   This merges a `SessionStart` and a `Stop` hook into
+   `{project}/.claude/settings.json`, each invoking `{skill-root}/lib/session-hook.sh`,
+   which appends `session.start` / `session.end` lines to
+   `.do-work/state/events.jsonl`. The hooks are safe no-ops (exit 0, no writes)
+   in any project without `.do-work/`, and the installer dedups by command
+   string so re-running install never duplicates them. If `python3` is
+   unavailable the installer prints a warning and reports `skipped` (telemetry
+   degrades gracefully) — the install still succeeds.
+
+5. Report what was created vs already existed. Example:
 
 ```
 do-work installed at /path/to/project/.do-work/
@@ -434,6 +453,7 @@ Created:
   .do-work/logs/
   .do-work/state/
   .do-work/config.yml
+  .claude/settings.json  (SessionStart + Stop telemetry hooks)
 
 Ready. Run `/do-work start` to record your first brief.
 Feature work first needs layers declared in .do-work/config.yml

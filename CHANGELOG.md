@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**Session telemetry emitter + hooks (REQ-037)**
+
+**Added**
+- `lib/emit-event.sh <project> <type> <session> [data-json]`: appends one well-formed JSON line (`{ts, session, type, data?}`) to `{project}/.do-work/state/events.jsonl`, creating `state/` defensively with a single atomic append. Matches the consumer extension's event-stream parser contract.
+- `lib/session-hook.sh <start|end>`: Claude Code `SessionStart` / `Stop` hook entry point. Reads `session_id` (and `cwd`) from the hook stdin JSON, emits `session.start` (with `data.marker` from `$DO_WORK_UI_MARKER` when set) or `session.end`. A silent no-op (exit 0, no writes) in any project without `.do-work/`; always exits 0 so a hook never breaks the session.
+- `lib/install-hooks.sh [--check] <project>`: idempotently merges the two hooks into `{project}/.claude/settings.json` (python3-backed, dedups by command string, preserves unrelated settings). Degrades gracefully to `skipped` when python3 is absent.
+- `/do-work install` now wires the session hooks; `/do-work upgrade` gains a `session-hooks` conformance row that adds them idempotently to existing projects.
+
 **Advisory manual-checks model replaces approve/reject**
 
 **Removed**

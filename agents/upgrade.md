@@ -34,6 +34,14 @@ to `lib/conformance-scan.sh` and add its fix contract here in the same change.
 | `config-keys` | `safe-silent` missing or incomplete `.do-work/config.yml`, detected and migrated by the `agents/config.md` loader | load config per `agents/config.md`; its missing-key migration has already applied by Step 0 | auto-apply |
 | `pending-dir` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation | interactive confirm |
 | `stale-config-key` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when a tombstoned config key is present | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation | interactive confirm |
+| `session-hooks` | `bash lib/install-hooks.sh --check {project}` prints `absent` (session telemetry hooks missing from `.claude/settings.json`) | run `bash lib/install-hooks.sh {project}` — idempotent, additive merge | auto-apply |
+
+**`session-hooks` detector location.** This row is the one exception to the
+accretion rule below: its detector lives in `lib/install-hooks.sh --check`, not
+in `lib/conformance-scan.sh`. The hooks are written to
+`{project}/.claude/settings.json`, which is outside the `.do-work/` tree that
+`conformance-scan.sh` scans, so the scan is the wrong home for it. The installer
+owns both detection (`--check`) and the idempotent fix.
 
 **Tombstone list.** This manifest is the curated documentation of tombstoned
 `.do-work/config.yml` keys — key paths the skill itself has removed, which
@@ -314,6 +322,36 @@ the commit silently.
 Do not record a `stale-config-key` outcome here. Step 8's re-scan and report
 converged is the authoritative source of truth for whether it converged.
 
+### 7a. Apply Safe Row: session-hooks
+
+`session-hooks` keeps the project's Claude Code session telemetry hooks in sync
+with the current skill. It is detected by the installer itself (`--check`), not
+by `conformance-scan.sh`, because the hooks live in
+`{project}/.claude/settings.json`, outside the `.do-work/` tree.
+
+1. Check current state:
+
+   ```bash
+   bash lib/install-hooks.sh --check "{project}"
+   ```
+
+2. If it prints `present`, record `session-hooks: already-conformant` and
+   continue.
+3. If it prints `absent`, apply the idempotent installer:
+
+   ```bash
+   bash lib/install-hooks.sh "{project}"
+   ```
+
+   - On `installed`, record `session-hooks: converged`.
+   - On `skipped` (python3 unavailable), record `session-hooks: skipped` — the
+     hooks were not written, but telemetry degrades gracefully and upgrade does
+     not fail.
+
+The installer merges a `SessionStart` and `Stop` hook (each calling
+`lib/session-hook.sh`) into `.claude/settings.json`, deduping by command string,
+so running upgrade twice yields exactly one entry per hook.
+
 ### 8. Re-scan And Report
 
 Run the scanner again:
@@ -353,6 +391,7 @@ dir-conflict: <outcome>
 config-keys: <outcome>
 pending-dir: <outcome>
 stale-config-key: <outcome>
+session-hooks: <outcome>
 ```
 
 If no outstanding rows remain, end with:
