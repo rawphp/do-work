@@ -45,8 +45,44 @@ json_field() {
     | head -n1
 }
 
+# JSON-string escaper for controlled values (marker, model id). Bash 3.2 safe.
+json_str_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"        # backslash first
+  s="${s//\"/\\\"}"        # double quote
+  s="${s//$'\t'/\\t}"      # tab
+  s="${s//$'\r'/}"         # strip CR
+  s="${s//$'\n'/}"         # strip LF
+  printf '%s' "$s"
+}
+
+# Model id of the LAST assistant message in a JSONL transcript. Prints nothing
+# when the path is empty/absent or no assistant message carries a model. No jq.
+transcript_model() {
+  local tpath="$1" line
+  [ -n "$tpath" ] || return 0
+  [ -f "$tpath" ] || return 0
+  line="$(grep '"type"[[:space:]]*:[[:space:]]*"assistant"' "$tpath" 2>/dev/null \
+    | grep '"model"' | tail -n1)"
+  [ -n "$line" ] || return 0
+  printf '%s' "$line" \
+    | sed -n 's/.*"model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
+}
+
+# Most recent model recorded for a session in this project's events.jsonl — the
+# last line for the session carrying data.model (session.start / model.change).
+recorded_model() {
+  local sess="$1" events="$PROJECT/.do-work/state/events.jsonl" line
+  [ -f "$events" ] || return 0
+  line="$(grep "\"session\":\"$sess\"" "$events" 2>/dev/null | grep '"model"' | tail -n1)"
+  [ -n "$line" ] || return 0
+  printf '%s' "$line" \
+    | sed -n 's/.*"model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
+}
+
 SESSION="$(json_field session_id)"
 CWD="$(json_field cwd)"
+TRANSCRIPT="$(json_field transcript_path)"
 
 PROJECT="${CWD:-$PWD}"
 [ -n "$PROJECT" ] || PROJECT="$PWD"
@@ -61,15 +97,40 @@ if [ -z "$SESSION" ]; then
   exit 0
 fi
 
+# Compose the session.start data object. It may carry:
+#   marker  — from $DO_WORK_UI_MARKER (existing REQ-037 behaviour)
+#   model   — the orchestrator model, from stdin `model` (SessionStart provides
+#             it, but not always) falling back to the last assistant message's
+#             message.model in the transcript. Omitted when neither yields one.
 DATA=""
-if [ "$MODE" = "start" ] && [ -n "${DO_WORK_UI_MARKER:-}" ]; then
-  M="${DO_WORK_UI_MARKER}"
-  M="${M//\\/\\\\}"
-  M="${M//\"/\\\"}"
-  M="${M//$'\r'/}"
-  M="${M//$'\n'/}"
-  DATA="{\"marker\":\"$M\"}"
+if [ "$MODE" = "start" ]; then
+  MODEL="$(json_field model)"
+  [ -n "$MODEL" ] || MODEL="$(transcript_model "$TRANSCRIPT")"
+  FIELDS=""
+  if [ -n "${DO_WORK_UI_MARKER:-}" ]; then
+    FIELDS="\"marker\":\"$(json_str_escape "$DO_WORK_UI_MARKER")\""
+  fi
+  if [ -n "$MODEL" ]; then
+    [ -n "$FIELDS" ] && FIELDS="$FIELDS,"
+    FIELDS="$FIELDS\"model\":\"$(json_str_escape "$MODEL")\""
+  fi
+  [ -n "$FIELDS" ] && DATA="{$FIELDS}"
 fi
 
 bash "$SCRIPT_DIR/emit-event.sh" "$PROJECT" "$EVENT_TYPE" "$SESSION" "$DATA" || true
+
+# Stop hook (end mode): in addition to session.end above, emit a model.change
+# event when the orchestrator's current model (last assistant message.model in
+# the transcript) differs from the last model recorded for this session. Emits
+# nothing when the model is unchanged (no per-turn spam) or undeterminable.
+if [ "$MODE" = "end" ]; then
+  CUR_MODEL="$(transcript_model "$TRANSCRIPT")"
+  if [ -n "$CUR_MODEL" ]; then
+    PREV_MODEL="$(recorded_model "$SESSION")"
+    if [ "$CUR_MODEL" != "$PREV_MODEL" ]; then
+      MC_DATA="{\"model\":\"$(json_str_escape "$CUR_MODEL")\"}"
+      bash "$SCRIPT_DIR/emit-event.sh" "$PROJECT" "model.change" "$SESSION" "$MC_DATA" || true
+    fi
+  fi
+fi
 exit 0
