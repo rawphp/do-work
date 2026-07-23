@@ -69,16 +69,13 @@ bash {skill-root}/lib/heartbeat.sh "$REQ_PATH"
 
 If `heartbeat.sh` exits non-zero (missing claim stamp, malformed file), report the failure and stop. Do not dispatch a worker against a REQ with no live heartbeat.
 
-**Refresh the `**Session:**` line.** Resume preserves the original claim ownership, but the *session* now handling the REQ is this one — the extension's REQ→session resume lookup must point at the live session. Re-resolve it and update the line inside the claim block:
+**Refresh the `**Session:**` line.** Resume preserves the original claim ownership, but the *session* now handling the REQ is this one — the extension's REQ→session resume lookup must point at the live session. Use the shared stamp primitive (insert / replace / leave-untouched; never free-hand edit the claim block):
 
 ```bash
-SESSION_ID="$(bash {skill-root}/lib/resolve-session.sh "{project}" 2>/dev/null || true)"
+bash {skill-root}/lib/stamp-session.sh "$REQ_PATH"
 ```
 
-- If `SESSION_ID` is **non-empty**: set the `**Session:**` line inside the `<!-- claimed-start --> … <!-- claimed-end -->` block to this id (insert it immediately before `<!-- claimed-end -->` when the line is absent — e.g. a REQ claimed by an older do-work version).
-- If `SESSION_ID` is **empty** (no session resolvable without guessing): leave any existing `**Session:**` line untouched. Never guess between candidate sessions.
-
-This is a filesystem-only edit — no git commit, mirroring the heartbeat refresh.
+`stamp-session.sh` re-resolves via `lib/resolve-session.sh` when the session-id argument is omitted, inserts or replaces `**Session:**` inside the claim stamp, and leaves any existing Session line untouched when resolve prints nothing. Filesystem-only — no git commit, same contract as the heartbeat refresh. If it exits non-zero (missing claim stamp, path outside working/), report the failure and stop.
 
 ### 4. Dispatch a fresh worker
 
