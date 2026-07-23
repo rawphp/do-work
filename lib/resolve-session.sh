@@ -12,10 +12,15 @@
 #      the session id of the LATEST `session.start` line whose `data.marker`
 #      equals it. This is the terminal→session correlation the extension relies
 #      on (the marker is exported per-terminal and echoed into session.start by
-#      the SessionStart hook — see lib/session-hook.sh).
-#   2. Fallback: the single un-ended session. A session is un-ended when it has
-#      a `session.start` and no later `session.end`. If exactly one such session
-#      exists, print it.
+#      the SessionStart hook — see lib/session-hook.sh). Preferred when the
+#      marker matches; unchanged by fallback semantics.
+#   2. Fallback: the single un-ended session (last-event semantics). A session
+#      is un-ended when its *last* event for that session id is `session.start`
+#      — i.e. it has a start and no later end. A prior `session.end` does not
+#      permanently retire the id: start→end→start is un-ended again.
+#      Implementation: one pass over events.jsonl tracking the last
+#      start|end type per session id; candidates are ids whose last type is
+#      start. If exactly one candidate, print it.
 #   3. Otherwise print NOTHING — no events file, no candidate, or more than one
 #      un-ended session with no marker match. The claim block then omits the
 #      `**Session:**` line entirely rather than guessing between candidates.
@@ -58,28 +63,43 @@ if [ -n "$MARKER" ]; then
   fi
 fi
 
-# --- 2. fallback: single un-ended session -----------------------------------
-STARTED="$(grep -F '"type":"session.start"' "$EVENTS" 2>/dev/null \
-           | while IFS= read -r l; do session_of "$l"; done)"
-ENDED="$(grep -F '"type":"session.end"' "$EVENTS" 2>/dev/null \
-         | while IFS= read -r l; do session_of "$l"; done)"
+# --- 2. fallback: single un-ended session (last-event semantics) ------------
+# One pass over events.jsonl: track last session.start|session.end type per id.
+# Candidates = sessions whose last event is session.start.
+# Exactly one candidate → print; zero or >1 → omit (never guess).
+# bash 3.2: no associative arrays — keep "sid:type" tokens in last_map.
 
 CANDIDATE=""
 COUNT=0
-seen=""
-for s in $STARTED; do
-  [ -n "$s" ] || continue
-  # Dedup: a session that restarted (multiple session.start lines) counts once.
-  case " $seen " in *" $s "*) continue ;; esac
-  seen="$seen $s"
-  ended=0
-  for e in $ENDED; do
-    if [ "$e" = "$s" ]; then ended=1; break; fi
+last_map=""
+
+while IFS= read -r line || [ -n "$line" ]; do
+  [ -n "$line" ] || continue
+  case "$line" in
+    *'"type":"session.start"'*) typ="start" ;;
+    *'"type":"session.end"'*)   typ="end" ;;
+    *) continue ;;
+  esac
+  sid="$(session_of "$line")"
+  [ -n "$sid" ] || continue
+  # Drop any prior entry for this sid so the final token is the last event.
+  rebuilt=""
+  for tok in $last_map; do
+    case "$tok" in
+      "${sid}:"*) ;;
+      *) rebuilt="$rebuilt $tok" ;;
+    esac
   done
-  if [ "$ended" = "0" ]; then
-    CANDIDATE="$s"
-    COUNT=$((COUNT + 1))
-  fi
+  last_map="$rebuilt ${sid}:$typ"
+done < "$EVENTS"
+
+for tok in $last_map; do
+  case "$tok" in
+    *:start)
+      CANDIDATE="${tok%:*}"
+      COUNT=$((COUNT + 1))
+      ;;
+  esac
 done
 
 # Exactly one un-ended session → unambiguous. Zero or >1 → omit (never guess).
