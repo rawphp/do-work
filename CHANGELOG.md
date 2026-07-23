@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**UI verification requires Playwright screenshots (UR-043)**
+
+**Changed**
+- `agents/run-worker.md` Step 6 `ui` type: every `ui` verification step must capture a Playwright PNG under `.do-work/user-requests/UR-NNN/ui-evidence/`, vision-read the image, and assert the expected UI outcome from the image. Accessibility/DOM snapshot alone is insufficient. Missing Playwright/browser is not an `environment` deferral — hard-fail as `verification-failing` after retries. Acceptance evidence for `type: ui` must cite the screenshot path.
+
 **Session telemetry emitter + hooks (REQ-037)**
 
 **Added**

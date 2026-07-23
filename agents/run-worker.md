@@ -242,9 +242,36 @@ Read `## Verification Steps` from the REQ. Execute each step in order:
 | `test` | Bash: run the command, check exit code 0 / matching output |
 | `build` | Bash: run the build command, check exit code 0 and no errors |
 | `runtime` | Ensure the dev server is running (start in background if not, wait healthy), run the command, compare output to expected |
-| `ui` | Playwright: navigate to the URL, take a snapshot, confirm the specified element/text |
+| `ui` | **Playwright screenshot + vision assert (mandatory visual check).** See **UI screenshot contract** below. |
 
 Record the result of each step in an ordered checkpoint log. Each checkpoint entry must include `step`, `total`, `type`, command/action, expected result, pass/fail status, and a short actual-output summary. If the step crosses a boundary, include the handoff name (for example `input -> persistence`, `API -> render`, or `command -> file`).
+
+**UI screenshot contract (HARD RULE for every `ui` step):**
+
+A `ui` step is a **visual** check. It is not satisfied by an accessibility tree snapshot, DOM text scrape, or HTML source alone.
+
+1. **Ensure the app is reachable** — start the dev server in the background if needed; wait until healthy (same as `runtime`).
+2. **Navigate with Playwright** to the URL/route in the step (Playwright CLI / project playwright skill — e.g. `playwright-cli open` / `screenshot`, or the project's equivalent).
+3. **Capture a PNG screenshot** to a durable path under the parent UR:
+   ```
+   {project}/.do-work/user-requests/UR-NNN/ui-evidence/REQ-NNN-step-<N>.png
+   ```
+   Create `ui-evidence/` if missing. Use the REQ's `**UR:**` field for `UR-NNN` and the verification step number for `<N>`.
+4. **Vision-read the image** — open the PNG with the harness Read/vision tool (multimodal). Assert the step's Expected outcome from what is **visible in the image** (element present, text readable, state shown). Do not pass solely because the a11y tree or page text contained a string.
+5. **Record evidence** — checkpoint `actual` and acceptance evidence for this step must cite the screenshot path:
+   - checkpoint: include the path in `command`/`actual` (e.g. `screenshot:.do-work/user-requests/UR-NNN/ui-evidence/REQ-NNN-step-1.png`)
+   - acceptance evidence: `type: ui` with `ref:` set to that same path (project-relative preferred)
+
+**Insufficient for pass (do not mark `ui` passed):**
+
+- Accessibility / ARIA snapshot only
+- DOM query or `page.content()` text match without a PNG on disk
+- Narrative claim ("looked fine") with no screenshot path
+- Empty, zero-byte, or missing PNG file
+
+**Playwright / browser unavailable — not deferrable:**
+
+If Playwright (or a usable browser binary) cannot run in this worktree, a `ui` step is **executable but failing infrastructure**, not an inherent `environment` deferral. Attempt the step; on failure follow the normal retry path (up to 3), then return `status: stopped`, `reason: verification-failing` with `failed_step` pointing at the `ui` step. **Do not** mark the step `status: deferred` with `category: environment` solely because Playwright is missing. (True human/device-only checks remain deferred when they appear in the REQ; automated `ui` screenshot steps never convert into advisory manual checks.)
 
 **Heartbeat checkpoint:** after each verification step, stamp the heartbeat — `{skill-root}/lib/heartbeat.sh "$REQ_PATH"` — so a long verification sequence never lets the slot drift stale.
 
@@ -475,7 +502,7 @@ acceptance:
     status: passed
     evidence:
       - type: test       # one of test, command, file, runtime_check, ui
-        ref: ""
+        ref: ""          # for type: ui, ref MUST be the ui-evidence PNG path (file must exist)
 milestone_complete: false
 milestone: ""           # active milestone id when milestone_complete is true
 retry_count: 0          # integer — number of conflict retries consumed (0 = no retries)
