@@ -30,20 +30,15 @@
 
 set -u
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# shellcheck source=json-bash.sh
+. "$SCRIPT_DIR/json-bash.sh"
+
 PROJECT="${1:-}"
 [ -n "$PROJECT" ] || exit 0
 
 EVENTS="$PROJECT/.do-work/state/events.jsonl"
 [ -f "$EVENTS" ] || exit 0
-
-# Extract the "session" string field value from a single JSON line. Tolerant of
-# optional whitespace around the colon; the emitter writes it compact.
-session_of() {
-  # NOTE: feed sed a trailing newline. BSD sed preserves a missing final
-  # newline, which would glue accumulated tokens together (sess-Xsess-Y).
-  printf '%s\n' "$1" \
-    | sed -n 's/.*"session"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
-}
 
 MARKER="${DO_WORK_UI_MARKER:-}"
 
@@ -55,7 +50,7 @@ if [ -n "$MARKER" ]; then
   line="$(grep -F '"type":"session.start"' "$EVENTS" 2>/dev/null \
           | grep -F -- "\"marker\":\"$MARKER\"" | tail -n1)"
   if [ -n "$line" ]; then
-    sid="$(session_of "$line")"
+    sid="$(json_string_field "$line" session)"
     if [ -n "$sid" ]; then
       printf '%s\n' "$sid"
       exit 0
@@ -80,7 +75,7 @@ while IFS= read -r line || [ -n "$line" ]; do
     *'"type":"session.end"'*)   typ="end" ;;
     *) continue ;;
   esac
-  sid="$(session_of "$line")"
+  sid="$(json_string_field "$line" session)"
   [ -n "$sid" ] || continue
   # Drop any prior entry for this sid so the final token is the last event.
   rebuilt=""

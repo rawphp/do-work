@@ -34,27 +34,11 @@ case "$MODE" in
 esac
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# shellcheck source=json-bash.sh
+. "$SCRIPT_DIR/json-bash.sh"
 
 # Read the whole hook payload from stdin. Tolerate an empty stdin.
 PAYLOAD="$(cat 2>/dev/null || true)"
-
-# Minimal, dependency-free extraction of a top-level JSON string field's value.
-json_field() {
-  printf '%s' "$PAYLOAD" \
-    | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" \
-    | head -n1
-}
-
-# JSON-string escaper for controlled values (marker, model id). Bash 3.2 safe.
-json_str_escape() {
-  local s="$1"
-  s="${s//\\/\\\\}"        # backslash first
-  s="${s//\"/\\\"}"        # double quote
-  s="${s//$'\t'/\\t}"      # tab
-  s="${s//$'\r'/}"         # strip CR
-  s="${s//$'\n'/}"         # strip LF
-  printf '%s' "$s"
-}
 
 # Model id of the LAST assistant message in a JSONL transcript. Prints nothing
 # when the path is empty/absent or no assistant message carries a model. No jq.
@@ -65,8 +49,7 @@ transcript_model() {
   line="$(grep '"type"[[:space:]]*:[[:space:]]*"assistant"' "$tpath" 2>/dev/null \
     | grep '"model"' | tail -n1)"
   [ -n "$line" ] || return 0
-  printf '%s' "$line" \
-    | sed -n 's/.*"model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
+  json_string_field "$line" model
 }
 
 # Most recent model recorded for a session in this project's events.jsonl — the
@@ -76,13 +59,12 @@ recorded_model() {
   [ -f "$events" ] || return 0
   line="$(grep "\"session\":\"$sess\"" "$events" 2>/dev/null | grep '"model"' | tail -n1)"
   [ -n "$line" ] || return 0
-  printf '%s' "$line" \
-    | sed -n 's/.*"model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
+  json_string_field "$line" model
 }
 
-SESSION="$(json_field session_id)"
-CWD="$(json_field cwd)"
-TRANSCRIPT="$(json_field transcript_path)"
+SESSION="$(json_string_field "$PAYLOAD" session_id)"
+CWD="$(json_string_field "$PAYLOAD" cwd)"
+TRANSCRIPT="$(json_string_field "$PAYLOAD" transcript_path)"
 
 PROJECT="${CWD:-$PWD}"
 [ -n "$PROJECT" ] || PROJECT="$PWD"
@@ -104,15 +86,15 @@ fi
 #             message.model in the transcript. Omitted when neither yields one.
 DATA=""
 if [ "$MODE" = "start" ]; then
-  MODEL="$(json_field model)"
+  MODEL="$(json_string_field "$PAYLOAD" model)"
   [ -n "$MODEL" ] || MODEL="$(transcript_model "$TRANSCRIPT")"
   FIELDS=""
   if [ -n "${DO_WORK_UI_MARKER:-}" ]; then
-    FIELDS="\"marker\":\"$(json_str_escape "$DO_WORK_UI_MARKER")\""
+    FIELDS="\"marker\":\"$(json_escape "$DO_WORK_UI_MARKER")\""
   fi
   if [ -n "$MODEL" ]; then
     [ -n "$FIELDS" ] && FIELDS="$FIELDS,"
-    FIELDS="$FIELDS\"model\":\"$(json_str_escape "$MODEL")\""
+    FIELDS="$FIELDS\"model\":\"$(json_escape "$MODEL")\""
   fi
   [ -n "$FIELDS" ] && DATA="{$FIELDS}"
 fi
@@ -128,7 +110,7 @@ if [ "$MODE" = "end" ]; then
   if [ -n "$CUR_MODEL" ]; then
     PREV_MODEL="$(recorded_model "$SESSION")"
     if [ "$CUR_MODEL" != "$PREV_MODEL" ]; then
-      MC_DATA="{\"model\":\"$(json_str_escape "$CUR_MODEL")\"}"
+      MC_DATA="{\"model\":\"$(json_escape "$CUR_MODEL")\"}"
       bash "$SCRIPT_DIR/emit-event.sh" "$PROJECT" "model.change" "$SESSION" "$MC_DATA" || true
     fi
   fi

@@ -40,6 +40,10 @@
 
 set -u
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# shellcheck source=json-bash.sh
+. "$SCRIPT_DIR/json-bash.sh"
+
 PROJECT="${1:-}"
 TYPE="${2:-}"
 SESSION="${3:-}"
@@ -49,19 +53,6 @@ if [ -z "$PROJECT" ] || [ -z "$TYPE" ] || [ -z "$SESSION" ]; then
   echo "emit-event.sh: usage: emit-event.sh <project> <type> <session> [data-json]" >&2
   exit 1
 fi
-
-# JSON-string escaper for the values this script controls (type, session).
-# Escapes backslash, double-quote, and tab; strips CR/LF so a value can never
-# break the one-line-per-event contract. Bash 3.2 safe.
-json_escape() {
-  local s="$1"
-  s="${s//\\/\\\\}"        # backslash first
-  s="${s//\"/\\\"}"        # double quote
-  s="${s//$'\t'/\\t}"      # tab
-  s="${s//$'\r'/}"         # strip CR
-  s="${s//$'\n'/}"         # strip LF
-  printf '%s' "$s"
-}
 
 TS="${EMIT_EVENT_TS:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 ESC_SESSION="$(json_escape "$SESSION")"
