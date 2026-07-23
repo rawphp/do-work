@@ -39,11 +39,16 @@ Perform these checks in order:
 1. **Scope:** Confirm changed files and behavior match the REQ. Flag unrelated changes, undeclared broad rewrites, or extra features.
 2. **Acceptance:** Confirm every acceptance criterion has passing evidence and that the evidence actually supports the criterion.
 3. **Verification:** Confirm required verification steps were run or explicitly justified when impossible.
-4. **Tests:** Confirm new or changed behavior has appropriate focused tests, plus broader tests when blast radius warrants it.
-5. **Secrets:** Inspect changed files and evidence for secrets, credentials, tokens, `.env` content, or sensitive local paths.
-6. **Documentation:** Confirm user-facing behavior, install behavior, config, or workflow changes update relevant docs.
-7. **Regression risk:** Identify migrations, auth, billing, payments, broad file changes, or other risk triggers that need stronger review.
-8. **Policy:** Include deterministic policy-check output from `lib/check-policy.sh`. A blocked path or blocked command from `security.blocked_paths` or `security.blocked_commands` is a blocker. A `risk.require_review` signal is mandatory context: review may pass only after explicitly addressing the signal in findings.
+4. **UI screenshot evidence (blocker when applicable):** If the REQ has any `ui` verification step, or any acceptance evidence item with `type: ui`, confirm all of the following. Failure on any item is **severity: blocker** (`status: failed`) — not a warning:
+   - The worker `checkpoint_log` includes a passed `ui` step whose command/actual cites a screenshot path.
+   - That path is under `.do-work/user-requests/UR-NNN/ui-evidence/` (or an equivalent documented `ui-evidence` path for the parent UR).
+   - The PNG exists on disk when the path is resolvable from the project root (or the report embeds an absolute path that exists).
+   - Evidence is not a11y/DOM narrative alone: a `type: ui` item whose `ref` is free text without a `.png` (or other image) path is insufficient.
+5. **Tests:** Confirm new or changed behavior has appropriate focused tests, plus broader tests when blast radius warrants it.
+6. **Secrets:** Inspect changed files and evidence for secrets, credentials, tokens, `.env` content, or sensitive local paths.
+7. **Documentation:** Confirm user-facing behavior, install behavior, config, or workflow changes update relevant docs.
+8. **Regression risk:** Identify migrations, auth, billing, payments, broad file changes, or other risk triggers that need stronger review.
+9. **Policy:** Include deterministic policy-check output from `lib/check-policy.sh`. A blocked path or blocked command from `security.blocked_paths` or `security.blocked_commands` is a blocker. A `risk.require_review` signal is mandatory context: review may pass only after explicitly addressing the signal in findings.
 
 ---
 
