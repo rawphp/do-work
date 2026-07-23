@@ -102,7 +102,7 @@ Then check the REQ's `## Verification Steps` block for any step of type `ui`.
 
 **Auto-fix vs flag decision:**
 
-- **Auto-fix** when the missing `ui` step can be inferred unambiguously from a specific acceptance criterion — translate the criterion into a concrete navigate + assert step. Example: criterion `user sees a success toast after form submit` → add `ui` step `Navigate to /form, submit valid data, assert toast with text "Success" is visible`. The inferred step must include: target URL or route, the action taken, and a specific element/text to assert.
+- **Auto-fix** when the missing `ui` step can be inferred unambiguously from a specific acceptance criterion — translate the criterion into a concrete navigate + **Playwright screenshot** + vision-assert step. Example: criterion `user sees a success toast after form submit` → add `ui` step `Navigate to /form, submit valid data, screenshot to .do-work/user-requests/UR-NNN/ui-evidence/REQ-NNN-step-N.png, vision-assert toast with text "Success" is visible in the image`. The inferred step must include: target URL or route, the action taken, screenshot under `ui-evidence/`, and a specific element/text to assert from the image.
 - **Flag** when the criteria describe user-visible behaviour but the target route, action, or assertion cannot be inferred without guessing — do not fabricate a step. Report `[FLAG] REQ-NNN has user-visible acceptance criteria but no ui verification step; target route/action unclear — add manually.`
 
 #### Dimension 7: Footprint Plausibility Check
@@ -132,7 +132,7 @@ Does the REQ's `## Verification Steps` contain steps that violate the worker-exe
 
 | Category | Example indicator phrases |
 |---|---|
-| **Human judgment** | "user confirms", "manually check", "looks correct", "[HUMAN]", "verify visually", "confirm the badge" |
+| **Human judgment** | "user confirms", "manually check", "looks correct", "[HUMAN]", "confirm the badge looks right to you" — do **not** relocate automated Playwright screenshot `ui` steps (navigate + `ui-evidence` PNG + vision assert) |
 | **Physical device** | "on-device", "on the phone", "on iOS", "on Android", "on the watch" |
 | **Unprovisionable environment** | "in production", "requires login", "against the live API", "on-device build" |
 | **Explicit human-action phrasing** | "Ask the user to...", "Have someone...", "Check with the team..." |
