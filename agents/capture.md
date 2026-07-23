@@ -363,7 +363,7 @@ Use the right type for the task:
 | `test` | Automated test coverage | `./vendor/bin/pest --filter=LeadStatusTest` |
 | `build` | App must compile cleanly | `npm run build` |
 | `runtime` | Call an endpoint or CLI and check output | `curl http://localhost:8000/api/leads` → expect 200 with `status: discarded` |
-| `ui` | Visual check in a running browser | Navigate to `/leads`, take snapshot, confirm "Discarded" tab is visible |
+| `ui` | Playwright **screenshot** visual check (mandatory for user-visible work) | Navigate to `/leads`, save screenshot to `.do-work/user-requests/UR-NNN/ui-evidence/REQ-NNN-step-1.png`, vision-assert "Discarded" tab is visible in the image |
 
 **Executability rule (HARD RULE — never write non-executable steps into `## Verification Steps`):**
 
@@ -371,7 +371,7 @@ Every verification step in `## Verification Steps` must be executable by a worke
 
 | Category | Description | Example phrases to flag |
 |---|---|---|
-| **Human judgment** | Requires a human to make a visual or contextual call | "user confirms", "manually check", "looks correct", "[HUMAN]", "verify visually", "confirm the badge" |
+| **Human judgment** | Requires a human to make a taste/contextual call that no automated tool can settle | "user confirms", "manually check", "looks correct", "[HUMAN]", "confirm the badge looks right to you" — **not** an automated Playwright screenshot `ui` step (those stay in Verification Steps) |
 | **Physical device** | Requires a mobile phone, watch, hardware, IoT sensor, or other physical device | "on-device", "on the phone", "on iOS", "on Android", "on the watch" |
 | **Unprovisionable environment** | Requires external credentials, a live third-party sandbox, or a runtime the worker genuinely cannot start in the worktree (e.g. a native mobile app build, a production database, an external OAuth callback) | "in production", "requires login", "against the live API", "on-device build" |
 | **Explicit human-action phrasing** | The step wording is imperative toward a human, not a command | "Ask the user to...", "Have someone...", "Check with the team..." |
@@ -382,10 +382,11 @@ If a brief describes a check that falls into one of these categories, **do not w
 
 - **Bug fixes:** Step 1 must reproduce the original bug path and confirm it no longer occurs. Do not skip this.
 - **User-visible acceptance criteria → `ui` step required.** If any acceptance criterion in the REQ describes user-visible behaviour, the REQ must include at least one `ui` verification step. Trigger on any of these concrete phrases in the criteria (checklist, not judgement call): `user sees`, `page shows`, `page renders`, `button is clickable`, `form displays`, `element is visible`, `message appears`, `toast appears`, `error appears`, `navigates to`, or any other phrase describing what a person sees or does on screen. If none of these phrases appear in the acceptance criteria, no `ui` step is required — this is the explicit "no phantom UI" escape for purely backend REQs (config keys, internal APIs with no caller, CLI-only changes).
-- **UI changes:** Always include at least one `ui` step (navigate + snapshot + assert element present). This is the same rule as above, restated for REQs whose title/task is explicitly a UI change — both rules must hold.
+- **UI changes:** Always include at least one `ui` step: **navigate + Playwright screenshot to `ui-evidence/` + vision-assert element/text visible in the image**. Accessibility/DOM snapshot alone is not enough. This is the same rule as above, restated for REQs whose title/task is explicitly a UI change — both rules must hold.
 - **API/backend changes:** Include a `runtime` step hitting the actual endpoint and checking the response.
 - **Pure refactors:** `test` steps only are sufficient if behaviour is unchanged.
-- **New pages/components:** Include `build` + `ui` steps minimum.
+- **New pages/components:** Include `build` + `ui` steps minimum (screenshot-backed `ui`).
+- **Screenshot-backed `ui` steps are worker-executable** — write them in `## Verification Steps`, never in `## Manual checks (advisory)`. Do not use vague "verify visually" phrasing for automated checks; write a concrete navigate target, screenshot path under `.do-work/user-requests/UR-NNN/ui-evidence/`, and Expected outcome a vision pass can falsify (specific text/element/state).
 - Steps must be specific enough that a pass/fail verdict is unambiguous — "looks good" is not a valid expected outcome.
 - Steps must be ordered so a worker can record `step N of M`, `last_good_step`, and `failed_step` in the checkpoint log.
 - When a step crosses a boundary (for example API -> render, command -> file, input -> persistence), name that handoff in the Expected outcome so failures localize cleanly.
