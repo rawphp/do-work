@@ -235,6 +235,114 @@ run_script
 assert_eq "0" "$RC" "$CURRENT_CASE rc (stderr=$STDERR)"
 teardown_fixture
 
+# --- REQ-279: collapse check_ui_ref + tighten path contract ---
+
+CURRENT_CASE="ui-shorthand-ui-colon"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/.do-work/user-requests/UR-044/ui-evidence"
+printf 'fake-png' > "$TMP/.do-work/user-requests/UR-044/ui-evidence/REQ-279-step-1.png"
+REQ="$TMP/.do-work/REQ-001-test.md"
+cat > "$REQ" <<'EOF'
+# REQ-001: Test
+
+## Acceptance Criteria
+
+- [ ] First criterion
+- [ ] Second criterion
+
+## Verification Steps
+EOF
+cat > "$REPORT" <<'EOF'
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - ui: .do-work/user-requests/UR-044/ui-evidence/REQ-279-step-1.png
+  AC2:
+    status: passed
+    evidence:
+      - type: file
+        ref: README.md
+EOF
+run_script
+assert_eq "0" "$RC" "$CURRENT_CASE rc (stderr=$STDERR)"
+teardown_fixture
+
+CURRENT_CASE="ui-wrong-dir-ui-evidence-substring"
+CASES=$((CASES + 1))
+setup_fixture
+# Path contains "ui-evidence" but is NOT under .do-work/user-requests/*/ui-evidence/
+mkdir -p "$TMP/.do-work" "$TMP/not-user-requests/ui-evidence"
+printf 'fake-png' > "$TMP/not-user-requests/ui-evidence/evil.png"
+REQ="$TMP/.do-work/REQ-001-test.md"
+cat > "$REQ" <<'EOF'
+# REQ-001: Test
+
+## Acceptance Criteria
+
+- [ ] First criterion
+- [ ] Second criterion
+
+## Verification Steps
+EOF
+cat > "$REPORT" <<'EOF'
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - type: ui
+        ref: not-user-requests/ui-evidence/evil.png
+  AC2:
+    status: passed
+    evidence:
+      - type: file
+        ref: README.md
+EOF
+run_script
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+case "$STDERR" in *"acceptance evidence ui ref must be under"*|*"ui-evidence"*) : ;; *) fail "$CURRENT_CASE stderr: $STDERR" ;; esac
+teardown_fixture
+
+CURRENT_CASE="ui-absolute-escape-outside-tree"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/.do-work"
+ABS_ESCAPE="$(mktemp -d -t ui-evidence-escape.XXXXXX)"
+mkdir -p "$ABS_ESCAPE/ui-evidence"
+printf 'fake-png' > "$ABS_ESCAPE/ui-evidence/x.png"
+ABS_REF="$ABS_ESCAPE/ui-evidence/x.png"
+REQ="$TMP/.do-work/REQ-001-test.md"
+cat > "$REQ" <<'EOF'
+# REQ-001: Test
+
+## Acceptance Criteria
+
+- [ ] First criterion
+- [ ] Second criterion
+
+## Verification Steps
+EOF
+# Inject absolute path (file exists but outside project user-requests tree)
+cat > "$REPORT" <<EOF
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - type: ui
+        ref: $ABS_REF
+  AC2:
+    status: passed
+    evidence:
+      - type: file
+        ref: README.md
+EOF
+run_script
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+case "$STDERR" in *"acceptance evidence ui ref must be under"*|*"ui-evidence"*) : ;; *) fail "$CURRENT_CASE stderr: $STDERR" ;; esac
+rm -rf "$ABS_ESCAPE"
+teardown_fixture
+
 echo ""
 echo "check-acceptance-evidence tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then
