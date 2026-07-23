@@ -15,9 +15,9 @@
 # Keys are AC1..ACn, matching acceptance criteria order in the REQ.
 #
 # For type: ui (or ui: shorthand), ref MUST be a path to an existing image
-# under .do-work/user-requests/.../ui-evidence/ (or any path containing
-# ui-evidence and ending in a common image extension). Soft ui claims
-# without a screenshot path fail the gate (UR-043).
+# under the project's .do-work/user-requests/<UR-id>/ui-evidence/ tree
+# (worker contract in agents/run-worker.md). Soft ui claims without a
+# screenshot path fail the gate (UR-043 / REQ-279).
 
 set -u
 
@@ -68,48 +68,80 @@ is_image_path() {
   esac
 }
 
+# Pure UI ref policy: strip quotes, require image extension, path must
+# resolve under {project}/.do-work/user-requests/<UR-id>/ui-evidence/, file exists.
+# Emits one diagnostic to stderr and returns non-zero on failure.
+check_ui_ref() {
+  local key="$1"
+  local ref="$2"
+  local candidate rest prefix
+
+  # Strip surrounding quotes
+  ref="$(printf '%s' "$ref" | sed -E 's/^["'\'']//; s/["'\'']$//')"
+
+  if [ -z "$ref" ]; then
+    echo "acceptance evidence ui missing screenshot ref: $key" >&2
+    return 1
+  fi
+
+  if ! is_image_path "$ref"; then
+    echo "acceptance evidence ui ref is not an image path: $key ($ref)" >&2
+    return 1
+  fi
+
+  # Resolve relative paths against project root
+  if [ "${ref#/}" = "$ref" ]; then
+    candidate="$PROJECT_ROOT/$ref"
+  else
+    candidate="$ref"
+  fi
+
+  # Path must live under project .do-work/user-requests/<id>/ui-evidence/
+  # (not a bare ui-evidence substring — rejects /tmp/ui-evidence/ and not-user-requests/ui-evidence/)
+  prefix="$PROJECT_ROOT/.do-work/user-requests/"
+  case "$candidate" in
+    "$prefix"*)
+      rest="${candidate#"$prefix"}"
+      # rest must be: <UR-id>/ui-evidence/<file...>
+      if ! printf '%s' "$rest" | grep -Eq '^[^/]+/ui-evidence/.+'; then
+        echo "acceptance evidence ui ref must be under .do-work/user-requests/*/ui-evidence/: $key ($ref)" >&2
+        return 1
+      fi
+      ;;
+    *)
+      echo "acceptance evidence ui ref must be under .do-work/user-requests/*/ui-evidence/: $key ($ref)" >&2
+      return 1
+      ;;
+  esac
+
+  if [ ! -f "$candidate" ]; then
+    echo "acceptance evidence ui screenshot file missing: $key ($ref)" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 # Validate every type: ui evidence item in a YAML acceptance block.
-# Emits diagnostics to stderr; returns non-zero if any ui item is invalid.
+# Walker only extracts refs (shorthand - ui: path | long form type: ui + ref:);
+# policy lives entirely in check_ui_ref.
 validate_ui_evidence_in_block() {
   local key="$1"
   local block="$2"
   local failed=0
-  local line type_line ref_line ref candidate
+  local line type_line ref
 
-  # Walk the block: when we see type: ui (or - ui:), require a following ref with screenshot path.
   type_line=""
-  ref_line=""
   while IFS= read -r line; do
     if echo "$line" | grep -Eq '^[[:space:]]*-[[:space:]]*type:[[:space:]]*ui[[:space:]]*$' \
       || echo "$line" | grep -Eq '^[[:space:]]*type:[[:space:]]*ui[[:space:]]*$' \
       || echo "$line" | grep -Eq '^[[:space:]]*-[[:space:]]*ui:'; then
       type_line="$line"
-      ref_line=""
-      # For shorthand "- ui: path" the path may be on the same line
+      # Shorthand "- ui: path" — path on the same line
       if echo "$line" | grep -Eq '^[[:space:]]*-[[:space:]]*ui:'; then
         ref="$(echo "$line" | sed -E 's/^[[:space:]]*-[[:space:]]*ui:[[:space:]]*//')"
-        ref="$(echo "$ref" | sed -E 's/^["'\'']//; s/["'\'']$//')"
-        if [ -z "$ref" ]; then
-          echo "acceptance evidence ui missing screenshot ref: $key" >&2
+        if ! check_ui_ref "$key" "$ref"; then
           failed=1
-        else
-          if ! is_image_path "$ref"; then
-            echo "acceptance evidence ui ref is not an image path: $key ($ref)" >&2
-            failed=1
-          elif ! echo "$ref" | grep -Eq 'ui-evidence'; then
-            echo "acceptance evidence ui ref must be under ui-evidence/: $key ($ref)" >&2
-            failed=1
-          else
-            candidate="$ref"
-            if [ "${ref#/}" = "$ref" ]; then
-              # relative — try project root
-              candidate="$PROJECT_ROOT/$ref"
-            fi
-            if [ ! -f "$candidate" ] && [ ! -f "$ref" ]; then
-              echo "acceptance evidence ui screenshot file missing: $key ($ref)" >&2
-              failed=1
-            fi
-          fi
         fi
         type_line=""
       fi
@@ -119,25 +151,8 @@ validate_ui_evidence_in_block() {
     if [ -n "$type_line" ]; then
       if echo "$line" | grep -Eq '^[[:space:]]*ref:'; then
         ref="$(echo "$line" | sed -E 's/^[[:space:]]*ref:[[:space:]]*//')"
-        ref="$(echo "$ref" | sed -E 's/^["'\'']//; s/["'\'']$//')"
-        if [ -z "$ref" ]; then
-          echo "acceptance evidence ui missing screenshot ref: $key" >&2
+        if ! check_ui_ref "$key" "$ref"; then
           failed=1
-        elif ! is_image_path "$ref"; then
-          echo "acceptance evidence ui ref is not an image path: $key ($ref)" >&2
-          failed=1
-        elif ! echo "$ref" | grep -Eq 'ui-evidence'; then
-          echo "acceptance evidence ui ref must be under ui-evidence/: $key ($ref)" >&2
-          failed=1
-        else
-          candidate="$ref"
-          if [ "${ref#/}" = "$ref" ]; then
-            candidate="$PROJECT_ROOT/$ref"
-          fi
-          if [ ! -f "$candidate" ] && [ ! -f "$ref" ]; then
-            echo "acceptance evidence ui screenshot file missing: $key ($ref)" >&2
-            failed=1
-          fi
         fi
         type_line=""
       elif echo "$line" | grep -Eq '^[[:space:]]*-[[:space:]]*(type:|test:|command:|file:|runtime_check:|ui:)'; then
