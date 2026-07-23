@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Changed**
 - `agents/run-worker.md` Step 6 `ui` type: every `ui` verification step must capture a Playwright PNG under `.do-work/user-requests/UR-NNN/ui-evidence/`, vision-read the image, and assert the expected UI outcome from the image. Accessibility/DOM snapshot alone is insufficient. Missing Playwright/browser is not an `environment` deferral — hard-fail as `verification-failing` after retries. Acceptance evidence for `type: ui` must cite the screenshot path.
+- `agents/capture.md` / `agents/audit.md`: `ui` steps are written and auto-fixed as navigate + screenshot + vision-assert; automated screenshot steps are not moved to advisory manual checks.
+- `lib/check-acceptance-evidence.sh`: `type: ui` requires a non-empty image `ref` under `ui-evidence/` that exists on disk (soft text-only ui evidence fails the gate).
+- `agents/review.md`: missing/invalid UI screenshot evidence is a **blocker**.
 
 **Session telemetry emitter + hooks (REQ-037)**
 
