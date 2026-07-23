@@ -164,6 +164,38 @@ assert_eq "0" "$RC" "$CURRENT_CASE rc"
 assert_eq "sess-ten" "$STDOUT" "$CURRENT_CASE m1 does not match m10 (falls back)"
 teardown_fixture
 
+
+# ----------------------------------------------------------------------
+# Case 9: start→end→start same session id (no marker) — last event is start
+# Documented invariant: un-ended means last event for that id is session.start
+# ----------------------------------------------------------------------
+CURRENT_CASE="restart-same-session-last-event-start"
+CASES=$((CASES + 1))
+setup_fixture
+emit "session.start" "sess-R" ""
+emit "session.end"   "sess-R" ""
+emit "session.start" "sess-R" ""
+run_resolve 0 ""
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "sess-R" "$STDOUT" "$CURRENT_CASE resolves restarted un-ended session"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 10: two sessions both last-event start (multi live) — omit
+# Reinforces last-event semantics do not change multi-candidate omit rule
+# ----------------------------------------------------------------------
+CURRENT_CASE="multi-live-last-event-start-omit"
+CASES=$((CASES + 1))
+setup_fixture
+emit "session.start" "sess-L1" ""
+emit "session.end"   "sess-L1" ""
+emit "session.start" "sess-L1" ""
+emit "session.start" "sess-L2" ""
+run_resolve 0 ""
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+assert_eq "" "$STDOUT" "$CURRENT_CASE omits when multiple last-event-start sessions"
+teardown_fixture
+
 # ----------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------
