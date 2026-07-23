@@ -132,6 +132,109 @@ assert_eq "1" "$RC" "$CURRENT_CASE rc"
 case "$STDERR" in *"acceptance evidence missing evidence item: AC1"*) : ;; *) fail "$CURRENT_CASE stderr" ;; esac
 teardown_fixture
 
+# --- UR-043: type ui requires existing ui-evidence screenshot ---
+
+CURRENT_CASE="ui-missing-ref"
+CASES=$((CASES + 1))
+setup_fixture
+# Simulate project layout so resolve_project_root finds TMP as project
+mkdir -p "$TMP/.do-work"
+cat > "$REPORT" <<'EOF'
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - type: ui
+  AC2:
+    status: passed
+    evidence:
+      - type: file
+        ref: README.md
+EOF
+run_script
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+case "$STDERR" in *"acceptance evidence ui missing screenshot ref: AC1"*) : ;; *) fail "$CURRENT_CASE stderr: $STDERR" ;; esac
+teardown_fixture
+
+CURRENT_CASE="ui-text-only-ref"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/.do-work"
+cat > "$REPORT" <<'EOF'
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - type: ui
+        ref: looked fine in the browser
+  AC2:
+    status: passed
+    evidence:
+      - type: file
+        ref: README.md
+EOF
+run_script
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+case "$STDERR" in *"acceptance evidence ui ref is not an image path: AC1"*) : ;; *) fail "$CURRENT_CASE stderr: $STDERR" ;; esac
+teardown_fixture
+
+CURRENT_CASE="ui-missing-file"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/.do-work"
+cat > "$REPORT" <<'EOF'
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - type: ui
+        ref: .do-work/user-requests/UR-001/ui-evidence/REQ-001-step-1.png
+  AC2:
+    status: passed
+    evidence:
+      - type: file
+        ref: README.md
+EOF
+run_script
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+case "$STDERR" in *"acceptance evidence ui screenshot file missing: AC1"*) : ;; *) fail "$CURRENT_CASE stderr: $STDERR" ;; esac
+teardown_fixture
+
+CURRENT_CASE="ui-valid-screenshot"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/.do-work/user-requests/UR-001/ui-evidence"
+# Minimal non-empty PNG-like file (existence check only)
+printf 'fake-png' > "$TMP/.do-work/user-requests/UR-001/ui-evidence/REQ-001-step-1.png"
+# REQ lives under project so PROJECT_ROOT resolves to TMP
+REQ="$TMP/.do-work/REQ-001-test.md"
+cat > "$REQ" <<'EOF'
+# REQ-001: Test
+
+## Acceptance Criteria
+
+- [ ] First criterion
+- [ ] Second criterion
+
+## Verification Steps
+EOF
+cat > "$REPORT" <<'EOF'
+acceptance:
+  AC1:
+    status: passed
+    evidence:
+      - type: ui
+        ref: .do-work/user-requests/UR-001/ui-evidence/REQ-001-step-1.png
+  AC2:
+    status: passed
+    evidence:
+      - type: file
+        ref: README.md
+EOF
+run_script
+assert_eq "0" "$RC" "$CURRENT_CASE rc (stderr=$STDERR)"
+teardown_fixture
+
 echo ""
 echo "check-acceptance-evidence tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then
