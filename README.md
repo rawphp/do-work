@@ -23,29 +23,28 @@ Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 
 ## Installation
 
+Installs into the shared skills hub (`~/.agents/skills/do-work` by default). All agents wired to that hub share one install. (`--env` is accepted for compatibility and ignored.)
+
 ### One-liner
 
-Choose the target assistant environment explicitly:
+```bash
+curl -fsSL https://raw.githubusercontent.com/agent-native/do-work/main/install.sh | bash
+```
+
+Optional live symlink from a checkout (dev):
 
 ```bash
-# Claude Code
-curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash -s -- --env claude
-
-# Codex
-curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash -s -- --env codex
+curl -fsSL https://raw.githubusercontent.com/agent-native/do-work/main/install.sh | bash -s -- --from-cwd
+# or: bash install.sh --source /path/to/do-work
 ```
 
 ### Or clone manually
 
 ```bash
-# Claude Code
-git clone https://github.com/rawphp/do-work.git ~/.claude/skills/do-work
-
-# Codex
-git clone https://github.com/rawphp/do-work.git ~/.codex/skills/do-work
+git clone https://github.com/agent-native/do-work.git ~/.agents/skills/do-work
 ```
 
-Claude Code or Codex picks up the `/do-work` slash command from the environment you installed into.
+Override the hub directory with `AGENTS_SKILLS_HUB` (same as `install.sh`). Wire Claude Code, Codex, or other agents to load skills from that hub.
 
 ---
 

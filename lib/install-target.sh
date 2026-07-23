@@ -1,27 +1,22 @@
 #!/usr/bin/env bash
-# install-target.sh — resolve do-work skill install directories.
+# install-target.sh — resolve the shared skills-hub install directory for do-work.
+# Aligns with install.sh: single target under AGENTS_SKILLS_HUB / ~/.agents/skills.
 
 set -u
 
 resolve_do_work_install_target() {
-  local env_name="${1:-}"
-  local home_dir="${2:-$HOME}"
+  local home_dir="${1:-$HOME}"
+  local hub
 
-  case "$env_name" in
-    claude)
-      printf '%s|%s|%s\n' "$home_dir/.claude/skills/do-work" "$home_dir/.claude/backups" "Claude Code"
-      ;;
-    codex)
-      printf '%s|%s|%s\n' "$home_dir/.codex/skills/do-work" "$home_dir/.codex/backups" "Codex"
-      ;;
-    *)
-      echo "Error: invalid --env '$env_name'. Valid values: claude, codex" >&2
-      return 1
-      ;;
-  esac
+  if [ -n "${AGENTS_SKILLS_HUB:-}" ]; then
+    hub="$AGENTS_SKILLS_HUB"
+  else
+    hub="$home_dir/.agents/skills"
+  fi
+
+  printf '%s|%s|%s\n' "$hub/do-work" "$hub/.backups" "skills hub"
 }
 
 if [ "${1:-}" = "--resolve" ]; then
-  resolve_do_work_install_target "${2:-}" "${3:-$HOME}"
+  resolve_do_work_install_target "${2:-$HOME}"
 fi
-

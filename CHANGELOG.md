@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**Hub-only skill install (UR-044 / REQ-278)**
+
+**Changed**
+- `install.sh` installs only into the shared skills hub (`AGENTS_SKILLS_HUB` / `~/.agents/skills/do-work`). Legacy `--env claude` / `--env codex` is ignored with a note; dual targets under `~/.claude/skills` and `~/.codex/skills` are no longer supported as install destinations.
+- `lib/install-target.sh` resolves the hub path only (`skill_dir|backup_dir|skills hub`); dual env resolution is removed.
+- README Installation uses the `agent-native/do-work` remote and hub clone path, matching `install.sh`.
+
+**Removed**
+- Primary dual-install documentation and tests that treated Claude/Codex skill directories as current install targets.
+
 **UI verification requires Playwright screenshots (UR-043)**
 
 **Changed**
