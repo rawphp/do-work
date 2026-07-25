@@ -4,6 +4,19 @@ A Claude Code and Codex skill that turns natural-language briefs into discrete, 
 
 Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 
+## User documentation
+
+Task-based guides for installing and running `/do-work` (not contributor internals):
+
+| Guide | Contents |
+|-------|----------|
+| [docs/README.md](docs/README.md) | Docs index |
+| [docs/getting-started.md](docs/getting-started.md) | Install → first start → first go |
+| [docs/concepts.md](docs/concepts.md) | UR, REQ, gates, evidence |
+| [docs/commands.md](docs/commands.md) | Command and flag reference |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common failure symptoms |
+| [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) | Phase-by-phase deep dive |
+
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/tests-219%2F219-brightgreen?style=flat-square" alt="Tests">

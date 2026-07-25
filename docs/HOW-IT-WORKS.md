@@ -1,5 +1,7 @@
 # How do-work Works
 
+> **Operators / first run:** use [getting-started.md](getting-started.md) for install and the happy path. This page is the phase-by-phase deep dive (design rationale included).
+
 A walkthrough of the do-work system — every phase, every file it produces, and the design reasoning behind each choice.
 
 ---
@@ -328,6 +330,10 @@ Defaults are picked from REQ shape (parallel claim ordering, layer enforcement) 
 
 ## Reference
 
+- [getting-started.md](getting-started.md) — install and first run
+- [concepts.md](concepts.md) — user-facing mental model
+- [commands.md](commands.md) — command reference
+- [troubleshooting.md](troubleshooting.md) — failure symptoms
 - `SKILL.md` — full command reference and migration semantics
 - `agents/*.md` — per-phase agent instructions
 - `lib/*.sh` — coordination primitives (claim, footprint, deps, heartbeat, deadlock, cycle)
