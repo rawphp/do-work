@@ -1,6 +1,6 @@
 # Do Work — user documentation
 
-Task-based guides for people who install and run `/do-work` in a project. These pages assume Claude Code or Codex (or another agent wired to the shared skills hub).
+Task-based guides for people who install and run `/do-work` in a project. Works with any agent harness wired to the shared skills hub.
 
 ## Start here
 

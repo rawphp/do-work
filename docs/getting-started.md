@@ -4,7 +4,7 @@ Install the skill, wire it into your agent, then run your first brief with `/do-
 
 ## Before you start
 
-- An agent that can load skills from a shared hub (Claude Code, Codex CLI, or another tool pointed at the same hub)
+- Any agent harness that can load skills from a shared hub (Claude Code, Codex CLI, Cursor, and others pointed at the same hub)
 - `git` available on your PATH
 - A project directory where you want work tracked under `.do-work/`
 - Optional: a project test command you can put in `.do-work/config.yml` as `test.suite_command` (for example `npx vitest run` or `./vendor/bin/pest`)
@@ -57,7 +57,7 @@ bash install.sh --from-cwd
 
 ### 2. Wire your agent to the hub
 
-Point Claude Code, Codex, or your other agent at the skills hub so it can load `do-work` (`SKILL.md` in the install directory). Exact agent settings differ by product; the install only places files on disk.
+Point your agent harness at the skills hub so it can load `do-work` (`SKILL.md` in the install directory). Exact settings differ by product; the install only places files on disk.
 
 You should be able to invoke `/do-work` (or bare `/do-work` for help) inside a project session.
 

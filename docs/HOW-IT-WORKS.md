@@ -8,7 +8,7 @@ A walkthrough of the do-work system — every phase, every file it produces, and
 
 ## What it is
 
-do-work is a Claude Code skill that turns a natural-language brief into a sequence of small, traceable, individually-committed tasks — executed autonomously with TDD.
+do-work is an agent-harness skill that turns a natural-language brief into a sequence of small, traceable, individually-committed tasks — executed autonomously with TDD. It runs on any agent that loads skills from a shared hub.
 
 It is **file-based**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no database, no in-memory queue, no central coordinator.
 

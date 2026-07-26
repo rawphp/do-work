@@ -1,6 +1,6 @@
 # Do Work
 
-A Claude Code and Codex skill that turns natural-language briefs into discrete, traceable tasks and executes them autonomously — with TDD, evidence gates, review, and a git commit per task.
+An agent-harness skill that turns natural-language briefs into discrete, traceable tasks and executes them autonomously — with TDD, evidence gates, review, and a git commit per task. Works with any agent that loads skills from a shared hub (Claude Code, Codex, Cursor, and others).
 
 Two commands: `/do-work start` to define the work, `/do-work go` to execute it.
 
@@ -23,13 +23,14 @@ Task-based guides for installing and running `/do-work` (not contributor interna
 </p>
 
 <p align="center">
-  <strong>Supported AI Providers</strong><br>
+  <strong>Any agent harness</strong><br>
   <a href=".claude/">
-    <img src="https://img.shields.io/badge/Claude_Code-Anthropic-orange?style=flat-square&logo=anthropic" alt="Claude Code">
+    <img src="https://img.shields.io/badge/Claude_Code-example-orange?style=flat-square&logo=anthropic" alt="Claude Code">
   </a>
   <a href=".codex/">
-    <img src="https://img.shields.io/badge/Codex_CLI-OpenAI-412991?style=flat-square&logo=openai" alt="Codex CLI">
+    <img src="https://img.shields.io/badge/Codex_CLI-example-412991?style=flat-square&logo=openai" alt="Codex CLI">
   </a>
+  <img src="https://img.shields.io/badge/any_skills_hub_agent-welcome-brightgreen?style=flat-square" alt="Any skills hub agent">
 </p>
 
 ---
@@ -57,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/agent-native/do-work/main/install.s
 git clone https://github.com/agent-native/do-work.git ~/.agents/skills/do-work
 ```
 
-Override the hub directory with `AGENTS_SKILLS_HUB` (same as `install.sh`). Wire Claude Code, Codex, or other agents to load skills from that hub.
+Override the hub directory with `AGENTS_SKILLS_HUB` (same as `install.sh`). Wire any agent harness to load skills from that hub.
 
 ---
 
