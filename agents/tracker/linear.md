@@ -245,10 +245,41 @@ This path-unit implements design **§11 Milestone mode (Linear)**. Trigger and g
 
 | Area | Responsibility | REQ |
 |------|----------------|-----|
-| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` sequences + Project block format + Issue markers | This file | REQ-298 (this section) |
-| Capture trigger + cursor write after decompose | `agents/capture.md` | REQ-298 |
-| Run filter / idle-wait / deploy-gate drain using port ops; local gate-owner | `agents/run.md` | REQ-298 |
-| `write_gate_state` (local) | Remain as REQ-296 | REQ-296 |
+| Path narrative + trigger/cursor home/gate locality hard rules | This file (above) | REQ-298 |
+| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` full sequences + marker parse + empty→null | This file | **REQ-299** |
+| Capture Linear branches call port ops after decompose | `agents/capture.md` | REQ-298 path; **REQ-299** ops |
+| Run filter / idle-wait / deploy-gate drain call port ops; local gate-owner serialize | `agents/run.md` | REQ-298 path; **REQ-299** ops |
+| `write_gate_state` (local-only + concurrent serialize) | This file + run.md | REQ-296 home; **REQ-299** concurrent rules |
+
+---
+
+## Path: Linear milestone cursor ops (REQ-299)
+
+| | |
+|---|---|
+| **Entry point** | Capture milestone decompose; run Step 1.0 / 1.0a / 7b under `tracker.backend: linear` |
+| **Terminal state** | Milestone cursor ops complete: marker format documented + parsed; empty marker → `active: null` (does **not** invent a milestone id); siblings idle on deploy gate same as markdown; concurrent gate ownership serializes via **local** `state/gate-owner.md`; `write_gate_state` remains local-allowed; capture/run call port ops only |
+
+REQ-298 documented the §11 path (trigger, cursor home, local gate). **REQ-299** finishes the **port op surface** and acceptance rules:
+
+| Op / rule | Where | Notes |
+|-----------|-------|--------|
+| Marker format + parse algorithm | This file — **Project description cursor block** + **Parse algorithm** | `<!-- do-work-milestone -->` + `**Active:**` + `# Milestones` checklist |
+| `read_active_milestone` | This file | Empty / missing marker → `active: null`; **does not invent a milestone id** |
+| `set_active_milestone` | This file | Set / advance / clear on Project description only |
+| `list_milestone_reqs` | This file | Filter by Issue milestone markers; no widen to other M |
+| Sibling idle on deploy gate | `agents/run.md` Step 1.0a | Same idle loop as markdown; Linear polls `read_active_milestone` + **local** `gate-owner.md` |
+| Concurrent gate ownership | `write_gate_state` (this file) + run Step 7b.2 | Serializes via **local** `state/gate-owner.md` even when cursor content is remote |
+| Capture / run Linear branches | `agents/capture.md`, `agents/run.md` | Call port ops; never treat local `active-milestone.md` as Linear store |
+
+**Hard rules (REQ-299):**
+
+1. **Marker format is authoritative** — Project description machine block must start with `<!-- do-work-milestone -->` then `**Active:**` then `# Milestones` checklist (see block template below). Parse only that format; do not invent alternate markers (YAML frontmatter, Initiative fields, Team Docs).
+2. **Empty marker → null active (does not invent a milestone id)** — when the Project description has **no** `<!-- do-work-milestone -->` marker, or the block is present but `**Active:**` is empty / `none` / missing, `read_active_milestone` returns `active: null` (not-in-milestone / not-active). It **must not** invent `M1` or any other id on read. Capture may *choose* `M1` as first-decompose default **after** observing null — that default is capture policy, not a return value of `read_active_milestone`.
+3. **`write_gate_state` remains local-allowed** — gate ownership and final-suite locks stay under `{project}/.do-work/state/` (design §5.5 / §10 / §11). Never Linear Issues, Project description, Initiative, or Docs. Not dual-write of work items.
+4. **Concurrent gate ownership serializes via local `gate-owner.md`** — even when milestone **cursor** content is remote (Project description), gate ownership is **only** the local file. First successful claim (absent→write own `AGENT_ID`, re-read confirms self) owns the human y/n prompt; losers idle on Step 1.0a. Do **not** invent a Linear lock or Project-description gate field.
+5. **Siblings idle same as markdown** — empty active-M backlog + foreign `gate-owner.md` → idle-wait; wake on cursor advance (`set_active_milestone` / `read_active_milestone`) or cursor clear + gate release. Poll interval and 30-minute stuck prompt parity with markdown Step 1.0a.
+6. **Capture and run call port ops** — Linear milestone branches must use `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` / `write_gate_state` from this file; no silent markdown cursor fallback.
 
 ---
 
@@ -378,8 +409,8 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | `write_close_report` | Initiative `## Closure` + Initiative comment | **Documented** (REQ-296/297) — close path-unit walk uses Linear issue ids |
 | `append_run_note` | Issue comments (+ optional project update) | **Documented** (REQ-294) — authoritative run/cost notes; local ledger optional telemetry |
 | List run notes (helper) | Issue comments `<!-- do-work-run-note -->` | **Documented** (REQ-297) — retro prefers Linear notes, falls back to local telemetry |
-| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` | Project description `<!-- do-work-milestone -->` + Issue milestone markers | **Documented** (REQ-298) — trigger unchanged; gate local |
-| `write_gate_state` | **Local** `state/gate-owner.md` (not Linear) | **Documented** (REQ-296) — local only; never Linear |
+| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` | Project description `<!-- do-work-milestone -->` + Issue milestone markers | **Documented** (REQ-298 path; **REQ-299** ops) — empty marker → null; does not invent milestone id |
+| `write_gate_state` | **Local** `state/gate-owner.md` (not Linear) | **Documented** (REQ-296 home; **REQ-299** concurrent serialize) — local only; never Linear |
 
 ---
 
@@ -926,8 +957,8 @@ Agents **must not invent** homes. Use only the rows below (plus local gate locks
 | Run / cost notes | Comment on Issue after attempt; optional Project update for run rollup | YAML fenced block + `<!-- do-work-run-note -->` | run | **`append_run_note`** (REQ-294) |
 | Verify report | Initiative description `## Verify` + Initiative comment | Full report markdown | verify, go | **`write_verify_report`** |
 | Close report | Initiative description `## Closure` + Initiative comment | Per path-unit results (closure schema) | close | **`write_close_report`** |
-| Milestone cursor | Project description `<!-- do-work-milestone -->` | active M + checklist | capture, run | **`read_active_milestone`** / **`set_active_milestone`** / **`list_milestone_reqs`** (REQ-298) |
-| Gate locks | **Local** `{project}/.do-work/state/gate-owner.md`, `final-suite-*.md` | unchanged | run | **`write_gate_state`** (local only) |
+| Milestone cursor | Project description `<!-- do-work-milestone -->` | active M + checklist | capture, run | **`read_active_milestone`** / **`set_active_milestone`** / **`list_milestone_reqs`** (REQ-298 path; **REQ-299** ops) |
+| Gate locks | **Local** `{project}/.do-work/state/gate-owner.md`, `final-suite-*.md` | unchanged | run | **`write_gate_state`** (local only; REQ-299 concurrent serialize) |
 
 **Create-if-missing (Team Docs):** on first write, if no Doc with the configured title exists for the configured team, create it (title exact match to config), then write. Readers: if missing, treat as empty (no decisions / no calibration) — never invent content.
 
@@ -1480,7 +1511,7 @@ Brief load under Linear: **`read_ur`** (Initiative description `## Brief` / mach
 
 ---
 
-## Milestone mode (design §11 — REQ-298)
+## Milestone mode (design §11 — REQ-298 path; REQ-299 ops)
 
 ### Trigger (unchanged)
 
@@ -1491,7 +1522,7 @@ Identical to markdown capture / run:
 
 Both required → **milestone mode**. Neither Linear labels nor Project cursor alone turn milestone mode on. Brief load under Linear: **`read_ur`** (`## Brief` / machine sections); do not invent a different trigger.
 
-### Project description cursor block
+### Project description cursor block (marker format)
 
 Authoritative work-item cursor under `backend: linear`. Lives on the UR **Project** description (`do-work/{UR-id}`), not Initiative and not local `active-milestone.md`.
 
@@ -1521,6 +1552,19 @@ Authoritative work-item cursor under `backend: linear`. Lives on the UR **Projec
 | `running` | Run loop active for this M (optional stamp) |
 | `deployed` | Deploy gate passed for this M |
 
+#### Parse algorithm (REQ-299)
+
+Given Project description text `D`:
+
+1. Locate the first line that is exactly (or trims to) `<!-- do-work-milestone -->`.
+2. **If not found** → marker absent → return `{ active: null, checklist: [] }` — **does not invent a milestone id**.
+3. Collect the machine block from that marker through the end of the `# Milestones` checklist (until blank line before next top-level machine marker, next `<!-- … -->` that is not checklist content, or EOF).
+4. Within the block, find the first line matching `**Active:**\s*(.*)$`. Trim the capture group:
+   - empty, missing, or case-insensitive `none` → `active: null` (still **does not invent a milestone id**).
+   - else require token shape `M` + digits (e.g. `M1`, `M12`); malformed → treat as `active: null` (do not invent / coerce).
+5. Parse checklist lines under `# Milestones` matching `- [ |x|X] M<n> — … — <status>` into `{ id, name, status, checked }` rows (best-effort; active id does not require checklist parse success).
+6. Return `{ active, checklist }`. Never read local `state/active-milestone.md` as the store under Linear.
+
 ### Issue milestone markers (for `list_milestone_reqs`)
 
 When capture creates Issues under milestone mode, mark membership so listing does not depend on markdown `REQ-M1-NNN` filenames:
@@ -1538,22 +1582,23 @@ Path-unit parents and layer children for the same unit share the same milestone 
 | **Intent** | Read the active milestone cursor (if any). |
 | **Home** | UR Project description block `<!-- do-work-milestone -->`. |
 | **Preconditions** | None beyond readable Project; missing / empty block ⇒ not in milestone mode. |
-| **Returns** | `{ active: "M1" \| null, checklist: [...] }` — `active` null when marker missing, `**Active:**` empty/`none`, or Project unresolved. |
+| **Returns** | `{ active: "M1" \| null, checklist: [...] }` — `active` null when marker missing, `**Active:**` empty/`none`/malformed, or Project unresolved. **Does not invent a milestone id.** |
 
 **Agent sequence:**
 
 1. **Rediscover** Project get/list tools (`search_tool` → `use_tool`).
 2. **Resolve Project** — name `do-work/{UR-id}` (or Project id from `read_ur` / `**Project-id:**`). Caller may pass Project id or UR id.
-3. **Read description.** Find the `<!-- do-work-milestone -->` block (from marker through end of checklist section, or next top-level HTML comment / known machine marker).
-4. **Parse** `**Active:**` → trim → if empty, `none`, or missing → `active: null`.
-5. **Parse checklist** lines under `# Milestones` (optional for callers that only need active id).
-6. **Return** structured result. Do **not** read local `state/active-milestone.md` as the store.
+3. **Read description.** Apply **Parse algorithm** above.
+4. **Return** structured result. Do **not** read local `state/active-milestone.md` as the store. Do **not** default missing cursor to `M1` inside this op.
 
 | Failure | Behavior |
 |---------|----------|
 | Project tools missing | Hard-stop — Linear setup; do **not** fall back to local `active-milestone.md` as work-item store |
 | Project missing | Hard-stop (UR not provisioned) |
-| Marker missing | Return `active: null` (not milestone mode) — not an error |
+| Marker missing | Return `active: null` (not-in-milestone) — **does not invent a milestone id**; not an error |
+| `**Active:**` empty / `none` / malformed | Return `active: null` — **does not invent a milestone id** |
+
+**Caller defaults (not part of this op):** capture Step 1b may use `M1` as the first-decompose target when `active` is null and the brief trigger is true. That policy lives in `agents/capture.md` and must call **`set_active_milestone`** to persist — it is not a fabricated return from `read_active_milestone`.
 
 ### `set_active_milestone`
 
@@ -1593,7 +1638,7 @@ Path-unit parents and layer children for the same unit share the same milestone 
 
 **Agent sequence:**
 
-1. **Resolve milestone id** — argument `M<n>`, else `read_active_milestone` → if `active` null, return empty list (not milestone mode).
+1. **Resolve milestone id** — argument `M<n>`, else `read_active_milestone` → if `active` null, return empty list (not milestone mode). **Do not invent** an id to list against.
 2. **Rediscover** issue list tools; optionally milestone-entity tools.
 3. **`list_reqs_for_ur`** (or equivalent Project-scoped issue list) for the UR Project.
 4. **Filter** to issues whose milestone marker matches `M<n>` (entity / label / `**Milestone:**` — see above).
@@ -1625,21 +1670,28 @@ Path-unit parents and layer children for the same unit share the same milestone 
 | | |
 |---|---|
 | **Intent** | Coordinate deploy-gate ownership / final-suite locks. |
-| **Home** | **Local only** — `{project}/.do-work/state/gate-owner.md` (and related `state/final-suite-*.md` locks). **Never** Linear Docs, Issues, Project description, or Initiative fields. |
+| **Home** | **Local only** — `{project}/.do-work/state/gate-owner.md` (and related `state/final-suite-*.md` locks). **Never** Linear Docs, Issues, Project description, or Initiative fields. **Remains local-allowed** under Linear backend (REQ-299). |
 | **Preconditions** | Milestone / gate flow active; project filesystem writable. |
 
 **Agent sequence (backend-agnostic; same under markdown and linear):**
 
-1. To **claim gate ownership**: write single-line `AGENT_ID` to `{project}/.do-work/state/gate-owner.md` (create `state/` if needed).
-2. To **release**: delete `gate-owner.md` when the gate resolves.
-3. Final-suite coordination files under `state/` follow existing run-agent rules.
-4. **Return** path written/deleted.
+1. Ensure `{project}/.do-work/state/` exists (`mkdir -p`).
+2. To **claim gate ownership** (concurrent serialize — REQ-299):
+   - **Read** `gate-owner.md` if present.
+   - If present and content (trimmed) is a **different** `AGENT_ID` → **do not overwrite**; return `{ owned: false, owner: <other> }` so the caller enters sibling idle-wait (run Step 1.0a). Concurrent gate ownership serializes via this **local** file even when milestone cursor content is remote.
+   - If absent, or content is self / malformed-as-absent: write single-line local `AGENT_ID`.
+   - **Re-read** after write. If contents ≠ local `AGENT_ID` → lost race; return `{ owned: false, owner: <other> }` (do not show the deploy-gate prompt).
+   - If contents = local `AGENT_ID` → return `{ owned: true, owner: <self> }`.
+3. To **release**: delete `gate-owner.md` when the gate resolves (y or n).
+4. Final-suite coordination files under `state/` follow existing run-agent rules.
+5. **Return** path written/deleted and ownership result.
 
 | Failure | Behavior |
 |---------|----------|
 | Cannot write `state/` | Hard-stop gate coordination; do not invent a Linear lock substitute |
+| Foreign owner already present | Yield — do not clobber; siblings idle |
 
-This op is **not** a dual-write of work items — it is the intentional local runtime lock allowed by design §5.5 / §10 / §11 / port.md. Under Linear milestone mode, **cursor** changes go through `set_active_milestone` (Project description); **gate ownership** always goes through this local file.
+This op is **not** a dual-write of work items — it is the intentional local runtime lock allowed by design §5.5 / §10 / §11 / port.md. Under Linear milestone mode, **cursor** changes go through `set_active_milestone` (Project description); **gate ownership** always goes through this local file. **Siblings idle on deploy gate the same as markdown mode** (run Step 1.0a): foreign `gate-owner.md` → poll `read_active_milestone` + local gate file until cursor advances or clears.
 
 ---
 
@@ -1825,7 +1877,7 @@ Dependency ids are **Linear issue identifiers only**.
 
 ## Out of scope for this file state
 
-- Full UR/REQ CRUD rewires beyond homes already mapped → later REQs where noted. **Claim consumers** as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296; **artifact home consumers** as of REQ-297; **milestone mode** (Project `<!-- do-work-milestone -->` cursor, `list_milestone_reqs` / `set_active_milestone` / `read_active_milestone`, local gate-owner) as of **REQ-298**.
+- Full UR/REQ CRUD rewires beyond homes already mapped → later REQs where noted. **Claim consumers** as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296; **artifact home consumers** as of REQ-297; **milestone path** (trigger, cursor home, local gate) as of **REQ-298**; **milestone cursor ops** (`read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`, empty-marker → null / does not invent a milestone id, concurrent local gate-owner serialize, capture/run port branches) as of **REQ-299**.
 - Migration one-shot → later path-unit (REQ-300).
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
@@ -1841,6 +1893,7 @@ Dependency ids are **Linear issue identifiers only**.
 - `agents/config.md` — `tracker.*` schema including `decisions_doc_title` / `calibration_doc_title`, `agent_claim_marker`, `heartbeat_max_age_seconds`, `review.required`, Load Config step 7
 - `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` / `agents/run-worker.md` / `agents/review.md` — claim/run consumers
 - `agents/capture.md` / `agents/ideate.md` / `agents/question.md` / `agents/verify.md` / `agents/close.md` / `agents/retro.md` / `agents/run-worker.md` — §10 artifact consumers (REQ-296 homes; REQ-297 full reader/writer wiring)
+- `agents/capture.md` / `agents/run.md` — §11 milestone consumers (REQ-298 path; **REQ-299** port ops)
 - Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §11 milestone mode, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288–297; this path **REQ-298** Linear milestone mode
+- Prior: REQ-288–298; this path **REQ-299** Linear milestone cursor ops
