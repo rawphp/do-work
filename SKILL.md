@@ -102,7 +102,7 @@ Full multi-backend deep dive: [references/tracker.md](references/tracker.md).
 
 **No dual-write.** With `tracker.backend: linear`, Linear is the **only** work-item store. Agents must not mirror URs/REQs into local markdown as a second source of truth, and must not fall back to markdown when Linear fails (hard-stop instead). After idle migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them.
 
-**Linear hierarchy:** **UR = Project Milestone** on shared `product_project` (default `do-work`); REQs = Issues with that milestone. Not Initiatives (MCP has no Initiative create tools).
+**Linear hierarchy:** **UR = Project Milestone** on a **shared product Project** per local product (`tracker.linear.product_project` — name or UUID; **default empty**). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Never invent skill name `do-work` for empty config (example name for this skill repo only). REQs = Issues with that milestone. Not Initiatives (MCP has no Initiative create tools).
 
 **Linear commit / branch** (when `backend: linear`): subject uses Linear issue id only (`feat(ENG-123): …`); footer `Issue:` / `UR:` / `Output:`; branch/worktree `req/<sanitized-linear-id>` (dir hard-defaults lowercase). Markdown backend still uses `feat(REQ-NNN): …` with `REQ:` / `UR:` archive paths — see [references/concepts.md](references/concepts.md#commit-convention).
 
