@@ -1,7 +1,13 @@
 # REQ-298: Linear milestone mode path
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T06:18:28Z
+**Heartbeat:** 2026-07-31T06:18:28Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** Milestone-shaped UR (saas-thesis handoff + ### Milestones) with backend linear
