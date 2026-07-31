@@ -67,7 +67,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/ideate.md](agents/ideate.md) — Surfaces assumptions, risks, and connections
 - [agents/capture.md](agents/capture.md) — Decomposes brief into REQ files
 - [agents/verify.md](agents/verify.md) — Scores REQ coverage against brief
-- [agents/run.md](agents/run.md) — Orchestrator: dispatches a worker subagent per REQ
+- [agents/run.md](agents/run.md) — Orchestrator: dispatches a worker subagent per REQ; deep sequences: [references/run-loop.md](references/run-loop.md), [references/run-parallel.md](references/run-parallel.md)
 - [agents/run-worker.md](agents/run-worker.md) — Worker: TDD-and-commits a single REQ in a fresh subagent session
 - [agents/review.md](agents/review.md) — Post-build gate: reviews scope, acceptance evidence, tests, secrets, docs, and regression risk before archive
 - [agents/status.md](agents/status.md) — Read-only situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup
@@ -79,7 +79,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/config.md](agents/config.md) — Reusable config loading instructions (includes `tracker.backend` resolution)
 - [agents/tracker/port.md](agents/tracker/port.md) — Tracker port: shared work-item op catalog and load path
 - [agents/tracker/markdown.md](agents/tracker/markdown.md) — Default markdown backend (`.do-work/` + `lib/*.sh`)
-- [agents/tracker/linear.md](agents/tracker/linear.md) — Optional Linear backend (when `tracker.backend: linear`)
+- [agents/tracker/linear.md](agents/tracker/linear.md) — Optional Linear backend (when `tracker.backend: linear`); sequences: [references/linear-ops.md](references/linear-ops.md)
 - [agents/help.md](agents/help.md) — Contextual help when invoked with no subcommand
 
 Run ledger: when `ledger.enabled: true`, `/do-work run` writes append-only `.do-work/runs/RUN-NNN.yml` records. Set `ledger.enabled: false` to disable.
