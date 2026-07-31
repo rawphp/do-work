@@ -49,12 +49,14 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 
 ```
 Team (config team_id / team_key)
-└── Product Project (tracker.linear.product_project, default "do-work")
+└── Product Project (tracker.linear.product_project — one shared Project per local product)
     ├── Project Milestone (UR brief / ideate / verify / close)
     │   └── Issue (REQ / path-unit) ± sub-issues (layer children)
     └── Project Milestone (next UR)
         └── Issue …
 ```
+
+**`product_project` resolve (default empty):** explicit `tracker.linear.product_project` (name|UUID) if set; else `project.name`; else git-root directory basename. Then `ensure_product_container` create-if-missing and **always persists** the Project UUID back to config. Empty config never falls through to the skill name `do-work` — that name is only an example when this skill's own repo is the local product.
 
 **Why milestones, not Initiatives:** official Linear MCP exposes Project Milestone create/list/get, but not Initiative create/list. do-work therefore homes each UR on a **Project Milestone**.
 

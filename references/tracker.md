@@ -20,8 +20,8 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) are stored th
 |----------|------------------|
 | Team | `team_id` and/or `team_key` — **hard-fail** if neither resolves |
 | MCP | Linear MCP tools must be discoverable — **hard-fail** with skill setup instructions if not |
-| Hierarchy | **UR = Project Milestone** on shared `product_project` (default `do-work`); REQs = Issues with that milestone. Not Initiatives (MCP has no Initiative create tools). |
-| `product_project` | Shared Linear Project name/id for all URs (default `do-work`) |
+| Hierarchy | **UR = Project Milestone** on shared product Project per local product; REQs = Issues with that milestone. Not Initiatives (MCP has no Initiative create tools). |
+| `product_project` | Shared Linear Project (**name or UUID**) for all URs on this local product — **default empty** (not skill name `do-work`). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Example for this skill repo only: name `do-work`. |
 | `ur_milestone_name_pattern` | Default `{ur_id}: {title}` |
 | `status_map` | `backlog→Todo`, `in_progress→In Progress`, `stopped→Canceled`, `done→Done` — **hard-fail** if a mapped state is missing on the team (rename team state or override the map key) |
 | Labels | `Layer/`, `path-unit`, `Size/` prefixes |

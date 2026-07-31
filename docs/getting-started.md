@@ -116,6 +116,7 @@ tracker:
   linear:
     team_id: ""       # required UUID — or set team_key
     team_key: ""      # optional alternate team resolve
+    # product_project: ""  # empty by default — resolve → project.name → basename; ensure binds UUID
     # status_map / labels / claim marker: defaults in agents/config.md
 ```
 
@@ -124,6 +125,7 @@ tracker:
 1. Connect **Linear MCP** in your agent host (API key preferred: `LINEAR_API_KEY` + MCP URL `https://mcp.linear.app/mcp`). Details: [Troubleshooting → Linear tracker backend](troubleshooting.md#linear-tracker-backend).
 2. Set a real `team_id` or `team_key` — agents hard-stop if the team cannot be resolved (they never guess).
 3. Confirm team workflow states match `tracker.linear.status_map` defaults (`Todo` / `In Progress` / `Canceled` / `Done`) or override the map.
+4. Product Project is **per local product**, not a universal Project named `do-work`. Leave `product_project` empty (default) to resolve via `project.name` → git-root basename, or set a name/UUID explicitly. First ensure create-if-missing and **persists the UUID**.
 
 **Rules that matter day one:**
 

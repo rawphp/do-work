@@ -313,7 +313,7 @@ Use dry-run first when offered. After cutover: no dual-write; historical markdow
 
 **Cause:** Older skill text required Initiative + per-UR Project. Current hierarchy uses **Project Milestones** for URs (Linear MCP has milestone CRUD, not Initiative create).
 
-**Fix:** Use skill version with Milestone-as-UR (`agents/tracker/linear.md` § Hierarchy). Ensure `tracker.linear.product_project` is set (default `do-work`) and milestone tools appear in `search_tool "linear milestone"`.
+**Fix:** Use skill version with Milestone-as-UR (`agents/tracker/linear.md` § Hierarchy). Ensure the shared product Project resolves: set `tracker.linear.product_project` (name|UUID) **or** leave it empty so resolve uses `project.name` → git-root basename, then `ensure_product_container` create-if-missing + persists UUID. Do **not** expect a universal default Project named `do-work` (that name is only an example for this skill repo). Confirm milestone tools appear in `search_tool "linear milestone"`.
 
 ---
 
