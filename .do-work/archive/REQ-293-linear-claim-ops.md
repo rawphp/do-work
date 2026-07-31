@@ -1,19 +1,14 @@
 # REQ-293: Implement Linear claim heartbeat status ops
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:40:07Z
-**Heartbeat:** 2026-07-31T05:40:07Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
 **Terminal state:** 
 **Parent:** REQ-292
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-293 commit:0422998 tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 2
 **Size:** L
@@ -30,10 +25,10 @@ Design §8 example claim comment; multi-agent safety without FS rename.
 
 ## Acceptance Criteria
 
-- [ ] Example claim comment block matches design §8
-- [ ] list_claimable_reqs: project filter + backlog state + deps via relations + footprint from Files + unclaimed
-- [ ] status agent can render Linear claimers/heartbeats for a UR Project
-- [ ] Mid-flight failure policy stated: leave claimed; resume/unblock
+- [x] Example claim comment block matches design §8
+- [x] list_claimable_reqs: project filter + backlog state + deps via relations + footprint from Files + unclaimed
+- [x] status agent can render Linear claimers/heartbeats for a UR Project
+- [x] Mid-flight failure policy stated: leave claimed; resume/unblock
 
 ## Verification Steps
 
