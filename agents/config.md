@@ -108,7 +108,26 @@ worktree:
 # When backend is missing, empty, or "markdown", resolve to markdown (no Linear tools).
 # linear is a full second backend (no dual-write); see agents/tracker/{port,markdown,linear}.md.
 tracker:
-  backend: markdown      # markdown | linear — unset/empty/missing key also means markdown
+  backend: markdown          # markdown | linear — unset/empty/missing key also means markdown
+  linear:
+    team_id: ""              # required when backend=linear (or resolve via team_key)
+    team_key: ""             # optional alternate resolve (e.g. team key string)
+    default_assignee_id: ""  # human operator; set on issue create when configured
+    project_name_pattern: "do-work/{ur_id}"
+    initiative_title_pattern: "{ur_id}: {title}"
+    status_map:
+      backlog: "Todo"
+      in_progress: "In Progress"
+      stopped: "Canceled"    # override if team has a dedicated Stopped state
+      done: "Done"
+    labels:
+      layer_prefix: "Layer/"
+      path_unit: "path-unit"
+      size_prefix: "Size/"
+    agent_claim_marker: "<!-- do-work-claim -->"
+    heartbeat_max_age_seconds: null  # null → use parallel.stale_threshold_seconds
+    decisions_doc_title: "do-work/decisions"
+    calibration_doc_title: "do-work/calibration"
 
 verify:
   threshold: 90          # minimum confidence score (0-100) for go to auto-run without --force
@@ -163,12 +182,28 @@ routing: []
 
    - If `tracker.backend` is **missing**, **null**, **empty**, or **whitespace-only** → effective backend = **`markdown`**.
    - If `tracker.backend` is **`markdown`** (case-sensitive value as stored) → effective backend = **`markdown`**.
-   - If `tracker.backend` is **`linear`** → effective backend = **`linear`** (Linear path-unit; validate team/MCP elsewhere — not required on markdown-default).
+   - If `tracker.backend` is **`linear`** → effective backend = **`linear`**.
    - Otherwise → hard-stop with a config error naming the unknown backend; do not guess.
 
-   When the effective backend is **`markdown`**: load `agents/tracker/port.md` then `agents/tracker/markdown.md` for work-item ops; **do not** require Linear MCP, credentials, or dual-write. Existing `lib/*.sh` + `.do-work/` behavior remains the implementation. Full `tracker.linear.*` keys and Linear hard-fail rules are documented by child REQs and the Linear path; they are inert while backend resolves to markdown.
+   When the effective backend is **`markdown`**: load `agents/tracker/port.md` then `agents/tracker/markdown.md` for work-item ops; **do not** require Linear MCP, credentials, or dual-write. Existing `lib/*.sh` + `.do-work/` behavior remains the implementation. `tracker.linear.*` keys may still be migrated onto disk as defaults, but they are **inert** while backend resolves to markdown (no Linear validation).
 
-**Never fail or stop because of a missing or incomplete config.** If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`).
+7. **Validate Linear config when effective backend is `linear`.** Run these checks **before** any work-item op. On failure, **hard-stop** — never silent-fallback to markdown, never invent team ids or workflow states.
+
+   | Check | Hard-fail when | Operator message must include |
+   |-------|----------------|-------------------------------|
+   | Team resolve | Neither `tracker.linear.team_id` nor `tracker.linear.team_key` resolves to a live team on Linear | How to set `team_id` / `team_key` in `.do-work/config.yml`; do not guess a team |
+   | Linear MCP tools | Linear skill/MCP tools are missing, unauthenticated, or undiscoverable | How to connect Linear (Linear skill setup / MCP auth) — not fabricated data |
+   | `status_map` states | Any mapped workflow state name is missing on the resolved team's workflow | List the missing do-work status → expected state name; instruct rename of the team state **or** override `tracker.linear.status_map.<key>` to an existing state name |
+
+   **status_map defaults** (design §7): `backlog → "Todo"`, `in_progress → "In Progress"`, `stopped → "Canceled"`, `done → "Done"`. Override per-team when the team's workflow uses different labels; missing states are never invented.
+
+   **Heartbeat age:** when `tracker.linear.heartbeat_max_age_seconds` is `null` or missing, use `parallel.stale_threshold_seconds` (default `900`).
+
+   **Interaction with other keys:** `ledger`, `parallel`, `delivery`, `review`, `layers` remain valid under Linear. Authoritative run/cost notes are Linear Issue comments via port op `append_run_note`. If `ledger.enabled: true`, the orchestrator may **also** append local `.do-work/runs/RUN-NNN.yml` for offline retro tooling — local runs are telemetry only, not a second work-item store. Retro prefers Linear run notes when `backend: linear`, falling back to local runs if comments are unavailable.
+
+   When the effective backend is **`linear`**: load `agents/tracker/port.md` then `agents/tracker/linear.md` for work-item ops after the validations above pass.
+
+**Never fail or stop because of a missing or incomplete config file** (steps 1–5). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exception:** step 7 Linear validation is a deliberate hard-stop when the operator has opted into `backend: linear` — that is not a config-file completeness problem.
 
 ---
 
@@ -208,4 +243,20 @@ routing: []
 | `routing` | list of `{match, agent}` maps | `[]` | Ordered subagent-routing rules for the run orchestrator's REQ classification. Each entry is `{match: <signal description or keyword list>, agent: <subagent_type>}`. The classifier scans rules top-to-bottom (first match wins) and dispatches the matching `agent`; if no rule matches — or the list is empty — it falls back to `general-purpose` silently. Ships empty so the stock skill is portable (no machine-specific agents). A commented example block in the template above reproduces the original specialist table for users who want to restore it. Consumers: `agents/run.md`, `agents/resume.md`. |
 | `worktree.link_paths` | list of strings | `[]` | Extra dependency directories to symlink from the main checkout into each worker worktree (e.g. `[server/vendor, web/node_modules]`). Additive to auto-detected dirs: `composer.json` → `vendor`, `package.json` → `node_modules`, `pyproject.toml` / `requirements.txt` → `.venv`. Use this for monorepo or subdir layouts where the auto-detection misses a directory. Consumers: `lib/provision-worktree.sh`. |
 | `worktree.setup_command` | string | `""` | Optional fallback command run inside the worktree when a dependency directory is absent from the main checkout and cannot be symlinked (e.g. `"composer install --no-interaction"`). The provisioner tries symlinking first (symlink-first semantics); this command runs only when a required dir is missing and symlinking fails. Empty = no fallback (the worktree is used as-is). Consumers: `lib/provision-worktree.sh`, `agents/run-worker.md`. |
-| `tracker.backend` | string | `"markdown"` | Work-item store backend: `markdown` (default — local `.do-work/` + `lib/*.sh`) or `linear` (Linear as sole work-item store). **Unset, empty, or missing key resolves to `markdown`** — no hard-stop, no Linear tools required. No dual-write between backends. Consumers: all phase agents that touch URs/REQs via `agents/tracker/port.md` + `agents/tracker/<backend>.md`. |
+| `tracker.backend` | string | `"markdown"` | Work-item store backend: `markdown` (default — local `.do-work/` + `lib/*.sh`) or `linear` (Linear as sole work-item store). **Unset, empty, or missing key resolves to `markdown`** — no hard-stop, no Linear tools required. No dual-write between backends. When `linear`, Load Config step 7 hard-fails if team cannot be resolved, Linear MCP tools are undiscoverable, or any `status_map` state is missing on the team. Consumers: all phase agents that touch URs/REQs via `agents/tracker/port.md` + `agents/tracker/<backend>.md`. |
+| `tracker.linear.team_id` | string | `""` | Linear team UUID. **Required when `backend: linear`** unless `team_key` alone resolves the team. Empty + unresolvable team_key → hard-fail (do not guess). Consumers: `agents/tracker/linear.md`, Load Config step 7. |
+| `tracker.linear.team_key` | string | `""` | Optional alternate team resolve (Linear team key string). Used when `team_id` is empty. Consumers: `agents/tracker/linear.md`, Load Config step 7. |
+| `tracker.linear.default_assignee_id` | string | `""` | Human operator Linear user id set as issue **assignee** on create when non-empty. Agents claim via workflow status + claim comments — they do not steal assignee. Consumers: `agents/tracker/linear.md` create/claim ops. |
+| `tracker.linear.project_name_pattern` | string | `"do-work/{ur_id}"` | Pattern for per-UR Linear Project name. `{ur_id}` is the sequential UR slug (e.g. `UR-007`). Consumers: `agents/tracker/linear.md` intake/list. |
+| `tracker.linear.initiative_title_pattern` | string | `"{ur_id}: {title}"` | Pattern for Initiative title. `{title}` is the human-facing brief title. Consumers: `agents/tracker/linear.md` intake. |
+| `tracker.linear.status_map.backlog` | string | `"Todo"` | Team workflow state name for unclaimed/backlog REQs. **Hard-fail** if this state is missing on the team when `backend: linear` — rename the team state or override this key. Consumers: claim/list/status ops in `agents/tracker/linear.md`. |
+| `tracker.linear.status_map.in_progress` | string | `"In Progress"` | Team workflow state for claimed/in-progress REQs. Same missing-state hard-fail as other status_map keys. Consumers: claim/heartbeat/resume. |
+| `tracker.linear.status_map.stopped` | string | `"Canceled"` | Team workflow state for stopped REQs. Override if the team has a dedicated Stopped state. Same missing-state hard-fail. Consumers: set_req_status, resume. |
+| `tracker.linear.status_map.done` | string | `"Done"` | Team workflow state for archived/done REQs. Same missing-state hard-fail. Consumers: archive_req. |
+| `tracker.linear.labels.layer_prefix` | string | `"Layer/"` | Prefix for layer labels (e.g. `Layer/agents`). Consumers: create_req / update_req on Linear. |
+| `tracker.linear.labels.path_unit` | string | `"path-unit"` | Label applied to path-unit parent Issues. Consumers: create_req. |
+| `tracker.linear.labels.size_prefix` | string | `"Size/"` | Prefix for size labels (e.g. `Size/M`). Consumers: create_req. |
+| `tracker.linear.agent_claim_marker` | string | `"<!-- do-work-claim -->"` | HTML comment marker at the start of agent claim-protocol comments. Consumers: claim_req, heartbeat_req, unblock_req, list_claimable_reqs. |
+| `tracker.linear.heartbeat_max_age_seconds` | integer or null | `null` | Max age of latest active claim heartbeat before the claim is stale. **`null` → use `parallel.stale_threshold_seconds`** (default `900`). Consumers: claim eligibility, scan-stale equivalent on Linear. |
+| `tracker.linear.decisions_doc_title` | string | `"do-work/decisions"` | Team Doc title for standing decisions (create-if-missing). Consumers: append_decision, capture/ideate readers. |
+| `tracker.linear.calibration_doc_title` | string | `"do-work/calibration"` | Team Doc title for calibration body. Consumers: retro write; capture read. |

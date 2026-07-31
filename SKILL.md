@@ -85,7 +85,20 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) are stored th
 | **`markdown`** | Default: local `.do-work/` files + `lib/*.sh` (behavior matches today) |
 | **`linear`** | Linear is the sole work-item store (no dual-write; hard-stop if Linear unusable) |
 
-**Load path** for every phase agent that touches work items: (1) load config, (2) resolve backend as above, (3) read `agents/tracker/port.md`, (4) read `agents/tracker/<backend>.md`, (5) call only named port ops for storage. Runtime/git (worktrees, merges, state locks, `config.yml`) stay local on every backend. Markdown remains the default; existing tests and conformance do not require Linear.
+**Load path** for every phase agent that touches work items: (1) load config (`agents/config.md`), (2) resolve `tracker.backend` (default **`markdown`** if missing/empty), (3) read `agents/tracker/port.md`, (4) read `agents/tracker/<backend>.md`, (5) call only named port ops for storage. Runtime/git (worktrees, merges, state locks, `config.yml`) stay local on every backend. Markdown remains the default; existing tests and conformance do not require Linear.
+
+**`tracker.linear.*` (when `backend: linear`).** Full schema and defaults live in `agents/config.md` (canonical template + schema reference). Summary:
+
+| Key area | Defaults / rules |
+|----------|------------------|
+| Team | `team_id` and/or `team_key` — **hard-fail** if neither resolves |
+| MCP | Linear MCP tools must be discoverable — **hard-fail** with skill setup instructions if not |
+| `status_map` | `backlog→Todo`, `in_progress→In Progress`, `stopped→Canceled`, `done→Done` — **hard-fail** if a mapped state is missing on the team (rename team state or override the map key) |
+| Labels | `Layer/`, `path-unit`, `Size/` prefixes |
+| Claim | `agent_claim_marker: "<!-- do-work-claim -->"`; heartbeat age defaults to `parallel.stale_threshold_seconds` when `heartbeat_max_age_seconds` is null |
+| Docs | Team Docs `do-work/decisions` and `do-work/calibration` |
+
+`ledger`, `parallel`, `delivery`, `review`, and `layers` remain valid under Linear. Authoritative run notes are Linear Issue comments; local `.do-work/runs/` is optional telemetry when `ledger.enabled: true`.
 
 ---
 
@@ -441,8 +454,17 @@ test:
   suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
 
 # Work-item store. Unset/empty tracker.backend also means markdown (default).
+# Full tracker.linear.* schema: agents/config.md (design §7).
 # tracker:
 #   backend: markdown    # markdown | linear
+#   linear:
+#     team_id: ""
+#     team_key: ""
+#     status_map:
+#       backlog: "Todo"
+#       in_progress: "In Progress"
+#       stopped: "Canceled"
+#       done: "Done"
 ```
 
 4. Wire the do-work **session telemetry hooks** into the project's Claude Code
