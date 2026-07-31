@@ -1,7 +1,13 @@
 # REQ-283: Markdown-default tracker port path
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T04:59:22Z
+**Heartbeat:** 2026-07-31T04:59:22Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** /do-work phase agents with tracker.backend unset or markdown
@@ -27,6 +33,7 @@ Design §2 goals 1 and Done-when #1; §5 load path; clarification: full map in o
 - [ ] Path-unit documents entry (default/markdown backend) and terminal (regression green, no Linear required)
 - [ ] Child REQs under this path implement config, port catalog, markdown mapping, and agent load-path wiring
 - [ ] No dual-write or Linear requirement on this path
+- [ ] When tracker.backend is unset or empty, resolution treats backend as markdown (no hard-stop, no Linear tools required)
 
 ## Verification Steps
 
