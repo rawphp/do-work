@@ -222,6 +222,7 @@ Names freeze intent. Exact field shapes and store sequences live in each backend
 | `set_active_milestone` | Advance / set milestone |
 | `list_milestone_reqs` | REQs for active milestone |
 | `write_gate_state` | Deploy-gate coordination (local lock still allowed) |
+| `migrate_markdown_to_linear` | One-shot idle markdown→Linear cutover (design §12); dry-run supported |
 
 ### Op contracts
 
@@ -435,6 +436,14 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 | **Preconditions** | Milestone / gate flow active. |
 | **Notes** | **Local lock still allowed** (e.g. `state/gate-owner.md`) even when work-items are remote. Not a dual-write of work items. |
 
+#### `migrate_markdown_to_linear`
+
+| | |
+|---|---|
+| **Intent** | One-shot, idle-only cutover from the markdown work-item store to Linear (design §12). Creates Initiatives / Projects / Issues for existing URs and REQs (backlog + archive), Team Docs for decisions/calibration, then flips `tracker.backend` to `linear`. After cutover, local UR/REQ trees are **read-only historical** — not dual-write. |
+| **Preconditions** | Effective backend is still **`markdown`** (cutover target is Linear). **`working/` empty.** No active claims. Operator confirms (or explicit dry-run). Linear team resolvable and MCP usable **before** any write. Surfaced via `/do-work upgrade migrate` (or upgrade migrate step) — see `agents/upgrade.md` + `agents/tracker/linear.md`. |
+| **Notes** | **Not a normal lifecycle op.** Sequences and dry-run live in `linear.md`. **Refuse entirely** if `working/` non-empty or active claims exist — leave config + markdown trees unchanged (no partial cutover). **Hard-stop** if Linear MCP is unusable mid-migration — leave markdown trees + config backend unchanged (no partial cutover). Supports **dry-run** (report planned creates; zero Linear writes; config untouched). |
+
 ---
 
 ## Shared rules (backend-independent summary)
@@ -448,6 +457,7 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 - **Hard-stop on unusable Linear** when `tracker.backend: linear` — **never silent markdown fallback**.
 - **Mid-flight MCP failure:** **leave claimed**; resume/unblock repair after recovery.
 - **Work-item vs runtime:** work-item data through port ops; git/worktrees/`state/*`/config/gate locks stay local.
+- **Idle markdown→Linear migration (design §12 / `migrate_markdown_to_linear`):** only when idle (`working/` empty, no active claims) + operator confirm (or dry-run). No partial cutover: refuse preflight or hard-stop MCP failure leaves `tracker.backend` and markdown trees unchanged. After successful cutover, ops **stop reading** local `user-requests/` and `archive/` as the work-item store (historical read-only only).
 
 ---
 
@@ -464,7 +474,8 @@ When `tracker.backend` resolves to `markdown`:
 
 ## Out of scope for this file
 
-- Concrete Linear MCP / skill tool call sequences → `agents/tracker/linear.md`.
+- Concrete Linear MCP / skill tool call sequences (including **`migrate_markdown_to_linear`** agent sequence + dry-run report format) → `agents/tracker/linear.md`.
 - Concrete `lib/*.sh` step lists → `agents/tracker/markdown.md`.
+- Upgrade/conformance UX that surfaces the migrate step → `agents/upgrade.md`.
 - Config key schema → `agents/config.md`.
 - Changing TDD, worktree isolation, or review philosophy — store contract only.

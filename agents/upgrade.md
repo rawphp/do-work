@@ -35,6 +35,7 @@ to `lib/conformance-scan.sh` and add its fix contract here in the same change.
 | `pending-dir` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation | interactive confirm |
 | `stale-config-key` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when a tombstoned config key is present | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation | interactive confirm |
 | `session-hooks` | `bash lib/install-hooks.sh --check {project}` prints `absent` (session telemetry hooks missing from `.claude/settings.json`) | run `bash lib/install-hooks.sh {project}` — idempotent, additive merge | auto-apply |
+| `migrate-linear` | **Optional / opt-in only** — not an auto-scan drift row. Operator runs `/do-work upgrade migrate` (or upgrade Step 9) when they want design §12 idle markdown→Linear cutover. Detector for *eligibility* is preflight in Step 9 (working empty, no active claims, backend still markdown, Linear MCP usable) | invoke port op **`migrate_markdown_to_linear`** sequences in `agents/tracker/linear.md` (dry-run or apply) | interactive confirm (or dry-run) |
 
 **`session-hooks` detector location.** This row is the one exception to the
 accretion rule below: its detector lives in `lib/install-hooks.sh --check`, not
@@ -42,6 +43,11 @@ in `lib/conformance-scan.sh`. The hooks are written to
 `{project}/.claude/settings.json`, which is outside the `.do-work/` tree that
 `conformance-scan.sh` scans, so the scan is the wrong home for it. The installer
 owns both detection (`--check`) and the idempotent fix.
+
+**`migrate-linear` is not scanned by `conformance-scan.sh`.** It is surfaced only
+via explicit `/do-work upgrade migrate` (Step 9). Do not invent a blocking
+conformance failure for “still on markdown” — markdown remains the default
+backend. Accretion rule for scanner rows does not apply to this opt-in path.
 
 **Tombstone list.** This manifest is the curated documentation of tombstoned
 `.do-work/config.yml` keys — key paths the skill itself has removed, which
@@ -425,6 +431,95 @@ Second run idempotence requirement: on a conformant project, the scan produces
 no drift lines, no files are modified, the row outcomes are
 `already-conformant`, and the final line is `Project is conformant.`
 
+### 9. Optional: Idle markdown→Linear migration (`migrate-linear`)
+
+Design **§12** one-shot cutover. **Not** part of automatic conformance — only
+when the operator invokes **`/do-work upgrade migrate`** (or explicitly asks
+upgrade to migrate to Linear after Steps 0–8).
+
+Port op: **`migrate_markdown_to_linear`**. Full agent sequence, dry-run report
+format, status/parent/deps mapping, and failure matrix live in
+`agents/tracker/linear.md` (**Path: Idle markdown→Linear migration (REQ-300)**).
+Shared refuse / hard-stop / no-partial-cutover rules live in
+`agents/tracker/port.md`.
+
+#### 9a. When this step runs
+
+| Invocation | Action |
+|------------|--------|
+| `/do-work upgrade` only (no migrate) | **Skip** Step 9 entirely. Markdown backend remains default. |
+| `/do-work upgrade migrate` | Run Step 9 after Steps 0–8 (or after conformance if already conformant). |
+| `/do-work upgrade migrate --dry-run` | Step 9 in **dry-run** mode only. |
+
+#### 9b. Preflight (refuse = entire abort, no partial cutover)
+
+Before any Linear write or config flip:
+
+1. Load config. Effective `tracker.backend` must be **`markdown`** (missing/empty → markdown). If already **`linear`**, report `migrate-linear: already-linear` and **stop** (do not re-migrate).
+2. **`working/` empty** — zero `REQ-*.md` under `{project}/.do-work/working/`. If any exist → **refuse entirely**:
+
+   ```text
+   Migration refused: .do-work/working/ is non-empty (active or stranded REQs).
+   Finish, unblock, or archive in-flight work first. tracker.backend unchanged.
+   ```
+
+   Record `migrate-linear: refused-working-non-empty`. **Do not** create Linear
+   entities. **Do not** change config.
+3. **No active claims** — with working empty, markdown claims are clear; if any
+   active claim protocol is still detected, refuse the same way
+   (`migrate-linear: refused-active-claims`).
+4. **Linear MCP usable** — `search_tool` must discover Linear tools; team
+   resolvable via `tracker.linear.team_id` / `team_key`; every `status_map`
+   state present on the team. If unusable → **hard-stop** with Linear skill
+   setup instructions. Markdown trees + config **unchanged**
+   (`migrate-linear: hard-stop-linear-unusable`). **No partial cutover.**
+5. **Operator confirm** (apply only) — `AskUserQuestion` (or equivalent confirm
+   gate) with options:
+
+   1. **"Migrate to Linear now"** — apply mode.
+   2. **"Dry-run only"** — planned creates report, no writes.
+   3. **"Skip migration"** — leave markdown backend.
+
+   Decline / skip → `migrate-linear: skipped-by-user`. No writes.
+
+Dry-run mode skips the affirmative “Migrate now” requirement but still runs
+preflight 1–4 so the report is honest about readiness.
+
+#### 9c. Execute
+
+Follow `agents/tracker/linear.md` → **`migrate_markdown_to_linear`**:
+
+| Mode | Behavior |
+|------|----------|
+| **dry-run** | Inventory markdown URs/REQs + decisions/calibration; print planned Initiatives / Projects / Issues / Docs / config flip; **zero** Linear writes; **zero** config changes. Record `migrate-linear: dry-run-reported`. |
+| **apply** | Team Docs → Initiatives/Projects/Issues (map status, relations, parents, AC checkboxes) → set `tracker.backend: linear` + team ids in `.do-work/config.yml` → leave `user-requests/`, backlog `REQ-*.md`, and `archive/` on disk as **read-only historical** (do not delete). Work-item ops stop reading them. Record `migrate-linear: converged`. |
+
+On mid-migration MCP failure: **hard-stop** per linear.md failure matrix — config
+backend left **markdown**; list any orphan Linear ids; markdown trees unchanged
+(`migrate-linear: hard-stop-partial-orphans` or equivalent detail in the body).
+**Never** leave `tracker.backend: linear` after a partial create run.
+
+#### 9d. Report line
+
+Include one of:
+
+```text
+migrate-linear: skipped (not requested)
+migrate-linear: dry-run-reported
+migrate-linear: converged
+migrate-linear: already-linear
+migrate-linear: refused-working-non-empty
+migrate-linear: refused-active-claims
+migrate-linear: skipped-by-user
+migrate-linear: hard-stop-linear-unusable
+migrate-linear: hard-stop-partial-orphans
+```
+
+When Steps 0–8 ran in the same invocation, append the migrate line after the
+conformance row report. When only migrate was requested, still run Load Config
+(Step 0 / 0a) then Step 9; conformance Steps 1–8 may be skipped if the operator
+only asked for migrate — but preflight remains mandatory.
+
 ---
 
 ## Rules
@@ -435,8 +530,9 @@ no drift lines, no files are modified, the row outcomes are
 - Never rewrite consumer docs during `legacy-dir`; the consumer-ref scan is
   advisory only.
 - Do not use a config version stamp. Detectors are ground truth.
-- The manifest accretes: future rows must be added here and in
-  `lib/conformance-scan.sh` together.
+- The manifest accretes: future **scanner** rows must be added here and in
+  `lib/conformance-scan.sh` together. Opt-in `migrate-linear` is documented
+  here only (not a scanner row).
 - Do not invent fixes for unknown scanner row ids.
 - `dir-conflict` is manual-only. The agent must not choose between two data
   directories.
@@ -448,4 +544,9 @@ no drift lines, no files are modified, the row outcomes are
 - Do not mark unchecked acceptance criteria as complete during upgrade. If
   `lib/check-archive-integrity.sh` rejects a parked REQ, stop and report the
   file instead of forcing archive.
+- **markdown→Linear migration (Step 9):** idle-only; refuse when `working/`
+  non-empty or active claims exist; hard-stop when Linear MCP is unusable;
+  **no partial cutover** (config backend unchanged on refuse/hard-stop); support
+  **dry-run**; after success leave markdown trees historical read-only and set
+  `tracker.backend: linear`. Sequence details only in `agents/tracker/linear.md`.
 - No next-step prompt after the report.
