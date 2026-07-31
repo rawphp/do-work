@@ -1,7 +1,13 @@
 # REQ-302: Document multi-tracker in SKILL and guides
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.32234
+**Claimed at:** 2026-07-31T06:49:41Z
+**Heartbeat:** 2026-07-31T06:49:41Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** Operator reads SKILL.md / getting-started / troubleshooting for Linear backend
