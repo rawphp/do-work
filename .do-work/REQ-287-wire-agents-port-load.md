@@ -11,7 +11,7 @@
 **Criteria approved:** agent-drafted
 **Priority:** 3
 **Size:** L
-**Files:** agents/intake.md agents/capture.md agents/ideate.md agents/question.md agents/verify.md agents/start.md agents/go.md agents/run.md agents/run-worker.md agents/review.md agents/status.md agents/close.md agents/unblock.md agents/resume.md agents/upgrade.md agents/retro.md agents/log.md agents/help.md agents/audit.md agents/config.md
+**Files:** agents/intake.md agents/capture.md agents/ideate.md agents/question.md agents/verify.md agents/start.md agents/go.md agents/run.md agents/run-worker.md agents/review.md agents/status.md agents/close.md agents/unblock.md agents/resume.md agents/upgrade.md agents/retro.md agents/log.md agents/help.md agents/audit.md agents/config.md agents/tracker/port.md agents/tracker/markdown.md SKILL.md
 **Depends on:** REQ-286
 
 ## Task
@@ -28,6 +28,7 @@ Design §5.2 and §13; ideate risk: missing one agent causes split brain. Clarif
 - [ ] No agent documents silent fallback from linear to markdown
 - [ ] Markdown path still references existing lib/file flows via markdown.md ops (no mass rewrite of lib/*.sh required in this REQ)
 - [ ] SKILL.md or config.md points at the load-path contract once
+- [ ] If backend resolves to linear but agents/tracker/linear.md is missing/unreadable, agents hard-stop with setup instructions — never fall through to markdown paths
 
 ## Verification Steps
 

@@ -11,7 +11,7 @@
 **Criteria approved:** agent-drafted
 **Priority:** 3
 **Size:** M
-**Files:** agents/tracker/markdown.md
+**Files:** agents/tracker/markdown.md lib/claim-req.sh lib/pick-req.sh lib/check-deps.sh lib/check-footprint.sh lib/heartbeat.sh
 **Depends on:** REQ-285
 
 ## Task
@@ -27,6 +27,7 @@ Design §5.1–5.3; Connector: reuse parallel coordination semantics, not reimpl
 - [ ] Every op in port.md has a markdown implementation note (script path and/or file glob)
 - [ ] Explicitly states no Linear-aware bash required for markdown backend
 - [ ] Claim atomicity documented as mv/git mv race (exit 2) matching claim-req.sh
+- [ ] Mapping never invents a lib/*.sh path that does not exist in the repo; missing scripts are called out as gaps, not invented
 
 ## Verification Steps
 

@@ -28,6 +28,7 @@ Design §6, §9; phasing step 2 after spike.
 - [ ] create_req/update_req/read_req/list_reqs_for_ur against Project
 - [ ] Issue body uses §9.2 template; path-units use parentId sub-issues
 - [ ] Linear issue ids only (e.g. ENG-123) — no parallel REQ-NNN allocation in Linear mode
+- [ ] If Linear MCP tools are undiscoverable or team_id unresolved at create_ur/create_req time, hard-stop with setup instructions — no partial Initiative without Project, no markdown dual-write
 
 ## Verification Steps
 

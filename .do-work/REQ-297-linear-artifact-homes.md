@@ -28,6 +28,7 @@ Design §10 table; decisions one-line format preserved.
 - [ ] Same one-line decisions grammar as .do-work/decisions.md
 - [ ] Close agent walks path-units using Linear issue ids
 - [ ] Retro prefers Linear run notes when backend=linear
+- [ ] If Team Doc create/update or Initiative description append fails (permission or size), hard-stop — agents must not invent ad-hoc issue comments or alternate doc titles outside §10 homes
 
 ## Verification Steps
 

@@ -29,6 +29,7 @@ Design §5.5 runtime stays local; §6.5 commit convention; phasing step 5.
 - [ ] Deps satisfaction uses blocks relations (authoritative)
 - [ ] Commit/PR message format uses Linear issue id per §6.5
 - [ ] Optional local ledger telemetry when ledger.enabled without becoming second work-item store
+- [ ] Mid-flight Linear MCP failure after claim leaves the issue claimed (active claim comment + in_progress); worker stops for resume/unblock — never silent-releases and never falls back to markdown store
 
 ## Verification Steps
 

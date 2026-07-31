@@ -29,6 +29,7 @@ Design §12; clarification migration under upgrade.
 - [ ] Sets tracker.backend linear + team ids in config
 - [ ] Leaves markdown trees read-only historical; ops stop reading them
 - [ ] Supports dry-run reporting planned creates without write
+- [ ] If working/ is non-empty or active claims exist, migration refuses entirely (no partial cutover, config backend left unchanged)
 
 ## Verification Steps
 

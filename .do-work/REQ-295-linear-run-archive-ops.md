@@ -28,6 +28,8 @@ Design §15 testing; worktree isolation unchanged. Connector: semantics from par
 - [ ] Review gate still required before archive when review.required
 - [ ] append_run_note posts YAML-fenced ledger fields as Issue comment
 - [ ] No Linear-aware bash required in lib/ for v1
+- [ ] Failed review or failed acceptance-evidence gate does not call archive_req; issue stays in_progress/stopped with claim protocol intact
+- [ ] Concurrent claim loss surfaces concurrent-conflict stopper with resume allowed (same semantics as markdown multi-agent mode)
 
 ## Verification Steps
 
