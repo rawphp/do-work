@@ -1,19 +1,14 @@
 # REQ-285: Write agents/tracker/port.md op catalog
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:12:09Z
-**Heartbeat:** 2026-07-31T05:12:09Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
 **Terminal state:** 
 **Parent:** REQ-283
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-285 commit:3b66f13 tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 3
 **Size:** M
@@ -30,11 +25,11 @@ Design §5.4 Operation catalog; §8 claim; clarifications on mid-flight failure 
 
 ## Acceptance Criteria
 
-- [ ] Every op name from design §5.4 appears with intent and preconditions
-- [ ] Documents: Linear unusable ⇒ hard stop never silent markdown fallback
-- [ ] Documents: mid-flight MCP failure leaves claim active; resume/unblock repair
-- [ ] Documents: deps eligibility uses native blocks relations as authority; body **Depends on:** is mirror
-- [ ] Documents work-item vs runtime split (design §5.5)
+- [x] Every op name from design §5.4 appears with intent and preconditions
+- [x] Documents: Linear unusable ⇒ hard stop never silent markdown fallback
+- [x] Documents: mid-flight MCP failure leaves claim active; resume/unblock repair
+- [x] Documents: deps eligibility uses native blocks relations as authority; body **Depends on:** is mirror
+- [x] Documents work-item vs runtime split (design §5.5)
 
 ## Verification Steps
 
