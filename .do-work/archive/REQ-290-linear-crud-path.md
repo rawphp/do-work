@@ -1,19 +1,14 @@
 # REQ-290: Linear UR/REQ CRUD path
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:25:55Z
-**Heartbeat:** 2026-07-31T05:25:55Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** /do-work intake or start with tracker.backend: linear and valid team config
 **Terminal state:** Initiative + Project do-work/{UR-id} + Issues/sub-issues exist with §9 templates; create/read/list/update ops work
 **Parent:** 
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-290 commit:530ecad tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 2
 **Size:** M
@@ -30,11 +25,11 @@ Design §6, §9; phasing step 2 after spike.
 
 ## Acceptance Criteria
 
-- [ ] create_ur: Initiative + Project do-work/{UR-id} + link
-- [ ] create_req/update_req/read_req/list_reqs_for_ur against Project
-- [ ] Issue body uses §9.2 template; path-units use parentId sub-issues
-- [ ] Linear issue ids only (e.g. ENG-123) — no parallel REQ-NNN allocation in Linear mode
-- [ ] If Linear MCP tools are undiscoverable or team_id unresolved at create_ur/create_req time, hard-stop with setup instructions — no partial Initiative without Project, no markdown dual-write
+- [x] create_ur: Initiative + Project do-work/{UR-id} + link
+- [x] create_req/update_req/read_req/list_reqs_for_ur against Project
+- [x] Issue body uses §9.2 template; path-units use parentId sub-issues
+- [x] Linear issue ids only (e.g. ENG-123) — no parallel REQ-NNN allocation in Linear mode
+- [x] If Linear MCP tools are undiscoverable or team_id unresolved at create_ur/create_req time, hard-stop with setup instructions — no partial Initiative without Project, no markdown dual-write
 
 ## Verification Steps
 
