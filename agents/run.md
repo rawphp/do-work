@@ -101,14 +101,14 @@ Work-item **pick, claim, heartbeat, set status, unblock, archive, run notes** go
 
 | Concern | Markdown (`markdown.md`) | Linear (`linear.md`) |
 |---------|--------------------------|----------------------|
-| Pick claimable | `list_claimable_reqs` → `lib/pick-req.sh` | **`list_claimable_reqs`** — project filter + backlog + **blocks** deps + footprint algorithm + Priority→created_at→id order + skip reasons (`dep:`/`overlap:`/`scope:`/`claim:`) (REQ-295) |
+| Pick claimable | `list_claimable_reqs` → `lib/pick-req.sh` | **`list_claimable_reqs`** — project filter + backlog + **blocks** deps + footprint algorithm + Priority **DESC** (missing→2) → created_at ASC → id ASC + skip reasons (`dep:`/`overlap:`/`scope:`/`claim:`) (REQ-295) |
 | Claim | `claim_req` → `lib/claim-req.sh` (FS stamp + working/) | **`claim_req`** — optimistic re-read; workflow `in_progress` + claim comment (`agent_claim_marker` / `<!-- do-work-claim -->`); **never** steal assignee |
 | Heartbeat | `heartbeat_req` → `lib/heartbeat.sh` | **`heartbeat_req`** — new/updated claim-protocol comment with fresh `heartbeat` ISO timestamp |
 | Stopped / resume | header + stamp edits; `agents/resume.md` | **`set_req_status`** + **`heartbeat_req`** (see linear.md Resume); `agents/resume.md` Linear branch |
 | Unblock | `agents/unblock.md` stamp strip | **`unblock_req`** — `status: released` + backlog state; `agents/unblock.md` Linear branch |
 | Archive | post-worker: status/proof/outputs + `working/` → `archive/` + integrity gate | **`archive_req`** — `status_map.done` + `**Closure proof:**` + `## Outputs` on Issue + claim `released`; **only after** evidence + review gates (REQ-295); **no** local archive file as store |
 | Run / cost notes | `append_run_note` → `lib/run-ledger.sh` when ledger enabled | **`append_run_note`** — Issue comment (YAML fenced `<!-- do-work-run-note -->`, authoritative). If `ledger.enabled`, **optional** local `RUN-NNN.yml` is **telemetry only** |
-| Commits / PRs / branches | `feat(REQ-NNN):` + `req/REQ-NNN` worktree | **§6.5** — `feat(ENG-123):` + `Issue:` footer; branch **`req/<linear-id>`** sanitized (linear.md Branch sanitize); worktree `.worktrees/req-<slug>` |
+| Commits / PRs / branches | `feat(REQ-NNN):` + `req/REQ-NNN` worktree | **§6.5** — `feat(ENG-123):` + `Issue:` footer; branch **`req/<linear-id>`** sanitized (linear.md Branch sanitize); worktree `.worktrees/req-<lowercase-slug>` (hard default) |
 | Review before archive | `review.required` → `agents/review.md` then archive move | Same gate: when `review.required: true`, review must `passed` **before** `archive_req`; failed review/evidence **must not** call `archive_req` (claim intact) |
 | Concurrent claim loss | claim-req exit 2 → re-pick | **`concurrent-conflict`** stopper; resume allowed for claim owner (same multi-agent semantics) |
 | Mid-flight MCP / worker death after claim | leave working/ slot; stale + resume/unblock | **Leave claimed** (in_progress + active claim comment + last heartbeat); stop for resume/unblock — **never** silent-release or silent markdown fallback |
@@ -119,7 +119,7 @@ Work-item **pick, claim, heartbeat, set status, unblock, archive, run notes** go
 1. Do **not** call `lib/pick-req.sh` / `lib/claim-req.sh` / `lib/heartbeat.sh` as the work-item store (those scripts implement the markdown backend). Do **not** require new Linear-aware bash under `lib/` for v1.
 2. In **The Loop** Step 1 (and pre-flight pick), replace the pick-req/claim-req shell blocks with agent steps that execute **`list_claimable_reqs`** then **`claim_req`** from `agents/tracker/linear.md` (eligibility: backlog, deps via **blocks**, footprint free, unclaimed or stale-eligible; order and skip reasons per REQ-295).
 3. On claim race lost → stop / retry with **`concurrent-conflict`** (same stopper as markdown exit 2); **`/do-work resume` allowed** for the claim owner. Do not invent alternate stopper reasons.
-4. Pass **Linear issue id** (e.g. `ENG-123`) to workers. Derive feature branch via linear.md **Branch sanitize** → `req/<sanitized-id>` and worktree `{project}/.worktrees/req-<slug>`. Worker heartbeats use **`heartbeat_req`** against that issue id. Worker **commits** use §6.5 Linear issue id format (see `agents/run-worker.md` W2 / Step 8).
+4. Pass **Linear issue id** (e.g. `ENG-123`) to workers. Derive feature branch via linear.md **Branch sanitize** → `req/<sanitized-id>` and worktree `{project}/.worktrees/req-<lowercase-slug>` (hard default). Worker heartbeats use **`heartbeat_req`** against that issue id. Worker **commits** use §6.5 Linear issue id format (see `agents/run-worker.md` W2 / Step 8).
 5. Pre-flight “scan working/” is markdown-specific; under Linear, scan **in-flight issues** (workflow in_progress/stopped + active claim comments) via list + Helper: read active claim — same mine/sibling/stale buckets in spirit, different representation.
 6. If Linear MCP dies after a successful **`claim_req`** and before archive/unblock → **leave claimed** (active claim + in_progress); stop for resume/unblock; **never** silent-release; **never** fall back to markdown store.
 7. After a successful worker, **acceptance evidence**, and **review** (when `review.required: true`), integrate via **`archive_req`** (linear.md) instead of moving a local REQ file to `.do-work/archive/`. Git merge/PR and worktree teardown remain local (Step 4). Failed review or failed acceptance-evidence → **do not** call `archive_req`; issue stays in_progress/stopped with claim protocol intact.
@@ -506,7 +506,7 @@ AGENT_ID="$(hostname).$$"
 **Pick the next claimable REQ — port op `list_claimable_reqs`:**
 
 - **Markdown backend:** implement via `lib/pick-req.sh` (below).
-- **Linear backend:** implement via **`list_claimable_reqs`** in `agents/tracker/linear.md` (project filter + backlog + **blocks** deps + footprint algorithm + Priority→created_at→identifier order + skip reasons `dep:`/`overlap:`/`scope:`/`claim:`). Do **not** run `pick-req.sh` as the Linear store. On empty claimable list, map the op’s skip-reason lines with the same precedence as `drain-classify.sh`: **`overlap-blocked` > `deps-blocked` > `scope-blocked` > `truly-empty`**. No Linear-aware bash required.
+- **Linear backend:** implement via **`list_claimable_reqs`** in `agents/tracker/linear.md` (project filter + backlog + **blocks** deps + footprint algorithm + Priority **DESC** (missing→2) → created_at ASC → identifier ASC + skip reasons `dep:`/`overlap:`/`scope:`/`claim:`). Do **not** run `pick-req.sh` as the Linear store. On empty claimable list, map the op’s skip-reason lines with the same precedence as `drain-classify.sh`: **`overlap-blocked` > `deps-blocked` > `scope-blocked` > `truly-empty`**. No Linear-aware bash required.
 
 ```bash
 # markdown only — linear: call list_claimable_reqs (linear.md) instead

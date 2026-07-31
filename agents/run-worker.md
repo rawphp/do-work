@@ -64,9 +64,9 @@ Resolve names from the tracker backend (load path Step 0). **Linear issue ids ar
 | Backend | Feature branch | Worktree directory |
 |---------|----------------|--------------------|
 | **markdown** | `req/REQ-NNN` (e.g. `req/REQ-117`) | `{project}/.worktrees/req-NNN` (e.g. `req-117`) |
-| **linear** | `req/<sanitized-linear-id>` (e.g. `req/ENG-123`) | `{project}/.worktrees/req-<sanitized-slug>` (e.g. `req-eng-123`) |
+| **linear** | `req/<sanitized-linear-id>` (e.g. `req/ENG-123`) | `{project}/.worktrees/req-<sanitized-lower>` (e.g. `req-eng-123`, hard default) |
 
-**Sanitize algorithm (Linear — REQ-295):** start from the Linear issue id (e.g. `ENG-123`); keep only `[A-Za-z0-9._-]`; map every other character to `-`; collapse consecutive `-`/`.`; strip leading/trailing `-`/`.`; if empty → hard-stop (do not invent a name). Branch = `req/<sanitized-id>`. Worktree dir prefers lowercase slug for FS friendliness (`req-eng-123`) unless the project already standardized on case-preserving names — stay consistent with the orchestrator.
+**Sanitize algorithm (Linear — REQ-295):** start from the Linear issue id (e.g. `ENG-123`); keep only `[A-Za-z0-9._-]`; map every other character to `-`; collapse consecutive `-`/`.`; strip leading/trailing `-`/`.`; if empty → hard-stop (do not invent a name). Branch = `req/<sanitized-id>` (preserve identifier case). Worktree dir **hard-defaults to lowercase** sanitized form (`req-eng-123`) for FS consistency — do not keep mixed-case worktree dirs.
 
 ```bash
 # markdown:

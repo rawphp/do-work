@@ -144,7 +144,7 @@ This path-unit **refines** the REQ-294 run loop for production pick/integrate ed
 
 **Hard rules (REQ-295):**
 
-1. **Pick order is deterministic** — Priority ascending (1 before 3), then created_at ascending, then Linear identifier ascending. First survivor wins (parity with `lib/pick-req.sh` first-survivor model).
+1. **Pick order is deterministic** — Priority **descending** (3 most urgent before 1; missing/malformed defaults to **2**), then created_at ascending, then Linear identifier ascending. First survivor wins (parity with `lib/pick-req.sh` priority + first-survivor model).
 2. **Skip reasons are emitted** for every rejected candidate (`dep:`, `overlap:`, `scope:`, `claim:`) so the run loop can map to `overlap-blocked` / `deps-blocked` / `scope-blocked` / `truly-empty` without calling `pick-req.sh`.
 3. **Footprint algorithm** matches `lib/check-footprint.sh` intent: parse `**Files:**`, treat empty/missing as free (no overlap), expand globs with nullglob semantics (unmatched globs do not collide), compare expanded path sets against in-flight claims only.
 4. **Review gate before archive** — when `review.required: true` (config default), orchestrator must pass post-build review **before** calling `archive_req`. Failed review or failed acceptance-evidence gate **must not** call `archive_req`; issue stays `in_progress`/`stopped` with claim protocol intact.
@@ -276,7 +276,7 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | `append_ideate` / `append_clarifications` | Initiatives (description/comments) | **Documented** (REQ-291) — section append under §9.1; rediscover update tools |
 | `create_req` / `update_req` / `read_req` | Issues, Projects, labels, statuses | **Documented** (REQ-290) |
 | `list_reqs_for_ur` | Issues by Project | **Documented** (REQ-290) |
-| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292/294/295) — Priority→created_at→id order; skip reasons; deps via **blocks**; footprint algorithm; no claim side-effect |
+| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292/294/295) — Priority DESC (missing→2) → created_at ASC → id ASC; skip reasons; deps via **blocks**; footprint algorithm; no claim side-effect |
 | `claim_req` / `heartbeat_req` / `unblock_req` | Issues status + comments | **Documented** (REQ-292) — optimistic claim comment protocol |
 | `set_req_status` | Workflow states, issues | **Documented** (REQ-292) — stopped / in-progress without archive or unclaim |
 | `archive_req` | Workflow states, issues, claim release, body proof/outputs | **Documented** (REQ-294/295) — done + proof + outputs + claim released; **not** called after failed review/evidence |
@@ -942,7 +942,7 @@ Sort candidates **before** filtering, then walk in order and return the first su
 
 | Rank | Key | Direction | Source |
 |------|-----|-----------|--------|
-| 1 | `**Priority:**` | ascending numeric (`1` before `3`); missing/empty → after all numbered (treat as `99`) | Issue body header |
+| 1 | `**Priority:**` | **descending** numeric (`3` most urgent before `1`); missing/empty/malformed → treat as **`2`** (same default as `lib/pick-req.sh` / capture) | Issue body header |
 | 2 | `created_at` | ascending (older first) | Linear issue create timestamp |
 | 3 | Linear identifier | ascending lexicographic (`ENG-12` before `ENG-100` only if string sort; prefer natural numeric suffix when practical) | e.g. `ENG-123` |
 
@@ -1220,7 +1220,7 @@ Output: path/to/primary/output
 | Footer | `Issue: ENG-123` (required); `UR: UR-NNN` when known; `Output:` primary path |
 | Archive path | **No** `.do-work/archive/REQ-…` line required |
 | Branch | **`req/<linear-id>`** after **Branch sanitize** (below) |
-| Worktree dir | `{project}/.worktrees/req-<sanitized-slug>` (see sanitize) |
+| Worktree dir | `{project}/.worktrees/req-<sanitized-lower>` (hard default lowercase; see sanitize) |
 | PR title/body | Same id convention when `delivery.mode: pr` |
 | Markdown backend | Unchanged: `feat(REQ-NNN):` + `REQ:` / `UR:` / `Output:` paths |
 
@@ -1236,8 +1236,8 @@ Git refs disallow some characters. Derive branch and worktree names from the Lin
 | 2. Allowed set | Keep `[A-Za-z0-9._-]` only | `ENG-123` |
 | 3. Replace | Map every other character (spaces, `/`, `:`, etc.) to `-` | — |
 | 4. Collapse | Collapse consecutive `-` / `.` runs; strip leading/trailing `-` and `.` | — |
-| 5. Branch | `req/<sanitized-id>` | `req/ENG-123` |
-| 6. Worktree path | `{project}/.worktrees/req-<sanitized-lower>` preferred lowercase dir for FS friendliness **or** `req-<sanitized-id>` if case-preserving FS is required — pick one scheme per project and stay consistent | `.worktrees/req-eng-123` |
+| 5. Branch | `req/<sanitized-id>` (preserve identifier case as sanitized) | `req/ENG-123` |
+| 6. Worktree path | **Hard default:** `{project}/.worktrees/req-<sanitized-lower>` — always lowercase the sanitized id for the directory name (FS consistency across case-sensitive/insensitive hosts). Do not keep mixed-case worktree dirs. | `.worktrees/req-eng-123` |
 | 7. Empty guard | If sanitize yields empty, hard-stop (do not invent a branch name) | — |
 
 Orchestrator merge / PR / teardown **must** use the same branch string the worker created (pass it through the worker report or reconstruct via the same sanitize function). Never mix `req/REQ-NNN` markdown naming with Linear issue ids on the same run.
@@ -1350,7 +1350,7 @@ Do **not** glob `.do-work/working/` or run `lib/synth-status.sh` as the work-ite
 | **Deps diverge** | Relations **win**; body `**Depends on:**` is display/mirror | File header is the store |
 | **Footprint free?** | Footprint algorithm under `list_claimable_reqs` (empty Files = free; nullglob; in-flight = active claim on in_progress/stopped) | `lib/check-footprint.sh` vs `working/` |
 | **After `archive_req`** | Done + released claim → no longer in-flight; footprint frees for siblings | File left `working/` |
-| **Pick order** | Priority → created_at → identifier (REQ-295) | Numeric REQ id sort in `pick-req.sh` |
+| **Pick order** | Priority **DESC** (3 before 1; missing→2) → created_at ASC → identifier ASC (REQ-295) | Priority DESC (missing→2) then numeric REQ id in `pick-req.sh` |
 | **Skip reasons** | `dep:` / `overlap:` / `scope:` / `claim:` lines (REQ-295) | pick-req stderr `dep` / `overlap` / `scope` |
 
 `list_claimable_reqs` (above) implements both checks. Run Step 1 must not re-implement with local REQ files while `backend: linear`.
