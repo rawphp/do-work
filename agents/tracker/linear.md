@@ -51,8 +51,28 @@ This path-unit wires **work-item create/read/update/list** only (design §6 hier
 |------|----------------|-----|
 | UR create/read/list sequences | Initiative + Project `do-work/{UR-id}` + InitiativeToProject (or discovered equivalent) | REQ-290 (this section) |
 | REQ create/update/read/list | Issues in that Project; §9.2 body; path-unit `parentId` sub-issues | REQ-290 (this section) |
+| Templates + append/deps/footprint ops | §9 field semantics; `append_ideate` / `append_clarifications` / `set_blocked_by` / `set_files` | REQ-291 |
 | Claim / heartbeat / pick / archive | Deferred | later REQs |
 | Non-ticket homes / migrate | Deferred | later REQs |
+
+---
+
+## Path: Linear templates + append/deps/footprint (REQ-291)
+
+| | |
+|---|---|
+| **Entry point** | Any phase that writes UR sections (ideate/question) or REQ deps/footprint under `tracker.backend: linear` |
+| **Terminal state** | §9.1 / §9.2 templates (machine markers `<!-- do-work-ur -->` / `<!-- do-work-req -->`), labels (`Layer/*`, `Size/*`, `path-unit`), `status_map` hard-fail rules, and full agent sequences for `append_ideate`, `append_clarifications`, `set_blocked_by` (blocks relations + `**Depends on:**` mirror), and `set_files` are documented with live rediscovery |
+
+This path-unit **extends** REQ-290 CRUD: templates become the field contract, and the remaining create/update surface for intake→capture without claim is complete.
+
+**Hard rules (in addition to REQ-290 CRUD rules):**
+
+1. **Machine markers are mandatory** on every Initiative description (`<!-- do-work-ur -->`) and Issue description (`<!-- do-work-req -->`). Parse/stop if missing on read/update — do not invent fields.
+2. **`set_blocked_by` dual-write** — when relation tools exist: native `blocks` relations **and** body `**Depends on:**` mirror in one op. Relations are authoritative for eligibility (port rule).
+3. **Labels from config prefixes** — `tracker.linear.labels.layer_prefix` (default `Layer/`), `size_prefix` (default `Size/`), `path_unit` (default `path-unit`). Apply on create/update when label tools are discoverable; body headers still hold the same values for parse.
+4. **`status_map` hard-fail** — every mapped workflow state name must exist on the team; missing → hard-stop (never invent a close-enough state).
+5. **Prefer section append** on Initiative for ideate/clarifications; never overwrite `## Brief` verbatim intake.
 
 ---
 
@@ -64,7 +84,7 @@ After config load and backend resolution (`port.md` load path + `agents/config.m
 2. Linear validation passes (team resolvable, MCP discoverable, every `status_map` state exists on the team) — or agent **hard-stops** (see below).
 3. Read `agents/tracker/port.md`.
 4. Read this file.
-5. Perform work-item ops only via port ops mapped here (CRUD sequences in **UR/REQ CRUD sequences**).
+5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD sequences**, including templates §9 and append/deps/footprint ops).
 
 Do **not** load this file when backend is `markdown` (including unset/empty).
 
@@ -140,14 +160,14 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 |---------|----------------------------|-----------------|
 | `ensure_product_container` | Team resolve, labels (optional) | Documented (CRUD preflight) |
 | `create_ur` / `read_ur` / `list_urs` | Initiatives, Projects, Initiative↔Project link | **Documented** (REQ-290) — live `search_tool` required; hard-stop if undiscoverable |
-| `append_ideate` / `append_clarifications` | Initiatives (description/comments) | TBD (reuse Initiative update pattern from `read_ur` / §9.1 sections) |
+| `append_ideate` / `append_clarifications` | Initiatives (description/comments) | **Documented** (REQ-291) — section append under §9.1; rediscover update tools |
 | `create_req` / `update_req` / `read_req` | Issues, Projects, labels, statuses | **Documented** (REQ-290) |
 | `list_reqs_for_ur` | Issues by Project | **Documented** (REQ-290) |
 | `list_claimable_reqs` | Issues + relations + comments + statuses | TBD after claim path |
 | `claim_req` / `heartbeat_req` / `unblock_req` | Issues status + comments | TBD after claim path |
 | `set_req_status` / `archive_req` | Workflow states, issues | TBD after claim path |
-| `set_blocked_by` | Issue relations `blocks` (+ body mirror) | TBD; if relations **missing** → description-only + one-time warning (port rule) |
-| `set_files` | Issue description headers | Partial via `update_req` body headers; dedicated op TBD |
+| `set_blocked_by` | Issue relations `blocks` (+ body mirror) | **Documented** (REQ-291) — dual-write; if relations **missing** → body-only + one-time warning (port rule) |
+| `set_files` | Issue description headers | **Documented** (REQ-291) — updates `**Files:**` only; no claim side-effect |
 | `append_decision` / calibration | Team Docs | TBD after spike Docs row |
 | `write_verify_report` / `write_close_report` | Initiative sections/comments | TBD |
 | `append_run_note` | Issue comments (+ optional project update) | TBD |
@@ -158,7 +178,16 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 
 ## Templates (design §9)
 
-Bodies are markdown conventions in Linear description fields. Prefer description appends; fall back to comments if size limits require it.
+Bodies are **markdown conventions** in Linear description fields — not custom Linear fields. Prefer description appends; fall back to Initiative/Issue **comments** if description size limits require it (record a one-line pointer in the section when spilling).
+
+**Machine markers (required):**
+
+| Entity | Marker (first non-empty line of structured body) | Op consumers |
+|--------|--------------------------------------------------|--------------|
+| Initiative (UR) | `<!-- do-work-ur -->` | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications`, verify/close writers |
+| Issue (REQ) | `<!-- do-work-req -->` | `create_req`, `update_req`, `read_req`, `set_files`, `set_blocked_by`, claim/archive later |
+
+On **read/update**: if the marker is missing, treat as template parse failure → **stop the op**; do not invent headers or rewrite the body into template form without an explicit migrate path.
 
 ### §9.1 Initiative (UR) description template
 
@@ -185,6 +214,22 @@ Bodies are markdown conventions in Linear description fields. Prefer description
 
 ## Closure
 ```
+
+#### §9.1 field semantics
+
+| Field / section | Write rules | Readers |
+|-----------------|-------------|---------|
+| `<!-- do-work-ur -->` | Must be present at create; never strip | All UR ops |
+| `**UR-id:**` | Sequential `UR-NNN` slug only (not a Linear entity id) | Resolve UR; `list_urs` |
+| `**Class:**` | Intake classification (feature / …) | Capture, status |
+| `**Created:**` | ISO date `YYYY-MM-DD` at create | Display |
+| `**Project:**` | Machine name `do-work/{UR-id}` (config `project_name_pattern`) | Resolve Project |
+| `**Project-id:**` | Linear project UUID after Project create + link | Prefer id over name when both present |
+| `## Brief` | **Verbatim** intake — never overwrite on ideate/question | `read_ur` |
+| `## Clarifications` | `append_clarifications` appends Q&A; does not create REQs | Question, capture |
+| `## Ideate` | `append_ideate` writes/appends ideate body | Ideate, capture |
+| `## Open gaps` / `## Capture summary` | Capture phase | Capture, verify |
+| `## Verify` / `## Closure` | Later path-units (`write_verify_report` / `write_close_report`) | Verify, close, go |
 
 ### §9.2 Issue (REQ) description template
 
@@ -219,10 +264,70 @@ Bodies are markdown conventions in Linear description fields. Prefer description
 ## Outputs
 ```
 
-**Labels (when label tools are discoverable):** `Layer/{name}`, `Size/{S|M|L}`, `path-unit` on path-unit parents (`tracker.linear.labels.*`).  
-**States:** via `tracker.linear.status_map` (default backlog → `Todo`).  
-**Deps:** when relation tools exist, create native `blocks` relations **and** mirror ids in `**Depends on:**` (relations authoritative — port rule).  
-**Path-units:** parent Issue + layer children as sub-issues; children set Linear `parentId` (or schema equivalent discovered live) and body `**Parent:**` to the parent Linear id.
+#### §9.2 field semantics
+
+| Field / section | Write rules | Readers |
+|-----------------|-------------|---------|
+| `<!-- do-work-req -->` | Required at create; never strip | All REQ ops |
+| `**UR:**` | Owning UR slug | `list_reqs_for_ur` cross-check; display |
+| `**Layer:**` | Layer name or `none`; also label `Layer/{name}` when labels available | Capture, footprint |
+| `**Parent:**` | Parent **Linear issue id** or `none`; children also set native `parentId` | Path-units |
+| `**Entry point:**` / `**Terminal state:**` | Path-unit **parents only**; leave empty on leaves | Capture path-units |
+| `**Files:**` | Space-separated paths/globs; sole write intent of `set_files` | Footprint / pick |
+| `**Depends on:**` | Space-separated **Linear issue ids** — **mirror only**; authoritative graph is native `blocks` relations via `set_blocked_by` | Display; eligibility uses relations when present |
+| `**Size:**` | `S` \| `M` \| `L`; also label `Size/{S\|M\|L}` when labels available | Capture; optional estimate map |
+| `**Priority:**` | `1`–`3` (or empty) | Capture / pick display |
+| `**Criteria approved:**` | Provenance only (`agent-drafted` / human…) | Workers |
+| `**Closure proof:**` / `**Suite:**` | Set by archive/orchestrator path | Archive integrity |
+| `## Task` … `## Outputs` | Capture / worker sections; preserve unknown sections on update | Workers, review |
+
+### Labels (`tracker.linear.labels.*`)
+
+When label tools are discoverable (create/list/attach), agents **must** keep labels aligned with body headers on create/update:
+
+| Config key | Default | Applied as | When |
+|------------|---------|------------|------|
+| `labels.layer_prefix` | `Layer/` | `Layer/{name}` e.g. `Layer/agents` | Every Issue with a non-empty `**Layer:**` (skip or omit for `none` if team convention prefers no label) |
+| `labels.size_prefix` | `Size/` | `Size/S`, `Size/M`, `Size/L` | Every Issue with `**Size:**` set |
+| `labels.path_unit` | `path-unit` | Exact label name `path-unit` | Path-unit **parent** Issues only (not layer children) |
+
+**Rules:**
+
+1. Resolve or create labels via live tools only; never invent label UUIDs.
+2. Body headers remain the parse source if labels are missing tools — still write headers.
+3. `ensure_product_container` may pre-create common labels when create-label tools exist.
+4. Estimate: if the team uses T-shirt estimates and tools allow, map Size → estimate **after** body/label write; estimate is optional display, not the footprint source.
+
+### States (`tracker.linear.status_map`)
+
+| do-work status | Config key | Default Linear state name |
+|----------------|------------|---------------------------|
+| backlog | `status_map.backlog` | `Todo` |
+| in_progress | `status_map.in_progress` | `In Progress` |
+| stopped | `status_map.stopped` | `Canceled` |
+| done | `status_map.done` | `Done` |
+
+**Hard-fail validation (when `backend: linear`):**
+
+1. At preflight (before first CRUD op in a session), list team workflow states via discovered tools.
+2. For **every** key in `status_map` (defaults filled if omitted), the Linear state **name** must exist on the team.
+3. If any mapped name is missing → **hard-stop** with rename-or-override instructions (setup block). **Never** invent states; **never** pick a “close enough” name; **never** fall back to markdown.
+4. Create/update ops that set status use the **validated** state id for the mapped name only.
+
+### Deps dual-write (template + relations)
+
+| Concern | Rule |
+|---------|------|
+| Authoritative graph | Native Linear **`blocks` relations** (this issue is blocked by dependency issues) |
+| Body mirror | `**Depends on:** ENG-101 ENG-102` (Linear issue ids only — never markdown `REQ-NNN`) |
+| Writer | Prefer `set_blocked_by` for sole intent; `create_req` may set deps at create the same way |
+| Diverge | Relations win for `list_claimable_reqs` / deps checks |
+| Relations tools missing | Body-only deps + **one-time** warning; still no markdown dual-store; document GraphQL fallback if spike later marks relations **missing** |
+
+### Path-units
+
+- **Parent Issue:** §9.2 with `**Entry point:**` / `**Terminal state:**`; label `path-unit` when available; no required `parentId`.
+- **Layer children:** Linear `parentId` (or schema field from live create-issue tool) = parent Linear id; body `**Parent:**` = same id; layer label when available; leave entry/terminal empty.
 
 ---
 
@@ -332,16 +437,18 @@ Bodies are markdown conventions in Linear description fields. Prefer description
    - `search_tool "linear create issue"` (or `"linear issues"`).
    - If create-issue undiscoverable → **hard-stop** (no markdown dual-write).
    - `use_tool` create: team, project, title, description, state=backlog map, optional assignee=`default_assignee_id`, labels, `parentId` when child.
-6. **Deps at create (optional):** if `**Depends on:**` Linear ids known and relation tools discovered, create `blocks` relations (this issue blocked by deps) **and** keep body mirror. If relations missing → body-only + one-time warning (port rule).
-7. Return Linear issue id(s). Human assignee only from config — agents do not steal assignee for claim (claim is later path).
+6. **Deps at create (optional):** if dependency Linear ids are known, run the same dual-write as **`set_blocked_by`** (native `blocks` relations when tools exist **and** body `**Depends on:**` mirror). If relations missing → body-only + one-time warning (port rule).
+7. **Labels:** attach `Layer/{name}`, `Size/{S|M|L}`, and `path-unit` (parents only) per **Labels** table when label tools exist.
+8. **State:** create in `status_map.backlog` only (validated id from preflight) — never invent a state name.
+9. Return Linear issue id(s). Human assignee only from config — agents do not steal assignee for claim (claim is later path).
 
 ### `update_req`
 
 | | |
 |---|---|
-| **Intent** | Edit Issue body/fields without claim/archive lifecycle. Prefer dedicated later ops for status, deps, footprint, claim when those are the sole intent. |
-| **Sequence** | 1) `search_tool` + get issue by Linear id. 2) Merge structured header / section edits into §9.2 description (preserve unknown sections). 3) `search_tool` + update issue with only changed fields (title, description, labels, project, parent). 4) If deps changed and relation tools exist, update relations + body mirror (`set_blocked_by` when that op lands; until then update_req may update body and relations if tools found). |
-| **Failure** | Issue missing → error; MCP missing → hard-stop. |
+| **Intent** | Edit Issue body/fields without claim/archive lifecycle. Prefer dedicated ops for status, deps, footprint, claim when those are the sole intent. |
+| **Sequence** | 1) `search_tool` + get issue by Linear id. 2) Require `<!-- do-work-req -->`; merge structured header / section edits into §9.2 description (preserve unknown sections). 3) `search_tool` + update issue with only changed fields (title, description, labels, project, parent). 4) **Deps sole intent → use `set_blocked_by`** (do not half-update relations). 5) **Footprint sole intent → use `set_files`**. 6) If a broader body edit also changes deps/files, after description update run the same dual-write / header rules as those ops. |
+| **Failure** | Issue missing → error; missing machine marker / unparsable required fields → stop op (do not invent); MCP missing → hard-stop. |
 
 ### `read_req`
 
@@ -360,15 +467,133 @@ Bodies are markdown conventions in Linear description fields. Prefer description
 | **Notes** | Design §6.3: project filter is the scope. Do not scan local `.do-work/REQ-*`. |
 | **Failure** | Project missing → empty or error; MCP missing → hard-stop. |
 
-### Hard-stop at create time (CRUD-specific)
+### `append_ideate`
+
+| | |
+|---|---|
+| **Intent** | Append or write ideate content onto an existing UR Initiative — **without** overwriting `## Brief`. |
+| **Preconditions** | Preflight passed; UR exists (Initiative with §9.1 marker + `**UR-id:**`). |
+| **Does not** | Create REQs, Projects, or local `ideate.md` files. |
+
+**Agent sequence:**
+
+1. **Rediscover** — `search_tool "linear initiative"` (and/or get/update initiative). Zero tools → hard-stop (setup block).
+2. **Resolve Initiative** for `UR-NNN` (same as `read_ur`: scan Initiatives for `**UR-id:**` / Project `do-work/{UR-id}` → linked initiative).
+3. **Read** current description (and comments if sections spilled). Require `<!-- do-work-ur -->`.
+4. **Locate `## Ideate`** section:
+   - If present and empty → replace section body with ideate markdown.
+   - If present and non-empty → **append** new ideate content (prefer dated subheading or clear separator); do not delete prior ideate unless the phase explicitly replaces.
+   - If missing → insert `## Ideate` after `## Clarifications` (or after `## Brief` if clarifications absent), preserving order of other §9.1 sections.
+5. **Never** modify `## Brief` verbatim intake.
+6. **Write** — `use_tool` update initiative description with the merged markdown. If description hits size limits → post overflow as Initiative comment titled/tagged for ideate and leave a one-line pointer under `## Ideate`.
+7. **Return** UR slug + initiative id. No `.do-work/user-requests/` write.
+
+| Failure | Behavior |
+|---------|----------|
+| UR / Initiative not found | Error to caller |
+| Marker missing / unparsable | Stop op; do not invent template |
+| MCP / update tool missing | Hard-stop |
+
+### `append_clarifications`
+
+| | |
+|---|---|
+| **Intent** | Append question-phase Q&A onto the UR under `## Clarifications`. Does **not** create REQs. |
+| **Preconditions** | Preflight passed; UR exists. |
+| **Does not** | Overwrite `## Brief`; replace prior Q&A wholesale (append only). |
+
+**Agent sequence:**
+
+1. **Rediscover** — `search_tool` for initiative get/update (same surface as `append_ideate`).
+2. **Resolve + read** Initiative; require `<!-- do-work-ur -->`.
+3. **Locate `## Clarifications`**:
+   - Append each Q&A as:
+
+     ```markdown
+     **Q:** {question}
+     **A:** {answer}
+     ```
+
+   - Keep prior entries. If section missing, insert after `## Brief` before `## Ideate`.
+4. **Write** updated description via discovered update tool (comment spill same as ideate if needed).
+5. **Return** UR slug + initiative id.
+
+| Failure | Behavior |
+|---------|----------|
+| UR missing | Error to caller |
+| Marker missing | Stop op |
+| MCP missing | Hard-stop |
+
+### `set_blocked_by`
+
+| | |
+|---|---|
+| **Intent** | Write the depends-on graph for a REQ: **authoritative** native `blocks` relations **and** body `**Depends on:**` mirror. |
+| **Preconditions** | Preflight passed; target Issue exists; dependency ids are Linear issue ids (or empty list to clear). |
+| **Ids** | Linear identifiers only (e.g. `ENG-101`). **Never** markdown `REQ-NNN`. |
+| **Authority** | Relations win on diverge (port **Deps authority**). Eligibility consumers use relations when present. |
+
+**Agent sequence:**
+
+1. **Rediscover** — `search_tool` for: get/update issue; issue **relations** create/list/delete (queries such as `"linear issue relations"`, `"linear blocks"`, `"linear dependencies"`). Map hits to create/remove `blocks` edges only with **observed** tool names + schemas.
+2. **Read issue** by Linear id. Require `<!-- do-work-req -->`. Parse current `**Depends on:**` and existing relations if list tools exist.
+3. **Normalize target set** — caller supplies ordered/unordered list of blocker issue ids (issues that **block** this issue / this issue depends on). Empty list = clear all deps.
+4. **Relations path (when create/list/delete relation tools discovered):**
+   - List existing `blocks` relations involving this issue (schema-dependent: type `blocks` / blockedBy — use fields from live schema).
+   - **Remove** relations whose other end is not in the target set (only deps edges this op owns; do not delete unrelated relation types).
+   - **Add** `blocks` relations for each target id missing an edge. Direction: dependency **blocks** the current issue (current issue is blocked by deps) — match Linear’s relation model from live schema docs on the tool; if ambiguous after schema read, hard-stop with gap note rather than guessing both directions.
+   - On partial relation write failure → hard-stop; do not leave body claiming success without relations if tools were supposed to run.
+5. **Body mirror (always when description is writable):**
+   - Set header `**Depends on:**` to space-separated target Linear ids (or empty / omit value when cleared).
+   - Preserve all other §9.2 headers and sections.
+   - `search_tool` + update issue description.
+6. **Relations tools missing after live probe:**
+   - Write body mirror only.
+   - Emit **one-time warning** to the caller/session: relations unavailable; body is sole store until tools appear; eligibility must treat body as fallback (port rule). Still **no** markdown dual-write.
+   - Prefer documenting GraphQL/API fallback in this file when spike marks the cell **missing** (not **unknown**).
+7. **Return** issue id + final depends-on id list + whether relations were written.
+
+| Failure | Behavior |
+|---------|----------|
+| Issue missing | Error to caller |
+| Invalid / unresolvable dependency id | Error; do not write partial graph |
+| Marker missing | Stop op |
+| MCP missing | Hard-stop |
+| Relation tool error mid-write | Hard-stop; operator may re-run op to reconcile |
+
+### `set_files`
+
+| | |
+|---|---|
+| **Intent** | Set the footprint list (`**Files:**`) on a REQ Issue. Does **not** claim, unclaim, or change workflow status. |
+| **Preconditions** | Preflight passed; Issue exists. |
+| **Notes** | Overlap vs other in-flight REQs is evaluated later by `list_claimable_reqs` / claim consumers — this op only writes the declaration. |
+
+**Agent sequence:**
+
+1. **Rediscover** — `search_tool "linear update issue"` / `"linear issues"`; get + update tools required.
+2. **Read issue** by Linear id. Require `<!-- do-work-req -->`.
+3. **Set header** `**Files:**` to the caller’s space-separated path list (empty clears footprint). Do not invent paths. Preserve all other headers/sections and the machine marker.
+4. **Write** description via `use_tool` update. Labels/status/assignee unchanged unless a future combined op says otherwise.
+5. **Return** issue id + files list.
+
+| Failure | Behavior |
+|---------|----------|
+| Issue missing | Error to caller |
+| Marker missing / unparsable | Stop op |
+| MCP / update missing | Hard-stop |
+
+### Hard-stop at create/update time (CRUD-specific)
 
 | Condition | Behavior |
 |-----------|----------|
-| Linear MCP tools undiscoverable at `create_ur` / `create_req` | Hard-stop + setup instructions; **no** Initiative-only, **no** Issue invent, **no** markdown dual-write |
+| Linear MCP tools undiscoverable at `create_ur` / `create_req` / append / `set_*` | Hard-stop + setup instructions; **no** Initiative-only, **no** Issue invent, **no** markdown dual-write |
 | `team_id` / `team_key` unresolved | Hard-stop; do not guess |
 | Initiative create ok, Project/link fail | Hard-stop; no partial UR; operator recovery for orphan Initiative if rollback tools missing |
 | Create-issue tools missing | Hard-stop; do not write `.do-work/REQ-*` |
-| Template required fields unparsable on update/read | Stop the REQ op; do not invent fields (port / design §14) |
+| Template required fields unparsable on update/read | Stop the op; do not invent fields (port / design §14) |
+| Missing `<!-- do-work-ur -->` / `<!-- do-work-req -->` on structured write | Stop the op; do not auto-rewrap without explicit migrate |
+| Any `status_map` state name missing on team workflow | Hard-stop + rename/override instructions; never invent states |
 
 ---
 
@@ -519,14 +744,21 @@ status: active
 
 ## Deps authority (Linear)
 
-Native **`blocks` relations** are authoritative for `list_claimable_reqs` / deps checks. Issue body `**Depends on:**` is a **mirror**. `set_blocked_by` updates both when relation tools exist. If the spike marks relations **missing**, document GraphQL/other fallback here or fall back to description-only + one-time warning (port rule) — still never markdown dual-store.
+Native **`blocks` relations** are authoritative for `list_claimable_reqs` / deps checks. Issue body `**Depends on:**` is a **mirror**. **`set_blocked_by`** (REQ-291 sequence) always:
+
+1. Updates relations when relation tools are discoverable (add/remove to match the target set).
+2. Updates the body mirror in the same op.
+3. If relations tools are **missing** after live probe → body-only + one-time warning (port rule); never markdown dual-store.
+4. If spike later marks relations **missing** (not merely **unknown**), document GraphQL/other fallback in this section before production claim depends on it.
+
+Dependency ids are **Linear issue identifiers only**.
 
 ---
 
 ## Out of scope for this file state
 
-- Claim / heartbeat / unblock / resume / `list_claimable_reqs` / `archive_req` full sequences → later REQs.
-- Capture/ideate/question/verify phase rewires that *call* these ops → later REQs (ops themselves for UR/REQ CRUD are in this file).
+- Claim / heartbeat / unblock / resume / `list_claimable_reqs` / `archive_req` / `set_req_status` full sequences → later REQs.
+- Capture/ideate/question/verify **phase playbook** rewires that *call* these ops → later REQs (port op sequences for UR/REQ templates + append/deps/footprint are in this file as of REQ-291).
 - Non-ticket Docs, run notes, calibration, milestone cursor, migration → later path-units.
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
@@ -540,4 +772,4 @@ Native **`blocks` relations** are authoritative for `list_claimable_reqs` / deps
 - `agents/config.md` — `tracker.*` schema and Load Config step 7
 - Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§6 hierarchy, §7 config, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior spike: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP)
+- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint
