@@ -101,7 +101,35 @@ This path-unit implements design **§8 Claim protocol** as Linear agent sequence
 |------|----------------|-----|
 | Claim comment protocol + claim/heartbeat/unblock/resume/status/list_claimable | Full sequences in this section | REQ-292 |
 | Phase playbooks that *call* these ops | `status` / `unblock` / `resume` / `run` Linear op callouts | REQ-293 |
-| `archive_req` (done + proof + release footprint) | Deferred | later REQs |
+| `archive_req` + `append_run_note` + run commit convention | Done + proof + outputs; run notes; §6.5 commits | REQ-294 |
+
+---
+
+## Path: Linear run coordination (REQ-294)
+
+| | |
+|---|---|
+| **Entry point** | `/do-work run` with `tracker.backend: linear` (after claim path) |
+| **Terminal state** | Worker/orchestrator can pick → claim → deps/footprint checks → archive a REQ using Linear as sole work-item store; worktrees/git remain local; commit messages use Linear issue ids; mid-flight MCP failure leaves the issue claimed |
+
+This path-unit closes the **run loop** on Linear (design phasing step 5 + §5.5 runtime split + §6.5 commits + §7 ledger note + clarification leave-claimed). Claim/pick sequences are REQ-292/293; this path adds **`archive_req`**, **`append_run_note`**, commit/PR message convention, and the ledger telemetry rule.
+
+**Hard rules (in addition to claim-path rules):**
+
+1. **`archive_req` is the only done transition** — set `status_map.done`, write **`Closure proof:`** + **`## Outputs`** on the Issue, release claim (`status: released`). Do **not** use bare `set_req_status` for done. Do **not** write local `.do-work/archive/REQ-*` as the work-item store.
+2. **Footprint overlap** — `list_claimable_reqs` / claim eligibility compare candidate `**Files:**` against `**Files:**` parsed from Issue bodies of **in-flight claims** (workflow `in_progress` or `stopped` with active claim). Same intent as `lib/check-footprint.sh`.
+3. **Deps satisfaction** — authoritative graph is native Linear **`blocks` relations**. A dep is satisfied only when that issue’s workflow maps to `status_map.done`. Body `**Depends on:**` is mirror only.
+4. **Commits/PRs (§6.5)** — messages reference the Linear issue id (`feat(ENG-123): …` + `Issue:` / `UR:` / `Output:` footer). No `.do-work/archive/REQ-…` path required. Branch may be `req/ENG-123` (sanitize for git refs).
+5. **`append_run_note` is authoritative** for run/cost notes in Linear mode (Issue comment, YAML fenced). When `ledger.enabled: true`, orchestrator **may also** write local `.do-work/runs/RUN-NNN.yml` — **telemetry only**, not a second work-item store. Retro prefers Linear run notes; falls back to local runs if comments unavailable.
+6. **Mid-flight MCP failure after claim** — **leave claimed** (active claim comment + `in_progress`); worker/orchestrator **stops** for resume/unblock. **Never** silent-release. **Never** fall back to markdown store.
+7. **Runtime stays local** — worktrees, merges, PRs, `state/*` locks, events, config.yml unchanged (§5.5).
+
+**Child work under this path:**
+
+| Area | Responsibility | REQ |
+|------|----------------|-----|
+| `archive_req` + `append_run_note` sequences + §6.5 + ledger telemetry rule | Documented in this file; run/run-worker callouts | REQ-294 (this section) |
+| Deeper pick ordering / review-gate / branch sanitize wiring | Further run-agent refinements | REQ-295 |
 
 ---
 
@@ -119,14 +147,16 @@ REQ-292 documents the op sequences. **REQ-293** wires the consumers:
 | `agents/status.md` | **Status reporting (claimers / heartbeats)**; Helper: read active claim; optional `list_reqs_for_ur` scope |
 | `agents/unblock.md` | **`unblock_req`** (release claim + backlog state); git partial-commit judgment stays local |
 | `agents/resume.md` | **Resume** (compose `set_req_status` + `heartbeat_req`); worktree/branch stay local |
-| `agents/run.md` | **`list_claimable_reqs`** → **`claim_req`**; worker **`heartbeat_req`** checkpoints; mid-flight **leave claimed** |
+| `agents/run.md` | **`list_claimable_reqs`** → **`claim_req`**; **`archive_req`** + **`append_run_note`**; worker **`heartbeat_req`** checkpoints; mid-flight **leave claimed**; §6.5 commits |
+| `agents/run-worker.md` | §6.5 commit/PR format; mid-flight **leave claimed**; Linear **`heartbeat_req`** when issue-id claim |
 
 **Hard rules for wired consumers:**
 
-1. Resolve backend first (load path). **Markdown** keeps existing `lib/*.sh` + file steps. **Linear** uses this file only for work-item claim/status/unblock/resume/pick.
+1. Resolve backend first (load path). **Markdown** keeps existing `lib/*.sh` + file steps. **Linear** uses this file only for work-item claim/status/unblock/resume/pick/**archive/run notes**.
 2. REQ identifiers under Linear are **Linear issue ids** (e.g. `ENG-123`), not `REQ-NNN` paths under `.do-work/`.
 3. Human **assignee** is never stolen. Claim is comment + workflow.
-4. Mid-flight MCP failure after `claim_req`: **leave claimed**; operator uses resume or unblock (port rule).
+4. Mid-flight MCP failure after `claim_req`: **leave claimed**; operator uses resume or unblock (port rule). Never silent-release; never markdown fallback.
+5. Run loop (REQ-294): deps via **blocks**; footprint via Issue `**Files:**` of in-flight claims; archive via **`archive_req`**; commits use Linear issue ids.
 
 ---
 
@@ -138,7 +168,7 @@ After config load and backend resolution (`port.md` load path + `agents/config.m
 2. Linear validation passes (team resolvable, MCP discoverable, every `status_map` state exists on the team) — or agent **hard-stops** (see below).
 3. Read `agents/tracker/port.md`.
 4. Read this file.
-5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD**, templates §9, append/deps/footprint, **and claim/status/unblock/resume** sequences).
+5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD**, templates §9, append/deps/footprint, claim/status/unblock/resume, **and run archive / append_run_note / §6.5 commits** sequences).
 
 Do **not** load this file when backend is `markdown` (including unset/empty).
 
@@ -217,15 +247,15 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | `append_ideate` / `append_clarifications` | Initiatives (description/comments) | **Documented** (REQ-291) — section append under §9.1; rediscover update tools |
 | `create_req` / `update_req` / `read_req` | Issues, Projects, labels, statuses | **Documented** (REQ-290) |
 | `list_reqs_for_ur` | Issues by Project | **Documented** (REQ-290) |
-| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292) — pick order; no claim side-effect |
+| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292/294) — pick order; deps via **blocks**; footprint via `**Files:**` of in-flight claims; no claim side-effect |
 | `claim_req` / `heartbeat_req` / `unblock_req` | Issues status + comments | **Documented** (REQ-292) — optimistic claim comment protocol |
 | `set_req_status` | Workflow states, issues | **Documented** (REQ-292) — stopped / in-progress without archive or unclaim |
-| `archive_req` | Workflow states, issues, claim release | TBD after archive path |
+| `archive_req` | Workflow states, issues, claim release, body proof/outputs | **Documented** (REQ-294) — done + closure proof + outputs + claim released |
 | `set_blocked_by` | Issue relations `blocks` (+ body mirror) | **Documented** (REQ-291) — dual-write; if relations **missing** → body-only + one-time warning (port rule) |
 | `set_files` | Issue description headers | **Documented** (REQ-291) — updates `**Files:**` only; no claim side-effect |
 | `append_decision` / calibration | Team Docs | TBD after spike Docs row |
 | `write_verify_report` / `write_close_report` | Initiative sections/comments | TBD |
-| `append_run_note` | Issue comments (+ optional project update) | TBD |
+| `append_run_note` | Issue comments (+ optional project update) | **Documented** (REQ-294) — authoritative run/cost notes; local ledger optional telemetry |
 | Milestone ops | Project description / labels / milestone entity if any | TBD |
 | `write_gate_state` | **Local** `state/gate-owner.md` (not Linear) | Local only |
 
@@ -981,7 +1011,7 @@ If comment tools are undiscoverable → **hard-stop** (claim protocol cannot run
    - `stopped` — set state → `status_map.stopped`. **Keep** active claim comment (`status: active`); refresh heartbeat optional. Record stopper reason via `append_run_note` or issue comment (not by deleting claim).
    - `in_progress` — set state → `status_map.in_progress` (usually via `claim_req` or **resume**, not bare status).
    - `backlog` — **do not** use this op alone to clear a claim; call **`unblock_req`**.
-   - `done` — **do not** use this op; call **`archive_req`** (later path).
+   - `done` — **do not** use this op; call **`archive_req`** (this file, REQ-294).
 3. **Write** state only (+ optional reason comment). Preserve assignee and claim comments.
 4. **Return** issue id + new do-work status key.
 
@@ -989,6 +1019,131 @@ If comment tools are undiscoverable → **hard-stop** (claim protocol cannot run
 |---------|----------|
 | Unknown status key / missing state on team | Hard-stop (status_map validation) |
 | MCP missing | Hard-stop; if already claimed → leave claimed |
+
+---
+
+### `archive_req`
+
+| | |
+|---|---|
+| **Intent** | Mark REQ **done** with closure proof and outputs; release the in-flight claim/footprint. Linear is the sole archive store. |
+| **Preconditions** | Worker returned `status: done` with non-empty `closure_proof` and AC evidence; review gate passed when `review.required`; claim owned by the orchestrating flow (or operator-approved). |
+| **Does not** | Steal assignee; delete the Issue; write local `.do-work/archive/REQ-*` as source of truth; auto-merge git (merge/PR stay local in `agents/run.md`). |
+
+**Agent sequence:**
+
+1. **Rediscover** — `search_tool` for: get/update issue; list/create comments; list workflow states (already validated at load). Map hits to **observed** tool names + schemas.
+2. **Pre-archive re-read** — get issue by Linear id. Confirm:
+   - Workflow is `in_progress` or `stopped` (not already `done` unless idempotent re-archive policy is explicit).
+   - Latest claim is `status: active` (preferred) owned by this run, **or** operator override documented in the call.
+   - If MCP fails here after a prior claim → **leave claimed**; stop; never silent-release and never markdown-archive.
+3. **Write body fields** (update Issue description; preserve machine marker `<!-- do-work-req -->` and other headers):
+   - Set / replace `**Closure proof:**` with the worker’s non-empty proof string (may cite checkpoint log + commit short hash).
+   - Ensure `## Outputs` exists; replace or append the orchestrator’s outputs list from the worker YAML (`path` + one-line description per item). Prefer a full section rewrite from the report so the archived Issue matches the attempt.
+   - Tick ACs already checked by the worker when the body still has `- [ ]` that the report marked passed — do not invent new AC text.
+   - Optional: set `**Suite:** not-run` when the worker deferred with `category: suite-not-run` (parity with markdown archive header).
+4. **State → done** — set workflow to `status_map.done` (resolved state id from preflight). **Assignee unchanged.**
+5. **Release claim** — post claim-protocol comment with `status: released` (same shape as `unblock_req` release). Latest released block means the issue is no longer in-flight for footprint purposes. Prefer preserving prior `agent_id` / `claimed_at`.
+6. **Optional** — `append_run_note` for the successful attempt (result `done`, cost, model, commit) if the orchestrator has not already written one for this attempt.
+7. **Return** issue id + done confirmation. Do **not** create or move local REQ markdown files.
+
+| Failure | Behavior |
+|---------|----------|
+| Missing / empty closure proof | Do not archive; leave in_progress/stopped + **leave claimed**; surface to orchestrator (parity with missing-closure-proof) |
+| Review / acceptance gate failed | **Do not call** this op; issue stays claimed |
+| MCP dies mid-archive (partial body or state write) | **Hard-stop; leave claimed** if claim not yet released; operator re-runs archive or resume after recovery — never silent markdown fallback |
+| State tools / comment tools missing | Hard-stop |
+
+**Parity with markdown `archive_req`:** done status + closure proof + outputs + footprint released. Representation differs (Issue body + workflow + claim comment vs `working/` → `archive/` move).
+
+**Footprint after archive:** other agents’ `list_claimable_reqs` no longer treat this issue as in-flight (done + released claim), so its `**Files:**` no longer blocks siblings.
+
+---
+
+### `append_run_note`
+
+| | |
+|---|---|
+| **Intent** | Append a ledger-ish / cost / run note for a REQ attempt. **Authoritative** work-item note in Linear mode. |
+| **Preconditions** | Target Issue (Linear id) exists; attempt context known (agent, model, result, timestamps, optional cost). |
+| **Does not** | Replace `archive_req`; change workflow state or assignee; require local `.do-work/runs/` as the store. |
+
+**Agent sequence:**
+
+1. **Rediscover** — `search_tool` for issue comments create (and optionally project updates for run rollup). Queries such as `"linear issue comments"`, `"linear create comment"`.
+2. **Build note body** — Issue comment with a YAML fenced block carrying ledger fields (same conceptual fields as `lib/run-ledger.sh` / `RUN-NNN.yml`):
+
+   ````markdown
+   <!-- do-work-run-note -->
+   ```yaml
+   req: ENG-123
+   agent: hostname.pid
+   model: sonnet
+   branch: req/ENG-123
+   started: 2026-07-31T12:00:00Z
+   ended: 2026-07-31T12:20:00Z
+   result: done
+   review: passed
+   cost_estimate: ""
+   commit: abcdef1
+   pr_url: ""
+   commands: []
+   tests: []
+   changed_files: []
+   ```
+   ````
+
+   Adjust fields to what the orchestrator collected; `result` may be `done`, `stopped:<reason>`, or `failed`. Marker line `<!-- do-work-run-note -->` is stable for readers/retro.
+3. **Post comment** on the Issue via discovered create-comment tool.
+4. **Optional Project update** — if project-update tools exist and the caller wants a run rollup, post a short summary on Project `do-work/{UR-id}` (non-authoritative convenience; Issue comment remains the home per design §10).
+5. **Return** comment id / success.
+
+| Failure | Behavior |
+|---------|----------|
+| Comment tools missing | Hard-stop for this op; do not invent a local markdown “note store” as work-item substitute |
+| MCP dies after claim, during note | **Leave claimed**; stop; retry note later — never silent-release |
+
+#### Local ledger telemetry (optional; not a second store)
+
+When `ledger.enabled: true`, the orchestrator **may also** append `{project}/.do-work/runs/RUN-NNN.yml` via `lib/run-ledger.sh` for offline retro tooling (design §7).
+
+| Store | Role when `backend: linear` |
+|-------|------------------------------|
+| **Issue comment via `append_run_note`** | **Authoritative** run/cost note |
+| **Local `RUN-NNN.yml`** | **Telemetry only** — offline sum/budget/retro convenience |
+| **Local UR/REQ markdown** | **Not** a work-item store; do not dual-write REQs |
+
+Rules:
+
+1. Local ledger **must not** become the system of record for work items or claim state.
+2. Retro prefers Linear run notes when `backend: linear`; falls back to local runs if comments are unavailable.
+3. If `ledger.enabled` is false, skip local file; still prefer `append_run_note` for Linear run history when the attempt warrants a note.
+4. Budget gate may sum local telemetry when present; if only Linear notes exist, sum from those comments or skip numeric gate with an explicit note — never invent spend.
+
+---
+
+### Commits and PRs (Linear mode — design §6.5)
+
+Runtime/git stay local. Message format uses the **Linear issue id**:
+
+```
+feat(ENG-123): short title
+
+Issue: ENG-123
+UR: UR-007
+Output: path/to/primary/output
+```
+
+| Rule | Detail |
+|------|--------|
+| Subject scope | `feat(ENG-123):` / `fix(ENG-123):` / `chore(ENG-123):` — Linear identifier, not `REQ-NNN` |
+| Footer | `Issue: ENG-123` (required); `UR: UR-NNN` when known; `Output:` primary path |
+| Archive path | **No** `.do-work/archive/REQ-…` line required |
+| Branch | May use `req/ENG-123` (sanitize for git ref rules: replace disallowed chars) |
+| PR title/body | Same id convention when `delivery.mode: pr` |
+| Markdown backend | Unchanged: `feat(REQ-NNN):` + `REQ:` / `UR:` / `Output:` paths |
+
+Workers and orchestrators under `backend: linear` use this convention for implementation commits and PR metadata. See `agents/run-worker.md` Step 8 and `agents/run.md` archive/PR commits.
 
 ---
 
@@ -1080,9 +1235,26 @@ Do **not** glob `.do-work/working/` or run `lib/synth-status.sh` as the work-ite
 |-------|----------|
 | Claim re-read sees foreign **fresh** active claim | Stop `concurrent-conflict`; no assignee change; resume allowed for claim owner |
 | Lost race on post-write re-read | Same stopper; do not delete the other agent’s comment |
-| MCP dies after successful claim, before archive/unblock | **Leave claimed** (in_progress + last heartbeat); resume or unblock after recovery |
+| MCP dies after successful claim, before archive/unblock | **Leave claimed** (in_progress + active claim comment + last heartbeat); worker/orchestrator **stops**; resume or unblock after recovery |
+| MCP dies mid-`archive_req` before claim release | **Leave claimed** if still active; re-run archive when healthy |
 | MCP dies before claim completes | Hard-stop; no markdown substitute store |
+| Silent-release or markdown fallback after claim | **Forbidden** — never auto-release claim; never switch to markdown work-item ops while `backend: linear` |
 | Operator clears claim comments in Linear UI mid-run | Protocol broken — status should warn; treat as unclaimed/ambiguous and stop rather than invent state |
+
+**Mid-flight policy (run path — REQ-294 / port):** after a successful `claim_req`, any Linear MCP failure leaves the Issue **claimed** (`status_map.in_progress` + latest claim `status: active`). The failing agent exits stopped (appropriate stopper reason). Operator recovers with `/do-work resume` or `/do-work unblock` once MCP is healthy. Same multi-agent recovery story as markdown concurrent-conflict / stale slots.
+
+---
+
+## Footprint and deps in the run loop (REQ-294)
+
+| Concern | Linear rule | Markdown parity |
+|---------|-------------|-----------------|
+| **Deps satisfied?** | Every issue on the authoritative **`blocks`** graph (deps that block this issue) is in `status_map.done` | `**Depends on:**` ids in `archive/` (or pending-validation per decisions) |
+| **Deps diverge** | Relations **win**; body `**Depends on:**` is display/mirror | File header is the store |
+| **Footprint free?** | Parse candidate `**Files:**`; for every **in-progress / stopped-with-active-claim** issue, parse that Issue body’s `**Files:**`; reject on path overlap | `lib/check-footprint.sh` vs `working/` |
+| **After `archive_req`** | Done + released claim → no longer in-flight; footprint frees for siblings | File left `working/` |
+
+`list_claimable_reqs` (above) implements both checks. Run Step 1 must not re-implement with local REQ files while `backend: linear`.
 
 ---
 
@@ -1101,9 +1273,9 @@ Dependency ids are **Linear issue identifiers only**.
 
 ## Out of scope for this file state
 
-- `archive_req` full sequence (done + closure proof + outputs + claim release) → later REQs.
-- Capture / ideate / question / verify **phase playbook** rewires (beyond load path) → later REQs. **Claim consumers** `status` / `unblock` / `resume` / `run` are wired as of REQ-293 (see **Path: Linear claim phase-agent wiring**).
-- Non-ticket Docs, run notes, calibration, milestone cursor, migration → later path-units.
+- Capture / ideate / question / verify **phase playbook** rewires (beyond load path) → later REQs. **Claim consumers** `status` / `unblock` / `resume` / `run` are wired as of REQ-293; **run archive/notes/commits** as of REQ-294.
+- Non-ticket Team Docs (decisions/calibration), verify/close Initiative homes, milestone cursor, migration → later path-units.
+- Deeper list_claimable ordering / review-gate edge cases → REQ-295.
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
 - Inventing tool names not returned by live `search_tool` (including treating Linear skill typical-tool tables as proven).
@@ -1115,7 +1287,7 @@ Dependency ids are **Linear issue identifiers only**.
 
 - `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative / claim rules
 - `agents/config.md` — `tracker.*` schema, `agent_claim_marker`, `heartbeat_max_age_seconds`, Load Config step 7
-- `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` — phase agents; markdown steps when backend is markdown; Linear port ops (this file) when backend is linear (REQ-293)
-- Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§6 hierarchy, §7 config, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
+- `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` / `agents/run-worker.md` — phase agents; markdown steps when backend is markdown; Linear port ops (this file) when backend is linear (REQ-293 claim; REQ-294 run archive/notes/commits)
+- Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint; REQ-292 claim sequences; REQ-293 phase-agent claim wiring
+- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint; REQ-292 claim sequences; REQ-293 phase-agent claim wiring; REQ-294 run coordination (archive / notes / §6.5 / mid-flight)
