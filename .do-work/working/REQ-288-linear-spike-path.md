@@ -1,7 +1,13 @@
 # REQ-288: Linear MCP capability spike path
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T05:16:15Z
+**Heartbeat:** 2026-07-31T05:16:15Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** Operator sets sandbox Linear team; agent runs spike against live MCP tools
