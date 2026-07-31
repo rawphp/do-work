@@ -17,11 +17,13 @@ One hop from [`agents/tracker/linear.md`](../agents/tracker/linear.md). Load whe
 
 ```
 Team (config)
-└── Project product_project (default "do-work")  — shared for all URs
+└── Project product_project  — one shared product Project per local product (not per UR)
     ├── Project Milestone (UR)  — §9.1 <!-- do-work-ur -->; brief, ideate, verify, close
     └── Issue (REQ)             — on product Project, attached to UR milestone
         └── Sub-issue (layer child)
 ```
+
+**Product Project naming:** `tracker.linear.product_project` defaults to **empty** (not skill name `do-work`). Resolve order is documented under `ensure_product_container` / `agents/config.md` Load Config step 8. Example for the do-work skill repo itself may still use name `do-work`.
 
 **No Initiative-as-UR.** Path-milestone mode (M1/M2) is a *cursor + Issue markers* on the UR milestone — see [linear-path-milestones.md](linear-path-milestones.md).
 
@@ -75,8 +77,9 @@ On **read/update**: if the marker is missing, treat as template parse failure �
 | `**UR-id:**` | Sequential `UR-NNN` slug only (not a Linear entity id) | Resolve UR; `list_urs` |
 | `**Class:**` | Intake classification (feature / …) | Capture, status |
 | `**Created:**` | ISO date `YYYY-MM-DD` at create | Display |
-| `**Product-project:**` | Shared product Project name (`product_project`, default `do-work`) | Resolve product Project |
+| `**Product-project:**` | Shared product Project **display name** after ensure (from bound Project; not a hard-coded skill default) | Display; prefer id for resolve |
 | `**Product-project-id:**` / `**Milestone-id:**` | Linear UUIDs after ensure + milestone create | Prefer ids over names |
+
 | `## Brief` | **Verbatim** intake — never overwrite on ideate/question | `read_ur` |
 | `## Clarifications` | `append_clarifications` appends Q&A; does not create REQs | Question, capture |
 | `## Ideate` | `append_ideate` writes/appends ideate body | Ideate, capture |
@@ -204,8 +207,9 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 |--------|---------|
 | UR slug | Sequential `UR-NNN` (UR Project Milestone metadata only) |
 | REQ | **Linear issue identifier only** (e.g. `ENG-123`) — never allocate `REQ-NNN` under Linear backend |
-| Product Project | `tracker.linear.product_project` (default `do-work`) — shared for all URs |
+| Product Project | `tracker.linear.product_project` — shared for all URs on this local product; **name or UUID**; empty default; resolve chain + ensure persist UUID (never invent skill name `do-work`) |
 | UR milestone name | `tracker.linear.ur_milestone_name_pattern` (default `{ur_id}: {title}`) |
+
 
 ### Preflight (before first CRUD op in a session)
 
@@ -219,34 +223,57 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | Team resolvable; ensure shared **product Project** (`product_project`, default `do-work`); optional labels ready. |
-| **Sequence** | Preflight steps 2–4. Resolve or create product Project by name/id from `tracker.linear.product_project` (default `do-work`). Optionally pre-create labels when tools exist. |
-| **Failure** | Hard-stop; never create markdown `.do-work/` as substitute product container. Never invent Initiatives as UR containers. |
+| **Intent** | Team resolvable; ensure the shared **product Project** for this local product (not per UR); optional labels ready. Create/bind when missing; **always persist** Project UUID to `tracker.linear.product_project`. |
+| **Preconditions** | Preflight steps 2–4 done (MCP tools, team resolved, `status_map` validated). Config loaded (`agents/config.md`). |
+| **Failure** | Hard-stop on empty-name, multi-match, tool missing, create/get failure. **Never** create markdown `.do-work/` as substitute product container. **Never** invent Initiatives as UR containers. **Never** fall through to skill name `do-work` for empty `product_project`. |
+
+**Agent sequence (executable):**
+
+1. **Resolve target name/id (lookup key)** — same chain as `agents/config.md` Load Config step 8; do **not** invent a different order:
+   1. Let `pp` = `tracker.linear.product_project` (missing / null / whitespace-only → empty).
+   2. If `pp` is **non-empty** (name **or** UUID) → **lookup key = `pp`**. Explicit config wins; do not replace with `project.name`, basename, or skill name `do-work`.
+   3. If `pp` is **empty** → lookup key = `project.name` when non-empty; else **git-root directory basename**.
+   4. If the final lookup key is still empty/whitespace → **hard-stop** (**empty-name**): instruct operator to set `project.name` or `tracker.linear.product_project` in `{project}/.do-work/config.yml`. Do **not** invent a name. Do **not** markdown-fallback.
+2. **Rediscover project tools** — `search_tool` for Linear project surfaces (`"linear project"`, `"linear list projects"`, `"linear save project"` / create-project). Map hits to list/get/create. If list/get (and, for name create path, create/`save_project`) tools are undiscoverable → **hard-stop** (setup block). Never hard-code tool names; use qualified names + `input_schema` from search.
+3. **Resolve or create on the team**
+   - **UUID path** (lookup key is already a Project UUID / id form): `use_tool` get-project (or list filtered by id). Found → use that Project. Not found → **hard-stop** (do not invent; do not create a Project whose name is the UUID string).
+   - **Name path** (lookup key is a display name):
+     1. `use_tool` list-projects scoped to the **resolved team** (team id/key from preflight). Prefer `query` / name filter when the schema supports it; otherwise list and filter client-side.
+     2. Keep **exact name matches** (case-sensitive unless the live tool documents otherwise) on that team.
+     3. **Match count:**
+        - **0** → **create** via rediscovered create/save-project surface (`save_project` when discovered): `name` = lookup key; attach team with `addTeams` **or** `setTeams` = resolved team (schema requires at least one team). Capture returned Project UUID.
+        - **1** → **use** that Project (id + name).
+        - **>1** → **hard-stop** (**multi-match**): list matching ids/names; require operator to set `tracker.linear.product_project` to the desired **UUID**. Do not pick “first”; do not invent; no markdown fallback.
+4. **Persist UUID** — **always** write the resolved Project **UUID** to `tracker.linear.product_project` in `{project}/.do-work/config.yml` and in-memory config. If the file already stores that same UUID, skip the write (idempotent). Prefer UUID over name for all subsequent ops in the session.
+5. **Optional labels** — when create/list label tools exist, pre-create common labels (`labels.layer_prefix`, `size_prefix`, `path_unit`) for the team. Label failure is non-fatal for container ensure (body headers remain source of truth); project ensure itself must already have succeeded.
+6. **Return** product Project **id (UUID)** + **name**. Cache for the session.
+
+**Does not:** create a UR or REQ; create a per-UR Linear Project; create Initiatives; write local UR/REQ markdown as the store.
 
 ### `create_ur`
 
 | | |
 |---|---|
-| **Intent** | Record intake brief as a **UR Project Milestone** on the shared **product Project**. Does **not** create REQs. **Not** Initiative-as-UR. |
+| **Intent** | Record intake brief as a **UR Project Milestone** on the shared **product Project**. Does **not** create REQs. **Not** Initiative-as-UR. **Not** a new Linear Project per UR. |
 | **Preconditions** | Preflight passed; `ensure_product_container` done; next `UR-NNN` slug allocatable. |
 | **Atomicity** | Product Project resolvable + Project Milestone create must succeed as one logical unit. **No partial UR.** |
 
 **Agent sequence:**
 
-1. **Ensure product Project** — call **`ensure_product_container`** (resolve/create `tracker.linear.product_project`, default `do-work`).
+1. **Ensure product Project** — call **`ensure_product_container`** first (resolve chain + list/create/bind + persist UUID). Do **not** restate a hard-coded product name here; do **not** create a per-UR Project.
 2. **Allocate next `UR-NNN` slug**
    - `search_tool` for project milestones list tools (`"linear milestones"`, `"linear project milestones"`).
    - List milestones on the product Project; scan names / descriptions for `UR-*` / `**UR-id:** UR-*` / `<!-- do-work-ur -->`.
    - Pick next free sequential `UR-NNN`.
 3. **Build body**
    - Milestone name: apply `tracker.linear.ur_milestone_name_pattern` (default `{ur_id}: {title}`, e.g. `UR-007: Add SSO`).
-   - Description: §9.1 template with verbatim brief; `**Product-project:**` + product project id; leave `**Milestone-id:**` empty until create returns it.
+   - Description: §9.1 template with verbatim brief; `**Product-project:**` + product project name; `**Product-project-id:**` from ensure; leave `**Milestone-id:**` empty until create returns it.
 4. **Create Project Milestone** on the product Project
    - `search_tool "linear milestone"` / create-milestone surface.
    - If **no** milestone create tool is discovered → **hard-stop** (do **not** invent Initiative-as-UR; do **not** create a per-UR Project as a fake UR).
    - `use_tool` create with discovered schema (project id + name + description as required).
    - Record milestone id; patch `**Milestone-id:**` if update tools allow.
-5. **Return** UR slug, product project id/name, milestone id/name. **Do not** write `.do-work/user-requests/UR-NNN/`. **Do not** create Linear Initiatives.
+5. **Return** UR slug, product project id/name, milestone id/name. **Do not** write `.do-work/user-requests/UR-NNN/`. **Do not** create Linear Initiatives. **Do not** create a Linear Project per UR.
 
 ### `read_ur`
 

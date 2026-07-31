@@ -196,7 +196,7 @@ Names freeze intent. Exact field shapes and store sequences live in each backend
 
 | Op | Intent |
 |----|--------|
-| `ensure_product_container` | Team/product labeling ready; no single product Project required |
+| `ensure_product_container` | Product/team container ready (markdown: dirs; Linear: shared product Project create/bind + persist UUID) |
 | `create_ur` | Record intake brief |
 | `read_ur` | Load brief (+ ideate if present) |
 | `list_urs` | Enumerate URs for prompts/status |
@@ -232,9 +232,9 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 
 | | |
 |---|---|
-| **Intent** | Ensure the product/team container for work items is ready (markdown: `.do-work/` dirs; Linear: team resolvable / labels ready — **no** single long-lived product Project required). |
+| **Intent** | Ensure the product/team container for work items is ready. **Markdown:** local `.do-work/` dirs. **Linear:** team resolvable; **create or bind** the shared product Project when missing (`product_project` resolve chain + list/create + **persist UUID**); optional labels ready. |
 | **Preconditions** | Config loaded; backend resolved. For Linear: team resolvable or hard-stop. |
-| **Notes** | Idempotent. Does not create a UR or REQ. |
+| **Notes** | Idempotent. Does not create a UR or REQ. Linear never falls through to skill name `do-work` for empty `product_project`. Multi-match by name and empty-name failures hard-stop (no markdown substitute store). |
 
 #### `create_ur`
 
