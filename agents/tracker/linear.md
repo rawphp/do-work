@@ -41,6 +41,7 @@ Team (config)
 
 ### Hard rules (hierarchy)
 
+<!-- UR-002 path closed via children ORI-15..18: empty product_project → project.name → basename → ensure create+persist UUID; never invent skill name do-work -->
 1. **No Initiative-as-UR** — MCP has no reliable Initiative create path; URs are Project Milestones.
 2. **`product_project` is shared per local product** — do not create per-UR Projects (including `do-work/{UR-id}` patterns) as the UR container.
 3. **Atomic `create_ur`** — product Project ensure + milestone create; no partial UR; hard-stop on failure.
