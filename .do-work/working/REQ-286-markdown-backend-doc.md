@@ -1,7 +1,13 @@
 # REQ-286: Write agents/tracker/markdown.md mapping
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T05:16:14Z
+**Heartbeat:** 2026-07-31T05:16:14Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
