@@ -1,19 +1,14 @@
 # REQ-286: Write agents/tracker/markdown.md mapping
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:16:14Z
-**Heartbeat:** 2026-07-31T05:16:14Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
 **Terminal state:** 
 **Parent:** REQ-283
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-286 commit:09e3d1e tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 3
 **Size:** M
@@ -30,10 +25,10 @@ Design §5.1–5.3; Connector: reuse parallel coordination semantics, not reimpl
 
 ## Acceptance Criteria
 
-- [ ] Every op in port.md has a markdown implementation note (script path and/or file glob)
-- [ ] Explicitly states no Linear-aware bash required for markdown backend
-- [ ] Claim atomicity documented as mv/git mv race (exit 2) matching claim-req.sh
-- [ ] Mapping never invents a lib/*.sh path that does not exist in the repo; missing scripts are called out as gaps, not invented
+- [x] Every op in port.md has a markdown implementation note (script path and/or file glob)
+- [x] Explicitly states no Linear-aware bash required for markdown backend
+- [x] Claim atomicity documented as mv/git mv race (exit 2) matching claim-req.sh
+- [x] Mapping never invents a lib/*.sh path that does not exist in the repo; missing scripts are called out as gaps, not invented
 
 ## Verification Steps
 
