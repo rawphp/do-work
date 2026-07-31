@@ -1,7 +1,13 @@
 # REQ-296: Linear non-ticket artifacts and close path
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T06:04:43Z
+**Heartbeat:** 2026-07-31T06:04:43Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** capture append_decision; verify/close write reports; retro calibration; run notes
