@@ -1,19 +1,14 @@
 # REQ-292: Linear claim and status path
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:35:09Z
-**Heartbeat:** 2026-07-31T05:35:09Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** /do-work run|status|unblock|resume with backend linear
 **Terminal state:** Optimistic claim comment protocol works; status reports claimers/heartbeats; unblock/resume match markdown semantics; mid-flight failure leaves claimed
 **Parent:** 
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-292 commit:a911cb5 tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 2
 **Size:** M
@@ -30,10 +25,10 @@ Design §8; clarification leave claimed on MCP death.
 
 ## Acceptance Criteria
 
-- [ ] Claim uses agent_claim_marker comment + workflow in_progress; assignee not stolen
-- [ ] Heartbeat updates; stale uses heartbeat_max_age_seconds or parallel.stale_threshold_seconds
-- [ ] Unblock → backlog + claim status released
-- [ ] Resume refreshes heartbeat; concurrent-conflict stopper when claim race lost
+- [x] Claim uses agent_claim_marker comment + workflow in_progress; assignee not stolen
+- [x] Heartbeat updates; stale uses heartbeat_max_age_seconds or parallel.stale_threshold_seconds
+- [x] Unblock → backlog + claim status released
+- [x] Resume refreshes heartbeat; concurrent-conflict stopper when claim race lost
 
 ## Verification Steps
 
