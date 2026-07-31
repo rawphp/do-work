@@ -1,19 +1,14 @@
 # REQ-289: Run Linear MCP spike and draft linear.md skeleton
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:20:59Z
-**Heartbeat:** 2026-07-31T05:20:59Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
 **Terminal state:** 
 **Parent:** REQ-288
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-289 commit:a675df1 tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 3
 **Size:** L
@@ -30,10 +25,10 @@ Clarification spike-first; ~/.grok/skills/linear/SKILL.md MCP-first rediscovery.
 
 ## Acceptance Criteria
 
-- [ ] agents/tracker/linear.md exists with capability matrix table
-- [ ] Documents hard-stop when MCP unauthenticated/missing with Linear skill setup steps
-- [ ] Records whether Initiatives, InitiativeToProject, issue relations, Team Docs are available
-- [ ] No secrets committed
+- [x] agents/tracker/linear.md exists with capability matrix table
+- [x] Documents hard-stop when MCP unauthenticated/missing with Linear skill setup steps
+- [x] Records whether Initiatives, InitiativeToProject, issue relations, Team Docs are available
+- [x] No secrets committed
 
 ## Verification Steps
 
@@ -44,7 +39,7 @@ Clarification spike-first; ~/.grok/skills/linear/SKILL.md MCP-first rediscovery.
 
 ## Manual checks (advisory)
 
-- [ ] Execute discovery against sandbox team in a session with Linear MCP connected — Observable: matrix rows filled from live tools not guesses
+- [x] Execute discovery against sandbox team in a session with Linear MCP connected — Observable: matrix rows filled from live tools not guesses
 
 ## Integration
 
