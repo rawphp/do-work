@@ -95,6 +95,30 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+### Claim / pick / heartbeat — backend branch (REQ-293)
+
+Work-item **pick, claim, heartbeat, set status, unblock** go through named port ops. Runtime (worktrees, merges, `state/*` locks, events) stays local for both backends.
+
+| Concern | Markdown (`markdown.md`) | Linear (`linear.md`) |
+|---------|--------------------------|----------------------|
+| Pick claimable | `list_claimable_reqs` → `lib/pick-req.sh` | **`list_claimable_reqs`** — project filter + backlog state + deps via **`blocks` relations** + footprint from `**Files:**` + unclaimed/stale (linear.md sequence) |
+| Claim | `claim_req` → `lib/claim-req.sh` (FS stamp + working/) | **`claim_req`** — optimistic re-read; workflow `in_progress` + claim comment (`agent_claim_marker` / `<!-- do-work-claim -->`); **never** steal assignee |
+| Heartbeat | `heartbeat_req` → `lib/heartbeat.sh` | **`heartbeat_req`** — new/updated claim-protocol comment with fresh `heartbeat` ISO timestamp |
+| Stopped / resume | header + stamp edits; `agents/resume.md` | **`set_req_status`** + **`heartbeat_req`** (see linear.md Resume); `agents/resume.md` Linear branch |
+| Unblock | `agents/unblock.md` stamp strip | **`unblock_req`** — `status: released` + backlog state; `agents/unblock.md` Linear branch |
+| Mid-flight MCP / worker death after claim | leave working/ slot; stale + resume/unblock | **Leave claimed** (in_progress + last claim/heartbeat); resume or unblock after recovery — **never** auto-release or silent markdown fallback |
+| Status situation room | `agents/status.md` + `synth-status.sh` | `agents/status.md` **1L** — claimers/heartbeats from Linear comments |
+
+**When effective backend is `linear`:**
+
+1. Do **not** call `lib/pick-req.sh` / `lib/claim-req.sh` / `lib/heartbeat.sh` as the work-item store (those scripts implement the markdown backend).
+2. In **The Loop** Step 1 (and pre-flight pick), replace the pick-req/claim-req shell blocks with agent steps that execute **`list_claimable_reqs`** then **`claim_req`** from `agents/tracker/linear.md` (same eligibility semantics: backlog, deps satisfied, footprint free, unclaimed or stale-eligible).
+3. On claim race lost → stop / retry with **`concurrent-conflict`** (same stopper as markdown exit 2); resume allowed for the claim owner.
+4. Pass **Linear issue id** (e.g. `ENG-123`) to workers; branch names may use `req/ENG-123` (sanitize for git). Worker heartbeats use **`heartbeat_req`** against that issue id (checkpoints unchanged in intent).
+5. Pre-flight “scan working/” is markdown-specific; under Linear, scan **in-flight issues** (workflow in_progress/stopped + active claim comments) via list + Helper: read active claim — same mine/sibling/stale buckets in spirit, different representation.
+6. If Linear MCP dies after a successful **`claim_req`** and before archive/unblock → **leave claimed**; do not invent cleanup that races siblings.
+
+**When effective backend is `markdown`:** keep the `lib/pick-req.sh` / `lib/claim-req.sh` / `lib/heartbeat.sh` sequences written throughout this file — they are the markdown backend implementation of those port ops.
 
 ---
 
@@ -472,9 +496,13 @@ AGENT_ID="$(hostname).$$"
 
 **Scope argument:** `SCOPE` is derived from the optional `UR-NNN` argument at startup (see `## When Invoked`). Default is `any`. When `/do-work run UR-NNN` is invoked, `SCOPE=UR-NNN` and the picker filters out REQs whose `**UR:**` field does not match. The picker is also milestone-aware: when `state/active-milestone.md` exists it constrains its glob to `REQ-M<active>-*.md` regardless of `SCOPE`.
 
-**Pick the next claimable REQ — delegate to `lib/pick-req.sh`:**
+**Pick the next claimable REQ — port op `list_claimable_reqs`:**
+
+- **Markdown backend:** implement via `lib/pick-req.sh` (below).
+- **Linear backend:** implement via **`list_claimable_reqs`** in `agents/tracker/linear.md` (project filter + backlog + relations deps + `**Files:**` footprint + unclaimed). Do not run `pick-req.sh` as the Linear store. On empty list, apply the same idle-wait / drain classification intent without requiring pick-req stderr lines (map “no claimable” → truly-empty or deps/overlap from the op’s skip reasons when available).
 
 ```bash
+# markdown only — linear: call list_claimable_reqs (linear.md) instead
 PICK_STDERR=$(mktemp)
 REQ_PATH=$(bash {skill-root}/lib/pick-req.sh "$SCOPE" "$AGENT_ID" 2>"$PICK_STDERR")
 ```
@@ -543,18 +571,22 @@ DEADLOCK_OUT=$(bash {skill-root}/lib/deadlock-check.sh)
 
 > **JUDGMENT:** The deadlock diagnosis must distinguish a stuck deadlock from a slow-but-live backlog. `deadlock-check.sh` returning a report is strong evidence (no commits in 5 min OR all slots stale OR runtime cycle) — trust it and surface. Empty output means heartbeats are still advancing or commits are landing; in that case the generic "continue waiting?" prompt is correct. Never silently keep idling past the 30-minute mark — either the deadlock path or the user prompt must fire.
 
-**If `pick-req.sh` returns a path (exit 0) — claim it atomically via `lib/claim-req.sh`:**
+**If pick returns a candidate — claim via port op `claim_req`:**
+
+- **Markdown backend:** `lib/claim-req.sh` (below).
+- **Linear backend:** **`claim_req`** in `agents/tracker/linear.md` — optimistic re-read; set `status_map.in_progress`; post `<!-- do-work-claim -->` (config `agent_claim_marker`) comment with `agent_id` / timestamps / `status: active`; **never** change assignee. Race lost → `concurrent-conflict` (retry list/claim or stop; resume allowed for owner). Mid-flight MCP death after claim → **leave claimed**.
 
 ```bash
+# markdown only — linear: call claim_req (linear.md) with issue id + AGENT_ID
 COMMIT_HASH=$(bash {skill-root}/lib/claim-req.sh "$REQ_PATH" "$AGENT_ID")
 ```
 
 `claim-req.sh` (REQ-146) performs the `git mv` → stamp insertion → `Status: in-progress` update → stage → commit sequence atomically and prints the commit short hash to stdout. On failure it writes a diagnostic to stderr and exits non-zero:
 
-- **Exit 2 (`Claim lost: REQ-NNN`)** — a sibling won the race on this exact file. Re-run `pick-req.sh` from the top of Step 1 (the lost candidate is now in `working/` and will be excluded by the overlap filter).
-- **Any other non-zero exit** — log the stderr diagnostic and re-run `pick-req.sh` after a 2 s backoff. After 3 consecutive non-race failures, stop and report to the user.
+- **Exit 2 (`Claim lost: REQ-NNN`)** — a sibling won the race on this exact file. Re-run `pick-req.sh` from the top of Step 1 (the lost candidate is now in `working/` and will be excluded by the overlap filter). Linear equivalent: re-run **`list_claimable_reqs`** then **`claim_req`**.
+- **Any other non-zero exit** — log the stderr diagnostic and re-run pick after a 2 s backoff. After 3 consecutive non-race failures, stop and report to the user.
 
-After a successful `claim-req.sh`:
+After a successful claim (`claim-req.sh` or Linear **`claim_req`**):
 
 **Announce:**
 

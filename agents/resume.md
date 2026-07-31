@@ -39,6 +39,60 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+**Branch on effective backend** after load path:
+
+| Backend | Work-item resume |
+|---------|------------------|
+| **`markdown`** | Steps **1–6** below (working/ stamp + `heartbeat.sh`) |
+| **`linear`** | Steps **L1–L5** — linear.md **Resume** (compose **`set_req_status`** + **`heartbeat_req`**). Id is a **Linear issue id**. Assignee and claim ownership preserved. |
+
+Invocation under Linear may be `/do-work resume ENG-123`. Worktree/branch isolation stays **local** regardless of backend.
+
+---
+
+## Linear backend (Resume compose)
+
+Resume is **not** a separate port op name. Follow **Resume (Linear — `agents/resume.md` consumer)** in `agents/tracker/linear.md`.
+
+### L1. Locate issue and confirm stopped
+
+1. Get issue by Linear id (rediscover tools; hard-stop if MCP unusable).
+2. Workflow must map to `status_map.stopped`. If not stopped → refuse (same as markdown).
+3. Latest claim must be `status: active` (**Helper: read active claim**). If `released` or missing → refuse; operator should use run/claim or `/do-work unblock`, not resume.
+4. Record prior stopper context from run notes / comments when present for the announce line.
+
+### L2. Detect worktree mode (local)
+
+Same as markdown Step 2, using branch `req/<issue-id>` (sanitize for git ref rules) when Linear ids are used:
+
+- Do **not** delete the existing feature branch.
+- Do **not** clear the Linear claim.
+- Fresh worker continues on the existing worktree/branch when present.
+
+### L3. Refresh status and heartbeat (port ops)
+
+1. **`set_req_status`** → `in_progress` (workflow `status_map.in_progress`). **Do not** change human assignee. **Do not** strip claim comments.
+2. **`heartbeat_req`** — refresh `heartbeat` now; preserve `agent_id` and `claimed_at` on the active claim protocol (`agent_claim_marker` / `<!-- do-work-claim -->`).
+3. If either op fails (MCP down mid-flight) → **leave claimed** (port mid-flight rule); hard-stop with setup/resume-later instructions. Do not invent markdown working/ cleanup.
+
+### L4. Dispatch a fresh worker
+
+Same as markdown Step 4 / [run.md](run.md) classification + model selection + dispatch. Pass the Linear issue id and prior context instead of a `.do-work/working/` path when the worker load path is Linear. Escalation for prior-stopped still applies.
+
+Announce:
+
+```
+[<agent-id>] Resuming <ISSUE-ID> [type=<subagent_type>, model=<model>, prior reason=<reason>]: [title]
+```
+
+### L5. Process the worker report / stop
+
+Same as markdown Steps 5–6 ([run.md](run.md) report processing). Single-issue operation; do not auto-loop.
+
+---
+
+## Markdown backend
+
 ### 1. Locate the REQ and confirm `stopped`
 
 Check whether `{project}/.do-work/working/REQ-NNN-*.md` exists.
@@ -126,9 +180,10 @@ Resume is a one-shot. Do not claim another REQ, do not invoke run, do not prompt
 
 ## Rules
 
-- Refuse to resume a REQ whose `**Status:**` is not `stopped`. Backlog REQs reclaim through `run.md`; archived REQs are done; `in-progress` REQs are either live or already abandoned (use `/do-work unblock` for those).
-- Preserve `**Claimed by:**` and `**Claimed at:**` exactly. Only `**Heartbeat:**` is refreshed.
-- For worktree-mode REQs, never delete or reset the `req/REQ-NNN` branch — the fresh worker continues on it.
+- Refuse to resume a work item that is not **stopped** with an **active** claim. Backlog reclaim through `run.md`; done/archived are finished; abandoned `in-progress` uses `/do-work unblock`.
+- **Markdown:** Preserve `**Claimed by:**` and `**Claimed at:**` exactly. Only `**Heartbeat:**` is refreshed.
+- **Linear:** Preserve claim `agent_id` / `claimed_at`; refresh via **`heartbeat_req`**; workflow via **`set_req_status`** → in_progress; never steal assignee.
+- For worktree-mode REQs, never delete or reset the feature branch — the fresh worker continues on it.
 - Do not duplicate classification, model selection, or dispatch logic — refer to [run.md](run.md). When that file changes, resume inherits the change for free.
-- Single REQ per invocation. No batching.
-- No `AskUserQuestion` next-step prompt unless triggered by the worker-report branch in Step 5.
+- Single REQ / issue per invocation. No batching.
+- No `AskUserQuestion` next-step prompt unless triggered by the worker-report branch.
