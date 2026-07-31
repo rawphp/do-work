@@ -47,6 +47,64 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+**Branch on effective backend** after load path:
+
+| Backend | Work-item unblock |
+|---------|-------------------|
+| **`markdown`** | Steps **1–8** below (working/ stamp strip + backlog move) |
+| **`linear`** | Steps **L1–L4** — port op **`unblock_req`** in `agents/tracker/linear.md`. Id is a **Linear issue id** (e.g. `ENG-123`). No `.do-work/working/` claim stamps. |
+
+Invocation under Linear may be `/do-work unblock ENG-123` (or the issue identifier the operator passes). Treat `REQ-NNN` in the markdown steps as the issue identifier only for markdown.
+
+---
+
+## Linear backend (`unblock_req`)
+
+### L1. Resolve the issue
+
+Caller supplies a Linear issue id. Run **Helper: read active claim** + get issue (linear.md). If the issue is missing → report nothing to unblock and stop. If already backlog with no active claim / latest claim `released` → report already unblocked and stop (idempotent).
+
+### L2. Detect implementation commits (local git — same judgment)
+
+Run:
+
+```bash
+git log --grep "<issue-id>" --oneline
+```
+
+Also accept historical `REQ-NNN` greps if the operator still uses that form in commit messages. Filter to implementation commits (`feat(…)` / `fix(…)`). Record as `IMPL_COMMITS`.
+
+### L3. Handle partial commits (judgment gate)
+
+Same **J1** as markdown Step 3 (`AskUserQuestion`: revert / keep / fold). Execute the chosen git action **before** the port op. Git recovery stays local; it is **outside** the tracker port.
+
+### L4. Call port op `unblock_req`
+
+Follow **`unblock_req`** in `agents/tracker/linear.md` exactly:
+
+1. Rediscover Linear tools (`search_tool` → `use_tool`); hard-stop if undiscoverable.
+2. Post claim-protocol comment with `status: released` (`agent_claim_marker` / `<!-- do-work-claim -->`).
+3. Set workflow state → `status_map.backlog`. **Do not** change human **assignee**.
+4. Do **not** write local backlog files or invent markdown dual-write.
+
+Report:
+
+```
+Unblock complete (Linear).
+
+<ISSUE-ID> → backlog (status_map.backlog)
+Claim status: released
+Assignee: unchanged
+Commit decision: <revert | keep | fold | none>
+Implementation commits affected: <count>
+```
+
+Stop. Do not invoke run/verify next-step prompts.
+
+---
+
+## Markdown backend
+
 ### 1. Locate the REQ
 
 Check whether `{project}/.do-work/working/REQ-NNN-*.md` exists.
@@ -148,9 +206,10 @@ Stop. Do not invoke run, verify, or any next-step prompt.
 
 ## Rules
 
-- Refuse to unblock a REQ that is not in `working/`. Backlog REQs are not blocked; archived REQs are done — neither needs unblocking.
-- Refuse to operate on multiple REQs in one invocation. One REQ per call.
+- **Markdown:** Refuse to unblock a REQ that is not in `working/`. Backlog REQs are not blocked; archived REQs are done — neither needs unblocking.
+- **Linear:** Unblock via **`unblock_req`** only; refuse to invent local working/ files; assignee never changed.
+- Refuse to operate on multiple REQs in one invocation. One REQ / issue per call.
 - Always surface implementation commits before discarding them — never silently revert.
-- Strip the claim stamp atomically. A half-edited stamp is worse than no edit at all.
-- Commit message follows the `chore(REQ-NNN): ...` convention. Never use `feat:` or `fix:` — unblock is housekeeping, not implementation.
+- **Markdown:** Strip the claim stamp atomically. A half-edited stamp is worse than no edit at all. Commit message follows the `chore(REQ-NNN): ...` convention.
+- **Linear:** Claim release is a `status: released` comment + backlog workflow state (linear.md); no half-updated protocol.
 - No `AskUserQuestion` next-step prompt after the report. Unblock is a terminal action.

@@ -35,7 +35,16 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
-### 1. Render situation
+**Branch the render path on effective backend** (after load path):
+
+| Backend | Work-item situation room |
+|---------|--------------------------|
+| **`markdown`** (default) | Steps **1–2** below (`lib/synth-status.sh`, `derive-status`, `coverage-rollup`, `deadlock-check`) |
+| **`linear`** | Step **1L** — Linear claimers / heartbeats via port ops in `agents/tracker/linear.md` (**Status reporting**). Do **not** glob `.do-work/working/` or treat local REQ files as the live store. |
+
+### 1. Render situation (markdown backend)
+
+*Skip this step when effective backend is `linear` — use **1L** instead.*
 
 Run:
 
@@ -63,7 +72,24 @@ bash lib/coverage-rollup.sh [UR-NNN]
 
 Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the UR has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the UR has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the UR declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `lib/coverage-rollup.sh` is missing, report `"lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
 
-### 2. Check for deadlock
+### 1L. Render situation (Linear backend)
+
+*Only when effective `tracker.backend` is `linear`. Sequences live in `agents/tracker/linear.md` — **Status reporting (claimers / heartbeats)** and **Helper: read active claim**. Rediscover Linear tools live; hard-stop if MCP unusable (never fall back to `synth-status.sh` as the work-item store).*
+
+1. **Scope** — optional `UR-NNN` → Project `do-work/{UR-id}` (config `project_name_pattern`). No UR → all team Projects matching `do-work/UR-*` (or `list_urs` then per-project issues).
+2. **List issues** in scope via port list ops (`list_reqs_for_ur` / list-by-project sequences). Identify rows by **Linear issue id** only (e.g. `ENG-123`).
+3. **For each issue** with workflow mapping to `in_progress` or `stopped` (and optionally recent `released` for audit):
+   - Parse the latest claim-protocol comment (`tracker.linear.agent_claim_marker`, default `<!-- do-work-claim -->`) via **Helper: read active claim**.
+   - Report: **id**, title, do-work status (via inverted `status_map`), **claimer** (`agent_id`), **claimed_at**, **heartbeat**, **fresh/stale** vs effective stale max (`heartbeat_max_age_seconds` or `parallel.stale_threshold_seconds`), claim `status` (`active` / `released`).
+4. **Stale banner** — if any active claim is stale, prepend a clear warning (parity with markdown stale/deadlock intent). Surface deps from authoritative `blocks` relations when tools exist.
+5. **Do not** invent local REQ paths, run `lib/synth-status.sh` / glob `.do-work/working/` as the live claim source, or change Linear state (read-only).
+6. Optional local telemetry (e.g. gate-owner files under `state/`) may be mentioned separately; they are **not** the work-item store.
+
+Print a compact table or list under a `Linear status` heading, then stop (skip markdown Step 2 unless a local deadlock helper is useful for **runtime** locks only — never treat markdown REQ globs as Linear truth).
+
+### 2. Check for deadlock (markdown backend)
+
+*Skip when backend is `linear` (stale claims already surfaced in **1L**). Optional: still run for local gate/runtime diagnostics only; do not treat empty `working/` as “idle” under Linear.*
 
 Run:
 
@@ -90,7 +116,7 @@ No prompts, no commits, no state changes.
 
 ## Rules
 
-- Read-only. Never write any file under `{project}/.do-work/` or the source tree.
+- Read-only. Never write any file under `{project}/.do-work/` or the source tree (and never write Linear issues while rendering status).
 - No git commits, no AskUserQuestion prompts.
-- If `lib/synth-status.sh` or `lib/deadlock-check.sh` are missing, report the missing script and stop (synth-status missing) or continue without the check (deadlock-check missing).
-- The deadlock banner always renders above the synth-status output when present.
+- **Markdown:** If `lib/synth-status.sh` or `lib/deadlock-check.sh` are missing, report the missing script and stop (synth-status missing) or continue without the check (deadlock-check missing). The deadlock banner always renders above the synth-status output when present.
+- **Linear:** Use only `agents/tracker/linear.md` status / claim-comment sequences; hard-stop if Linear MCP is unusable; no silent markdown situation room.

@@ -100,8 +100,33 @@ This path-unit implements design **§8 Claim protocol** as Linear agent sequence
 | Area | Responsibility | REQ |
 |------|----------------|-----|
 | Claim comment protocol + claim/heartbeat/unblock/resume/status/list_claimable | Full sequences in this section | REQ-292 |
+| Phase playbooks that *call* these ops | `status` / `unblock` / `resume` / `run` Linear op callouts | REQ-293 |
 | `archive_req` (done + proof + release footprint) | Deferred | later REQs |
-| Run-loop phase playbook rewires that *call* these ops | Deferred | later REQs |
+
+---
+
+## Path: Linear claim phase-agent wiring (REQ-293)
+
+| | |
+|---|---|
+| **Entry point** | `/do-work status` \| `unblock` \| `resume` \| `run` after load path with `tracker.backend: linear` |
+| **Terminal state** | Those phase agents call **only** the named port ops in this file for claim/pick/status/unblock/resume (no `.do-work/working/` claim stamps, no `pick-req.sh` / `claim-req.sh` / `synth-status.sh` as the work-item store) |
+
+REQ-292 documents the op sequences. **REQ-293** wires the consumers:
+
+| Phase agent | Linear port ops / sections (this file) |
+|-------------|----------------------------------------|
+| `agents/status.md` | **Status reporting (claimers / heartbeats)**; Helper: read active claim; optional `list_reqs_for_ur` scope |
+| `agents/unblock.md` | **`unblock_req`** (release claim + backlog state); git partial-commit judgment stays local |
+| `agents/resume.md` | **Resume** (compose `set_req_status` + `heartbeat_req`); worktree/branch stay local |
+| `agents/run.md` | **`list_claimable_reqs`** → **`claim_req`**; worker **`heartbeat_req`** checkpoints; mid-flight **leave claimed** |
+
+**Hard rules for wired consumers:**
+
+1. Resolve backend first (load path). **Markdown** keeps existing `lib/*.sh` + file steps. **Linear** uses this file only for work-item claim/status/unblock/resume/pick.
+2. REQ identifiers under Linear are **Linear issue ids** (e.g. `ENG-123`), not `REQ-NNN` paths under `.do-work/`.
+3. Human **assignee** is never stolen. Claim is comment + workflow.
+4. Mid-flight MCP failure after `claim_req`: **leave claimed**; operator uses resume or unblock (port rule).
 
 ---
 
@@ -1035,14 +1060,17 @@ Resume is **not** a separate port op name; it composes `set_req_status` + `heart
 
 ### Status reporting (claimers / heartbeats)
 
-When `/do-work status` runs with `backend: linear`, do **not** glob `.do-work/working/`. Instead:
+**Consumer:** `agents/status.md` Step **1L** when `/do-work status` runs with `backend: linear`.
 
-1. **Rediscover** list issues (scope: optional UR Project `do-work/{UR-id}`, or all `do-work/UR-*` projects on the team).
+Do **not** glob `.do-work/working/` or run `lib/synth-status.sh` as the work-item store. Instead:
+
+1. **Rediscover** list issues (scope: optional UR Project `do-work/{UR-id}`, or all `do-work/UR-*` projects on the team). Prefer `list_reqs_for_ur` / list-by-project sequences already documented above.
 2. For each issue with workflow in `in_progress` or `stopped` (and optionally recent `released` for audit):
-   - Parse latest claim-protocol comment → show **claimer** (`agent_id`), **claimed_at**, **heartbeat**, **fresh/stale** vs effective `stale_max`, claim `status`.
+   - Run **Helper: read active claim** — parse latest claim-protocol comment (`agent_claim_marker` / `<!-- do-work-claim -->`) → show **claimer** (`agent_id`), **claimed_at**, **heartbeat**, **fresh/stale** vs effective `stale_max`, claim `status`.
 3. Surface **stale** active claims as warnings (parity with `lib/scan-stale.sh` / deadlock banner intent).
-4. Surface **deps** from authoritative relations when tools exist.
+4. Surface **deps** from authoritative **`blocks` relations** when tools exist (body `**Depends on:**` is mirror only).
 5. Never invent local REQ paths; identify rows by Linear issue id.
+6. Read-only — status never posts claim comments or changes workflow state.
 
 ---
 
@@ -1074,7 +1102,7 @@ Dependency ids are **Linear issue identifiers only**.
 ## Out of scope for this file state
 
 - `archive_req` full sequence (done + closure proof + outputs + claim release) → later REQs.
-- Capture/ideate/question/verify/run **phase playbook** rewires that *call* these ops → later REQs (port op sequences for UR/REQ, templates, deps/footprint, and claim/status/unblock/resume are in this file as of REQ-292).
+- Capture / ideate / question / verify **phase playbook** rewires (beyond load path) → later REQs. **Claim consumers** `status` / `unblock` / `resume` / `run` are wired as of REQ-293 (see **Path: Linear claim phase-agent wiring**).
 - Non-ticket Docs, run notes, calibration, milestone cursor, migration → later path-units.
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
@@ -1087,7 +1115,7 @@ Dependency ids are **Linear issue identifiers only**.
 
 - `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative / claim rules
 - `agents/config.md` — `tracker.*` schema, `agent_claim_marker`, `heartbeat_max_age_seconds`, Load Config step 7
-- `agents/resume.md` / `agents/unblock.md` / `agents/status.md` — markdown semantics these Linear sequences mirror
+- `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` — phase agents; markdown steps when backend is markdown; Linear port ops (this file) when backend is linear (REQ-293)
 - Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§6 hierarchy, §7 config, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint; REQ-292 claim/status/unblock/resume
+- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint; REQ-292 claim sequences; REQ-293 phase-agent claim wiring
