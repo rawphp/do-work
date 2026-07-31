@@ -107,6 +107,21 @@ Your `Return Report` must list every output path in the `outputs:` array — the
 
 ## Steps
 
+### 0. Tracker load path
+
+Load config and resolve work-item storage before reading/updating REQs:
+
+1. Read and follow the **Load Config** section of [config.md](config.md) (resolve effective `tracker.backend`; missing/empty/whitespace → `markdown`).
+2. Read `agents/tracker/port.md` (shared op catalog + rules).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
+
+**Hard rules:**
+- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` (including `heartbeat_req` → `lib/heartbeat.sh`) — use those ops; do not re-implement store details here.
+- Runtime/git isolation (worktrees, feature branch, commit) stays local regardless of backend.
+
 ### 1. Read the REQ
 
 Read the REQ file in full. Understand:

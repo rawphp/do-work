@@ -94,6 +94,7 @@ When `tracker.backend` resolves to **`linear`**, an unusable Linear backend is a
 
 | Condition | Behavior |
 |-----------|----------|
+| `agents/tracker/linear.md` missing or unreadable | **Hard stop** with setup instructions (restore the Linear backend doc from the skill install; do not invent Linear sequences) |
 | Linear MCP missing, offline, or unauthenticated | **Hard stop** with setup instructions from the Linear skill |
 | Team id / team key unresolved | **Hard stop**; do not guess a team |
 | Required `status_map` workflow state missing on the team | **Hard stop** with rename / map-fix instructions |
@@ -101,7 +102,7 @@ When `tracker.backend` resolves to **`linear`**, an unusable Linear backend is a
 
 **Never silent markdown fallback.** Agents must not:
 
-- switch to `markdown` ops “to keep going”
+- switch to `markdown` ops “to keep going” (including when `linear.md` is missing)
 - write UR/REQ files under `.do-work/` as a substitute store while backend is `linear`
 - invent partial local mirrors of Linear work items
 

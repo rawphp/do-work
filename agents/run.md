@@ -81,6 +81,21 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 Keep `model.default`, `model.escalation`, `cost.budget`, and `ledger.enabled` in context for the run. Use `model.default` for ordinary worker dispatch and `model.escalation` for high-risk or retry-worthy work as described in model selection. Resolve the **effective budget** once at startup per `## When Invoked → Budget (--budget <amount>)`: the `--budget` flag overrides `cost.budget` for this invocation; empty/unset means unlimited. If the effective budget is non-empty, surface it in the run summary and ledger, and **enforce it at the Step 3b budget gate** — do not silently exceed an explicit user-provided budget; stop gracefully at the next REQ boundary with the budget-stop report.
 
+## Tracker load path
+
+Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+
+1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
+2. Read `agents/tracker/port.md` (shared op catalog + rules).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
+
+**Hard rules:**
+- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
+
+
 ---
 
 ## Agent Identity

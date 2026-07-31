@@ -22,6 +22,22 @@ When the orchestrator runs in **adversarial mode**, you may be one of three revi
 
 ---
 
+## Tracker load path
+
+Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops:
+
+1. Load config (`agents/config.md`) and resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
+2. Read `agents/tracker/port.md` (shared op catalog + rules).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
+
+**Hard rules:**
+- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
+
+Review is primarily read-only against the working REQ and worker report; still resolve the load path so any work-item field reads go through port ops for the active backend.
+
 ## Inputs To Inspect
 
 - The REQ task, acceptance criteria, verification steps, approved-criteria state, dependencies, and declared file scope
