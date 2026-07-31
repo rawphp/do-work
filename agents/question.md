@@ -70,9 +70,9 @@ Build a prioritized list of ambiguities, ordered by impact on the downstream dec
 Before asking the user anything, attempt to resolve each ambiguity from existing artifacts. Check:
 
 - The project codebase (source files, configs, existing tests)
-- Prior UR `## Clarifications` sections (`user-requests/UR-*/input.md`)
-- Archived REQs (`.do-work/archive/REQ-*.md`)
-- `.do-work/decisions.md` if present
+- Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear:** Initiative clarifications via port `read_ur` / list URs (never invent a dual store)
+- Prior REQs — **markdown:** `.do-work/archive/REQ-*.md`; **linear:** Issues via port `list_reqs_for_ur` / `read_req` (Linear issue ids)
+- **Decisions memory (REQ-297):** **markdown** — `.do-work/decisions.md` if present; **linear** — **Read decisions** helper (`agents/tracker/linear.md`, Team Doc `decisions_doc_title` / default `do-work/decisions`). Same one-line grammar either backend. Do not read local `decisions.md` when backend is linear.
 
 For each ambiguity, classify the resolution into one of three buckets:
 

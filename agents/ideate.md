@@ -48,7 +48,14 @@ Read every file in `UR-NNN/assets/` if it exists.
 
 Scan the project folder for existing code, REQs in the archive, and any documentation that gives you context on what already exists.
 
-Read `{project}/.do-work/decisions.md` if it exists — the append-only cross-UR decisions memory (format in SKILL.md § Decisions Memory). Each line is a standing decision from a prior UR. Use these to ground Connector observations (reuse, overlap) and to flag when the brief contradicts a recorded decision. If the file is absent (no decision recorded yet), continue without it — never create it.
+**Decisions (constraints — backend branch, REQ-297):**
+
+| Backend | How to load standing decisions |
+|---------|--------------------------------|
+| **markdown** | Read `{project}/.do-work/decisions.md` if it exists |
+| **linear** | **Read decisions** helper in `agents/tracker/linear.md` — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty. Do **not** read local `decisions.md` as the store |
+
+Each line uses the same one-line grammar as SKILL.md § Decisions Memory: `YYYY-MM-DD | UR/REQ ref | decision | rationale`. Lines are standing decisions from prior work. Use them to ground Connector observations (reuse, overlap) and to flag when the brief contradicts a recorded decision. If the store is empty/absent (no decision recorded yet), continue without it — never create it on the read path.
 
 Read at most 10 files (excluding node_modules, vendor, and build artifacts). Stop scanning after you have enough context to ground your observations — do not audit the whole codebase.
 
