@@ -1,19 +1,14 @@
 # REQ-284: Add tracker.* config schema and validation
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:08:45Z
-**Heartbeat:** 2026-07-31T05:08:45Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
 **Terminal state:** 
 **Parent:** REQ-283
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-284 commit:8949762 tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 3
 **Size:** M
@@ -30,10 +25,10 @@ Design §7 Config schema; clarification: defaults + hard fail on missing workflo
 
 ## Acceptance Criteria
 
-- [ ] config template includes tracker.backend default markdown and tracker.linear keys from design §7
-- [ ] Schema reference documents validation: backend=linear requires resolvable team and discoverable Linear MCP tools
-- [ ] status_map defaults match design; missing team workflow state is hard-fail with rename instructions
-- [ ] Load Config section describes resolving tracker.backend (default markdown if missing/empty)
+- [x] config template includes tracker.backend default markdown and tracker.linear keys from design §7
+- [x] Schema reference documents validation: backend=linear requires resolvable team and discoverable Linear MCP tools
+- [x] status_map defaults match design; missing team workflow state is hard-fail with rename instructions
+- [x] Load Config section describes resolving tracker.backend (default markdown if missing/empty)
 
 ## Verification Steps
 
