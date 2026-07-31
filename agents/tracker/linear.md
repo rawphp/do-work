@@ -26,7 +26,7 @@ Do **not** load this file for ordinary work-item ops when backend is `markdown` 
 
 ```
 Team (config)
-└── Project product_project (default "do-work")   — shared for all URs
+└── Project product_project   — one shared product Project per local product (not per UR)
     ├── Project Milestone (UR)   — §9.1 <!-- do-work-ur -->
     └── Issue (REQ)              — attached to that UR milestone
         └── Sub-issue (layer child)
@@ -34,7 +34,7 @@ Team (config)
 
 | Entity | Naming / config |
 |--------|-----------------|
-| Product Project | `tracker.linear.product_project` (default `do-work`) — **shared** |
+| Product Project | `tracker.linear.product_project` — **shared** name or UUID; **default empty**. Resolve via config chain (explicit `product_project` → `project.name` → git-root basename); `ensure_product_container` create-if-missing + **always persist UUID**. Never fall through to skill name `do-work` for empty config. Example for this skill repo only: name `do-work`. |
 | UR | **Project Milestone** on that project; name `ur_milestone_name_pattern` (default `{ur_id}: {title}`) |
 | REQ | **Linear issue id only** (e.g. `ENG-123`) — no parallel `REQ-NNN` |
 | Issue scope | product Project + UR Project Milestone membership |
@@ -42,7 +42,7 @@ Team (config)
 ### Hard rules (hierarchy)
 
 1. **No Initiative-as-UR** — MCP has no reliable Initiative create path; URs are Project Milestones.
-2. **`product_project` is shared** — do not create `do-work/{UR-id}` Projects per UR as the UR container.
+2. **`product_project` is shared per local product** — do not create per-UR Projects (including `do-work/{UR-id}` patterns) as the UR container.
 3. **Atomic `create_ur`** — product Project ensure + milestone create; no partial UR; hard-stop on failure.
 4. **Rediscover, never invent** — every op begins with `search_tool`; hard-stop if tools missing.
 5. **No dual-write** — Linear is sole work-item store while `backend: linear`.
@@ -142,7 +142,7 @@ HARD STOP: Linear tracker backend is configured but Linear MCP is not usable.
 do-work will not fall back to markdown work-item storage while tracker.backend is "linear".
 No issues, Initiative-as-UR entities, or local REQ/UR substitutes were invented.
 
-What failed: <MCP missing | unauthenticated | tools undiscoverable | team unresolved | status_map state missing | product_project unresolved>
+What failed: <MCP missing | unauthenticated | tools undiscoverable | team unresolved | status_map state missing | product_project unresolved | product_project empty-name | product_project multi-match>
 
 Fix — connect Linear MCP (from Linear skill setup):
 
@@ -164,9 +164,17 @@ Fix — connect Linear MCP (from Linear skill setup):
    - grok mcp enable linear
    - grok mcp doctor linear
 
-4. Team config (when MCP works but team fails):
+4. Team + product Project config (when MCP works but team/project fails):
    - Set tracker.linear.team_id (UUID) and/or tracker.linear.team_key in .do-work/config.yml
-   - Set tracker.linear.product_project (default name `do-work`) when the shared project is not yet resolved
+   - product_project resolve (Load Config step 8 / ensure_product_container): explicit
+     tracker.linear.product_project (name|UUID) if set; else project.name; else git-root
+     directory basename. Default product_project is empty — never invent skill name `do-work`
+     for empty config. ensure_product_container create-if-missing (name path) and always
+     persists the Project UUID back to tracker.linear.product_project.
+   - Empty-name failure: product_project, project.name, and basename all empty/unusable →
+     set project.name or product_project explicitly; do not invent a name; do not markdown-fallback
+   - Multi-match failure: more than one team Project shares the target name → set
+     tracker.linear.product_project to the desired Project UUID (names are ambiguous)
    - Do not guess a team
 
 5. status_map (when team loads but a workflow state name is missing):
@@ -186,6 +194,8 @@ use /do-work resume or unblock after MCP recovers (port: leave claimed).
 | `search_tool` returns no Linear tools | Hard stop + setup steps above |
 | MCP offline / unauthenticated mid-session | Hard stop; if already claimed → leave claimed |
 | Team id/key unresolved | Hard stop; do not guess |
+| `product_project` empty-name after resolve chain | Hard stop; set `project.name` or `product_project`; **no** skill-name invent; **no** markdown fallback |
+| `product_project` multi-match by name on team | Hard stop; require UUID in `tracker.linear.product_project` |
 | `product_project` unresolved / uncreatable | Hard stop |
 | Any `status_map` value missing on team workflow | Hard stop + rename / override instructions |
 | Milestone / issue create tools missing for `create_ur` / `create_req` | Hard stop; **no** Initiative-as-UR substitute; **no** markdown dual-write |
