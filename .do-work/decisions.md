@@ -23,3 +23,4 @@
 2026-07-31 | UR-045 | status_map defaults hard-fail if team workflow state missing | user clarification
 2026-07-31 | UR-045 | deps eligibility: native Linear blocks relations authoritative; body Depends on is mirror | user clarification
 2026-07-31 | UR-045 | migration surfaced via /do-work upgrade + conformance, not a separate forever command | inferred+confirmed + UR-039
+2026-07-31 | hierarchy | Linear UR home is Project Milestone on shared product_project, not Initiative | Linear MCP lacks Initiative create/list tools

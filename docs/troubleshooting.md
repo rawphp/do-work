@@ -309,6 +309,12 @@ Use dry-run first when offered. After cutover: no dual-write; historical markdow
 
 **Fix:** Either connect MCP + set `team_id` (above), or set `tracker.backend: markdown` (or remove the key) to return to the default local store. Do not dual-write.
 
+### Intake hard-stops looking for Initiatives
+
+**Cause:** Older skill text required Initiative + per-UR Project. Current hierarchy uses **Project Milestones** for URs (Linear MCP has milestone CRUD, not Initiative create).
+
+**Fix:** Use skill version with Milestone-as-UR (`agents/tracker/linear.md` § Hierarchy). Ensure `tracker.linear.product_project` is set (default `do-work`) and milestone tools appear in `search_tool "linear milestone"`.
+
 ---
 
 ## Upgrade and legacy layout

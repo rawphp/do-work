@@ -27,7 +27,7 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 | `tracker.backend` | Work-item store |
 |-------------------|-----------------|
 | **unset / empty / `markdown`** | Default: local `.do-work/` + `lib/*.sh` |
-| **`linear`** | Linear only (Initiatives / Projects / Issues) — **no dual-write** |
+| **`linear`** | Linear only (product Project / **UR milestones** / Issues) — **no dual-write** |
 
 **Load path** (every phase agent that touches work items):
 
@@ -49,12 +49,16 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 
 ```
 Team (config team_id / team_key)
-└── Initiative (UR brief / ideate / verify / close)
-    └── Project do-work/{UR-id}
-        └── Issue (REQ / path-unit) ± sub-issues (layer children)
+└── Product Project (tracker.linear.product_project, default "do-work")
+    ├── Project Milestone (UR brief / ideate / verify / close)
+    │   └── Issue (REQ / path-unit) ± sub-issues (layer children)
+    └── Project Milestone (next UR)
+        └── Issue …
 ```
 
-REQs use **Linear issue ids** only (e.g. `ENG-123`). `UR-NNN` remains a Project/Initiative slug.
+**Why milestones, not Initiatives:** official Linear MCP exposes Project Milestone create/list/get, but not Initiative create/list. do-work therefore homes each UR on a **Project Milestone**.
+
+REQs use **Linear issue ids** only (e.g. `ENG-123`). `UR-NNN` remains the UR-milestone slug.
 
 ### Commit convention (Linear)
 

@@ -36,7 +36,7 @@ do-work stores work items (URs, REQs, decisions, verify/close reports) only as l
 | Decision | Choice |
 |----------|--------|
 | Architecture | Tracker port docs: `agents/tracker/{port,markdown,linear}.md` |
-| Hierarchy | UR = Initiative; one Project per UR named `do-work/{UR-id}`; REQs = Issues in that Project; Project linked to Initiative via `InitiativeToProject` |
+| Hierarchy | **UR = Project Milestone** on a shared product Project (`tracker.linear.product_project`); REQs = Issues in that Project with `milestone` = UR milestone. *(2026-07-31: supersedes Initiative + per-UR Project — Linear MCP has no Initiative create tools.)* |
 | Product container | Team + config — **not** one long-lived product Project for all URs |
 | Linear IDs | Linear mode uses Linear issue identifiers only (e.g. `ENG-123`). No parallel `REQ-NNN` allocation |
 | UR naming slug | Sequential `UR-NNN` still used as Project name / Initiative metadata slug only |
@@ -129,39 +129,42 @@ From storage inventory (~88 ops): **work-item** data moves to Linear in Linear m
 
 ### 6.1 Hierarchy
 
+**(Updated 2026-07-31.)** UR home is a **Project Milestone**, not an Initiative — Linear MCP exposes milestone CRUD but not Initiative create/list.
+
 ```
 Team (config)
-└── Initiative (UR) — brief, ideate, verify, close
-    └── Project do-work/{UR-id}  — linked via InitiativeToProject
-        └── Issue (path-unit parent)
-            └── Sub-issue (layer child)
+└── Product Project (tracker.linear.product_project, e.g. do-work)
+    ├── Project Milestone (UR) — brief, ideate, verify, close
+    │   └── Issue (path-unit parent)  [milestone = UR]
+    │       └── Sub-issue (layer child)
+    └── Project Milestone (next UR)
+        └── Issue …
 ```
 
 ### 6.2 Naming
 
 | Entity | Naming |
 |--------|--------|
-| Project (machine-stable) | `do-work/{UR-id}` e.g. `do-work/UR-007` — agents resolve by name/id; humans must not rename without updating ids |
-| Initiative (human-facing) | Free title; may include UR id for scanability (`UR-007: Add SSO`); not the sole lookup key |
+| Product Project | `tracker.linear.product_project` (default `do-work`) — shared; not one Project per UR |
+| UR Milestone (human-facing) | `ur_milestone_name_pattern` (default `{ur_id}: {title}`); body has `**UR-id:** UR-NNN` |
 | Issue | Linear identifier only (`ENG-123`). Titles short and actionable; body holds do-work schema |
 
 ### 6.3 List / scope
 
 | Need | How |
 |------|-----|
-| `list_reqs_for_ur` | `list_issues` filtered by that UR’s **Project** id |
+| `list_reqs_for_ur` | `list_issues` filtered by **product Project** + **UR milestone** |
 | `list_claimable_reqs` | Same project filter + status + deps + footprint + unclaimed |
-| `status` for a UR | Issues in that Project + claim comments |
-| `read_ur` | Initiative description (and comments if needed) |
-| Product-wide backlog | Optional: Projects matching `do-work/UR-*` for the team |
+| `status` for a UR | Issues for that milestone + claim comments |
+| `read_ur` | UR milestone description (and comments if needed) |
+| Product-wide backlog | All issues in product Project (optionally all milestones) |
 
 ### 6.4 Intake create sequence (Linear)
 
-1. Allocate next `UR-NNN` slug (scan existing Initiatives/Projects / id cache).
-2. Create **Initiative** (title human; description = template with verbatim brief).
-3. Create **Project** named `do-work/UR-NNN` on configured team.
-4. Link Project → Initiative.
-5. Capture creates Issues (and sub-issues) only in that Project.
+1. Ensure product Project exists (`product_project`).
+2. Allocate next `UR-NNN` slug (scan existing Project Milestones for `**UR-id:**` / name).
+3. Create **Project Milestone** (name from pattern; description = §9.1 template with verbatim brief).
+4. Capture creates Issues (and sub-issues) on the product Project with `milestone` set to that UR milestone.
 
 ### 6.5 Commits and PRs (Linear mode)
 

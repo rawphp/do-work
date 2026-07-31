@@ -113,8 +113,13 @@ tracker:
     team_id: ""              # required when backend=linear (or resolve via team_key)
     team_key: ""             # optional alternate resolve (e.g. team key string)
     default_assignee_id: ""  # human operator; set on issue create when configured
-    project_name_pattern: "do-work/{ur_id}"
-    initiative_title_pattern: "{ur_id}: {title}"
+    # Shared Linear Project that holds all UR milestones + Issues (not one Project per UR).
+    product_project: "do-work"   # name or UUID; default "do-work" (or project.name when set)
+    # Human-facing Project Milestone name for each UR.
+    ur_milestone_name_pattern: "{ur_id}: {title}"
+    # Deprecated aliases (still accepted if new keys missing):
+    # project_name_pattern: "do-work/{ur_id}"      # ignored for UR home
+    # initiative_title_pattern: "{ur_id}: {title}" # alias of ur_milestone_name_pattern
     status_map:
       backlog: "Todo"
       in_progress: "In Progress"
