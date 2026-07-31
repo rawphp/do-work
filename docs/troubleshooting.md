@@ -229,6 +229,88 @@ Fix dependency declarations in backlog REQs if the graph is wrong. Capture-time 
 
 ---
 
+## Linear tracker backend
+
+Optional work-item store when `tracker.backend: linear` in `.do-work/config.yml`. Markdown remains the default when the key is unset or `markdown`. Deep dive: [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends). Canonical hard-stop copy: `agents/tracker/linear.md`.
+
+### HARD STOP: Linear MCP not usable
+
+**Cause:** `tracker.backend` is `linear` but Linear MCP tools are missing, unauthenticated, or undiscoverable. do-work **does not** fall back to markdown work-item storage.
+
+**Fix — connect Linear MCP:**
+
+1. **Preferred (API key):**
+   - Create a Personal API key in Linear → Settings → Account → Security & access
+   - Export in the shell that launches the agent (do not paste the key into chat):
+     ```bash
+     export LINEAR_API_KEY='lin_api_...'
+     ```
+   - Configure MCP server `linear` at `https://mcp.linear.app/mcp` with `Authorization: Bearer ${LINEAR_API_KEY}`
+   - Restart the agent / refresh MCP and verify tools (e.g. `search_tool "linear"`)
+
+2. **OAuth alternative** (if your host supports it): add HTTP MCP server `linear` → `https://mcp.linear.app/mcp`, authenticate in the host MCP UI. If OAuth sticks on "authenticating", use the API key path.
+
+3. **Grok CLI examples** (host-specific):
+   ```bash
+   grok mcp add --transport http linear https://mcp.linear.app/mcp
+   grok mcp enable linear
+   grok mcp doctor linear
+   ```
+
+Then re-run the phase. If a claim was already active when MCP died mid-flight, **leave it** — use `/do-work resume` or `/do-work unblock` after MCP recovers.
+
+### Team unresolved (`team_id` / `team_key`)
+
+**Cause:** Linear MCP works but config has empty/wrong team.
+
+**Fix:** Set a real team in `.do-work/config.yml`:
+
+```yaml
+tracker:
+  backend: linear
+  linear:
+    team_id: "<linear-team-uuid>"   # preferred
+    team_key: ""                    # optional alternate resolve
+```
+
+Do **not** guess a team. Agents hard-stop until one resolves. Full schema: `agents/config.md`.
+
+### `status_map` state missing on team
+
+**Cause:** Defaults (`Todo` / `In Progress` / `Canceled` / `Done`) do not match your team’s workflow names.
+
+**Fix:** Rename the team workflow state to match, **or** override `tracker.linear.status_map.<key>` to an existing state name. Missing states are never invented.
+
+### Operator cleared agent claim comments mid-run
+
+**Cause:** Human edited/deleted `<!-- do-work-claim -->` comments (or equivalent `agent_claim_marker`) in the Linear UI while a worker was live. Assignee stays human; agents rely on those comments for claim + heartbeat.
+
+**Fix:**
+
+1. Prefer: **do not clear claim comments while a run is live**
+2. If already cleared: treat protocol as broken — stop inventing state; wait until agents stop, then `/do-work status` and `/do-work unblock` / re-claim via a fresh run
+3. Recover mid-flight MCP stops with `/do-work resume` only when the claim comment is still intact and status is stopped
+
+### Want Linear but still on markdown history
+
+**Cause:** Project has local URs/REQs; you want cutover.
+
+**Fix:** Idle only (`working/` empty, no active claims):
+
+```text
+/do-work upgrade migrate
+```
+
+Use dry-run first when offered. After cutover: no dual-write; historical markdown trees are read-only. Refuse if already `backend: linear` or if working/ is non-empty.
+
+### Accidentally set `backend: linear` without Linear
+
+**Cause:** Config flipped before MCP/team were ready.
+
+**Fix:** Either connect MCP + set `team_id` (above), or set `tracker.backend: markdown` (or remove the key) to return to the default local store. Do not dual-write.
+
+---
+
 ## Upgrade and legacy layout
 
 ### Prompt to run `/do-work upgrade`
