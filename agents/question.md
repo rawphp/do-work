@@ -8,11 +8,12 @@ You sharpen the brief by asking what the user already knows but didn't say. You 
 
 ## When Invoked
 
-You will be given a path to a user-request folder, e.g.:
+You will be given a UR reference:
 
-```
-{project}/.do-work/user-requests/UR-001/
-```
+| Backend | Invocation |
+|---------|------------|
+| **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/` |
+| **linear** | UR slug (e.g. `UR-001`) and/or UR Project Milestone id — no local folder required |
 
 You may also be invoked from the ideate gate when the user selects "Grill me", or run standalone via the `/do-work question` subcommand.
 
@@ -38,11 +39,18 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+### Clarifications store — backend branch (ORI-9)
+
+| Backend | Persist Q&A |
+|---------|-------------|
+| **markdown** | Append `## Clarifications` to `{project}/.do-work/user-requests/UR-NNN/input.md` |
+| **linear** | Port op **`append_clarifications`** — append Q&A under `## Clarifications` on the **UR Project Milestone** description. Never overwrite `## Brief`. **No** local `input.md` dual-write. |
+
 ### 1. Read the brief
 
-Read `UR-NNN/input.md` in full.
+**Markdown:** Read `UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if it exists.
 
-Read every file in `UR-NNN/assets/` if it exists.
+**Linear:** Call **`read_ur`** for `UR-NNN`. Use `## Brief` (+ existing `## Clarifications` / `## Ideate` if present). Optional local assets only if the operator keeps them on disk.
 
 ### 2. Analyze for ambiguity
 
@@ -70,7 +78,7 @@ Build a prioritized list of ambiguities, ordered by impact on the downstream dec
 Before asking the user anything, attempt to resolve each ambiguity from existing artifacts. Check:
 
 - The project codebase (source files, configs, existing tests)
-- Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear:** Initiative clarifications via port `read_ur` / list URs (never invent a dual store)
+- Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear:** UR Project Milestone clarifications via port `read_ur` / `list_urs` (never invent a dual store)
 - Prior REQs — **markdown:** `.do-work/archive/REQ-*.md`; **linear:** Issues via port `list_reqs_for_ur` / `read_req` (Linear issue ids)
 - **Decisions memory (REQ-297):** **markdown** — `.do-work/decisions.md` if present; **linear** — **Read decisions** helper (`agents/tracker/linear.md`, Team Doc `decisions_doc_title` / default `do-work/decisions`). Same one-line grammar either backend. Do not read local `decisions.md` when backend is linear.
 
@@ -133,13 +141,7 @@ When stopping, announce: "That covers the key ambiguities. Writing clarification
 
 ### 5. Write clarifications
 
-Append a `## Clarifications` section to `{project}/.do-work/user-requests/UR-NNN/input.md`.
-
-**If `## Clarifications` already exists** (re-run scenario), append new Q&A entries below the existing ones. Never overwrite or modify prior clarifications.
-
-**If `## Clarifications` does not exist**, append it after the existing content with a blank line separator.
-
-Use this format exactly for directly-asked answers:
+Use this format for directly-asked answers:
 
 ```markdown
 ## Clarifications
@@ -160,11 +162,18 @@ For inferences confirmed in the Step 2.5 batch, use this format — the provenan
 
 If the user chose "Correct some" for specific inferences, record the corrected values without the `*(inferred, confirmed)*` marker — the correction makes them directly-asserted answers.
 
-**Never modify the original brief text** above the `## Clarifications` section. The brief is the source of truth — clarifications are additive context.
+**Persist via backend branch (ORI-9):**
+
+| Backend | How |
+|---------|-----|
+| **markdown** | Append a `## Clarifications` section to `{project}/.do-work/user-requests/UR-NNN/input.md`. If the section already exists, append new Q&A below existing entries. Never overwrite prior clarifications. Never modify the original brief text above the section. |
+| **linear** | Call port op **`append_clarifications`** (`agents/tracker/linear.md`) with each Q&A pair. Appends under `## Clarifications` on the **UR Project Milestone**; creates the section if missing; never overwrites `## Brief` or prior Q&A. **Do not** write local `input.md`. If MCP fails → hard-stop. |
+
+The brief is the source of truth — clarifications are additive context.
 
 ### 6. Commit
 
-Stage and commit the updated `input.md`:
+**Markdown only:** Stage and commit the updated `input.md`:
 
 ```bash
 git add {project}/.do-work/user-requests/UR-NNN/input.md
@@ -173,6 +182,8 @@ git commit -m "chore(UR-NNN): record question session clarifications"
 
 If the project is not a git repo, skip this step silently.
 
+**Linear:** Skip git for work-item storage (clarifications already on the UR milestone). Do not invent a local dual-write commit.
+
 ### 7. Report and prompt
 
 Output the completion report:
@@ -180,7 +191,7 @@ Output the completion report:
 ```
 Question session complete for UR-NNN.
 
-Updated: {project}/.do-work/user-requests/UR-NNN/input.md
+Updated: <markdown: {project}/.do-work/user-requests/UR-NNN/input.md | linear: UR milestone ## Clarifications via append_clarifications (milestone id)>
 
 Clarifications recorded: N questions answered
 ```
@@ -202,6 +213,7 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 ## Rules
 
 - Never modify the original brief text — only append `## Clarifications` below it
+- **Linear:** use **`append_clarifications`** only; never dual-write local `input.md`; hard-stop if MCP unusable
 - Never suggest changes to scope — only extract what the user already knows but didn't write down
 - Never ask more than one question per message
 - Never ask compound questions (questions joined by "and" or "also")
