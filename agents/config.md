@@ -114,7 +114,10 @@ tracker:
     team_key: ""             # optional alternate resolve (e.g. team key string)
     default_assignee_id: ""  # human operator; set on issue create when configured
     # Shared Linear Project that holds all UR milestones + Issues (not one Project per UR).
-    product_project: "do-work"   # name or UUID; default "do-work" (or project.name when set)
+    # Empty default — NOT the skill name. Resolve when backend=linear (Load Config step 8):
+    #   explicit product_project (name|UUID) wins; if empty → project.name; if that empty →
+    #   git-root directory basename; ensure_product_container create-if-missing; persist UUID.
+    product_project: ""
     # Human-facing Project Milestone name for each UR.
     ur_milestone_name_pattern: "{ur_id}: {title}"
     # Deprecated aliases (still accepted if new keys missing):
@@ -177,11 +180,18 @@ routing: []
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
    - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
-   - **Never overwrite existing values.** If a key exists in the file, keep the user's value regardless of what the default says. For nested maps, treat presence of the parent key as "existing" — if `log.max_chars:` is present, do not overwrite any of its entries or add missing platform entries, even if the default template has more.
+   - **Never overwrite existing values.** If a key exists in the file, keep the user's value regardless of what the default says. For nested maps, treat presence of the parent key as "existing" — if `log.max_chars:` is present, do not overwrite any of its entries or add missing platform entries, even if the default template has more. In particular, never replace a non-empty `tracker.linear.product_project` (name or UUID) with the template empty default or with the skill name `do-work`.
    - If **no keys are missing**, do not write to the file. Skip this step silently.
    - If keys were added, report: `Config updated: added [list of added keys/sections]`
 
-5. Keep the final merged values (file values + defaults for anything still missing) in context for subsequent steps.
+4b. **Seed `project.name` from directory basename when empty (install / first load).** After create (step 3) or migrate (step 4):
+
+   - Let `name` = current `project.name` (treat missing, null, empty, or whitespace-only as empty).
+   - If `name` is **non-empty** → leave it alone; do **not** overwrite.
+   - If `name` is **empty** → set `project.name` to the **git-root directory basename** (the basename of the detected project root from startup) and **write** that value to `{project}/.do-work/config.yml`.
+   - This runs on create and on every load where `project.name` is still blank (e.g. operator cleared it, or an older template left it empty). It never replaces a deliberate non-empty name.
+
+5. Keep the final merged values (file values + defaults for anything still missing, plus any seed from step 4b) in context for subsequent steps.
 
 6. **Resolve tracker backend (markdown-default).** After the merged config is in context, set the effective work-item backend:
 
@@ -208,9 +218,22 @@ routing: []
 
    When the effective backend is **`linear`**: load `agents/tracker/port.md` then `agents/tracker/linear.md` for work-item ops after the validations above pass. If `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the backend doc from the skill install / Linear skill setup) — **never** fall through to `markdown.md` or invent Linear tool sequences.
 
+8. **Resolve and bind `tracker.linear.product_project` when effective backend is `linear`.** Run after step 7 validations pass and the Linear backend docs are loaded — **before** any work-item CRUD that needs the product Project. When effective backend is **`markdown`**, skip this step entirely (`product_project` is inert).
+
+   **Resolve order (name/lookup key only — does not rewrite an already-set value):**
+
+   1. Let `pp` = current `tracker.linear.product_project` (missing, null, or whitespace-only → treat as empty).
+   2. If `pp` is **non-empty** (name **or** UUID) → **lookup key = `pp`**. Explicit config wins. Do **not** replace it with `project.name`, the git-root basename, or the skill name `do-work`. Existing product UUIDs (and explicit names) are left untouched by this fallback chain.
+   3. If `pp` is **empty** → lookup key = `project.name` when that is non-empty; else the **git-root directory basename** (same basename as step 4b). Never fall back to a hard-coded skill name.
+   4. Call port op **`ensure_product_container`** with that lookup key: resolve the Linear Project by name or UUID; **create-if-missing** when the key is a name and no Project matches.
+   5. On success, **always persist** the resolved Project **UUID** back to `tracker.linear.product_project` in `{project}/.do-work/config.yml` and in the in-memory config. If the file already stores that same UUID, skip the write (idempotent).
+   6. On failure (unresolved after create attempt, MCP missing, permission error) → **hard-stop** with operator instructions; never invent a product Project and never silent-fallback to markdown.
+
+   **Rewrite rules:** The empty → `project.name` → basename chain runs **only** when `product_project` is truly empty. It must never overwrite an explicit existing value. The only write after a non-empty start is ensure's **UUID bind** (e.g. name → UUID once resolved). After a true empty state, ensure binds and step 5 persists the UUID so subsequent loads take the explicit-UUID path.
+
 **Phase-agent contract:** every phase agent that touches work items follows the **Tracker load path** (config → resolve `tracker.backend` → `port.md` → `agents/tracker/<backend>.md` → only named port ops). The shared load path is defined once here and in `agents/tracker/port.md`; each phase agent restates a short copy so a missing wire cannot cause split-brain storage.
 
-**Never fail or stop because of a missing or incomplete config file** (steps 1–5). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exception:** step 7 Linear validation (and missing `linear.md`) is a deliberate hard-stop when the operator has opted into `backend: linear` — that is not a config-file completeness problem.
+**Never fail or stop because of a missing or incomplete config file** (steps 1–5, including 4b seed). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exception:** step 7 Linear validation, missing `linear.md`, and step 8 product_project ensure/bind are deliberate hard-stops when the operator has opted into `backend: linear` — those are not config-file completeness problems.
 
 ---
 
@@ -218,7 +241,7 @@ routing: []
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `project.name` | string | `""` | Project display name |
+| `project.name` | string | `""` (seeded from git-root directory basename when empty on create/first load — Load Config step 4b; never overwrites a non-empty name) | Project display name. Also the preferred empty-`product_project` fallback when `backend: linear` (Load Config step 8). |
 | `layers` | list of strings | `[]` | Project's declared layers for gap-aware capture. Capture and verify check that REQs cover each declared layer. Empty = opt out (feature briefs will halt until declared or `--no-layers` is passed). |
 | `log.enabled` | boolean | `true` | Whether the log step runs after Go |
 | `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin]`) |
@@ -254,7 +277,9 @@ routing: []
 | `tracker.linear.team_id` | string | `""` | Linear team UUID. **Required when `backend: linear`** unless `team_key` alone resolves the team. Empty + unresolvable team_key → hard-fail (do not guess). Consumers: `agents/tracker/linear.md`, Load Config step 7. |
 | `tracker.linear.team_key` | string | `""` | Optional alternate team resolve (Linear team key string). Used when `team_id` is empty. Consumers: `agents/tracker/linear.md`, Load Config step 7. |
 | `tracker.linear.default_assignee_id` | string | `""` | Human operator Linear user id set as issue **assignee** on create when non-empty. Agents claim via workflow status + claim comments — they do not steal assignee. Consumers: `agents/tracker/linear.md` create/claim ops. |
-| `tracker.linear.project_name_pattern` | string | `"do-work/{ur_id}"` | Pattern for per-UR Linear Project name. `{ur_id}` is the sequential UR slug (e.g. `UR-007`). Consumers: `agents/tracker/linear.md` intake/list. |
+| `tracker.linear.product_project` | string | `""` | Shared Linear Project (**name or UUID**) that holds all UR Project Milestones + Issues — **not** one Project per UR. **Default is empty**, not the skill name `do-work`. When `backend: linear`, Load Config step 8 resolve order: (1) explicit non-empty `product_project` (name\|UUID) wins and is never replaced by the empty-fallback chain; (2) if empty/missing → `project.name`; (3) if that empty → git-root directory basename; (4) `ensure_product_container` create-if-missing; (5) **always persist** the resolved Project **UUID** back to this key. Explicit existing values (including a bound UUID) are left alone by the fallback chain; only ensure's UUID bind may update the field after a true empty (or name→UUID bind). Consumers: `agents/tracker/linear.md`, `ensure_product_container`, intake/`create_ur`. |
+| `tracker.linear.ur_milestone_name_pattern` | string | `"{ur_id}: {title}"` | Human-facing Project Milestone name pattern for each UR. `{ur_id}` is the sequential UR slug; `{title}` is the brief title. Consumers: `agents/tracker/linear.md` create_ur / list_urs. |
+| `tracker.linear.project_name_pattern` | string | `"do-work/{ur_id}"` | **Deprecated** pattern for per-UR Linear Project name (ignored for UR home; URs are Project Milestones on `product_project`). Kept for migrate compatibility. Consumers: legacy notes only. |
 | `tracker.linear.initiative_title_pattern` | string | `"{ur_id}: {title}"` | Pattern for Initiative title. `{title}` is the human-facing brief title. Consumers: `agents/tracker/linear.md` intake. |
 | `tracker.linear.status_map.backlog` | string | `"Todo"` | Team workflow state name for unclaimed/backlog REQs. **Hard-fail** if this state is missing on the team when `backend: linear` — rename the team state or override this key. Consumers: claim/list/status ops in `agents/tracker/linear.md`. |
 | `tracker.linear.status_map.in_progress` | string | `"In Progress"` | Team workflow state for claimed/in-progress REQs. Same missing-state hard-fail as other status_map keys. Consumers: claim/heartbeat/resume. |
