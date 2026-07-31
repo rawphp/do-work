@@ -235,6 +235,84 @@ assert_eq "REQ-005" "$CHK_STDOUT" "$CURRENT_CASE REQ-005 still missing (REQ-0050
 teardown_fixture
 
 # ----------------------------------------------------------------------
+# Case 10: space-separated valid ids — no malformed warning, empty missing
+#          when all archived (UR-041 regression)
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-space-separated-all-satisfied"
+CASES=$((CASES + 1))
+setup_fixture
+write_archived "$TMP/.do-work/archive/REQ-260-a.md" "REQ-260"
+write_archived "$TMP/.do-work/archive/REQ-263-b.md" "REQ-263"
+write_archived "$TMP/.do-work/archive/REQ-264-c.md" "REQ-264"
+write_req "$TMP/.do-work/REQ-261-target.md" "REQ-261" "REQ-260 REQ-263 REQ-264"
+run_checker ".do-work/REQ-261-target.md"
+assert_eq "0" "$CHK_RC" "$CURRENT_CASE rc"
+assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty (all satisfied)"
+assert_not_contains "malformed" "$CHK_STDERR" "$CURRENT_CASE no malformed warning for space-separated valid ids"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 11: space-separated — one missing → that id alone on stdout
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-space-separated-one-missing"
+CASES=$((CASES + 1))
+setup_fixture
+write_archived "$TMP/.do-work/archive/REQ-260-a.md" "REQ-260"
+write_archived "$TMP/.do-work/archive/REQ-263-b.md" "REQ-263"
+# REQ-264 not archived
+write_req "$TMP/.do-work/REQ-261-target.md" "REQ-261" "REQ-260 REQ-263 REQ-264"
+run_checker ".do-work/REQ-261-target.md"
+assert_eq "0" "$CHK_RC" "$CURRENT_CASE rc"
+assert_eq "REQ-264" "$CHK_STDOUT" "$CURRENT_CASE only REQ-264 missing"
+assert_not_contains "malformed" "$CHK_STDERR" "$CURRENT_CASE no malformed for valid space-separated ids"
+assert_not_contains "REQ-260 REQ-263 REQ-264" "$CHK_STDOUT" "$CURRENT_CASE not one blob on stdout"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 12: mixed delimiters (comma + whitespace) — same per-id missing-list
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-mixed-delimiters-partial-missing"
+CASES=$((CASES + 1))
+setup_fixture
+write_archived "$TMP/.do-work/archive/REQ-001-a.md" "REQ-001"
+# REQ-002 and REQ-003 not archived
+write_req "$TMP/.do-work/REQ-010-target.md" "REQ-010" "REQ-001, REQ-002 REQ-003"
+run_checker ".do-work/REQ-010-target.md"
+assert_eq "0" "$CHK_RC" "$CURRENT_CASE rc"
+assert_contains "REQ-002" "$CHK_STDOUT" "$CURRENT_CASE missing REQ-002"
+assert_contains "REQ-003" "$CHK_STDOUT" "$CURRENT_CASE missing REQ-003"
+assert_not_contains "REQ-001" "$CHK_STDOUT" "$CURRENT_CASE omits satisfied REQ-001"
+assert_not_contains "malformed" "$CHK_STDERR" "$CURRENT_CASE no malformed for mixed valid ids"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 13: malformed tokens still rejected per delimiter style
+# ----------------------------------------------------------------------
+CURRENT_CASE="malformed-space-separated"
+CASES=$((CASES + 1))
+setup_fixture
+write_archived "$TMP/.do-work/archive/REQ-005-a.md" "REQ-005"
+write_req "$TMP/.do-work/REQ-070-target.md" "REQ-070" "REQ-005 REQ- foo"
+run_checker ".do-work/REQ-070-target.md"
+assert_eq "0" "$CHK_RC" "$CURRENT_CASE rc"
+assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty (no missing valid deps)"
+assert_contains "malformed" "$CHK_STDERR" "$CURRENT_CASE stderr flags malformed"
+assert_contains "REQ-" "$CHK_STDERR" "$CURRENT_CASE stderr mentions REQ-"
+assert_contains "foo" "$CHK_STDERR" "$CURRENT_CASE stderr mentions foo"
+teardown_fixture
+
+CURRENT_CASE="malformed-mixed-delimiters"
+CASES=$((CASES + 1))
+setup_fixture
+write_archived "$TMP/.do-work/archive/REQ-005-a.md" "REQ-005"
+write_req "$TMP/.do-work/REQ-071-target.md" "REQ-071" "REQ-005, REQ- foo"
+run_checker ".do-work/REQ-071-target.md"
+assert_eq "0" "$CHK_RC" "$CURRENT_CASE rc"
+assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty"
+assert_contains "malformed" "$CHK_STDERR" "$CURRENT_CASE stderr flags malformed"
+teardown_fixture
+
+# ----------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------
 echo ""

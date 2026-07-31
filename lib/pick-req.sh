@@ -58,6 +58,7 @@ extract_field() {
 }
 
 # Split a comma-separated list, trim whitespace around each item, print one per line.
+# Used for **Files:** only — do not use for **Depends on:** (see split_dep_ids).
 split_csv() {
   local s="$1"
   if [ -z "$s" ]; then
@@ -76,6 +77,34 @@ split_csv() {
       printf '%s\n' "$item"
     fi
   done
+}
+
+# Split a **Depends on:** value on commas AND/OR runs of whitespace.
+# Trim each token, drop empties, print one id per line. Delimiter-tolerant so
+# both "REQ-144 REQ-145" and "REQ-144, REQ-145" (and mixed) tokenize the same.
+# Does not validate id shape — callers that need validation do so themselves.
+split_dep_ids() {
+  local s="$1"
+  if [ -z "$s" ]; then
+    return 0
+  fi
+  # Normalize commas to spaces, then word-split on whitespace runs.
+  # bash 3.2 + set -u: relax nounset around empty arrays; disable globbing.
+  set +u
+  set -f
+  s="${s//,/ }"
+  # shellcheck disable=SC2206
+  local arr=($s)
+  set +f
+  local item
+  for item in "${arr[@]}"; do
+    item="${item#"${item%%[![:space:]]*}"}"
+    item="${item%"${item##*[![:space:]]}"}"
+    if [ -n "$item" ]; then
+      printf '%s\n' "$item"
+    fi
+  done
+  set -u
 }
 
 # Extract the REQ id from a REQ filename or first-line heading.
@@ -291,7 +320,7 @@ while IFS= read -r candidate; do
         dep_blocked=1
         break
       fi
-    done < <(split_csv "$deps_raw")
+    done < <(split_dep_ids "$deps_raw")
   fi
   if [ "$dep_blocked" -eq 1 ]; then
     continue

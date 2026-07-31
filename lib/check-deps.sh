@@ -7,8 +7,9 @@
 #               yet satisfied.
 #
 # Behavior:
-#   1. Parses this REQ's `**Depends on:**` field — comma-separated REQ ids,
-#      may be empty. The field line may be omitted entirely (treated as empty).
+#   1. Parses this REQ's `**Depends on:**` field — REQ ids separated by commas
+#      and/or runs of whitespace (may be empty). The field line may be omitted
+#      entirely (treated as empty).
 #   2. Validates each id against `REQ-\d+` or `REQ-M\d+-\d+` (milestone form).
 #      Malformed ids are logged to stderr and NOT included in the missing-list.
 #   3. For each valid id, globs `{project}/.do-work/archive/<id>-*.md`.
@@ -57,8 +58,11 @@ extract_field() {
     | sed -E "s/^\*\*${field}:\*\*[[:space:]]*//"
 }
 
-# Split a comma-separated list, trim whitespace, print one item per line.
-split_csv() {
+# Split a **Depends on:** value on commas AND/OR runs of whitespace.
+# Trim each token, drop empties, print one id per line. Delimiter-tolerant so
+# both "REQ-144 REQ-145" and "REQ-144, REQ-145" (and mixed) tokenize the same.
+# Must agree with pick-req.sh's split_dep_ids.
+split_dep_ids() {
   local s="$1"
   if [ -z "$s" ]; then
     return 0
@@ -68,7 +72,8 @@ split_csv() {
   # expansion so entries containing `*` don't get expanded during the split.
   set +u
   set -f
-  local IFS=','
+  # Normalize commas to spaces, then word-split on whitespace runs.
+  s="${s//,/ }"
   # shellcheck disable=SC2206
   local arr=($s)
   set +f
@@ -134,6 +139,6 @@ while IFS= read -r dep; do
   if ! is_satisfied "$dep"; then
     printf '%s\n' "$dep"
   fi
-done < <(split_csv "$DEPS_RAW")
+done < <(split_dep_ids "$DEPS_RAW")
 
 exit 0

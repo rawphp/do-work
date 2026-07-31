@@ -305,7 +305,7 @@ Every REQ file carries a structured header immediately below the title. The cano
 | `**Priority:**` | optional | Backlog urgency `1`–`3` (3 = most urgent), derived by capture from dependency-graph depth. Read by `lib/pick-req.sh` to order claimable candidates (Priority desc, then REQ number asc). Absent or out-of-range sorts as `2`, so legacy REQs are unaffected. |
 | `**Size:**` | optional | Effort estimate `S` / `M` / `L`, derived by capture from file count, layer span, and criteria count. `Size: L` is a primary opus-escalation signal in `agents/run.md` Model Selection. Absent falls back to the lexical heuristics. |
 | `**Files:**` | yes | Space-separated list of primary output files — used by `lib/check-footprint.sh` for overlap detection |
-| `**Depends on:**` | optional | Space-separated REQ ids this REQ must not start before (e.g. `REQ-144 REQ-145`) — checked by `lib/check-deps.sh` |
+| `**Depends on:**` | optional | REQ ids this REQ must not start before, separated by commas and/or whitespace (e.g. `REQ-144, REQ-145` or `REQ-144 REQ-145`) — tokenized by `lib/pick-req.sh` / `lib/check-deps.sh` and checked against `archive/` |
 
 A **path-unit** is a REQ whose `**Entry point:**` and `**Terminal state:**` are both non-empty. Path-units describe a vertical, reachable slice of intent. Child layer-tasks point back to a path-unit with `**Parent:**`; legacy REQs without these fields remain valid because the migration is additive.
 
