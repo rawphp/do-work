@@ -1,7 +1,13 @@
 # REQ-284: Add tracker.* config schema and validation
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T05:08:45Z
+**Heartbeat:** 2026-07-31T05:08:45Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
