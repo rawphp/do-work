@@ -115,22 +115,22 @@ When in milestone mode:
 
   Mark the active milestone as `captured` once REQ files are written. Other statuses: `pending` (not yet captured), `captured` (REQs written), `running` (run loop active), `deployed` (deploy gate passed).
 
-#### Linear backend (REQ-298)
+#### Linear backend (REQ-298 path; REQ-299 ops)
 
 - **Trigger** is the same two bullets above — no Linear-only activation.
-- Identify the **active milestone** via port op **`read_active_milestone`** (`agents/tracker/linear.md`) on Project `do-work/{UR-id}` (`<!-- do-work-milestone -->`). If `active` is null (no cursor yet), the active milestone is `M1`.
+- Identify the **active milestone** via port op **`read_active_milestone`** (`agents/tracker/linear.md`) on Project `do-work/{UR-id}` (`<!-- do-work-milestone -->`). That op returns `active: null` when the Project description has **no milestone marker** — it **does not invent a milestone id**. If `active` is null (no cursor yet) **and** the brief trigger is true, capture policy uses `M1` as the first-decompose target only — then persists via **`set_active_milestone`**.
 - Decompose ONLY the active milestone, not the whole brief. R-mapping is built against ONLY that milestone's user-value, deploy gate, and high-level REQs.
 - Create Issues with **`create_req`** only in Project `do-work/{UR-id}`. Linear issue ids are the REQ identifiers (no `REQ-M1-NNN` filenames).
 - On each Issue: set body `**Milestone:** M<n>` and, when labels exist, label `M<n>` (see linear.md Issue milestone markers). Prefer Project milestone entity when MCP supports it.
 - After writing REQs for this milestone, call **`set_active_milestone`** with `active: M<n>` and checklist status `captured` for that M (full checklist from the brief on first write). Do **not** write local `state/active-milestone.md` / `milestones.md` as the work-item store.
-- Deploy-gate ownership remains local (`write_gate_state` / `gate-owner.md`) — capture does not claim the gate.
+- Deploy-gate ownership remains local (`write_gate_state` / `gate-owner.md` — local-only even when cursor is remote) — capture does not claim the gate.
 
 ### 2. Determine the next REQ number
 
 If **milestone mode** (from Step 1b):
 
 - **Markdown:** Scan for existing `REQ-M<n>-<NNN>-*.md` files matching the active milestone in both backlog root and `archive/`. Find the highest number for this milestone. New REQ = highest + 1, zero-padded to 3 digits. If no REQs for this milestone exist yet, start at `REQ-M<n>-001`.
-- **Linear:** Call **`list_milestone_reqs`** for active `M<n>` (status `any`). Linear allocates issue ids — do not invent `REQ-NNN` / `REQ-M1-NNN` names. Use the list only for sequence metadata / capture summary counts if needed.
+- **Linear (REQ-299):** Call port op **`list_milestone_reqs`** for active `M<n>` (status `any`). Linear allocates issue ids — do not invent `REQ-NNN` / `REQ-M1-NNN` names. Use the list only for sequence metadata / capture summary counts if needed.
 
 If **not in milestone mode**:
 

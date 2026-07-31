@@ -464,7 +464,7 @@ Repeat until the backlog is empty:
 
 #### Step 1.0 — Milestone filter (milestone mode only)
 
-Resolve whether milestone mode is active via the tracker backend (REQ-298 Linear path).
+Resolve whether milestone mode is active via the tracker backend (REQ-298 Linear path; REQ-299 ops).
 
 **Markdown backend:**
 
@@ -475,10 +475,10 @@ Resolve whether milestone mode is active via the tracker backend (REQ-298 Linear
   2. **Constrain the candidate glob** to `{project}/.do-work/REQ-M<active>-*.md` instead of `{project}/.do-work/REQ-*.md`. Sort ascending and iterate exactly as the steps below describe.
   3. **No fallback to other milestones.** If the constrained glob returns no files, the active milestone's backlog is drained — fall through to **Step 1.0a: Sibling idle-waiting** below. The orchestrator MUST NOT silently widen the glob to pick up REQs from other milestones. The deploy gate (Step 7b) is the only mechanism that advances `active-milestone.md` to the next milestone.
 
-**Linear backend (REQ-298):**
+**Linear backend (REQ-298 path; REQ-299 ops):**
 
-1. Call port op **`read_active_milestone`** (`agents/tracker/linear.md`) for the scoped UR Project (`do-work/{UR-id}` when `/do-work run UR-NNN`, else each active Project the run scopes). Cursor lives on Project description `<!-- do-work-milestone -->` — **not** local `active-milestone.md`.
-2. **`active` null (non-milestone mode):** skip this step; proceed with unconstrained `list_claimable_reqs`.
+1. Call port op **`read_active_milestone`** (`agents/tracker/linear.md`) for the scoped UR Project (`do-work/{UR-id}` when `/do-work run UR-NNN`, else each active Project the run scopes). Cursor lives on Project description `<!-- do-work-milestone -->` — **not** local `active-milestone.md`. When the Project description has **no milestone marker**, the op returns `active: null` and **does not invent a milestone id**.
+2. **`active` null (non-milestone mode / empty marker):** skip this step; proceed with unconstrained `list_claimable_reqs`.
 3. **`active` set (e.g. `M1`):** constrain claim pool to that milestone — pass milestone scope into **`list_claimable_reqs`** and/or intersect with **`list_milestone_reqs`** for `M<active>` (status backlog / claimable). Issue markers: label `M<n>` and/or body `**Milestone:** M<n>` (see linear.md).
 4. **No fallback to other milestones.** If the constrained list is empty, fall through to **Step 1.0a**. Deploy gate (Step 7b) + **`set_active_milestone`** are the only advances of the cursor.
 
@@ -489,9 +489,9 @@ Reached only when Step 1.0 found the active milestone's backlog empty. The local
 1. Re-read the active cursor and capture as `<active_at_entry>`:
    - **Markdown:** re-read `{project}/.do-work/state/active-milestone.md`.
    - **Linear:** **`read_active_milestone`** again (Project description).
-2. Check gate ownership via **local** `{project}/.do-work/state/gate-owner.md` (port **`write_gate_state`** home — **both backends**; never Linear):
+2. Check gate ownership via **local** `{project}/.do-work/state/gate-owner.md` (port **`write_gate_state`** home — **both backends**; never Linear). Concurrent gate ownership **serializes via this local file** even when milestone cursor content is remote (REQ-299):
    - **File absent:** No sibling has claimed the gate. This orchestrator has finished its in-flight REQ and the milestone backlog is empty, but no one has surfaced the gate yet. Fall through to `## When the Backlog is Empty` — this is the genuine drain path for a single-orchestrator run, or the loser of a race where the gate-owner will detect milestone completion on its own next worker return.
-   - **File present:** Read the single line — the `<gate-owner-agent-id>`. If it equals the local `AGENT_ID`, this orchestrator already owns the gate (re-entry after a restart mid-prompt) — jump to Step 7b. Otherwise enter **idle-waiting** mode.
+   - **File present:** Read the single line — the `<gate-owner-agent-id>`. If it equals the local `AGENT_ID`, this orchestrator already owns the gate (re-entry after a restart mid-prompt) — jump to Step 7b. Otherwise enter **idle-waiting** mode (**siblings idle on deploy gate same as markdown mode**).
 3. **Idle-waiting loop.** Log exactly once:
 
    ```
@@ -506,7 +506,7 @@ Reached only when Step 1.0 found the active milestone's backlog empty. The local
      - **File unchanged AND `gate-owner.md` deleted while `active-milestone.md` is also gone:** treat as stop → empty-backlog path.
      - **File unchanged after 30 minutes:** surface stuck-owner prompt (same text as before).
      - **Otherwise:** continue polling.
-   - **Linear —** poll **`read_active_milestone`** (+ still read local `gate-owner.md`):
+   - **Linear —** poll **`read_active_milestone`** (+ still read local `gate-owner.md` — never a Linear lock):
      - **`active` changed** to a new id: gate-owner advanced. Exit idle-waiting → Step 1.
      - **`active` null / cleared** while gate-owner released: stop → empty-backlog path.
      - **Unchanged after 30 minutes:** same stuck-owner user prompt.
@@ -528,7 +528,7 @@ AGENT_ID="$(hostname).$$"
 **Pick the next claimable REQ — port op `list_claimable_reqs`:**
 
 - **Markdown backend:** implement via `lib/pick-req.sh` (below).
-- **Linear backend:** implement via **`list_claimable_reqs`** in `agents/tracker/linear.md` (project filter + backlog + **blocks** deps + footprint algorithm + Priority **DESC** (missing→2) → created_at ASC → identifier ASC + skip reasons `dep:`/`overlap:`/`scope:`/`claim:`). When milestone mode is active, apply **`list_milestone_reqs`** membership filter for the active M (REQ-298). Do **not** run `pick-req.sh` as the Linear store. On empty claimable list, map the op’s skip-reason lines with the same precedence as `drain-classify.sh`: **`overlap-blocked` > `deps-blocked` > `scope-blocked` > `truly-empty`**. No Linear-aware bash required.
+- **Linear backend:** implement via **`list_claimable_reqs`** in `agents/tracker/linear.md` (project filter + backlog + **blocks** deps + footprint algorithm + Priority **DESC** (missing→2) → created_at ASC → identifier ASC + skip reasons `dep:`/`overlap:`/`scope:`/`claim:`). When milestone mode is active, apply port op **`list_milestone_reqs`** membership filter for the active M (REQ-298 path; REQ-299 ops). Do **not** run `pick-req.sh` as the Linear store. On empty claimable list, map the op’s skip-reason lines with the same precedence as `drain-classify.sh`: **`overlap-blocked` > `deps-blocked` > `scope-blocked` > `truly-empty`**. No Linear-aware bash required.
 
 ```bash
 # markdown only — linear: call list_claimable_reqs (linear.md) instead
@@ -1042,7 +1042,7 @@ The deploy-gate prompt is **owned by the orchestrator, not the worker**. The wor
 **Is milestone mode active?**
 
 - **Markdown:** `{project}/.do-work/state/active-milestone.md` exists.
-- **Linear (REQ-298):** **`read_active_milestone`** returns non-null `active` (Project description `<!-- do-work-milestone -->`). Do **not** require local `active-milestone.md`.
+- **Linear (REQ-298/299):** **`read_active_milestone`** returns non-null `active` (Project description `<!-- do-work-milestone -->`). Empty / missing marker → null (not-in-milestone; does not invent a milestone id). Do **not** require local `active-milestone.md`.
 
 If not in milestone mode, the worker typically reports `milestone_complete: false` and the orchestrator simply continues until the backlog is empty. Skip the rest of this step.
 
@@ -1071,10 +1071,10 @@ Let `<active>` be:
    - On 30-minute timeout, surface to the user: `Milestone M<active> appears stuck — sibling slot(s) <list of agent-ids and REQ ids> have not drained after 30 minutes. Continue waiting, or abort?` Act on the user's response (continue → resume polling; abort → exit this orchestrator cleanly without writing `gate-owner.md`).
 4. **If both globs come back clean on the first check (or after polling completes)**, this orchestrator owns the gate. Proceed to Step 7b.2.
 
-**Linear drain (REQ-298):**
+**Linear drain (REQ-298 path; REQ-299 ops):**
 
-1. **`list_milestone_reqs`** for `M<active>` with status `backlog` (or claimable intersection). **Must return zero issues.** If non-zero, abort gate detection → Step 8.
-2. **`list_milestone_reqs`** for `M<active>` with status `in_flight` (active claim). For each issue, read active claim comment:
+1. Port op **`list_milestone_reqs`** for `M<active>` with status `backlog` (or claimable intersection). **Must return zero issues.** If non-zero, abort gate detection → Step 8.
+2. Port op **`list_milestone_reqs`** for `M<active>` with status `in_flight` (active claim). For each issue, read active claim comment:
    - Claims by local `AGENT_ID` are expected (just-archived / releasing) and not a blocker once archive completed.
    - Any **foreign** active claim means the milestone is not drained.
 3. **If foreign in-flight issues exist**, poll every 30 seconds, up to 30 minutes (re-list + re-classify). Timeout → same stuck-sibling user prompt (list Linear issue ids + agent ids). Abort without writing `gate-owner.md` if user aborts.
@@ -1082,7 +1082,7 @@ Let `<active>` be:
 
 #### Step 7b.2 — Claim the gate
 
-1. **Write local gate ownership** via **`write_gate_state`** / write `{project}/.do-work/state/gate-owner.md` containing a single line: the local `AGENT_ID`. (**Both backends** — first orchestrator owns the gate via this **local** file only; never Linear. Siblings in Step 1.0a read it to attribute the wait.)
+1. **Write local gate ownership** via port op **`write_gate_state`** (claim) → `{project}/.do-work/state/gate-owner.md` containing a single line: the local `AGENT_ID`. (**Both backends** — concurrent gate ownership serializes via this **local** file only, even when milestone cursor content is remote — REQ-299; never Linear. Use the op’s re-read / lost-race rules: if another agent already owns the file, **do not** show the prompt; enter Step 1.0a idle-wait instead. Siblings in Step 1.0a read the file to attribute the wait.)
 2. Read the deploy gate text for the active milestone:
    - **Markdown:** from `{project}/.do-work/user-requests/UR-NNN/input.md` — line beginning `**Deploy gate:**` under `#### M<active>`.
    - **Linear:** from **`read_ur`** brief / Initiative description — same `**Deploy gate:**` line under `#### M<active>` in the milestone-shaped brief.
@@ -1108,11 +1108,11 @@ Let `<active>` be:
   - **If none exists** (all milestones deployed): delete `{project}/.do-work/state/active-milestone.md` so idle siblings fall through to `## When the Backlog is Empty`.
 - Delete `{project}/.do-work/state/gate-owner.md` (or **`write_gate_state`** release).
 
-**Linear (REQ-298):**
+**Linear (REQ-298/299):**
 
-- Call **`set_active_milestone`**: mark M<active> checklist line `deployed`; set `**Active:**` to next pending `M<n+1>` **or clear** if none remain. **This Project description change wakes idle siblings** polling `read_active_milestone` (Step 1.0a).
+- Call port op **`set_active_milestone`**: mark M<active> checklist line `deployed`; set `**Active:**` to next pending `M<n+1>` **or clear** if none remain. **This Project description change wakes idle siblings** polling `read_active_milestone` (Step 1.0a).
 - Do **not** require local `active-milestone.md` / `milestones.md` as the store.
-- Delete `{project}/.do-work/state/gate-owner.md` (local **`write_gate_state`** release).
+- Release local gate via **`write_gate_state`** / delete `{project}/.do-work/state/gate-owner.md` (local-only).
 
 Then (both backends):
 
@@ -1137,7 +1137,7 @@ Then (both backends):
 | **Read** | Sibling orchestrators (Step 1.0a) | When their active-milestone backlog is empty, to attribute the idle log line |
 | **Delete** | Gate-owning orchestrator (Step 7b.3 or Step 7b.4) | After the user answers y or n, before exit |
 
-Contents: a single line — the gate-owner's `AGENT_ID`. No header, no trailing data. If the file is ever found with malformed contents, treat as absent and continue. **Never** store gate ownership in Linear (design §11 / REQ-298).
+Contents: a single line — the gate-owner's `AGENT_ID`. No header, no trailing data. If the file is ever found with malformed contents, treat as absent and continue. **Never** store gate ownership in Linear (design §11 / REQ-298 path; REQ-299 concurrent serialize). Concurrent claims use **`write_gate_state`** re-read rules so ownership serializes via this local file even when the milestone cursor is remote.
 
 #### Non-delegation
 
