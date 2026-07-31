@@ -353,6 +353,88 @@ assert_eq "$TMP/.do-work/REQ-112-explicit-high.md" "$PICK_STDOUT" "$CURRENT_CASE
 teardown_fixture
 
 # ----------------------------------------------------------------------
+# Case 15: space-separated Depends on — each id checked separately
+#          (UR-041 regression: "REQ-260 REQ-263 REQ-264" was treated as one id)
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-space-separated-all-archived"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-260-a.md" "REQ-260" "src/a.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/archive/REQ-263-b.md" "REQ-263" "src/b.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/archive/REQ-264-c.md" "REQ-264" "src/c.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/REQ-261-next.md" "REQ-261" "src/n.ts" "REQ-260 REQ-263 REQ-264" "UR-001" "backlog"
+run_picker "any" "test-agent"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "$TMP/.do-work/REQ-261-next.md" "$PICK_STDOUT" "$CURRENT_CASE space-separated multi-id deps pickable"
+assert_not_contains "dep:" "$PICK_STDERR" "$CURRENT_CASE no dep rejection"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 16: space-separated deps — one missing → blocked on that id alone
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-space-separated-one-missing"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-260-a.md" "REQ-260" "src/a.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/archive/REQ-263-b.md" "REQ-263" "src/b.ts" "" "UR-001" "done"
+# REQ-264 not archived
+write_req "$TMP/.do-work/REQ-261-next.md" "REQ-261" "src/n.ts" "REQ-260 REQ-263 REQ-264" "UR-001" "backlog"
+run_picker "any" "test-agent"
+assert_eq "1" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "" "$PICK_STDOUT" "$CURRENT_CASE stdout empty"
+assert_contains "dep:REQ-264" "$PICK_STDERR" "$CURRENT_CASE blocked on missing REQ-264"
+assert_not_contains "dep:REQ-260 REQ-263 REQ-264" "$PICK_STDERR" "$CURRENT_CASE must not treat multi-id as one token"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 17: comma-separated multi-id still works (no regression)
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-comma-separated-all-archived"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-144-a.md" "REQ-144" "src/a.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/archive/REQ-145-b.md" "REQ-145" "src/b.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/REQ-150-next.md" "REQ-150" "src/n.ts" "REQ-144, REQ-145" "UR-001" "backlog"
+run_picker "any" "test-agent"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "$TMP/.do-work/REQ-150-next.md" "$PICK_STDOUT" "$CURRENT_CASE comma form still pickable"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 18: mixed delimiters (comma + whitespace) — same claimable verdict
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-mixed-delimiters-all-archived"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-001-a.md" "REQ-001" "src/a.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/archive/REQ-002-b.md" "REQ-002" "src/b.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/archive/REQ-003-c.md" "REQ-003" "src/c.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/REQ-010-next.md" "REQ-010" "src/n.ts" "REQ-1, REQ-2 REQ-3" "UR-001" "backlog"
+# Note: REQ-1 would not match REQ-001 — use exact ids matching archive stems
+# Re-write with exact ids
+write_req "$TMP/.do-work/REQ-010-next.md" "REQ-010" "src/n.ts" "REQ-001, REQ-002 REQ-003" "UR-001" "backlog"
+run_picker "any" "test-agent"
+assert_eq "0" "$PICK_RC" "$CURRENT_CASE rc"
+assert_eq "$TMP/.do-work/REQ-010-next.md" "$PICK_STDOUT" "$CURRENT_CASE mixed delimiters pickable"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 19: mixed delimiters — one missing reports that single id
+# ----------------------------------------------------------------------
+CURRENT_CASE="deps-mixed-delimiters-one-missing"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-001-a.md" "REQ-001" "src/a.ts" "" "UR-001" "done"
+write_req "$TMP/.do-work/archive/REQ-002-b.md" "REQ-002" "src/b.ts" "" "UR-001" "done"
+# REQ-003 not archived
+write_req "$TMP/.do-work/REQ-010-next.md" "REQ-010" "src/n.ts" "REQ-001, REQ-002 REQ-003" "UR-001" "backlog"
+run_picker "any" "test-agent"
+assert_eq "1" "$PICK_RC" "$CURRENT_CASE rc"
+assert_contains "dep:REQ-003" "$PICK_STDERR" "$CURRENT_CASE missing REQ-003 alone"
+assert_not_contains "dep:REQ-001, REQ-002 REQ-003" "$PICK_STDERR" "$CURRENT_CASE not one blob"
+teardown_fixture
+
+# ----------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------
 echo ""
