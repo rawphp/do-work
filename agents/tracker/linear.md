@@ -53,7 +53,8 @@ This path-unit wires **work-item create/read/update/list** only (design §6 hier
 | REQ create/update/read/list | Issues in that Project; §9.2 body; path-unit `parentId` sub-issues | REQ-290 (this section) |
 | Templates + append/deps/footprint ops | §9 field semantics; `append_ideate` / `append_clarifications` / `set_blocked_by` / `set_files` | REQ-291 |
 | Claim / heartbeat / pick / status / unblock / resume | Optimistic claim comment protocol (§8); human assignee preserved | REQ-292 |
-| Archive / non-ticket homes / migrate | Deferred | later REQs |
+| Archive / non-ticket homes | Deferred → REQ-294–297 | later REQs |
+| Idle markdown→Linear migration | Deferred → **REQ-300** | upgrade + this file |
 
 ---
 
@@ -283,6 +284,203 @@ REQ-298 documented the §11 path (trigger, cursor home, local gate). **REQ-299**
 
 ---
 
+## Path: Idle markdown→Linear migration (REQ-300)
+
+| | |
+|---|---|
+| **Entry point** | `/do-work upgrade migrate` (or upgrade **Step 9** migrate path) when the project still uses the **markdown** work-item store and wants a one-shot cutover to Linear — design §12 |
+| **Terminal state** | All URs/REQs from markdown backlog + archive exist in Linear (Initiatives / Projects `do-work/{UR-id}` / Issues); Team Docs for decisions (+ empty calibration if missing); `tracker.backend: linear` + resolved team ids written to config; local `user-requests/` + `archive/` (and backlog REQ files) left as **read-only historical** trees; **no dual-write**; dry-run reports planned creates without write |
+
+This path-unit implements design **§12 Migration (markdown → Linear)**. It is **idle-only**, **operator-confirmed** (or dry-run), and **all-or-nothing** on preflight / MCP failure (no partial cutover).
+
+**Hard rules (REQ-300):**
+
+1. **Preflight is absolute** — migration runs only when **all** of:
+   - `{project}/.do-work/working/` has **zero** `REQ-*.md` files (empty of in-flight work).
+   - **No active claims** (no claim stamps with live heartbeats in working/ — redundant if working empty; still verify no stranded claim protocol elsewhere the agent knows about for markdown).
+   - Effective `tracker.backend` is still **`markdown`** (or unset → markdown). Already-`linear` → refuse (already cut over; do not re-migrate).
+   - Operator **confirms** cutover **or** the invocation is **dry-run** (report only).
+2. **Refuse entirely on failed preflight** — if `working/` is non-empty **or** active claims exist, **refuse the whole migration**. Do **not** create any Linear entities. Do **not** change `tracker.backend`. Config and markdown trees left unchanged. Message: idle required; finish or unblock in-flight work first.
+3. **Hard-stop on unusable Linear MCP** — before any write (and if MCP dies mid-migration), **hard-stop** with Linear skill setup instructions. Leave markdown trees **and** `tracker.backend` **unchanged**. **No partial cutover** (do not flip config after only some URs/REQs landed; do not dual-write). Prefer operator cleanup of any orphan Linear entities created mid-flight only when a write phase already started — document orphans in the stop report; never flip backend mid-orphan.
+4. **No dual-write after cutover** — once `tracker.backend: linear` is set, work-item ops use **only** this file. Local `.do-work/user-requests/`, backlog `REQ-*.md`, and `archive/` become **historical read-only** (do not delete; ops **stop reading them** as the store).
+5. **Dry-run** — when flag/mode is dry-run: run preflight + inventory + planned-create report; **zero** Linear writes; **zero** config changes. Exit after the report.
+6. **Rediscover tools** — every Linear create/list uses `search_tool` → `use_tool` with live schemas. Never invent tool names. Missing create tools → hard-stop (same as CRUD preflight).
+7. **Map, do not invent** — preserve UR ids, REQ task text, AC checkboxes, deps, parents, status (backlog vs done), closure proof / outputs when present. Linear REQs get **Linear issue ids** only after create (markdown `REQ-NNN` may be noted in body for historical trace, not as the Linear identifier).
+
+**Surfacing (upgrade / conformance):**
+
+| Surface | Role |
+|---------|------|
+| `agents/upgrade.md` Step **9** / `/do-work upgrade migrate` | Operator-facing UX: preflight, confirm or dry-run, invoke this sequence, report |
+| Port op `migrate_markdown_to_linear` | Shared contract (preconditions, refuse / hard-stop, dry-run) — `agents/tracker/port.md` |
+| This section | Full agent sequence + status/relation/parent mapping + post-cutover rules |
+
+**Child work under this path:**
+
+| Area | Responsibility | REQ |
+|------|----------------|-----|
+| Path narrative + hard rules + agent sequence | This file | **REQ-300** |
+| Port op contract + shared refuse/hard-stop rules | `agents/tracker/port.md` | **REQ-300** |
+| Upgrade migrate step + dry-run flag UX | `agents/upgrade.md` | **REQ-300** |
+
+---
+
+### `migrate_markdown_to_linear` (agent sequence)
+
+| | |
+|---|---|
+| **Intent** | One-shot idle markdown → Linear cutover (design §12). |
+| **Preconditions** | See hard rules 1–2. Team id/key intended for Linear must be known (config `tracker.linear.team_id` / `team_key` or operator-supplied before write). |
+| **Modes** | `dry-run` (report only) \| `apply` (writes + config flip after full success). |
+| **Does not** | Delete markdown trees; dual-write after cutover; migrate mid-flight working/ REQs; flip config on partial failure. |
+
+#### Step M0 — Invocation flags
+
+| Flag | Meaning |
+|------|---------|
+| `--dry-run` / dry-run mode | Inventory + planned creates only; no Linear write; no config write |
+| apply (default when operator confirmed) | Full sequence; config flip only at M6 after successful creates |
+
+Upgrade agent passes the mode after confirm / dry-run selection (`agents/upgrade.md` Step 9).
+
+#### Step M1 — Preflight (refuse = entire abort)
+
+1. Resolve `{project}` (`git rev-parse --show-toplevel` or CWD).
+2. Load config (`agents/config.md`). Effective backend must be **`markdown`**. If effective backend is **`linear`**, **refuse**: already on Linear; do not re-run production migration.
+3. **Working empty:**
+   ```bash
+   # Non-zero count → refuse
+   find "{project}/.do-work/working" -maxdepth 1 -name 'REQ-*.md' 2>/dev/null | wc -l
+   ```
+   Any `REQ-*.md` in `working/` → **refuse entirely** (message: drain or unblock working/ first). Config unchanged.
+4. **No active claims:** with working empty of REQ files, markdown claims are absent. If any claim stamp protocol file is found outside the empty working/ contract, treat as refuse (do not invent partial cleanup).
+5. **Linear readiness (write modes and dry-run):**
+   - `search_tool "linear"` (or `"linear team"`) — must return Linear MCP tools. Zero tools → **hard-stop** with setup block (same as this file's **Hard-stop** section). **Config backend left markdown.** Markdown trees unchanged.
+   - Resolve team via `tracker.linear.team_id` and/or `team_key`. Unresolved → **hard-stop** (do not guess). Config unchanged.
+   - Validate every `status_map` state exists on the team workflow. Missing → **hard-stop** with rename/override instructions. Config unchanged.
+6. **Operator confirm** (apply mode only): upgrade agent must have an affirmative confirm. Without confirm and without dry-run → **refuse** (do not write).
+7. On any refuse/hard-stop in M1: **stop**. No Linear creates. No config edit.
+
+#### Step M2 — Inventory (read markdown store only)
+
+Build a plan from the **markdown** store (allowed because backend is still markdown):
+
+| Source | Collect |
+|--------|---------|
+| `{project}/.do-work/user-requests/UR-*/` | Each `UR-NNN`: `input.md` brief, ideate, clarifications, verify/close artifacts if present |
+| `{project}/.do-work/REQ-*.md` (backlog root) | Open REQs (not working, not archive) |
+| `{project}/.do-work/archive/REQ-*.md` | Done REQs |
+| `{project}/.do-work/decisions.md` | Standing decision lines (if present) |
+| `{project}/.do-work/state/calibration.md` | Calibration body (if present) — else plan empty calibration Doc |
+
+For each REQ file parse: `**UR:**`, `**Status:**`, `**Parent:**`, `**Depends on:**`, `**Files:**`, `**Layer:**`, `**Entry point:**` / `**Terminal state:**` (path-unit), `## Task`, `## Acceptance Criteria` (preserve `- [ ]` / `- [x]`), `## Verification Steps`, `## Outputs`, `**Closure proof:**`, size/priority/criteria-approved headers.
+
+Group REQs by UR. Skip any REQ whose UR directory is missing only after recording a plan warning (still attempt create under that UR slug if inventable from REQ header).
+
+**In-flight forbidden:** working/ was empty at M1 — do not invent migration of in-progress slots.
+
+#### Step M3 — Dry-run report (always build; exit here if dry-run)
+
+Emit a planned-create report, for example:
+
+```text
+markdown→Linear migration plan (dry-run|apply)
+Team: <team_id or key>
+backend after cutover: linear
+
+Team Docs:
+  - create-or-update: do-work/decisions (N lines from decisions.md | empty)
+  - create-if-missing: do-work/calibration (body | empty stub)
+
+URs (Initiatives + Projects):
+  - UR-007: Initiative title "…" + Project do-work/UR-007 + link
+  - …
+
+REQs (Issues):
+  - REQ-100 → Project do-work/UR-007 | status=done | parent=none | deps=REQ-99
+  - REQ-101 → Project do-work/UR-007 | status=backlog | parent=REQ-100 (path-unit child)
+  - …
+
+Config flip (apply only): tracker.backend: linear; team_id: …
+Post-cutover: user-requests/ + archive/ + backlog REQ-*.md remain on disk as historical read-only; ops stop reading them as store.
+```
+
+If mode is **dry-run**: **stop here**. Zero Linear writes. Zero config changes. Return report to operator.
+
+#### Step M4 — Team Docs (apply only)
+
+1. Rediscover Team Docs tools (`search_tool`).
+2. **Decisions** — title `tracker.linear.decisions_doc_title` (default `do-work/decisions`). Find or create-if-missing. If local `decisions.md` has lines, write them into the Doc body (preserve one-line grammar). If local empty/missing, create empty/header Doc.
+3. **Calibration** — title `tracker.linear.calibration_doc_title` (default `do-work/calibration`). Create-if-missing; if local `state/calibration.md` exists, full-replace Doc body with it; else empty stub.
+4. Failure (permission/MCP) → **hard-stop**. Do **not** flip `tracker.backend`. Prefer not to continue Issues if Docs failed at the start; if any Doc was created, list it in the stop report for operator cleanup. **No partial cutover of config.**
+
+#### Step M5 — URs then REQs (apply only)
+
+For each inventoried UR (stable order: ascending `UR-NNN`):
+
+1. **Create Initiative** — title from `initiative_title_pattern` / brief title; description = §9.1 template filled from `input.md` + ideate + clarifications + verify/closure sections when present (`<!-- do-work-ur -->`, `**UR-id:** UR-NNN`, `**Project:** do-work/UR-NNN`).
+2. **Create Project** named `do-work/{UR-id}` on the resolved team.
+3. **Link** Project → Initiative (discovered InitiativeToProject or equivalent). Update Initiative `**Project-id:**`.
+4. Atomicity: same as `create_ur` — no Initiative without Project+link. Failure → **hard-stop**; list created entity ids for cleanup; **do not flip config**.
+
+Then for each REQ belonging to that UR (parents before children; backlog + archive):
+
+5. **Map status** via `status_map`:
+   - archive / `**Status:** done` → `status_map.done` (default `"Done"`)
+   - backlog / open / missing done → `status_map.backlog` (default `"Todo"`)
+   - **Never** migrate as `in_progress` (preflight forbids working/). If a file claims stopped in archive-like state, map to `status_map.done` only when archive path or explicit done; otherwise backlog or stopped map per `**Status:**` (`stopped` → `status_map.stopped`).
+6. **Build Issue body** from §9.2: copy headers/sections; preserve AC checkboxes literally. Optional historical line: `**Migrated-from:** REQ-NNN` (display only; **not** the Linear id).
+7. **Create Issue** in the UR Project with mapped workflow state; labels Layer/Size/path-unit when tools exist; assignee from `default_assignee_id` when set.
+8. **Parents / path-units:** if `**Parent:** REQ-X` (markdown id), resolve to the Linear issue id created earlier in this run for that markdown id (maintain a `REQ-NNN → ENG-…` map). Set Linear `parentId` + body `**Parent:** ENG-…`. Create path-unit parents before children.
+9. **Deps:** after all Issues for the UR (or globally once all Issues exist), for each REQ with `**Depends on:**`, map markdown ids through the same map and run **`set_blocked_by`** dual-write (native `blocks` + body mirror) using **Linear** ids. If relation tools missing → body-only + one-time warning (port rule).
+10. Mid-sequence MCP failure → **hard-stop**. Do **not** set `tracker.backend: linear`. Report orphan Initiative/Project/Issue ids. Markdown trees unchanged. Operator may clean Linear side and re-run after idle preflight (re-run should be safe to plan; apply may create duplicates if orphans left — operator cleans first).
+
+#### Step M6 — Config flip (apply only; only after M4–M5 full success)
+
+Write `{project}/.do-work/config.yml`:
+
+- `tracker.backend: linear`
+- `tracker.linear.team_id` / `team_key` as resolved (persist the id used)
+- Leave other `tracker.linear.*` keys as already migrated defaults
+
+**Only after** this write is the cutover complete. Until then, effective backend remains markdown.
+
+If config write fails after Linear creates succeeded: **hard-stop** with: Linear entities exist; config still markdown; operator must set `tracker.backend: linear` manually **or** delete Linear orphans and retry. Do not dual-write; do not invent a half-mode.
+
+#### Step M7 — Post-cutover (historical trees)
+
+1. **Do not delete** `.do-work/user-requests/`, `.do-work/archive/`, backlog `REQ-*.md`, or `decisions.md`.
+2. Treat them as **read-only historical**. Phase agents with `backend: linear` **must not** read them as the work-item store (port load path → this file only).
+3. Runtime locals unchanged: worktrees, `state/*` locks, events, gate-owner, optional ledger telemetry.
+4. Report success: counts created, id map summary (`REQ-NNN → Linear id`), config backend now linear, pointer to Linear skill if further setup needed.
+
+#### Failure matrix (no partial cutover)
+
+| Failure | Behavior |
+|---------|----------|
+| `working/` non-empty or active claims | **Refuse entirely** — no Linear writes; config unchanged |
+| Operator declines confirm (apply) | **Refuse** — no writes |
+| Linear MCP missing / unauthenticated / team unresolved / status_map missing | **Hard-stop** with setup instructions — markdown trees + config unchanged |
+| MCP dies during M4–M5 | **Hard-stop** — config **not** flipped; list orphans; markdown unchanged |
+| Config write fails after creates | **Hard-stop** — report manual flip or orphan cleanup; no dual-write mode |
+| Dry-run | Report only — always safe |
+
+#### Mapping summary
+
+| Markdown | Linear |
+|----------|--------|
+| `user-requests/UR-NNN/` + brief | Initiative (`<!-- do-work-ur -->`) + Project `do-work/UR-NNN` + link |
+| Backlog `REQ-*.md` | Issue in Project; state `status_map.backlog` |
+| `archive/REQ-*.md` | Issue in Project; state `status_map.done` (+ closure/outputs in body) |
+| `**Parent:** REQ-X` | `parentId` + `**Parent:** <Linear id>` after id map |
+| `**Depends on:** REQ-A REQ-B` | `blocks` relations + body mirror with Linear ids |
+| AC `- [ ]` / `- [x]` | Same checkbox markdown in Issue description |
+| `decisions.md` | Team Doc `do-work/decisions` (or config title) |
+| `state/calibration.md` | Team Doc `do-work/calibration` (or config title); empty if missing |
+| `tracker.backend` after success | `linear` + team ids |
+
+---
+
 ## Path: Linear claim phase-agent wiring (REQ-293)
 
 | | |
@@ -318,9 +516,11 @@ After config load and backend resolution (`port.md` load path + `agents/config.m
 2. Linear validation passes (team resolvable, MCP discoverable, every `status_map` state exists on the team) — or agent **hard-stops** (see below).
 3. Read `agents/tracker/port.md`.
 4. Read this file.
-5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD**, templates §9, append/deps/footprint, claim/status/unblock/resume, run archive / append_run_note / §6.5 commits, **§10 non-ticket artifacts** — `append_decision`, calibration Doc, `write_verify_report`, `write_close_report`, **and §11 milestone cursor** — `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`; gate locks local via `write_gate_state`).
+5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD**, templates §9, append/deps/footprint, claim/status/unblock/resume, run archive / append_run_note / §6.5 commits, **§10 non-ticket artifacts** — `append_decision`, calibration Doc, `write_verify_report`, `write_close_report`, **§11 milestone cursor** — `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`; gate locks local via `write_gate_state`).
 
-Do **not** load this file when backend is `markdown` (including unset/empty).
+**Exception — idle migration (REQ-300):** `/do-work upgrade migrate` / port op **`migrate_markdown_to_linear`** is invoked while effective backend is still **`markdown`**. The upgrade agent loads this file’s **Path: Idle markdown→Linear migration** section for the cutover sequence only (preflight still refuses non-idle markdown state). After successful config flip to `linear`, all subsequent work-item ops use this file under the normal load path above.
+
+Do **not** load this file for ordinary work-item ops when backend is `markdown` (including unset/empty), except the migration path above.
 
 ---
 
@@ -1877,23 +2077,23 @@ Dependency ids are **Linear issue identifiers only**.
 
 ## Out of scope for this file state
 
-- Full UR/REQ CRUD rewires beyond homes already mapped → later REQs where noted. **Claim consumers** as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296; **artifact home consumers** as of REQ-297; **milestone path** (trigger, cursor home, local gate) as of **REQ-298**; **milestone cursor ops** (`read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`, empty-marker → null / does not invent a milestone id, concurrent local gate-owner serialize, capture/run port branches) as of **REQ-299**.
-- Migration one-shot → later path-unit (REQ-300).
-- Production migration of existing `.do-work/` work items → REQ-300 path.
+- Full UR/REQ CRUD rewires beyond homes already mapped → later REQs where noted. **Claim consumers** as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296; **artifact home consumers** as of REQ-297; **milestone path** (trigger, cursor home, local gate) as of **REQ-298**; **milestone cursor ops** as of **REQ-299**; **idle markdown→Linear migration** (`migrate_markdown_to_linear`, dry-run, refuse non-empty working/, hard-stop MCP without partial cutover, historical trees) as of **REQ-300**.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
 - Inventing tool names not returned by live `search_tool` (including treating Linear skill typical-tool tables as proven).
 - True distributed locks on Linear (optimistic claim only — design non-goal).
 - Linear-aware bash under `lib/` (explicitly deferred; agent/MCP sequences only for v1).
+- Automatic re-migration or continuous sync after cutover (one-shot only).
 
 ---
 
 ## References
 
-- `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative / claim rules
+- `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative / claim rules; **`migrate_markdown_to_linear`** contract
 - `agents/config.md` — `tracker.*` schema including `decisions_doc_title` / `calibration_doc_title`, `agent_claim_marker`, `heartbeat_max_age_seconds`, `review.required`, Load Config step 7
+- `agents/upgrade.md` — **Step 9** `/do-work upgrade migrate` UX (preflight, dry-run, confirm, invoke sequence)
 - `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` / `agents/run-worker.md` / `agents/review.md` — claim/run consumers
 - `agents/capture.md` / `agents/ideate.md` / `agents/question.md` / `agents/verify.md` / `agents/close.md` / `agents/retro.md` / `agents/run-worker.md` — §10 artifact consumers (REQ-296 homes; REQ-297 full reader/writer wiring)
 - `agents/capture.md` / `agents/run.md` — §11 milestone consumers (REQ-298 path; **REQ-299** port ops)
-- Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §11 milestone mode, §14 errors, §17 risks)
+- Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §11 milestone mode, **§12 migration**, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288–298; this path **REQ-299** Linear milestone cursor ops
+- Prior: REQ-288–299; this path **REQ-300** idle markdown→Linear migration
