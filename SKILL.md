@@ -68,9 +68,24 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
 - [agents/retro.md](agents/retro.md) — Mines the run ledger to produce a learning report and regenerate `calibration.md`
-- [agents/config.md](agents/config.md) — Reusable config loading instructions
+- [agents/config.md](agents/config.md) — Reusable config loading instructions (includes `tracker.backend` resolution)
+- [agents/tracker/port.md](agents/tracker/port.md) — Tracker port: shared work-item op catalog and load path
+- [agents/tracker/markdown.md](agents/tracker/markdown.md) — Default markdown backend (`.do-work/` + `lib/*.sh`)
+- [agents/tracker/linear.md](agents/tracker/linear.md) — Optional Linear backend (when `tracker.backend: linear`)
 
 Run ledger: when `ledger.enabled: true`, `/do-work run` writes append-only `.do-work/runs/RUN-NNN.yml` records with model, cost, commands, tests, changed files, review outcome, result, and proof status. Set `ledger.enabled: false` to disable ledger writes.
+
+### Tracker backends (work-item store)
+
+Work items (URs, REQs, decisions, verify/close reports, run notes) are stored through a **tracker port**. Config key `tracker.backend` selects the implementation:
+
+| `tracker.backend` | Behavior |
+|-------------------|----------|
+| **unset / empty / missing** | Treat as **`markdown`** — no hard-stop, no Linear tools |
+| **`markdown`** | Default: local `.do-work/` files + `lib/*.sh` (behavior matches today) |
+| **`linear`** | Linear is the sole work-item store (no dual-write; hard-stop if Linear unusable) |
+
+**Load path** for every phase agent that touches work items: (1) load config, (2) resolve backend as above, (3) read `agents/tracker/port.md`, (4) read `agents/tracker/<backend>.md`, (5) call only named port ops for storage. Runtime/git (worktrees, merges, state locks, `config.yml`) stay local on every backend. Markdown remains the default; existing tests and conformance do not require Linear.
 
 ---
 
@@ -424,6 +439,10 @@ layers: []
 
 test:
   suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
+
+# Work-item store. Unset/empty tracker.backend also means markdown (default).
+# tracker:
+#   backend: markdown    # markdown | linear
 ```
 
 4. Wire the do-work **session telemetry hooks** into the project's Claude Code
