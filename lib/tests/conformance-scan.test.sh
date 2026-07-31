@@ -208,6 +208,34 @@ assert_eq "" "$SCAN_STDOUT" "$CURRENT_CASE stdout empty"
 assert_contains "Usage: conformance-scan.sh <project-root>" "$SCAN_STDERR" "$CURRENT_CASE stderr usage"
 teardown_fixture
 
+# REQ-301: migrate-linear is upgrade opt-in only — never a scanner drift row.
+# Source documents the contract; runtime never emits migrate-linear.
+CURRENT_CASE="migrate-linear-not-a-scanner-row"
+CASES=$((CASES + 1))
+setup_fixture
+SCAN_SRC="$(cat "$SCRIPT")"
+assert_contains "migrate-linear" "$SCAN_SRC" "$CURRENT_CASE source documents migrate-linear"
+assert_contains "/do-work upgrade migrate" "$SCAN_SRC" "$CURRENT_CASE source documents upgrade migrate surface"
+mkdir -p "$TMP/project/.do-work/user-requests/UR-001" \
+  "$TMP/project/.do-work/archive" \
+  "$TMP/project/.do-work/working"
+cat > "$TMP/project/.do-work/config.yml" <<'EOF'
+tracker:
+  backend: linear
+  linear:
+    team_id: "team_example"
+EOF
+echo "historical brief" > "$TMP/project/.do-work/user-requests/UR-001/input.md"
+echo "# REQ-001 historical" > "$TMP/project/.do-work/archive/REQ-001-done.md"
+run_scan "$TMP/project"
+assert_eq "0" "$SCAN_RC" "$CURRENT_CASE historical trees + linear backend still conformant"
+assert_eq "" "$SCAN_STDOUT" "$CURRENT_CASE stdout empty (no migrate-linear drift)"
+case "$SCAN_STDOUT" in
+  *migrate-linear*) fail "$CURRENT_CASE must never emit migrate-linear drift line" ;;
+esac
+assert_eq "" "$SCAN_STDERR" "$CURRENT_CASE stderr empty"
+teardown_fixture
+
 echo ""
 echo "conformance-scan tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then
