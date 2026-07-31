@@ -1,10 +1,10 @@
-# Skill best-practices findings — do-work (ORI-5)
+# Skill best-practices findings — do-work (ORI-5 / ORI-6)
 
-**Issue:** ORI-5 · **UR:** UR-001  
+**Issue:** ORI-5 (inventory) · ORI-6 (confirm + N/A completeness) · **UR:** UR-001  
 **Scope:** Inventory only — progressive disclosure, description routing, lean SKILL.md, references/scripts layout, anti-patterns, Linear store consistency.  
 **Out of scope:** Structural migration (no splits, no renames, no agent body rewrites in this REQ).
 
-Measured in worktree `.worktrees/req-ori-5` on branch `req/ORI-5` (base `linear`).
+Measured in worktree `.worktrees/req-ori-5` on branch `req/ORI-5` (base `linear`); confirmed on `req/ORI-6` with explicit N/A table (ORI-6 AC).
 
 ---
 
@@ -30,7 +30,22 @@ Source: `effective-agent-skills` (`~/.grok/skills/effective-agent-skills/SKILL.m
 | **No dual-write / single source of truth** (project multi-tracker rule) | Yes | Port contract: Linear sole store when `backend: linear` |
 | **Ship checklist** (name match, triggers, relative paths, compose, VCS) | Yes | Spot-check only |
 
-**Not applied as hard gates:** Pattern A “30–80 line skill” (do-work is intentionally Pattern B process + large lib surface). Security audit of third-party install is out of band.
+### N/A checklist items (no silent omission)
+
+Items from `effective-agent-skills` that do **not** apply as hard gates or ship criteria for this inventory. Each row is deliberate — not omitted.
+
+| Checklist / guide item | Status | One-line rationale |
+|------------------------|--------|--------------------|
+| Pattern A “30–80 line skill” length target | **N/A** | do-work is intentionally Pattern B (process + large `lib/` surface); line-count budget still measured under L2, not Pattern A. |
+| Security checklist (third-party skill install audit) | **N/A** | Evaluating first-party do-work package, not installing untrusted third-party skills. |
+| `assets/` folder (templates/fonts/static) | **N/A** | No static skill assets required; templates live under project/skill `templates/` when present, not skill-standard `assets/`. |
+| `disable-model-invocation` frontmatter | **N/A** | Skill is meant to auto-route on PM/backlog phrases; manual-only flag would break primary UX. |
+| “Don’t write style-only variants” anti-pattern | **N/A** | do-work is a full workflow skill, not a tone/format preference pack. |
+| “Don’t bundle library code” (paste npm/pip sources into skill) | **N/A** | Helpers are project shell under `lib/`, not vendored third-party library source trees. |
+| “Defer to `--help` for completeness” | **N/A** as ship gate | Most agent ops are Markdown sequences + MCP rediscovery, not a single CLI with `--help`; `lib/*.sh` scripts are thin and documented in agents. |
+| Ship: tested with weak and strong models | **N/A** this REQ | Inventory/docs only; model matrix testing is out of scope for ORI-5/ORI-6 (belongs to runtime eval, not findings file). |
+| Ship: eval suite of trigger prompts | **N/A** this REQ | No trigger-eval harness in this inventory; routing quality noted qualitatively under F6 only. |
+| Compose interfaces between *separate* published skills | **N/A** short-term | Product is one skill + `lib/`; multi-skill composition is a future migrate option (see §4 item 6), not current packaging. |
 
 ---
 
@@ -138,15 +153,16 @@ Do **not** execute here — sequencing only so later REQs stay identify-first.
 
 ---
 
-## 5. Acceptance map (this REQ)
+## 5. Acceptance map (ORI-5 / ORI-6)
 
 | AC | How satisfied |
 |----|----------------|
 | Rubric explicit | §1 |
-| Each finding: title, severity, evidence, fix class | §3 tables |
+| Each finding: title, severity, evidence, fix class | §3 tables (≥5; F1–F16) |
 | SKILL.md line count, top agent sizes, missing references/scripts | §2 |
 | Linear dual-write / phase-agent path gaps | F11–F16 |
-| Identify-first before migrate | §3 order + §4 |
+| Identify-first before migrate | §3 order + §4 explicit sequencing |
+| Non-applicable checklist items documented as N/A | §1 **N/A checklist items** table (no silent omission) |
 | No structural migration in this REQ | Findings file only |
 
 ---
