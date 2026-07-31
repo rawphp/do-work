@@ -8,7 +8,7 @@ Implements the tracker port (`agents/tracker/port.md`) with local files under `.
 
 ## When to load
 
-After config load and backend resolution (see `port.md` load path):
+After config load and backend resolution (see `port.md` load path and each phase agent's **Tracker load path** block):
 
 1. Backend resolves to `markdown` (including unset/empty default).
 2. Read `agents/tracker/port.md`.

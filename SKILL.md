@@ -87,6 +87,8 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) are stored th
 
 **Load path** for every phase agent that touches work items: (1) load config (`agents/config.md`), (2) resolve `tracker.backend` (default **`markdown`** if missing/empty), (3) read `agents/tracker/port.md`, (4) read `agents/tracker/<backend>.md`, (5) call only named port ops for storage. Runtime/git (worktrees, merges, state locks, `config.yml`) stay local on every backend. Markdown remains the default; existing tests and conformance do not require Linear.
 
+**Hard-stop (no silent fallback):** when effective backend is `linear` and Linear is unusable (MCP missing/unauthenticated, team unresolved, missing `status_map` state) **or** `agents/tracker/linear.md` is missing/unreadable, agents **hard-stop** with setup instructions — they never fall through to markdown work-item paths. Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 in `agents/config.md`.
+
 **`tracker.linear.*` (when `backend: linear`).** Full schema and defaults live in `agents/config.md` (canonical template + schema reference). Summary:
 
 | Key area | Defaults / rules |
