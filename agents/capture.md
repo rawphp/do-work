@@ -45,6 +45,18 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+### Decisions / calibration — backend branch (REQ-296)
+
+Standing decisions and capture calibration are **work-item memory**, not runtime locks. Homes are fixed by design §10 / the active backend file — never invent alternate paths or Doc titles.
+
+| Concern | Markdown (`markdown.md`) | Linear (`linear.md`) |
+|---------|--------------------------|----------------------|
+| Read decisions | `{project}/.do-work/decisions.md` if present | **Read decisions** helper — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty |
+| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing) |
+| Read calibration | `{project}/.do-work/state/calibration.md` if present | **Read calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`); missing → continue without |
+
+**When effective backend is `linear`:** do **not** read or write local `.do-work/decisions.md` or `state/calibration.md` as the store. Use the sequences in `agents/tracker/linear.md` only. **When `markdown`:** keep the file paths in the steps below.
+
 ### 1. Read the brief
 
 Read `UR-NNN/input.md` in full.
@@ -53,9 +65,17 @@ Read every file in `UR-NNN/assets/` if it exists.
 
 Read `UR-NNN/ideate.md` if it exists. Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If the file does not exist (e.g. the user ran `--no-ideate` or capture is running standalone), continue without it.
 
-Read `{project}/.do-work/state/calibration.md` if it exists. Keep its guidance bullets in context as advisory calibration — they inform how you size REQs, scope `**Files:**`, and split acceptance criteria, but they never block decomposition and are not hard requirements. This parallel mirrors the ideate.md pattern above: both are advisory; the brief always wins; absence is silently ignored. If the file is absent (no `/do-work retro` has run yet, or the project is new), continue without it.
+**Calibration (advisory):**
+- **Markdown:** Read `{project}/.do-work/state/calibration.md` if it exists.
+- **Linear:** Read the calibration Team Doc via linear.md **Read calibration Doc** (title `calibration_doc_title` / default `do-work/calibration`).
 
-Read `{project}/.do-work/decisions.md` if it exists — the append-only cross-UR decisions memory (format and discipline in SKILL.md § Decisions Memory). Each line records a standing decision (`YYYY-MM-DD | UR/REQ ref | decision | rationale`). Hold these in context while decomposing: they are prior calls that should shape how you split and scope REQs so this UR does not contradict them (e.g. a recorded "validation lives server-side" decision tells you which layer a validation REQ belongs to). If the file is absent (no decision has been recorded yet), continue without it — never create it just to read it.
+Keep guidance bullets in context as advisory calibration — they inform how you size REQs, scope `**Files:**`, and split acceptance criteria, but they never block decomposition and are not hard requirements. This parallel mirrors the ideate.md pattern above: both are advisory; the brief always wins; absence is silently ignored. If calibration is absent (no `/do-work retro` has run yet, or the project is new), continue without it — never create the store just to read it.
+
+**Decisions (constraints):**
+- **Markdown:** Read `{project}/.do-work/decisions.md` if it exists.
+- **Linear:** Load via linear.md **Read decisions** (Team Doc `decisions_doc_title` / default `do-work/decisions`).
+
+Each line records a standing decision (`YYYY-MM-DD | UR/REQ ref | decision | rationale`). Hold these in context while decomposing: they are prior calls that should shape how you split and scope REQs so this UR does not contradict them (e.g. a recorded "validation lives server-side" decision tells you which layer a validation REQ belongs to). If the store is empty/absent (no decision has been recorded yet), continue without it — never create it just to read it.
 
 ### 1b. Detect milestone mode
 
@@ -156,11 +176,14 @@ when they don't apply (e.g. internal CLI scripts).
 
 Hold `layers_in_scope` (the per-UR list) in context for downstream steps.
 
-If `--no-layers` produced a deliberate per-UR opt-out (a `feature` brief proceeding with `layers_in_scope: []`), append one line to `{project}/.do-work/decisions.md` in the documented format (SKILL.md § Decisions Memory), creating the file if absent:
+If `--no-layers` produced a deliberate per-UR opt-out (a `feature` brief proceeding with `layers_in_scope: []`), append one standing decision line (SKILL.md § Decisions Memory format):
 
 ```
 YYYY-MM-DD | UR-NNN | layer-coverage checks skipped for this UR | --no-layers opt-out
 ```
+
+- **Markdown:** append to `{project}/.do-work/decisions.md` (create if absent).
+- **Linear:** call port op **`append_decision`** (`agents/tracker/linear.md`) — Team Doc create-if-missing; do not also write local `decisions.md`.
 
 This is a judgment-point choice that shapes the whole decomposition. Append-only; do not write this line when layers are in scope normally.
 
@@ -192,7 +215,7 @@ If `ideate.md` was loaded in Step 1, use its observations as advisory context wh
 - Do not bundle unrelated concerns into a single REQ
 - If a task has a clear dependency chain, order the REQ numbers to reflect it (lower numbers first)
 - Each child REQ must address exactly one layer-specific behavior change or one internal component. If a REQ description contains the word "and" joining two unrelated outcomes, split it into two REQs. When in doubt, split.
-- If you make a non-obvious split-vs-merge call that shapes the decomposition (e.g. deliberately keeping two related concerns in one REQ, or splitting where the brief implied one unit), append a one-line record to `{project}/.do-work/decisions.md` in the documented format (SKILL.md § Decisions Memory), creating the file if absent: `YYYY-MM-DD | UR-NNN | <the split/merge decision> | <one-phrase rationale>`. Routine, obvious splits do not need a line — only choices a future capture might otherwise re-litigate.
+- If you make a non-obvious split-vs-merge call that shapes the decomposition (e.g. deliberately keeping two related concerns in one REQ, or splitting where the brief implied one unit), append one decision line: `YYYY-MM-DD | UR-NNN | <the split/merge decision> | <one-phrase rationale>`. **Markdown:** append to `.do-work/decisions.md` (create if absent). **Linear:** **`append_decision`** on the decisions Team Doc (no local dual-write). Routine, obvious splits do not need a line — only choices a future capture might otherwise re-litigate.
 - A path-unit REQ may be documentation/state only: it defines the path, owns closure semantics, and depends on its child layer REQs.
 
 ### 3b. Verify full coverage before writing
@@ -465,13 +488,13 @@ Options:
 
 **No path:** record the decision in working state. The actual frontmatter write happens later in Step 6b. For now, hold `layer_decisions[<layer>] = no` in context.
 
-Also append the decision to the cross-UR decisions memory (this is a judgment-point choice that shapes the decomposition — the layer is being deliberately left out of this UR). Append one line to `{project}/.do-work/decisions.md` in the documented format (SKILL.md § Decisions Memory), creating the file if it does not yet exist:
+Also append the decision to the cross-UR decisions memory (this is a judgment-point choice that shapes the decomposition — the layer is being deliberately left out of this UR). One line:
 
 ```
 YYYY-MM-DD | UR-NNN | layer "<layer>" out of scope | user answered "No" at layer-coverage prompt
 ```
 
-Use today's date and the actual UR id and layer name. This is the only place capture creates the file — append-only, one line per "No" answer, never rewrite existing lines.
+Use today's date and the actual UR id and layer name. **Markdown:** append to `{project}/.do-work/decisions.md` (create if absent) — append-only, one line per "No" answer, never rewrite existing lines. **Linear:** **`append_decision`** (Team Doc create-if-missing); never rewrite prior lines; no local `decisions.md` dual-write.
 
 **Loop:** after each layer is resolved (yes or no), continue to the next uncovered layer until none remain.
 

@@ -35,6 +35,15 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+### Verify report home — backend branch (REQ-296)
+
+| Backend | Where the verify report lives |
+|---------|-------------------------------|
+| **markdown** | Console-primary (Step 5c). No fixed durable path required (`markdown.md` `write_verify_report`). |
+| **linear** | Port op **`write_verify_report`** — Initiative description **`## Verify`** + Initiative comment with the full report (`agents/tracker/linear.md`). Fixed home; do not invent alternate sections or local files as the store. |
+
+After producing the report in Step 5c, when backend is **linear**, call **`write_verify_report`** with the full report body for this UR. Still print the report to the console for the operator. Scoring arithmetic remains `lib/score-coverage.sh` (local).
+
 ### 1. Read the brief
 
 Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full.
@@ -306,6 +315,8 @@ Recommendation: [Approved — run the loop / Fix gaps first — re-run capture /
 ```
 
 The Confidence Score is whatever `lib/score-coverage.sh` printed in Step 5b. Do not recompute it — see the composition formula documented there.
+
+**Persist (Linear only):** when effective `tracker.backend` is `linear`, call port op **`write_verify_report`** (`agents/tracker/linear.md`) with this full report for `UR-NNN` — Initiative `## Verify` + Initiative comment. Do not invent another home. When backend is `markdown`, leave console-only unless the operator asks to save.
 
 **Then, immediately after the report**, check whether to present next-step options:
 
