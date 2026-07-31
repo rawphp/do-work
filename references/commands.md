@@ -21,15 +21,18 @@ Create the do-work folder structure. Idempotent — safe to run multiple times.
    - `{project}/.do-work/archive/`
    - `{project}/.do-work/logs/`
    - `{project}/.do-work/state/`
-3. Create `{project}/.do-work/config.yml` if it does not already exist, using the bootstrap template below. This template contains the keys most commonly customised at install time. The full default template — including all sections, defaults, and inline documentation — is the canonical template in `agents/config.md`. On first agent run, the config loader in `agents/config.md` migrates any missing sections and keys from that canonical template automatically, so new installs receive all defaults without needing the full template written to disk by install.
+3. Create `{project}/.do-work/config.yml` if it does not already exist, using the bootstrap template below. **Seed `project.name`:** when writing the file, if `project.name` would otherwise be empty (missing, null, or whitespace-only), set it to the **basename of `{project}`** (git-root directory name, e.g. `/path/to/my-app` → `my-app`). Never leave a brand-new install with a blank `project.name` when a basename is available. Do **not** write `tracker.linear.product_project: "do-work"` (or any skill-name default) — omit `product_project` or leave it empty; it remains empty until the first Linear ensure binds a Project UUID. Full `tracker.linear` resolve chain (empty → `project.name` → basename → `ensure_product_container` → persist UUID): `agents/config.md` Load Config step 8. This template contains the keys most commonly customised at install time. The full default template — including all sections, defaults, and inline documentation — is the canonical template in `agents/config.md`. On first agent run, the config loader in `agents/config.md` migrates any missing sections and keys from that canonical template automatically (and Load Config step 4b re-seeds `project.name` from basename if still blank), so new installs receive all defaults without needing the full template written to disk by install.
 
 ```yaml
 # do-work configuration
 # Edit this file to customize agent behavior.
 # Full schema and defaults: agents/config.md (canonical template)
+# product_project (tracker.linear): remains empty until first Linear ensure
+# persists UUID — never seed as "do-work". Resolve chain: agents/config.md
+# Load Config step 8 (empty → project.name → basename → ensure → UUID).
 
 project:
-  name: ""
+  name: "{project-basename}"   # install seeds from git-root directory basename when empty
 
 # Declare your project's layers, e.g. [frontend, backend] for a web app,
 # [commands, core, output] for a CLI, [agents, commands, templates] for do-work.
@@ -41,12 +44,14 @@ test:
   suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
 
 # Work-item store. Unset/empty tracker.backend also means markdown (default).
-# Full tracker.linear.* schema: agents/config.md (design §7).
+# Full tracker.linear.* schema + product_project resolve: agents/config.md
+# (Load Config step 8; design §7). Do not bootstrap product_project as "do-work".
 # tracker:
 #   backend: markdown    # markdown | linear
 #   linear:
 #     team_id: ""
 #     team_key: ""
+#     product_project: ""   # empty until ensure binds UUID — never "do-work"
 #     status_map:
 #       backlog: "Todo"
 #       in_progress: "In Progress"
