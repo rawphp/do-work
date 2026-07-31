@@ -104,6 +104,12 @@ worktree:
                          # absent from the main checkout and cannot be symlinked
                          # (e.g. "composer install --no-interaction"). Empty = no fallback.
 
+# Work-item tracker backend. Default markdown = today's .do-work/ + lib/*.sh loop.
+# When backend is missing, empty, or "markdown", resolve to markdown (no Linear tools).
+# linear is a full second backend (no dual-write); see agents/tracker/{port,markdown,linear}.md.
+tracker:
+  backend: markdown      # markdown | linear — unset/empty/missing key also means markdown
+
 verify:
   threshold: 90          # minimum confidence score (0-100) for go to auto-run without --force
 
@@ -143,7 +149,7 @@ routing: []
 #     agent: llm-app-engineer
 ```
 
-4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `delivery`, `worktree`, `verify`, `routing`) and each key within those sections:
+4. **Migrate missing keys to disk.** Compare the existing config.yml against the default template above. For each top-level section (`project`, `log`, `next_steps`, `feedback`, `parallel`, `review`, `acceptance`, `risk`, `security`, `model`, `cost`, `ledger`, `delivery`, `worktree`, `tracker`, `verify`, `routing`) and each key within those sections:
 
    - If a **top-level section is entirely missing** from the file (e.g. `next_steps:` does not appear), append the full section block — including all keys, default values, and inline comments — to the end of the file.
    - If a **top-level section exists but is missing individual keys** (e.g. `log:` exists but `batch_size` is absent), append the missing keys with their default values to that section. This applies to nested-map keys too — e.g. if `log:` exists but `log.max_chars` is absent, append it with its default map (`{x: 280, linkedin: 1300}`) and inline comment.
@@ -153,7 +159,16 @@ routing: []
 
 5. Keep the final merged values (file values + defaults for anything still missing) in context for subsequent steps.
 
-**Never fail or stop because of a missing or incomplete config.** If config creation or migration fails for any reason, proceed with in-memory defaults.
+6. **Resolve tracker backend (markdown-default).** After the merged config is in context, set the effective work-item backend:
+
+   - If `tracker.backend` is **missing**, **null**, **empty**, or **whitespace-only** → effective backend = **`markdown`**.
+   - If `tracker.backend` is **`markdown`** (case-sensitive value as stored) → effective backend = **`markdown`**.
+   - If `tracker.backend` is **`linear`** → effective backend = **`linear`** (Linear path-unit; validate team/MCP elsewhere — not required on markdown-default).
+   - Otherwise → hard-stop with a config error naming the unknown backend; do not guess.
+
+   When the effective backend is **`markdown`**: load `agents/tracker/port.md` then `agents/tracker/markdown.md` for work-item ops; **do not** require Linear MCP, credentials, or dual-write. Existing `lib/*.sh` + `.do-work/` behavior remains the implementation. Full `tracker.linear.*` keys and Linear hard-fail rules are documented by child REQs and the Linear path; they are inert while backend resolves to markdown.
+
+**Never fail or stop because of a missing or incomplete config.** If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`).
 
 ---
 
@@ -193,3 +208,4 @@ routing: []
 | `routing` | list of `{match, agent}` maps | `[]` | Ordered subagent-routing rules for the run orchestrator's REQ classification. Each entry is `{match: <signal description or keyword list>, agent: <subagent_type>}`. The classifier scans rules top-to-bottom (first match wins) and dispatches the matching `agent`; if no rule matches — or the list is empty — it falls back to `general-purpose` silently. Ships empty so the stock skill is portable (no machine-specific agents). A commented example block in the template above reproduces the original specialist table for users who want to restore it. Consumers: `agents/run.md`, `agents/resume.md`. |
 | `worktree.link_paths` | list of strings | `[]` | Extra dependency directories to symlink from the main checkout into each worker worktree (e.g. `[server/vendor, web/node_modules]`). Additive to auto-detected dirs: `composer.json` → `vendor`, `package.json` → `node_modules`, `pyproject.toml` / `requirements.txt` → `.venv`. Use this for monorepo or subdir layouts where the auto-detection misses a directory. Consumers: `lib/provision-worktree.sh`. |
 | `worktree.setup_command` | string | `""` | Optional fallback command run inside the worktree when a dependency directory is absent from the main checkout and cannot be symlinked (e.g. `"composer install --no-interaction"`). The provisioner tries symlinking first (symlink-first semantics); this command runs only when a required dir is missing and symlinking fails. Empty = no fallback (the worktree is used as-is). Consumers: `lib/provision-worktree.sh`, `agents/run-worker.md`. |
+| `tracker.backend` | string | `"markdown"` | Work-item store backend: `markdown` (default — local `.do-work/` + `lib/*.sh`) or `linear` (Linear as sole work-item store). **Unset, empty, or missing key resolves to `markdown`** — no hard-stop, no Linear tools required. No dual-write between backends. Consumers: all phase agents that touch URs/REQs via `agents/tracker/port.md` + `agents/tracker/<backend>.md`. |
