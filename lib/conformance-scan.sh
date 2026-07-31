@@ -11,6 +11,23 @@
 #   0  no drift detected
 #   1  one or more drift rows detected
 #   2  usage error
+#
+# ---------------------------------------------------------------------------
+# migrate-linear (opt-in; NOT a scanner drift row) — REQ-301 / design §12
+# ---------------------------------------------------------------------------
+# Markdown→Linear one-shot migration is operator-invoked only via
+# `/do-work upgrade migrate` (agents/upgrade.md Step 9 → port op
+# migrate_markdown_to_linear in agents/tracker/linear.md).
+#
+# This scanner intentionally never emits a `migrate-linear` drift line:
+# remaining on markdown is the default backend, not non-conformance.
+# Do not invent blocking drift for "still on markdown."
+#
+# After a successful cutover (`tracker.backend: linear`), leftover
+# `.do-work/user-requests/`, backlog `REQ-*.md`, and `archive/` trees are
+# historical read-only. They are also not drift — work-item ops ignore them
+# as the store (Linear is sole truth); runtime/git/config stay local.
+# ---------------------------------------------------------------------------
 
 set -u
 
