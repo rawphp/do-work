@@ -49,29 +49,37 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | **markdown** | `{project}/.do-work/user-requests/UR-NNN/closure.md` (+ optional `closure-evidence/`) |
 | **linear** | Port op **`write_close_report`** — Initiative description **`## Closure`** + Initiative comment with the full report (`agents/tracker/linear.md`). Do **not** dual-write authoritative `closure.md` under `user-requests/`. Optional local evidence files for screenshots are fine; the report home is the Initiative. |
 
-**When effective backend is `linear`:** load the brief and path-unit REQs via port ops (`read_ur`, `list_reqs_for_ur` / archived-equivalent done Issues) rather than assuming local `input.md` / `archive/` are the store. Walk still runs against the **merged app** (local git). Persist only via **`write_close_report`**.
+**When effective backend is `linear`:** load the brief and path-unit Issues via port ops (`read_ur`, `list_reqs_for_ur` / done-equivalent Issues) rather than assuming local `input.md` / `archive/` are the store. Walk still runs against the **merged app** (local git). Persist only via **`write_close_report`**. Path-unit ids are **Linear issue identifiers** (e.g. `ENG-123`) — see linear.md **Close path-unit collection**.
 
 Keep these values in context: `test.suite_command` (for degraded `evidence-by-test` verdicts and library walks), `security.blocked_commands` / `security.blocked_paths` (never run a probe that trips these), and any runtime hints.
 
 ### 1. Read the verbatim brief
 
-Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full.
+**Backend branch (REQ-297):**
 
-If it does not exist, report `"UR-NNN/input.md not found at {path}. Cannot close without a brief."` and stop. Do not write a partial closure.md.
+| Backend | Brief source |
+|---------|--------------|
+| **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. If missing → report `"UR-NNN/input.md not found at {path}. Cannot close without a brief."` and stop. Do not write a partial `closure.md`. |
+| **linear** | Call port op **`read_ur`** for `UR-NNN` (Initiative description: `## Brief` and machine sections). If Initiative / Project missing → hard-stop with that error; do not invent a brief; do not fall back to local `input.md` as the store. |
 
 The brief is the user's own words — the contract the integrated app must satisfy. You read it for orientation only; the validated contract is each path-unit's declared entry point and terminal state (Step 2).
 
-### 2. Collect the path-unit REQs
+### 2. Collect the path-unit REQs / Issues
 
-Scan `{project}/.do-work/archive/` for every `REQ-*.md` whose `**UR:**` field is `UR-NNN`.
+A work item is a **path-unit** when its `**Layer:**` is `none` **and** both `**Entry point:**` and `**Terminal state:**` are present and non-empty after trimming whitespace. For each path-unit, extract verbatim:
 
-A REQ is a **path-unit** when its `**Layer:**` is `none` **and** both `**Entry point:**` and `**Terminal state:**` are present and non-empty after trimming whitespace. For each path-unit, extract verbatim:
-
-- `req` — the REQ id
+- `req` — the work-item id (**markdown:** `REQ-NNN`; **linear:** Linear issue id e.g. `ENG-123`)
 - `entry_point` — the verbatim `**Entry point:**` value
 - `terminal_state` — the verbatim `**Terminal state:**` value
 
-Do not read `**Closure proof:**`. Do not read non-path-unit REQs except to confirm they are not path-units.
+Do not read `**Closure proof:**`. Do not read non-path-unit items except to confirm they are not path-units.
+
+**Backend branch (REQ-297):**
+
+| Backend | How to collect path-units |
+|---------|---------------------------|
+| **markdown** | Scan `{project}/.do-work/archive/` for every `REQ-*.md` whose `**UR:**` field is `UR-NNN`. `req` = the `REQ-NNN` id. |
+| **linear** | Follow linear.md **Close path-unit collection**: resolve Project `do-work/{UR-id}`; **`list_reqs_for_ur`** (include done/archived-equivalent Issues); select path-units by Layer/Entry/Terminal fields. **`req` = Linear issue identifier** only — never invent parallel `REQ-NNN` ids. Do not scan local `archive/` as the store. |
 
 **Empty case.** If zero path-units are found, skip Steps 3–4 and go straight to Step 5 with the empty-case schema (`path_units: 0`, `overall: no-path-units`).
 
@@ -137,7 +145,7 @@ Place evidence artifacts (screenshots, captured command output) under `{project}
 | `verdict_summary` | map | counts keyed by verdict (`closed`, `not-reached`, `terminal-mismatch`, `degraded:evidence-by-test`, `degraded:human-confirmed`) |
 | `overall` | enum | `closed` (all path-units `closed` or degraded-with-evidence) / `gaps` (≥1 `not-reached` or `terminal-mismatch`, or a denied human-confirm) / `no-path-units` |
 
-**Per-path-unit verdict row (required fields, one per path-unit REQ):** `req`, `entry_point` (verbatim), `terminal_state` (verbatim), `walk_kind` (`web`/`api`/`cli`/`library`/`slash-command`/`human`), `action_taken`, `observed_state`, `verdict` (`closed`/`not-reached`/`terminal-mismatch`/`degraded:evidence-by-test`/`degraded:human-confirmed`), `evidence_ref`.
+**Per-path-unit verdict row (required fields, one per path-unit):** `req` (markdown `REQ-NNN` or Linear issue id), `entry_point` (verbatim), `terminal_state` (verbatim), `walk_kind` (`web`/`api`/`cli`/`library`/`slash-command`/`human`), `action_taken`, `observed_state`, `verdict` (`closed`/`not-reached`/`terminal-mismatch`/`degraded:evidence-by-test`/`degraded:human-confirmed`), `evidence_ref`.
 
 **Verdict semantics:** `closed` = reached + observed matches terminal; `not-reached` = could not exercise the entry point at all; `terminal-mismatch` = reached but observed ≠ terminal; `degraded:*` = per Step 4.
 
@@ -234,4 +242,4 @@ No commits. No work-item writes beyond the closure report home for the active ba
 - **Evidence, not assertion.** Every verdict carries a concrete `evidence_ref` (command output, screenshot, test name, or human-confirm id). Do not invent evidence; do not record a verdict you did not observe.
 - **Respect security config.** Never run a probe that trips `security.blocked_commands` or touches `security.blocked_paths`; treat such a path-unit as not-automatable and route it through degraded mode.
 - **The empty case is success, not failure.** A UR with no path-units writes a valid `no-path-units` closure report (backend home) and exits cleanly.
-- **Linear homes are fixed (REQ-296).** When `tracker.backend: linear`, persist only via **`write_close_report`** (Initiative `## Closure` + comment). Do not invent ad-hoc Docs or local `closure.md` as the authoritative store.
+- **Linear homes are fixed (REQ-296 / REQ-297).** When `tracker.backend: linear`, collect path-units via Linear issue ids (`list_reqs_for_ur` + path-unit fields) and persist only via **`write_close_report`** (Initiative `## Closure` + comment). If Initiative write fails (permission/size) and the §10 Initiative-comment path also fails, hard-stop — do not invent ad-hoc Issue comments, alternate Docs, or local `closure.md` as the authoritative store.

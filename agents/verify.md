@@ -35,20 +35,25 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
-### Verify report home — backend branch (REQ-296)
+### Verify report home — backend branch (REQ-296 / REQ-297)
 
 | Backend | Where the verify report lives |
 |---------|-------------------------------|
 | **markdown** | Console-primary (Step 5c). No fixed durable path required (`markdown.md` `write_verify_report`). |
-| **linear** | Port op **`write_verify_report`** — Initiative description **`## Verify`** + Initiative comment with the full report (`agents/tracker/linear.md`). Fixed home; do not invent alternate sections or local files as the store. |
+| **linear** | Port op **`write_verify_report`** — Initiative description **`## Verify`** + Initiative comment with the full report (`agents/tracker/linear.md`). Fixed home; do not invent alternate sections or local files as the store. Description size spill → section pointer + Initiative comment only (§10). If description **and** Initiative comment both fail → hard-stop; never invent Issue comments or alternate Docs. |
 
 After producing the report in Step 5c, when backend is **linear**, call **`write_verify_report`** with the full report body for this UR. Still print the report to the console for the operator. Scoring arithmetic remains `lib/score-coverage.sh` (local).
 
 ### 1. Read the brief
 
-Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full.
+**Backend branch (REQ-297):**
 
-Read every file in `UR-NNN/assets/` if present.
+| Backend | Brief / REQs |
+|---------|--------------|
+| **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present. Backlog REQs from `.do-work/` as today. |
+| **linear** | **`read_ur`** for brief (Initiative `## Brief` + sections). **`list_reqs_for_ur`** for Issues in Project `do-work/{UR-id}`. Optional local assets only if the operator keeps them on disk — not a dual work-item store. |
+
+**Markdown path (default):** Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present.
 
 **Legacy UR detection.** Read the first 10 lines of `input.md`. If they do not begin with a `---` line followed by a YAML frontmatter block ending in `---`, this UR predates the gap-aware capture refactor. Mark it as legacy. Verify will:
 - Run all pre-existing checks (coverage scoring, ideate observation tracking, vague-criteria scan).

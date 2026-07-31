@@ -45,17 +45,19 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
-### Decisions / calibration — backend branch (REQ-296)
+### Decisions / calibration — backend branch (REQ-296 / REQ-297)
 
 Standing decisions and capture calibration are **work-item memory**, not runtime locks. Homes are fixed by design §10 / the active backend file — never invent alternate paths or Doc titles.
 
 | Concern | Markdown (`markdown.md`) | Linear (`linear.md`) |
 |---------|--------------------------|----------------------|
 | Read decisions | `{project}/.do-work/decisions.md` if present | **Read decisions** helper — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty |
-| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing) |
+| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing). Same grammar: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale` |
 | Read calibration | `{project}/.do-work/state/calibration.md` if present | **Read calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`); missing → continue without |
 
 **When effective backend is `linear`:** do **not** read or write local `.do-work/decisions.md` or `state/calibration.md` as the store. Use the sequences in `agents/tracker/linear.md` only. **When `markdown`:** keep the file paths in the steps below.
+
+**Hard-stop (Linear writes):** if `append_decision` Doc create/update fails (permission, size, MCP), hard-stop — do **not** invent Issue comments, alternate Doc titles, or a local `decisions.md` dual-write.
 
 ### 1. Read the brief
 

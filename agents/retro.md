@@ -34,30 +34,43 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
-### Calibration / run-notes home — backend branch (REQ-296)
+### Calibration / run-notes home — backend branch (REQ-296 / REQ-297)
 
 | Concern | Markdown | Linear (`linear.md`) |
 |---------|----------|----------------------|
-| Calibration write | Truncate-write `{project}/.do-work/state/calibration.md` | **Write calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`), create-if-missing, **full replace** body |
-| Run history for rollup | Local `.do-work/runs/RUN-NNN.yml` via `lib/retro-rollup.sh` | Prefer Linear **`append_run_note`** Issue comments when available; fall back to local runs if comments unavailable (design §7). Local `RUN-NNN.yml` is telemetry only when `ledger.enabled` |
+| Calibration write | Truncate-write `{project}/.do-work/state/calibration.md` | **Write calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`), create-if-missing, **full replace** body. Create/update failure → hard-stop; never invent alternate titles or local store |
+| Run history for rollup | Local `.do-work/runs/RUN-NNN.yml` via `lib/retro-rollup.sh` | **Prefer Linear first (REQ-297):** **List run notes** helper — Issue comments with `<!-- do-work-run-note -->` from `append_run_note`. Fall back to local `RUN-NNN.yml` only if comments unavailable. Local files are telemetry only when `ledger.enabled` |
 
 **When effective backend is `linear`:** do **not** write local `state/calibration.md` as the store. Use the calibration Team Doc sequence only. Fixed home — never invent alternate Doc titles.
 
-### 1. Run the rollup
+### 1. Collect run history and run the rollup
+
+**Prefer Linear run notes when `backend: linear` (REQ-297):**
+
+1. Call linear.md **List run notes** — rediscover comment tools; collect `<!-- do-work-run-note -->` YAML blocks from Issues under `do-work/UR-*` Projects (or the scoped UR). Hold parsed notes in context.
+2. Still run the local rollup script when present (it chews optional telemetry):
 
 ```bash
 bash lib/retro-rollup.sh
 ```
 
-Run it from the project root (the directory containing `.do-work/`). Capture stdout verbatim — these are the facts you will interpret. Warnings on stderr (e.g. `skip malformed ledger row ...`) are informational; note them but do not stop.
+Run the script from the project root (the directory containing `.do-work/`). Capture stdout verbatim. Warnings on stderr (e.g. `skip malformed ledger row ...`) are informational; note them but do not stop.
 
-If `lib/retro-rollup.sh` is missing, report `"lib/retro-rollup.sh not found — cannot run retro."` and stop.
+If `lib/retro-rollup.sh` is missing **and** backend is markdown, report `"lib/retro-rollup.sh not found — cannot run retro."` and stop. If backend is linear and the script is missing but **List run notes** returned rows, continue interpreting from those notes only.
 
-**Linear note:** when backend is linear and local runs are empty but Issue run-note comments exist, prefer deriving rollup input from those notes if the script has nothing to chew on — or re-run after optional local telemetry is present. Do not invent spend/stats. If only Linear notes exist and the script prints `runs=0`, report that local telemetry is empty and either skip calibration write (empty-state) or interpret from collected Linear notes when you successfully listed them — never dual-write a fabricated local ledger.
+**Interpretation priority under Linear:**
+
+| Situation | What you interpret |
+|-----------|--------------------|
+| Linear run notes present | Prefer those notes as authoritative history (design §7); local rollup numbers are secondary if they disagree on coverage |
+| Linear notes empty/unavailable, local `runs=N` > 0 | Fall back to local rollup stdout (telemetry) |
+| Both empty | Empty-state branch (Step 2) |
+
+Do not invent spend/stats. Never dual-write a fabricated local ledger from partial Linear data.
 
 ### 2. Empty-state branch (§2e)
 
-If the rollup's output is exactly `runs=0` **and** (markdown backend **or** no Linear run notes were available to interpret):
+If there is **no** history to learn from — markdown: rollup output is exactly `runs=0`; linear: **List run notes** returned zero usable notes **and** rollup is `runs=0` (or script missing with no notes):
 
 1. Render a clean report: `"No run history yet — nothing to learn from. Run some REQs through /do-work run, then retro again."`
 2. Write **no** calibration. Do not create or truncate `.do-work/state/calibration.md` (markdown) and do **not** create/replace the Linear calibration Team Doc.
@@ -138,5 +151,5 @@ Print the report. Confirm the calibration home written (local path or Linear Doc
 - **Empty state writes nothing.** On `runs=0` (and no Linear notes to interpret), render the "no run history yet" report and write no calibration.
 - **Advisory, never blocking.** Calibration informs capture; it is not a requirement. Nothing you produce blocks the pipeline.
 - **No git commits, no AskUserQuestion prompts, no deploys.**
-- **Linear homes are fixed (REQ-296).** Never invent ad-hoc Doc titles; use `calibration_doc_title` only.
-- If `lib/retro-rollup.sh` is missing, report it and stop.
+- **Linear homes are fixed (REQ-296 / REQ-297).** Never invent ad-hoc Doc titles; use `calibration_doc_title` only. Prefer **List run notes** over local telemetry when backend is linear. Doc create/update failure → hard-stop (no local substitute store).
+- If `lib/retro-rollup.sh` is missing under markdown, report it and stop. Under linear, missing script alone is not fatal when Linear run notes were listed successfully.

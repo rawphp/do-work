@@ -187,7 +187,38 @@ This path-unit maps **non-ticket** work-item artifacts to Linear homes and docum
 |------|----------------|-----|
 | §10 home map + `append_decision` / calibration Doc / `write_verify_report` / `write_close_report` / `write_gate_state` sequences | This file | REQ-296 (this section) |
 | Phase agents call those homes | `agents/capture.md`, `agents/verify.md`, `agents/close.md`, `agents/retro.md` | REQ-296 |
+| Full consumer wiring + hard-stop invent ban + close Linear path-unit walk + retro prefer run notes | This file + capture/ideate/question/verify/close/retro/run-worker | REQ-297 |
 | `append_run_note` Issue comments | Remain as REQ-294 sequences | REQ-294 |
+
+---
+
+## Path: Linear artifact home consumers (REQ-297)
+
+| | |
+|---|---|
+| **Entry point** | capture / ideate / question / verify / close / retro / run-worker after load path with `tracker.backend: linear` |
+| **Terminal state** | All §10 readers and writers use port sequences in this file; Doc titles from config; decisions one-line grammar identical to markdown; close walks **Linear issue ids**; retro prefers Linear run notes; create/update failures hard-stop with **no invented homes** |
+
+REQ-296 documented the homes and write sequences. **REQ-297** finishes the consumer surface:
+
+| Consumer | Linear port ops / helpers (this file) |
+|----------|----------------------------------------|
+| `agents/capture.md` | **Read decisions**; **`append_decision`**; **Read calibration Doc** |
+| `agents/ideate.md` | **Read decisions** (constraints for Connector / contradiction flags) |
+| `agents/question.md` | **Read decisions** (self-answer pass evidence) |
+| `agents/run-worker.md` | **Read decisions** (standing constraints; conflict → stop) |
+| `agents/verify.md` | **`write_verify_report`** (and `read_ur` / `list_reqs_for_ur` for brief + REQs) |
+| `agents/close.md` | Path-unit walk via **Linear issue ids** + **`write_close_report`** |
+| `agents/retro.md` | **List run notes** (prefer) → local `RUN-NNN.yml` fallback; **Write calibration Doc** |
+
+**Hard rules (REQ-297):**
+
+1. **Config titles only** — decisions Doc = `tracker.linear.decisions_doc_title` (default `do-work/decisions`); calibration Doc = `tracker.linear.calibration_doc_title` (default `do-work/calibration`). Never invent alternate titles.
+2. **Same decisions grammar as markdown** — every line is exactly `YYYY-MM-DD | UR/REQ ref | decision | rationale` (SKILL.md § Decisions Memory). Linear issue ids may appear in the ref slot (e.g. `ENG-123`); pipe-separated four fields; one line per decision; append-only; supersede by new line.
+3. **Close walks Linear issue ids** — under `backend: linear`, path-units are Issues in Project `do-work/{UR-id}` with path-unit semantics (`Layer: none` + non-empty Entry point + Terminal state). The `req` field in closure rows is the **Linear identifier** (e.g. `ENG-123`), not `REQ-NNN`.
+4. **Retro prefers Linear run notes** — when `backend: linear`, collect `<!-- do-work-run-note -->` Issue comments via **List run notes** before treating local `.do-work/runs/` as the only history. Fall back to local telemetry only when comments are unavailable.
+5. **Hard-stop on Doc / Initiative write failure — no invent** — if Team Doc **create** or **update** fails (permission, size, MCP error), or Initiative description section update **and** Initiative comment both fail for verify/close, **hard-stop**. Agents must **not** invent ad-hoc Issue comments for decisions/calibration, alternate Doc titles, local `.do-work/decisions.md` / `state/calibration.md` / `closure.md` as substitute stores, or any home outside the §10 table.
+6. **§10-allowed spill only** — for verify/close, putting the full report in an **Initiative comment** while leaving a one-line pointer under `## Verify` / `## Closure` is the documented size path (still §10). That is **not** inventing a home. Putting the report on a random Issue, a different Initiative, or a new Doc title **is** inventing — forbidden.
 
 ---
 
@@ -311,11 +342,12 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | `archive_req` | Workflow states, issues, claim release, body proof/outputs | **Documented** (REQ-294/295) — done + proof + outputs + claim released; **not** called after failed review/evidence |
 | `set_blocked_by` | Issue relations `blocks` (+ body mirror) | **Documented** (REQ-291) — dual-write; if relations **missing** → body-only + one-time warning (port rule) |
 | `set_files` | Issue description headers | **Documented** (REQ-291) — updates `**Files:**` only; no claim side-effect |
-| `append_decision` | Team Doc `decisions_doc_title` | **Documented** (REQ-296) — create-if-missing; append-only decision lines |
-| Calibration (retro write / capture read) | Team Doc `calibration_doc_title` | **Documented** (REQ-296) — create-if-missing; full replace body |
-| `write_verify_report` | Initiative `## Verify` + Initiative comment | **Documented** (REQ-296) |
-| `write_close_report` | Initiative `## Closure` + Initiative comment | **Documented** (REQ-296) |
+| `append_decision` | Team Doc `decisions_doc_title` | **Documented** (REQ-296 ops; REQ-297 consumers) — create-if-missing; same one-line grammar; hard-stop on create/update fail |
+| Calibration (retro write / capture read) | Team Doc `calibration_doc_title` | **Documented** (REQ-296/297) — create-if-missing; full replace body; hard-stop invent ban |
+| `write_verify_report` | Initiative `## Verify` + Initiative comment | **Documented** (REQ-296/297) — dual-fail hard-stop |
+| `write_close_report` | Initiative `## Closure` + Initiative comment | **Documented** (REQ-296/297) — close path-unit walk uses Linear issue ids |
 | `append_run_note` | Issue comments (+ optional project update) | **Documented** (REQ-294) — authoritative run/cost notes; local ledger optional telemetry |
+| List run notes (helper) | Issue comments `<!-- do-work-run-note -->` | **Documented** (REQ-297) — retro prefers Linear notes, falls back to local telemetry |
 | Milestone ops | Project description / labels / milestone entity if any | TBD |
 | `write_gate_state` | **Local** `state/gate-owner.md` (not Linear) | **Documented** (REQ-296) — local only; never Linear |
 
@@ -867,7 +899,13 @@ Agents **must not invent** homes. Use only the rows below (plus local gate locks
 
 **Create-if-missing (Team Docs):** on first write, if no Doc with the configured title exists for the configured team, create it (title exact match to config), then write. Readers: if missing, treat as empty (no decisions / no calibration) — never invent content.
 
-**Hard-stop:** if Docs tools (for decisions/calibration) or Initiative update/comment tools (for verify/close) are undiscoverable after `search_tool`, hard-stop that op with Linear setup instructions. Do **not** fall back to local `.do-work/decisions.md` / `state/calibration.md` / `closure.md` as the work-item store.
+**Hard-stop (REQ-296 / REQ-297):** if Docs tools (for decisions/calibration) or Initiative update/comment tools (for verify/close) are undiscoverable after `search_tool`, **or** Team Doc create/update fails (permission, size, MCP error), **or** Initiative description append/update fails **and** the §10 Initiative-comment path also fails — hard-stop that op with Linear setup / permission instructions. Do **not**:
+
+- fall back to local `.do-work/decisions.md` / `state/calibration.md` / `closure.md` as the work-item store
+- invent alternate Doc titles outside `decisions_doc_title` / `calibration_doc_title`
+- invent ad-hoc Issue comments (or Project updates) as a substitute home for decisions, calibration, verify, or close reports
+
+§10-allowed Initiative comment for the full verify/close body (with a section pointer) remains valid when description size alone fails.
 
 ---
 
@@ -1238,6 +1276,17 @@ Rules:
 3. If `ledger.enabled` is false, skip local file; still prefer `append_run_note` for Linear run history when the attempt warrants a note.
 4. Budget gate may sum local telemetry when present; if only Linear notes exist, sum from those comments or skip numeric gate with an explicit note — never invent spend.
 
+#### List run notes (helper — retro / budget; not a separate port op name)
+
+Readers (primarily **`agents/retro.md`**, optionally budget/status) collect authoritative Linear run history when `backend: linear`:
+
+1. **Rediscover** issue list/get + comment list tools (`search_tool`).
+2. **Scope** — Issues under Projects matching `do-work/UR-*` for the configured team (or a single UR’s Project when scoped). Prefer Issues that have been attempted (in_progress / stopped / done), not pure backlog with zero comments.
+3. **List comments** per Issue; keep bodies whose first marker line is `<!-- do-work-run-note -->` (same marker as `append_run_note`).
+4. **Parse** the YAML fenced block (fields: `req`, `agent`, `model`, `result`, timestamps, cost, commit, …). Treat parse failures as skip-with-warning (do not invent stats).
+5. **Prefer** these notes for retro interpretation when present. If comment tools fail or zero notes found → fall back to local `{project}/.do-work/runs/RUN-NNN.yml` telemetry (if any). Never dual-write a fabricated local ledger from partial Linear data.
+6. Do **not** invent spend, stop rates, or shapes from narrative Issue comments that lack the run-note marker.
+
 ---
 
 ### `append_decision`
@@ -1249,16 +1298,25 @@ Rules:
 | **Home** | Team Doc titled `tracker.linear.decisions_doc_title` (default **`do-work/decisions`**). **Never** invent a different title or a local `.do-work/decisions.md` store while backend is linear. |
 | **Does not** | Rewrite prior lines; change Issues/Initiatives; write calibration. |
 
-**Line format** (same as markdown decisions memory / SKILL.md § Decisions Memory):
+**Line format** — **identical** one-line grammar to markdown `.do-work/decisions.md` / SKILL.md § Decisions Memory (four pipe-separated fields; no paragraphs):
 
 ```
-YYYY-MM-DD | UR-NNN | <decision> | <one-phrase rationale>
+YYYY-MM-DD | UR/REQ ref | decision | rationale
 ```
+
+| Field | Rule |
+|-------|------|
+| `YYYY-MM-DD` | UTC date the decision was recorded |
+| `UR/REQ ref` | UR slug (`UR-035`) and/or Linear issue id (`ENG-123`) — same slot as markdown `REQ-NNN` |
+| `decision` | Standing choice, stated as a constraint |
+| `rationale` | One phrase explaining why |
+
+**Discipline (parity with markdown):** append-only; never rewrite or delete a prior line; supersede with a new line that references the old; absent Doc on **read** = empty set (do not create on read).
 
 **Agent sequence:**
 
 1. **Rediscover** — `search_tool` for Linear **Team Docs** (list/get/create/update). Queries such as `"linear team docs"`, `"linear document"`, `"linear create document"`. Use only qualified names + schemas returned.
-2. **Resolve title** — `title = tracker.linear.decisions_doc_title` if non-empty, else `do-work/decisions`.
+2. **Resolve title** — `title = tracker.linear.decisions_doc_title` if non-empty, else `do-work/decisions`. **Never** invent another title.
 3. **Find or create** — list/search Docs on the configured team for exact title match.
    - If found → load body.
    - If missing → **create-if-missing** with that exact title and empty or header-only body (e.g. `# do-work decisions\n\n` plus append-only lines below).
@@ -1270,15 +1328,17 @@ YYYY-MM-DD | UR-NNN | <decision> | <one-phrase rationale>
 |---------|----------|
 | Docs tools missing / unauthenticated | Hard-stop; Linear setup instructions; **no** local decisions file as substitute store |
 | Team unresolved | Hard-stop |
-| Create or update fails | Hard-stop; leave Doc as-is; retry later |
+| Create fails (permission / size / MCP) | Hard-stop; **do not** invent Issue comments, alternate Doc titles, or local `decisions.md` |
+| Update fails (permission / size / MCP) | Hard-stop; leave Doc as-is; **do not** invent alternate homes; retry later |
 
 #### Read decisions (helper — not a separate port op name)
 
-Readers (capture, ideate, question, run-worker) load standing decisions as **constraints**:
+Readers (**capture, ideate, question, run-worker** — REQ-297) load standing decisions as **constraints**:
 
-1. Same rediscovery + title resolution as `append_decision`.
+1. Same rediscovery + title resolution as `append_decision` (`decisions_doc_title` / default `do-work/decisions`).
 2. If Doc missing → empty set (continue; never create on read-only path).
-3. If present → parse body lines matching the decision format; hold in context. Same discipline as markdown `.do-work/decisions.md` readers.
+3. If present → parse body lines matching the four-field decision grammar; hold in context. Same discipline as markdown `.do-work/decisions.md` readers (worker treats lines as hard constraints; ideate/question use them as evidence / contradiction flags).
+4. Do **not** also read local `.do-work/decisions.md` when `backend: linear`.
 
 ---
 
@@ -1311,9 +1371,10 @@ Calibration is **not** a separate port op name in `port.md`; representation unde
 | Failure | Behavior |
 |---------|----------|
 | Docs tools missing on write | Hard-stop retro calibration write; do not invent local calibration store |
+| Create/update fails (permission / size / MCP) | Hard-stop; **do not** invent alternate Doc titles, Issue comments, or local `state/calibration.md` |
 | Docs tools missing on read | Treat as absent calibration (advisory path); do not hard-stop capture solely for missing Docs on read if the rest of capture can proceed without it — prefer hard-stop only when backend is linear **and** the agent was required to read remote work-items that also failed |
 
-**Empty retro (`runs=0`):** do **not** create or replace the calibration Doc (parity with markdown: write no file).
+**Empty retro (`runs=0` and no Linear run notes to interpret):** do **not** create or replace the calibration Doc (parity with markdown: write no file).
 
 ---
 
@@ -1339,7 +1400,8 @@ Calibration is **not** a separate port op name in `port.md`; representation unde
 |---------|----------|
 | Initiative tools missing | Hard-stop |
 | UR / Initiative not found | Hard-stop; do not invent Initiative |
-| Size limit on description | Section pointer + full comment (required path above) |
+| Size limit on description only | Section pointer + full **Initiative** comment (required §10 path above) — **not** inventing a home |
+| Description **and** Initiative comment both fail (permission / size / MCP) | Hard-stop; **do not** invent Issue comments, alternate Docs, or local verify files as the store |
 
 **Markdown backend note:** `markdown.md` remains console-primary for verify (no fixed durable path). Linear makes verify durable via this op.
 
@@ -1368,6 +1430,21 @@ Calibration is **not** a separate port op name in `port.md`; representation unde
 |---------|----------|
 | Initiative tools missing | Hard-stop |
 | UR missing | Hard-stop |
+| Size limit on description only | Section pointer + full **Initiative** comment (§10) |
+| Description **and** Initiative comment both fail (permission / size / MCP) | Hard-stop; **do not** invent Issue comments, alternate Docs, or local `closure.md` as the store |
+
+#### Close path-unit collection (Linear — REQ-297)
+
+When `agents/close.md` walks a UR under `backend: linear`, path-units come from Linear Issues — not from local `archive/REQ-*.md`:
+
+1. Resolve Project `do-work/{UR-id}` and call **`list_reqs_for_ur`** (all Issues in that Project; include done/archived-equivalent).
+2. For each Issue body, treat as a **path-unit** when `**Layer:**` is `none` **and** both `**Entry point:**` and `**Terminal state:**` are present and non-empty after trim.
+3. Extract: `req` = **Linear issue identifier** (e.g. `ENG-123`); `entry_point` / `terminal_state` = verbatim header values.
+4. Do **not** read `**Closure proof:**` (same cold-dispatch rule as markdown).
+5. Walk still runs against the **merged local app** (git). Persist results only via **`write_close_report`**.
+6. Closure row `req:` fields and report headings use Linear ids (`## ENG-123 — closed`), never parallel `REQ-NNN` allocation.
+
+Brief load under Linear: **`read_ur`** (Initiative description `## Brief` / machine sections) — do not require local `user-requests/UR-NNN/input.md` as the store.
 
 ---
 
@@ -1576,7 +1653,7 @@ Dependency ids are **Linear issue identifiers only**.
 
 ## Out of scope for this file state
 
-- Capture / ideate / question **full** CRUD rewires beyond artifact homes → later REQs where noted. **Claim consumers** `status` / `unblock` / `resume` / `run` as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296 (`append_decision`, calibration Doc, `write_verify_report`, `write_close_report`, local `write_gate_state`; capture/verify/close/retro callouts).
+- Full UR/REQ CRUD rewires beyond homes already mapped → later REQs where noted. **Claim consumers** as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296; **artifact home consumers** (capture/ideate/question/verify/close/retro/run-worker decisions readers; close Linear path-unit walk; retro List run notes; hard-stop invent ban) as of **REQ-297**.
 - Milestone cursor on Project description + migration one-shot → later path-units.
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
@@ -1591,7 +1668,7 @@ Dependency ids are **Linear issue identifiers only**.
 - `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative / claim rules
 - `agents/config.md` — `tracker.*` schema including `decisions_doc_title` / `calibration_doc_title`, `agent_claim_marker`, `heartbeat_max_age_seconds`, `review.required`, Load Config step 7
 - `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` / `agents/run-worker.md` / `agents/review.md` — claim/run consumers
-- `agents/capture.md` / `agents/verify.md` / `agents/close.md` / `agents/retro.md` — §10 artifact consumers (REQ-296)
+- `agents/capture.md` / `agents/ideate.md` / `agents/question.md` / `agents/verify.md` / `agents/close.md` / `agents/retro.md` / `agents/run-worker.md` — §10 artifact consumers (REQ-296 homes; REQ-297 full reader/writer wiring)
 - Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288–295; this path REQ-296 non-ticket artifact homes
+- Prior: REQ-288–296; this path REQ-297 artifact home consumers
