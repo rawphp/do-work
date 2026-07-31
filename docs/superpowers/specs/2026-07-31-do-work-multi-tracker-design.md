@@ -362,26 +362,28 @@ intake, capture, ideate, question, audit, verify, run, run-worker, review, statu
 
 1. **Markdown regression:** existing `lib/tests` + conformance pass with `backend: markdown` (default).
 2. **Port contract:** checklist that both backend docs implement every op name in `port.md`.
-3. **Linear integration:** sandbox team manual/agent harness; no secrets in repo.
-4. **Migrate dry-run:** report planned creates without writing when flag set.
+3. **Linear capability spike:** before full Linear CRUD, sandbox-team harness rediscovers tools live (`search_tool`) and commits a capability matrix in `agents/tracker/linear.md` (Initiatives, Projects, InitiativeToProject, `blocks` relations, Team Docs, comments, workflow/`status_map` states). Tool names stay **unknown** until proven; no secrets in repo; no production work-item migration during the spike.
+4. **Linear integration:** sandbox team manual/agent harness after matrix fill; no secrets in repo.
+5. **Migrate dry-run:** report planned creates without writing when flag set.
 
 ## 16. Implementation phasing (for writing-plans)
 
 Suggested dependency order (single plan, multi-PR REQs):
 
 1. Config schema + load path + `port.md` stub ops + `markdown.md` mapping existing behavior  
-2. Initiative/Issue templates + `linear.md` CRUD for UR/REQ  
-3. Claim/heartbeat/unblock/resume + status  
-4. Capture/ideate/question/verify against port  
-5. Run loop pick/claim/deps/footprint/archive on Linear  
-6. Close, decisions doc, run notes, calibration  
-7. Milestone mode on Linear  
-8. Migration one-shot + upgrade wiring  
-9. Docs (SKILL.md, getting-started, troubleshooting)
+2. **Linear MCP capability spike** — `agents/tracker/linear.md` skeleton + live matrix (rediscover tools; hard-stop copy; `status_map` validation notes) **before** wiring full CRUD  
+3. Initiative/Issue templates + `linear.md` CRUD for UR/REQ (only after spike cells for hierarchy/relations/Docs are known)  
+4. Claim/heartbeat/unblock/resume + status  
+5. Capture/ideate/question/verify against port  
+6. Run loop pick/claim/deps/footprint/archive on Linear  
+7. Close, decisions doc, run notes, calibration  
+8. Milestone mode on Linear  
+9. Migration one-shot + upgrade wiring  
+10. Docs (SKILL.md, getting-started, troubleshooting)
 
 ## 17. Open risks
 
-1. **Linear MCP offline / thin tools** — initiative link, issue relations may need GraphQL; agents must rediscover tools live.
+1. **Linear MCP offline / thin tools** — initiative link, issue relations may need GraphQL; agents must rediscover tools live. Mitigation: capability matrix + hard-stop copy in `agents/tracker/linear.md` (spike path before CRUD).
 2. **No custom fields** — all structure is markdown conventions; parse discipline is mandatory.
 3. **Optimistic claim** — weaker than FS rename; acceptable with documented conflict/resume.
 4. **Linear IDs only** — breaks continuity with markdown `REQ-NNN` history after migrate (by design).
