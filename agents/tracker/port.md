@@ -3,6 +3,8 @@
 Shared work-item operation catalog and load path for do-work multi-tracker backends.
 Phase agents that touch URs/REQs (or other work-item artifacts) resolve storage **only** through this port and the active backend file — never by inventing raw store paths or tools outside the backend doc.
 
+This file freezes **op names**, **preconditions**, and **backend-independent semantic rules** (claim, deps, footprint, hard-stop, mid-flight failure). Backend files implement each op; they must not invent alternate op names or weaken these rules.
+
 ---
 
 ## Path: markdown-default (REQ-283)
@@ -19,8 +21,9 @@ This path is the happy path for every project that has not opted into Linear. Pr
 | Area | Responsibility |
 |------|----------------|
 | Config schema (`tracker.*`) | Full keys, validation, migrate-to-disk |
-| Port op catalog body | Preconditions, inputs/outputs, error contracts per op |
-| Markdown backend mapping | Op → `lib/*.sh` + `.do-work/` path sequences |
+| Port op catalog body | This file — preconditions, claim/deps/footprint, hard-stop, mid-flight |
+| Markdown backend mapping | Op → `lib/*.sh` + `.do-work/` path sequences (`markdown.md`) |
+| Linear backend mapping | Op → Linear skill/MCP sequences (`linear.md`; no tool inventing here) |
 | Phase-agent load-path wiring | Each agent that touches work items loads port + backend |
 
 ---
@@ -31,7 +34,7 @@ This path is the happy path for every project that has not opted into Linear. Pr
 2. Resolve `tracker.backend`:
    - **missing key, empty string, or whitespace-only** → treat as **`markdown`**
    - **`markdown`** → continue; **no Linear tools required**, no hard-stop
-   - **`linear`** → Linear backend path (separate path-unit; not this default)
+   - **`linear`** → Linear backend path; Linear must be usable (see **Hard-stop**)
    - **any other value** → hard-stop with a clear config error (do not guess)
 3. Read `agents/tracker/port.md` (this file).
 4. Read `agents/tracker/<backend>.md` (for default: `agents/tracker/markdown.md`).
@@ -53,26 +56,146 @@ Later backends (e.g. GitHub Issues, Jira) add sibling files; they are not part o
 
 ---
 
-## Work-item vs runtime split
+## Work-item vs runtime split (design §5.5)
 
-| Stays local (all backends) | Work-item store (backend-specific) |
-|----------------------------|------------------------------------|
-| Worktrees, branches, merges, PRs | UR create/read/update |
-| `state/*` locks, events, context-pack | REQ create/edit/status/claim/archive |
-| `config.yml`, install/conformance | Deps / footprint fields |
-| Gate-owner / final-suite locks | Decisions, verify/close reports, run notes, calibration, milestone cursor content |
+From the storage inventory: **work-item** data is what the active tracker backend owns; **runtime / git / config** always stay local regardless of backend.
 
-Markdown mode implements work-item ops with existing `.do-work/` trees and `lib/*.sh`. Linear mode reimplements the **same op names** via MCP; it never silently falls back to markdown.
+### Must map through port ops (work-item store)
+
+| Domain | Examples (ops) |
+|--------|----------------|
+| UR lifecycle | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications` |
+| REQ lifecycle | `create_req`, `update_req`, `read_req`, `list_reqs_for_ur`, `set_req_status`, `archive_req` |
+| Claim / pick | `list_claimable_reqs`, `claim_req`, `heartbeat_req`, `unblock_req` |
+| Deps / footprint fields | `set_blocked_by`, `set_files` |
+| Non-ticket artifacts | `append_decision`, `write_verify_report`, `write_close_report`, `append_run_note` |
+| Milestone cursor content | `read_active_milestone`, `set_active_milestone`, `list_milestone_reqs` |
+| Product container | `ensure_product_container` |
+
+In Linear mode these live only in Linear (Initiatives, Projects, Issues, Docs, comments) — **no dual-write** to UR/REQ markdown as source of truth.
+
+### Stay local (not port work-item storage)
+
+| Domain | Notes |
+|--------|--------|
+| Worktrees, branches, merges, PRs | Git isolation; branch names may reference Linear issue ids |
+| `state/*` locks, events, context-pack, retry counters | Orchestrator coordination |
+| `config.yml`, install, conformance | Config load path; tracker backend selection |
+| Gate-owner / final-suite locks | Deploy-gate coordination; `write_gate_state` may still use a **local** lock file even when work-items are remote |
+| Optional local ledger telemetry | If `ledger.enabled`, local `.do-work/runs/RUN-NNN.yml` may mirror cost notes for offline tooling — **telemetry only**, not a second work-item store |
+
+Claim **semantics** are port rules; claim **representation** is backend-specific (markdown: claim stamp on the REQ file; Linear: workflow status + claim **comment**, not a local claim file).
 
 ---
 
-## Operation catalog (names)
+## Hard-stop (Linear unusable)
 
-Names freeze intent. Full preconditions, fields, and error contracts live in the port catalog expansion and each backend file. Markdown may implement several ops by composing existing scripts.
+When `tracker.backend` resolves to **`linear`**, an unusable Linear backend is a **hard stop** — never silent markdown fallback.
+
+| Condition | Behavior |
+|-----------|----------|
+| Linear MCP missing, offline, or unauthenticated | **Hard stop** with setup instructions from the Linear skill |
+| Team id / team key unresolved | **Hard stop**; do not guess a team |
+| Required `status_map` workflow state missing on the team | **Hard stop** with rename / map-fix instructions |
+| MCP dies mid-op before a safe commit point | **Hard stop** — see **Mid-flight MCP failure** |
+
+**Never silent markdown fallback.** Agents must not:
+
+- switch to `markdown` ops “to keep going”
+- write UR/REQ files under `.do-work/` as a substitute store while backend is `linear`
+- invent partial local mirrors of Linear work items
+
+When `tracker.backend` resolves to **`markdown`** (including unset/empty), Linear unavailability is irrelevant — no Linear tools required, no hard-stop for Linear.
+
+---
+
+## Mid-flight MCP failure (leave claimed)
+
+If Linear MCP fails **after** a successful `claim_req` (issue is in-progress + active claim/heartbeat) but **before** `archive_req` / clean `unblock_req`:
+
+1. **Leave claimed** — do **not** clear the claim, force backlog, or silently release the slot.
+2. Issue stays in-progress with the last claim / heartbeat as written.
+3. Operator recovers with `/do-work resume` or `/do-work unblock` after MCP is healthy again (same multi-agent recovery story as markdown concurrent-conflict).
+4. The failing agent exits stopped (e.g. concurrent-conflict / missing-creds / dependency-missing as appropriate to the surface); it does **not** invent a “claimed-but-abandoned” cleanup that races siblings.
+
+Markdown mid-flight failures follow the same spirit: a claimed working/ slot is not auto-released on worker crash; stale heartbeat + resume/unblock repair it.
+
+---
+
+## Deps authority (relations authoritative)
+
+| Backend | Authoritative deps for eligibility | Mirror / display |
+|---------|------------------------------------|------------------|
+| **markdown** | `**Depends on:**` header on the REQ (file is the store) | same field |
+| **linear** | Native Linear **`blocks` relations** | `**Depends on:**` line in Issue body is a **mirror** only |
+
+Rules (backend-independent intent):
+
+1. **`list_claimable_reqs` / deps checks** use the **authoritative** graph for the active backend — never a stale mirror when relations exist.
+2. On Linear, if native `blocks` relations and body `**Depends on:**` diverge, **relations win** for claim eligibility.
+3. **`set_blocked_by`** always updates the authoritative store; when relation tools exist on Linear, it updates **both** relations and body mirror.
+4. If relation tools are unavailable on Linear, backends may fall back to description-only deps with a one-time warning (documented in `linear.md`) — still no silent markdown fallback.
+5. A dependency is **satisfied** only when the depended-on REQ is **archived/done** (backend equivalent). Unsatisfied deps block claim.
+
+---
+
+## Claim, deps, and footprint semantic rules
+
+These rules are shared. Backends implement the representation; they must preserve the semantics.
+
+### Claim
+
+| Concept | Rule |
+|---------|------|
+| Unclaimed | Backlog-equivalent status **and** no active claim (or last claim released / unblocked) |
+| Claim (`claim_req`) | **Optimistic:** re-read before write; if another agent holds an active claim with a fresh heartbeat → fail (`concurrent-conflict`); else mark in-progress and record claim + heartbeat |
+| Heartbeat (`heartbeat_req`) | Refresh liveness timestamp on the active claim; consumers take the latest active claim |
+| Stale | Latest active heartbeat older than configured max age (`parallel.stale_threshold_seconds` or backend override) — recoverable by claim takeover / resume / unblock per multi-agent rules |
+| Unblock (`unblock_req`) | Return to backlog-equivalent; clear / release claim |
+| Resume | stopped → in-progress; refresh heartbeat; do not steal human assignee semantics on Linear |
+| Atomicity | Markdown: FS claim stamp + move. Linear: re-read + comment protocol (no true distributed lock — intentional) |
+
+### Footprint
+
+| Concept | Rule |
+|---------|------|
+| Representation | Structured `**Files:**` (and related header fields) on the REQ — **not** ad-hoc custom fields |
+| Free footprint | No other **in-flight** (claimed / working) REQ’s footprint overlaps the candidate’s declared paths |
+| Overlap | Blocks `list_claimable_reqs` / claim until the overlapping in-flight REQ archives or changes footprint |
+| `set_files` | Updates the footprint list; does not by itself claim or unclaim |
+
+### Deps (eligibility)
+
+| Concept | Rule |
+|---------|------|
+| Graph | Declared depends-on edges (authoritative store per backend — see **Deps authority**) |
+| Satisfied | Every depended-on work item is done/archived |
+| Unsatisfied | REQ is not claimable |
+| `set_blocked_by` | Writes the graph (and mirror when applicable) |
+
+### Pick order (`list_claimable_reqs`)
+
+A REQ is claimable only when **all** of the following hold:
+
+1. Status is backlog-equivalent (not in-progress, stopped-held, or done).
+2. Unclaimed (or stale claim eligible for recovery per multi-agent rules).
+3. Deps satisfied (authoritative graph).
+4. Footprint free vs other in-flight REQs.
+5. Within scope filters the caller applies (e.g. active milestone, single UR project).
+
+Backends return pick-order suitable for the run loop; exact ordering policy lives in the backend / pick implementation.
+
+---
+
+## Operation catalog (design §5.4)
+
+Names freeze intent. Exact field shapes and store sequences live in each backend file. Markdown may compose several ops from existing `lib/*.sh` scripts. **Do not invent Linear tool call names in this file** — those belong only in `linear.md`.
+
+### Catalog index
 
 | Op | Intent |
 |----|--------|
-| `ensure_product_container` | Product/team labeling ready (markdown: no-op / local dirs) |
+| `ensure_product_container` | Team/product labeling ready; no single product Project required |
 | `create_ur` | Record intake brief |
 | `read_ur` | Load brief (+ ideate if present) |
 | `list_urs` | Enumerate URs for prompts/status |
@@ -99,16 +222,231 @@ Names freeze intent. Full preconditions, fields, and error contracts live in the
 | `list_milestone_reqs` | REQs for active milestone |
 | `write_gate_state` | Deploy-gate coordination (local lock still allowed) |
 
+### Op contracts
+
+Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are conceptual; backends map them to files or remote entities.
+
+#### `ensure_product_container`
+
+| | |
+|---|---|
+| **Intent** | Ensure the product/team container for work items is ready (markdown: `.do-work/` dirs; Linear: team resolvable / labels ready — **no** single long-lived product Project required). |
+| **Preconditions** | Config loaded; backend resolved. For Linear: team resolvable or hard-stop. |
+| **Notes** | Idempotent. Does not create a UR or REQ. |
+
+#### `create_ur`
+
+| | |
+|---|---|
+| **Intent** | Record a new intake brief as a UR. |
+| **Preconditions** | `ensure_product_container` satisfied; next UR slug allocatable; backend store writable. |
+| **Notes** | Allocates sequential `UR-NNN` slug (machine-stable). Does not create REQs. |
+
+#### `read_ur`
+
+| | |
+|---|---|
+| **Intent** | Load the UR brief and attached sections (ideate, clarifications, etc. if present). |
+| **Preconditions** | UR id known and exists. |
+| **Notes** | Read-only. |
+
+#### `list_urs`
+
+| | |
+|---|---|
+| **Intent** | Enumerate URs for prompts, status, and migration. |
+| **Preconditions** | Product container ready. |
+| **Notes** | May return ids + titles only; use `read_ur` for full body. |
+
+#### `append_ideate`
+
+| | |
+|---|---|
+| **Intent** | Append or write ideate content onto an existing UR. |
+| **Preconditions** | UR exists; ideate phase allowed for that UR. |
+| **Notes** | Prefer append over overwrite of intake brief. |
+
+#### `append_clarifications`
+
+| | |
+|---|---|
+| **Intent** | Append question-phase Q&A onto the UR. |
+| **Preconditions** | UR exists. |
+| **Notes** | Does not create REQs. |
+
+#### `create_req`
+
+| | |
+|---|---|
+| **Intent** | Create one REQ in the backlog for a UR (optionally under a path-unit parent). |
+| **Preconditions** | UR exists; capture/schema fields available; backend writable. |
+| **Notes** | Starts unclaimed, backlog-equivalent status. Footprint/deps may be set at create or via `set_files` / `set_blocked_by`. |
+
+#### `update_req`
+
+| | |
+|---|---|
+| **Intent** | Edit REQ body or structured fields without changing claim/archive lifecycle. |
+| **Preconditions** | REQ exists; caller is allowed to edit in the current phase (capture/audit/worker rules). |
+| **Notes** | Prefer dedicated ops for status, deps, footprint, claim when those are the intent. |
+
+#### `read_req`
+
+| | |
+|---|---|
+| **Intent** | Load the full REQ (headers + body sections). |
+| **Preconditions** | REQ id known; present in backlog, in-flight, or archive store. |
+| **Notes** | Read-only. |
+
+#### `list_reqs_for_ur`
+
+| | |
+|---|---|
+| **Intent** | List all REQs for a UR in any status. |
+| **Preconditions** | UR exists (or UR id known). |
+| **Notes** | Scope is the UR’s project/container; not global product backlog unless caller expands. |
+
+#### `list_claimable_reqs`
+
+| | |
+|---|---|
+| **Intent** | Return REQs that are backlog, deps-satisfied, footprint-free, and unclaimed — in pick order. |
+| **Preconditions** | Backend readable; claim/deps/footprint rules evaluable. |
+| **Notes** | Uses **authoritative** deps (relations on Linear). Does not claim. Empty list is valid. |
+
+#### `claim_req`
+
+| | |
+|---|---|
+| **Intent** | Optimistically claim a REQ and move it to in-progress. |
+| **Preconditions** | REQ appears claimable under **Claim / deps / footprint** rules at re-read time; agent id available. |
+| **Notes** | Re-read before write; loser → concurrent-conflict / stop; resume allowed. On Linear, human assignee is not stolen for claim. |
+
+#### `heartbeat_req`
+
+| | |
+|---|---|
+| **Intent** | Refresh liveness on an active claim so siblings do not treat the slot as stale. |
+| **Preconditions** | REQ is claimed by this agent (or caller is the claim owner); claim still active. |
+| **Notes** | Filesystem-only / comment-only — no git commit for stamps. |
+
+#### `set_req_status`
+
+| | |
+|---|---|
+| **Intent** | Set workflow status (e.g. stopped, in-progress) without full archive. |
+| **Preconditions** | REQ exists; target status is valid for the backend `status_map` / schema. |
+| **Notes** | Archive/done should use `archive_req`. Unclaim/backlog return should use `unblock_req` when clearing a claim. |
+
+#### `set_blocked_by`
+
+| | |
+|---|---|
+| **Intent** | Write the depends-on graph for a REQ. |
+| **Preconditions** | REQ exists; dependency ids valid (or empty to clear). |
+| **Notes** | Updates authoritative store; on Linear with relation tools, updates **blocks relations + body mirror**. |
+
+#### `set_files`
+
+| | |
+|---|---|
+| **Intent** | Set the footprint (`**Files:**`) list for a REQ. |
+| **Preconditions** | REQ exists. |
+| **Notes** | Does not claim. Overlap is evaluated by consumers at pick/claim time. |
+
+#### `archive_req`
+
+| | |
+|---|---|
+| **Intent** | Mark REQ done with closure proof and outputs; move to archive-equivalent store. |
+| **Preconditions** | Acceptance / verification evidence complete per run-worker rules; claim owned by orchestrating flow as required by backend. |
+| **Notes** | Releases in-flight footprint. Does not delete historical data. |
+
+#### `unblock_req`
+
+| | |
+|---|---|
+| **Intent** | Return a REQ to backlog and clear/release the claim. |
+| **Preconditions** | REQ is in-flight or stopped with a claim (or explicitly targeted by unblock). |
+| **Notes** | Used after mid-flight failure recovery and operator-driven unblock. |
+
+#### `append_decision`
+
+| | |
+|---|---|
+| **Intent** | Append one standing decision line to decisions memory. |
+| **Preconditions** | Decisions store reachable (markdown file or Linear team Doc). |
+| **Notes** | Append-only; readers treat lines as constraints. |
+
+#### `write_verify_report`
+
+| | |
+|---|---|
+| **Intent** | Persist verify-phase output for a UR. |
+| **Preconditions** | UR exists; verify phase has produced a report. |
+| **Notes** | Backend chooses home (UR tree vs Initiative section/comment). |
+
+#### `write_close_report`
+
+| | |
+|---|---|
+| **Intent** | Persist close-phase output for a UR. |
+| **Preconditions** | UR exists; close phase has produced a report. |
+| **Notes** | Backend chooses home (UR tree vs Initiative section/comment). |
+
+#### `append_run_note`
+
+| | |
+|---|---|
+| **Intent** | Append a ledger-ish / cost / run note for a REQ or run. |
+| **Preconditions** | Target REQ or run context exists when required. |
+| **Notes** | Authoritative work-item note is backend store; optional local ledger file is telemetry only when `ledger.enabled`. |
+
+#### `read_active_milestone`
+
+| | |
+|---|---|
+| **Intent** | Read the active milestone cursor (if any). |
+| **Preconditions** | None beyond readable state; missing cursor means not in milestone mode. |
+| **Notes** | Content is work-item-ish; representation may be local file or Project description marker. |
+
+#### `set_active_milestone`
+
+| | |
+|---|---|
+| **Intent** | Set or advance the active milestone cursor. |
+| **Preconditions** | Milestone mode applicable; target milestone id valid. |
+| **Notes** | Deploy-gate human y/n remains orchestrator-owned; this op only persists the cursor. |
+
+#### `list_milestone_reqs`
+
+| | |
+|---|---|
+| **Intent** | List REQs belonging to the active (or named) milestone. |
+| **Preconditions** | Milestone id known or active cursor set. |
+| **Notes** | Used by run loop and milestone-complete detection. |
+
+#### `write_gate_state`
+
+| | |
+|---|---|
+| **Intent** | Coordinate deploy-gate ownership / state. |
+| **Preconditions** | Milestone / gate flow active. |
+| **Notes** | **Local lock still allowed** (e.g. `state/gate-owner.md`) even when work-items are remote. Not a dual-write of work items. |
+
 ---
 
-## Shared rules (backend-independent)
+## Shared rules (backend-independent summary)
 
 - **No dual-write.** One active backend owns work-item truth. Markdown does not mirror to Linear; Linear does not write UR/REQ markdown as source of truth.
+- **Port-only storage API.** Phase agents call named ops only — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend file.
 - **Claim eligibility** requires deps satisfied + footprint free + unclaimed (or stale claim recoverable per multi-agent rules).
 - **Optimistic claim:** re-read before write; loser stops with concurrent-conflict / resume allowed.
-- **Footprint** is the structured `**Files:**` (and related header fields) on the REQ — not ad-hoc custom fields.
-- **Deps** are the declared depends-on graph; consumers honor archive-done dependencies before claim.
-- **Hard-stop on unusable Linear** applies only when `tracker.backend: linear` — never on the markdown-default path.
+- **Footprint** is structured `**Files:**` (and related headers) on the REQ — not ad-hoc custom fields.
+- **Deps authority:** Linear native **blocks relations** are authoritative for eligibility; body `**Depends on:**` is mirror. Markdown file header is the store.
+- **Hard-stop on unusable Linear** when `tracker.backend: linear` — **never silent markdown fallback**.
+- **Mid-flight MCP failure:** **leave claimed**; resume/unblock repair after recovery.
+- **Work-item vs runtime:** work-item data through port ops; git/worktrees/`state/*`/config/gate locks stay local.
 
 ---
 
@@ -120,3 +458,12 @@ When `tracker.backend` resolves to `markdown`:
 - `bash lib/tests/run-all.sh` and `bash lib/conformance-scan.sh` remain the regression gates.
 - No Linear MCP discovery, team resolution, or credentials are required.
 - Agents must not invent Linear tools or dual-write “for safety.”
+
+---
+
+## Out of scope for this file
+
+- Concrete Linear MCP / skill tool call sequences → `agents/tracker/linear.md`.
+- Concrete `lib/*.sh` step lists → `agents/tracker/markdown.md`.
+- Config key schema → `agents/config.md`.
+- Changing TDD, worktree isolation, or review philosophy — store contract only.
