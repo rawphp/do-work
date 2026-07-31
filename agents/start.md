@@ -38,17 +38,29 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+### Start store — backend branch (ORI-9)
+
+| Backend | Intake home | Ideate home | Capture home |
+|---------|-------------|-------------|--------------|
+| **linear** | **`create_ur`** → UR Project Milestone; report Linear ids | **`append_ideate`** on that milestone; **`read_ur`** for brief/ideate | **`create_req`** Issues on product Project + UR milestone; **`list_reqs_for_ur`** to list |
+| **markdown** | Local `user-requests/UR-NNN/input.md` | Local `ideate.md` | Local `REQ-*.md` backlog files |
+
+When backend is **`linear`**, start **must not** require or create `.do-work/user-requests/` as the work-item store. Hard-stop if Linear MCP unusable — never silent markdown fallback.
+
 ### 1. Run Intake
 
 Read and follow [intake.md](intake.md) in full.
 
-Execute all intake steps: find next UR number, create the folder, write `input.md`.
+- **Markdown:** execute intake steps: find next UR number, create the folder, write `input.md`.
+- **Linear:** execute intake **Linear path** only — port op **`create_ur`** (no local folder). Note **UR slug + product project id/name + milestone id/name** from the intake report.
 
 **Do not stop after intake.** Unlike standalone intake, the start agent continues immediately.
 
-Note the UR number created (e.g. `UR-003`) — you will need it for the next steps.
+Note the UR number created (e.g. `UR-003`) — you will need it for the next steps. Under Linear, also keep the milestone id in context.
 
-**Number conflict guard:** Intake scans existing UR folders and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002). This prevents conflicts with deleted or moved items.
+**Number conflict guard:**
+- **Markdown:** Intake scans existing UR folders and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002).
+- **Linear:** UR slugs come from **`create_ur`** milestone scan; REQ ids are **Linear issue identifiers** allocated by Linear (no local `REQ-NNN`).
 
 ### 2. Run Ideate (default — skip with `--no-ideate`)
 
@@ -56,15 +68,23 @@ Unless the `--no-ideate` flag was specified:
 
 Read and follow [ideate.md](ideate.md) in full.
 
-Pass it the UR folder path from Step 1.
+Pass it:
+- **Markdown:** the UR folder path from Step 1
+- **Linear:** the UR slug (and milestone id if known) — not a local folder path
 
 Ideate now ends with a mandatory interactive gate (Grill / Continue / Stop). Honor the gate's outcome:
 
 - **Grill** chosen by user → ideate.md will already have invoked question.md inline. Continue to Step 3 (Run Capture) when ideate returns.
 - **Continue** chosen by user (or empty input default) → Continue to Step 3 (Run Capture) when ideate returns.
-- **Stop** chosen by user → **Halt the start orchestrator.** Do not run Capture. Output: `Start halted at ideate gate — revise UR-NNN/input.md and re-run start.` Return.
+- **Stop** chosen by user → **Halt the start orchestrator.** Do not run Capture.
+  - **Markdown:** Output: `Start halted at ideate gate — revise UR-NNN/input.md and re-run start.`
+  - **Linear:** Output: `Start halted at ideate gate — revise UR-NNN brief on Linear (UR milestone) and re-run start.`
+  - Return.
 
-After ideate returns (and unless Stop was chosen), read `{project}/.do-work/user-requests/UR-NNN/ideate.md` — keep its observations in context for Step 3.
+After ideate returns (and unless Stop was chosen), load ideate observations for Step 3:
+
+- **Markdown:** read `{project}/.do-work/user-requests/UR-NNN/ideate.md`
+- **Linear:** **`read_ur`** and use `## Ideate` (do not require local `ideate.md`)
 
 If `--no-ideate` was specified, skip this step entirely (no gate runs).
 
@@ -73,14 +93,15 @@ If `--no-ideate` was specified, skip this step entirely (no gate runs).
 Read and follow [capture.md](capture.md) in full.
 
 Pass it:
-- The UR folder path from Step 1
+- **Markdown:** the UR folder path from Step 1
+- **Linear:** the UR slug (+ milestone id); capture uses **`read_ur`** / **`create_req`** — no local `input.md` required
 - The `--no-layers` flag if it was set on the start invocation (capture reads it in its Step 2c)
 
-If ideate was run in Step 2, the Capture agent should read `ideate.md` alongside `input.md` when decomposing — treating the observations as additional context (not as requirements to blindly follow).
+If ideate was run in Step 2, Capture should treat ideate observations as additional context (not requirements to blindly follow) — from local `ideate.md` (markdown) or `## Ideate` via **`read_ur`** (linear).
 
 ### 4. Report and prompt
 
-Output the combined summary:
+**Markdown report:**
 
 ```
 Start complete for UR-NNN
@@ -90,10 +111,25 @@ Ideate: [yes/no]
 
 REQs written:
   REQ-NNN-slug.md — Short title
-  REQ-NNN-slug.md — Short title
   ...
 
 Total: N tasks in backlog
+```
+
+**Linear report (report Linear ids):**
+
+```
+Start complete for UR-NNN
+
+Intake: Linear UR milestone <milestone id/name> (product project <id/name>)
+Ideate: [yes/no — ## Ideate on UR milestone via append_ideate]
+
+REQs written (Linear issue ids):
+  ENG-123 — Short title
+  ENG-124 — Short title
+  ...
+
+Total: N issues for UR-NNN
 ```
 
 **Then, immediately after the report**, check whether to present next-step options:
@@ -118,10 +154,12 @@ If any sub-agent (Intake, Ideate, or Capture) fails mid-flow:
 
 1. **Intake fails:** Stop immediately. Report the exact error. The UR was not created — no cleanup needed. Output: `"Start failed at intake: {error}. No UR was created."`
 2. **Question fails:** Output the failure to the user: `"Question failed: {error}. Proceeding without clarifications."` Continue to Ideate (or Capture if `--no-ideate`). Do not block the pipeline for an advisory step.
-3. **Ideate fails:** Output the failure to the user: `"Ideate failed: {error}. Proceeding without ideate observations."` Continue to Capture as if `--no-ideate` was specified. Do not block the pipeline for an advisory step. Do not write a partial `ideate.md` — if the file was partially written, delete it before continuing.
+3. **Ideate fails:** Output the failure to the user: `"Ideate failed: {error}. Proceeding without ideate observations."` Continue to Capture as if `--no-ideate` was specified. Do not block the pipeline for an advisory step.
+   - **Markdown:** do not leave a partial local `ideate.md` — if partially written, delete it before continuing.
+   - **Linear:** do not invent a local `ideate.md` dual-write; partial milestone append failures → hard-stop / report per linear.md (leave remote state as-is for operator).
 4. **Capture fails:** Stop immediately. Report the exact error and the UR number so the user can resume. Output: `"Start failed at capture: {error}. UR-NNN was created but has no REQs. Resume with: /do-work capture UR-NNN"`
 
-In all cases, never leave partial state without reporting it. If a UR was created but Capture failed, tell the user the UR number so they can resume.
+In all cases, never leave partial state without reporting it. If a UR was created but Capture failed, tell the user the UR number (and under Linear, the milestone id) so they can resume.
 
 ---
 
@@ -132,3 +170,4 @@ In all cases, never leave partial state without reporting it. If a UR was create
 - If Intake encounters an existing UR conflict, resolve it per intake.md's rules before proceeding
 - Ideate runs by default — use `--no-ideate` to skip it
 - Do not run Verify or Run — that is the Go agent's job
+- **Linear:** no dual-write to `user-requests/`; intake reports Linear ids; hard-stop if MCP unusable

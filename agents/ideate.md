@@ -8,11 +8,12 @@ You are powered by the Creativity Engine's three most relevant modes: Explorer, 
 
 ## When Invoked
 
-You will be given a path to a user-request folder, e.g.:
+You will be given a UR reference:
 
-```
-{project}/.do-work/user-requests/UR-001/
-```
+| Backend | Invocation |
+|---------|------------|
+| **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/` |
+| **linear** | UR slug (e.g. `UR-001`) and/or Linear **UR Project Milestone** id — **not** a required local folder |
 
 You may also be invoked by the Start agent as part of the default pipeline (ideate runs unless `--no-ideate` is passed).
 
@@ -38,11 +39,22 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+### Ideate store — backend branch (ORI-9)
+
+| Concern | Markdown | Linear (`linear.md`) |
+|---------|----------|----------------------|
+| Load brief | `UR-NNN/input.md` (+ optional `assets/`) | Port op **`read_ur`** — UR **Project Milestone** §9.1 (`## Brief` + clarifications if any). No local `input.md` required. |
+| Persist observations | Write `{project}/.do-work/user-requests/UR-NNN/ideate.md` | Port op **`append_ideate`** — write/append under `## Ideate` on the **UR milestone** description. **No** local `ideate.md` as the work-item store. |
+| Open gaps (Continue gate) | `open_gaps:` in `input.md` frontmatter (or `## Notes — Open Gaps`) | Append / replace machine-readable open-gaps on the **UR milestone** body (prefer a fenced block or `open_gaps:` under a `## Notes` / frontmatter-equivalent section that does **not** overwrite `## Brief`). Use `read_ur` then milestone update sequence from linear.md (`save_milestone` / discovered update via the same surface as `append_ideate`). |
+| Hard-stop | n/a for local files | If Linear MCP / milestone tools unusable → **hard-stop**. Never write local `user-requests/.../ideate.md` as substitute. |
+
+**When effective backend is `linear`:** Linear is the sole store. Do **not** dual-write `user-requests/UR-NNN/ideate.md` or require that path to exist. **When `markdown`:** keep the local paths in the steps below.
+
 ### 1. Read the brief
 
-Read `UR-NNN/input.md` in full.
+**Markdown:** Read `UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if it exists.
 
-Read every file in `UR-NNN/assets/` if it exists.
+**Linear:** Call port op **`read_ur`** for `UR-NNN` (resolve product Project + UR Project Milestone per `agents/tracker/linear.md`). Use `## Brief` (and `## Clarifications` if present) as the brief. Optional local assets only if the operator keeps them on disk — not a dual work-item store. If the UR milestone is missing → error to caller (do not invent a local UR folder).
 
 ### 2. Read relevant project context
 
@@ -89,13 +101,7 @@ Find links to existing work and patterns.
 
 ### 4. Write the review
 
-Write observations to:
-
-```
-{project}/.do-work/user-requests/UR-NNN/ideate.md
-```
-
-Use this format exactly:
+Use this format exactly for the ideate body (Explorer / Challenger / Connector / Summary):
 
 ```markdown
 # Ideate — UR-NNN
@@ -122,6 +128,13 @@ Use this format exactly:
 [2-3 sentences: the most important things to consider before decomposing this brief into tasks.]
 ```
 
+**Persist via backend branch (ORI-9) — Linear first when `backend: linear`:**
+
+| Backend | How to store |
+|---------|--------------|
+| **linear** | Call port op **`append_ideate`** (`agents/tracker/linear.md`) with the body above. Target is the **UR Project Milestone** `## Ideate` section. Prefer section append; never overwrite `## Brief`. **Do not** write `{project}/.do-work/user-requests/UR-NNN/ideate.md`. If MCP/update tools fail → hard-stop. |
+| **markdown** | Write observations to `{project}/.do-work/user-requests/UR-NNN/ideate.md` (create/overwrite that file as today). |
+
 ### 5. Report and prompt — interactive gate
 
 Output the completion report:
@@ -129,7 +142,7 @@ Output the completion report:
 ```
 Ideate complete for UR-NNN.
 
-Written: {project}/.do-work/user-requests/UR-NNN/ideate.md
+Written: <markdown: {project}/.do-work/user-requests/UR-NNN/ideate.md | linear: UR milestone ## Ideate via append_ideate (milestone id)>
 
 Gaps surfaced:
 - [gap 1, one line]
@@ -137,7 +150,7 @@ Gaps surfaced:
 - ...
 ```
 
-Compile the gaps from the Explorer "Assumptions & Perspectives" and Challenger "Risks & Edge Cases" sections of the just-written ideate.md — pick the top 3-5, one line each.
+Compile the gaps from the Explorer "Assumptions & Perspectives" and Challenger "Risks & Edge Cases" sections of the just-written ideate body — pick the top 3-5, one line each.
 
 **Then, regardless of `config.next_steps.enabled` setting, present the gate via `AskUserQuestion`:**
 
@@ -146,7 +159,7 @@ Question: `How would you like to proceed?`
 Options:
 1. **"Grill me"** — Run interactive Q&A on the surfaced gaps before capture
 2. **"Continue"** — Proceed to capture as-is, gaps recorded
-3. **"Stop"** — Halt — let me revise input.md, then re-run
+3. **"Stop"** — Halt — let me revise the brief, then re-run
 
 (`AskUserQuestion` exposes 3 options; this fits within the 4-option limit.)
 
@@ -155,8 +168,14 @@ Options:
 **Behaviour per option:**
 
 - **(1) Grill me:** Read and follow [question.md](question.md) in full, scoped to the gaps just listed. After question.md returns, control flows back here — automatically continue to capture (do not re-show this gate).
-- **(2) Continue:** Write the surfaced gaps to the UR's `input.md` YAML frontmatter under an `open_gaps:` list (one item per gap, verbatim). If `open_gaps:` already exists in the frontmatter (rare — the user re-ran ideate), overwrite it. Then return control to the caller (start.md) so it proceeds to capture. If `input.md` has no frontmatter (legacy UR — should not happen for new URs but guard anyway), append the gap list to the body under a `## Notes — Open Gaps` heading instead.
-- **(3) Stop:** Output `Halted by user — revise {project}/.do-work/user-requests/UR-NNN/input.md and re-run`. Return control to the caller; the caller must NOT proceed to capture.
+- **(2) Continue:** Record the surfaced gaps under `open_gaps:` (one item per gap, verbatim). If `open_gaps:` already exists (rare — the user re-ran ideate), overwrite it.
+  - **Markdown:** write to the UR's `input.md` YAML frontmatter. If `input.md` has no frontmatter (legacy UR), append under `## Notes — Open Gaps` instead.
+  - **Linear:** update the **UR Project Milestone** description (same rediscovery surface as `append_ideate` / `read_ur`) — do **not** require or write local `input.md`. Never overwrite `## Brief`.
+  - Then return control to the caller (start.md) so it proceeds to capture.
+- **(3) Stop:**
+  - **Markdown:** Output `Halted by user — revise {project}/.do-work/user-requests/UR-NNN/input.md and re-run`.
+  - **Linear:** Output `Halted by user — revise UR-NNN brief on Linear (UR milestone) and re-run`.
+  - Return control to the caller; the caller must NOT proceed to capture.
 
 Users pick Grill at this gate when they want interactive Q&A, after seeing the actual gaps. The gate runs whether or not `next_steps.enabled` is true — this is a workflow gate, not a next-step suggestion.
 
@@ -164,9 +183,11 @@ Users pick Grill at this gate when they want interactive Q&A, after seeing the a
 
 ## Rules
 
-- Never modify `input.md` — your output goes to a separate file
+- **Markdown:** never modify the brief text in `input.md` as ideate output — observations go to `ideate.md` (open_gaps frontmatter is the Continue-gate exception).
+- **Linear:** never write local `user-requests/.../ideate.md` as the store; use **`append_ideate`** only. Never overwrite `## Brief`.
 - Every observation must include: (1) what the risk or assumption is, (2) a concrete scenario where it would cause a problem, and (3) which part of the brief triggers the concern. Observations missing any of these three elements must be rewritten before saving.
 - Only surface high-confidence observations. Queue uncertain ones under a "Lower confidence" subheading if you include them at all.
 - Be concise. One insight per bullet. Don't bundle.
 - Do not decompose the brief into tasks — that is Capture's job
 - Do not block the pipeline. You are advisory.
+- Hard-stop if backend is `linear` and Linear MCP is unusable — never silent markdown fallback.

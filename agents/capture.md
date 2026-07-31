@@ -17,11 +17,12 @@ The following steps require model judgment that cannot be reduced to a rule. Eac
 
 ## When Invoked
 
-You will be given a path to a user-request folder, e.g.:
+You will be given a UR reference:
 
-```
-{project}/.do-work/user-requests/UR-001/
-```
+| Backend | Invocation |
+|---------|------------|
+| **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/` |
+| **linear** | UR slug (e.g. `UR-001`) and/or UR Project Milestone id — **no** local folder required |
 
 ---
 
@@ -45,6 +46,18 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+### Capture REQ store — backend branch (ORI-9)
+
+| Concern | Markdown | Linear |
+|---------|----------|--------|
+| Brief / ideate / clarifications | `input.md`, optional `ideate.md` | **`read_ur`** (UR Project Milestone §9.1: Brief, Ideate, Clarifications) |
+| Create REQs | Write `{project}/.do-work/REQ-NNN-*.md` | Port op **`create_req`** only — Issues on **product Project** + **UR milestone**; Linear issue ids only (e.g. `ENG-123`). **No** local `REQ-*.md` as store. |
+| List REQs for this UR | Glob backlog/working/archive | Port op **`list_reqs_for_ur`** (product Project + UR milestone filter) — same op verify uses later |
+| Capture summary / status | `input.md` body + frontmatter | Update UR milestone description sections/status fields (never overwrite `## Brief` verbatim intake); no local `input.md` dual-write |
+| Hard-stop | n/a | MCP / create-issue tools missing → hard-stop; never write local backlog REQs as substitute |
+
+**When effective backend is `linear`:** use **`create_req`** exclusively for REQ persistence; after create, optionally **`list_reqs_for_ur`** to verify Issues landed. Do **not** dual-write under `.do-work/REQ-*` or `user-requests/`.
+
 ### Decisions / calibration — backend branch (REQ-296 / REQ-297)
 
 Standing decisions and capture calibration are **work-item memory**, not runtime locks. Homes are fixed by design §10 / the active backend file — never invent alternate paths or Doc titles.
@@ -61,17 +74,20 @@ Standing decisions and capture calibration are **work-item memory**, not runtime
 
 ### 1. Read the brief
 
-Read `UR-NNN/input.md` in full.
+**Brief / assets / ideate — backend branch (ORI-9):**
 
-Read every file in `UR-NNN/assets/` if it exists.
+| Backend | How to load |
+|---------|-------------|
+| **markdown** | Read `UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if it exists. Read `UR-NNN/ideate.md` if it exists. |
+| **linear** | Call **`read_ur`** for `UR-NNN`. Use `## Brief` (+ `## Clarifications` if present) as the brief. Use `## Ideate` if present as advisory ideate observations. Optional local assets only if the operator keeps them on disk — not a dual store. **Do not** require `user-requests/UR-NNN/input.md` or local `ideate.md`. |
 
-Read `UR-NNN/ideate.md` if it exists. Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If the file does not exist (e.g. the user ran `--no-ideate` or capture is running standalone), continue without it.
+Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If ideate is absent (e.g. `--no-ideate` or standalone capture), continue without it.
 
 **Calibration (advisory):**
 - **Markdown:** Read `{project}/.do-work/state/calibration.md` if it exists.
 - **Linear:** Read the calibration Team Doc via linear.md **Read calibration Doc** (title `calibration_doc_title` / default `do-work/calibration`).
 
-Keep guidance bullets in context as advisory calibration — they inform how you size REQs, scope `**Files:**`, and split acceptance criteria, but they never block decomposition and are not hard requirements. This parallel mirrors the ideate.md pattern above: both are advisory; the brief always wins; absence is silently ignored. If calibration is absent (no `/do-work retro` has run yet, or the project is new), continue without it — never create the store just to read it.
+Keep guidance bullets in context as advisory calibration — they inform how you size REQs, scope `**Files:**`, and split acceptance criteria, but they never block decomposition and are not hard requirements. This parallel mirrors the ideate pattern above: both are advisory; the brief always wins; absence is silently ignored. If calibration is absent (no `/do-work retro` has run yet, or the project is new), continue without it — never create the store just to read it.
 
 **Decisions (constraints):**
 - **Markdown:** Read `{project}/.do-work/decisions.md` if it exists.
@@ -308,11 +324,14 @@ If you discover a requirement that was missed, add a REQ for it before proceedin
 
 ### 4. Write REQ files
 
-For each task, write a file to the backlog root:
+**Persist REQs via backend branch (ORI-9):**
 
-```
-{project}/.do-work/REQ-NNN-short-slug.md
-```
+| Backend | How to create each REQ |
+|---------|------------------------|
+| **markdown** | Write a file to the backlog root: `{project}/.do-work/REQ-NNN-short-slug.md` |
+| **linear** | Call port op **`create_req`** (`agents/tracker/linear.md`) for each planned task — Issue on **product Project**, **milestone** = parent UR Project Milestone, body §9.2, labels as available. Resulting id is the **Linear issue id only** (e.g. `ENG-123`). Path-unit parents first, then children with `parentId`. **Do not** write local `.do-work/REQ-*.md` as the store. After all creates (or on verify), **`list_reqs_for_ur`** may be used to confirm Issues for this UR. |
+
+Decomposition content (Task / Context / AC / Verification / Integration fields) is the same for both backends; only the store differs. Under Linear, `**UR:**` / `**Parent:**` / `**Depends on:**` use Linear issue ids and the UR slug; never invent parallel `REQ-NNN` allocation.
 
 **Every REQ must carry a `**Layer:**` field.** Set it from the R-number's tag (Step 3b). If multiple R-numbers map to the same REQ, they must all share the same tag — otherwise split the REQ. Bug-fix briefs (classification from Step 2b) write `**Layer:** none` on every REQ.
 
@@ -666,7 +685,11 @@ For each qualifying REQ in scope, fill the `## Integration` block by answering t
 
 ### 6. Write capture summary to UR body
 
-Prepend (or replace, on re-run — see Step 7 idempotency rules) a summary block to `input.md`'s body, immediately after the YAML frontmatter close (`---`) and before the `## Request` heading.
+**Backend branch:**
+- **Markdown:** Prepend (or replace, on re-run — see Step 7 idempotency rules) a summary block to `input.md`'s body, immediately after the YAML frontmatter close (`---`) and before the `## Request` heading.
+- **Linear:** Write the same summary content onto the **UR Project Milestone** description (e.g. under `## Capture summary` or fenced `<!-- capture-summary-start -->` … `<!-- capture-summary-end -->`) via rediscovered milestone update tools — same surface as `append_ideate`. **Never** overwrite `## Brief`. **Never** dual-write local `input.md`. REQ rows use **Linear issue ids**.
+
+**Markdown path (detail):** Prepend (or replace, on re-run — see Step 7 idempotency rules) a summary block to `input.md`'s body, immediately after the YAML frontmatter close (`---`) and before the `## Request` heading.
 
 Format:
 
@@ -710,7 +733,11 @@ On re-run: if both fence comments are present, replace everything from `<!-- cap
 
 ### 6b. Write UR frontmatter
 
-Update `input.md`'s YAML frontmatter (the block between the first two `---` lines) to record capture's decisions. The frontmatter must end up looking like:
+**Markdown:** Update `input.md`'s YAML frontmatter (the block between the first two `---` lines) to record capture's decisions.
+
+**Linear:** Record the same fields as machine-readable state on the **UR Project Milestone** description (status → captured, classification, layers_in_scope, layer_decisions, reqs with Linear issue ids, acknowledged_partials). Prefer structured YAML or §9.1-compatible headers that `read_ur` can re-parse — never overwrite `## Brief`. Rebuild `reqs` via **`list_reqs_for_ur`** when re-running. Do not write local `input.md`.
+
+**Markdown frontmatter shape** must end up looking like:
 
 ```yaml
 ---
@@ -751,7 +778,7 @@ A re-run that produces no new REQs and no new layer decisions is otherwise a no-
 
 ### 7. Commit the backlog
 
-Stage and commit the newly created REQ files, the updated UR `input.md`, and the ideate.md file if it exists.
+**Markdown:** Stage and commit the newly created REQ files, the updated UR `input.md`, and the ideate.md file if it exists.
 
 If the project is not a git repo, skip this step silently.
 
@@ -770,9 +797,13 @@ git commit -m "chore(UR-NNN): capture decomposition + state"
 
 Replace `UR-NNN` with the actual UR identifier. The commit includes new REQ files, the updated `input.md` (frontmatter + summary block), and any newly written `## Integration` blocks within REQs.
 
+**Linear:** Skip git commits for work-item storage (Issues + UR milestone already live in Linear). Optional local commits only if capture also changed non-work-item project files — do **not** invent dual-write REQ markdown just to commit. Prefer **`list_reqs_for_ur`** after creates as the verify-green step before reporting.
+
 ### 8. Report and prompt
 
-After writing all REQ files and frontmatter, output the completion report:
+After writing all REQs and UR state, output the completion report.
+
+**Markdown:**
 
 ```
 Capture complete for UR-NNN
@@ -788,7 +819,25 @@ REQs written:
 Total: N tasks in backlog
 ```
 
-The user reads this to confirm capture's decisions match the brief. Detail-level review can use the `## Capture summary` block in `input.md`.
+**Linear (report Linear issue ids):**
+
+```
+Capture complete for UR-NNN
+
+Classification: <classification>
+Layers in scope: <list, or "(none)">
+Layer decisions: <"<layer>: no" entries, or "(none — all covered)">
+Product project: <name or id>
+UR milestone: <name or id>
+
+REQs written (Linear issue ids):
+  ENG-123 — Short title — layer: <layer> — integration: <confidence>
+  ...
+
+Total: N issues (list_reqs_for_ur)
+```
+
+The user reads this to confirm capture's decisions match the brief. Detail-level review: markdown `## Capture summary` in `input.md`; linear same section on the UR milestone / **`read_ur`**.
 
 **Then, immediately after the report**, check whether to present next-step options:
 
@@ -806,14 +855,15 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 ## Error Recovery
 
-- **REQ file write fails** (permissions, disk): Stop and report: `"Failed to write REQ-NNN-slug.md: {error}. N of M REQs were written successfully."` Do not commit partial REQ sets — the user should fix the issue and re-run capture.
-- **Brief is empty or unreadable**: Stop and report: `"input.md is empty or unreadable at {path}. Run intake first."` Do not attempt to decompose an empty brief.
-- **REQ number conflict**: If `REQ-NNN-slug.md` already exists in backlog, working, or archive, increment the number and retry. Log: `"REQ-NNN already exists — using REQ-{NNN+1} instead."`
-- **Git commit fails**: Report the error but do NOT stop the pipeline. The REQ files are already written — the user can commit manually. Output: `"REQ files written but git commit failed: {error}. Files are in the backlog — commit manually."`
+- **REQ write fails (markdown file / Linear create_req):** Stop and report which REQs landed. Do not pretend a full capture completed. Linear: hard-stop on MCP failure mid-create; list Linear issue ids already created for operator cleanup; **never** fall back to writing local `REQ-*.md`.
+- **Brief is empty or unreadable**: Stop and report. Markdown: `"input.md is empty or unreadable at {path}. Run intake first."` Linear: `"read_ur failed or ## Brief empty for UR-NNN. Run intake (create_ur) first."` Do not attempt to decompose an empty brief.
+- **REQ number conflict (markdown):** If `REQ-NNN-slug.md` already exists in backlog, working, or archive, increment the number and retry. Log: `"REQ-NNN already exists — using REQ-{NNN+1} instead."` Linear allocates issue ids — no local number conflict path.
+- **Git commit fails (markdown):** Report the error but do NOT stop the pipeline. The REQ files are already written — the user can commit manually. Output: `"REQ files written but git commit failed: {error}. Files are in the backlog — commit manually."`
 
 ## Rules
 
-- Never modify the original `input.md`
-- Never create REQ files in `working/` or `archive/` — backlog root only
+- **Markdown:** never modify the original brief text in `input.md` (summary/frontmatter updates are the capture exceptions above); never create REQ files in `working/` or `archive/` — backlog root only
+- **Linear:** create REQs only via **`create_req`**; list via **`list_reqs_for_ur`**; no dual-write to `.do-work/REQ-*` or `user-requests/`
 - Do not skip tasks that seem small — they are all traceable commitments
-- Slugs: lowercase, kebab-case, max 5 words, derived from the task title
+- Slugs: lowercase, kebab-case, max 5 words, derived from the task title (markdown filenames; Linear titles remain short/actionable)
+- Hard-stop if backend is `linear` and Linear MCP is unusable — never silent markdown fallback
