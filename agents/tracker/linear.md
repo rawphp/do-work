@@ -35,7 +35,7 @@ This path answers design risk §17 #1 (**MCP thin / offline tools**) and the cla
 | **Entry point** | `/do-work` intake or start with `tracker.backend: linear` and valid team config (Load Config step 7) |
 | **Terminal state** | Initiative + Project `do-work/{UR-id}` + Issues/sub-issues exist with §9 templates; `create_ur` / `create_req` / `update_req` / `read_req` / `list_reqs_for_ur` (+ `read_ur` / `list_urs`) sequences are documented as agent steps that rediscover tools live |
 
-This path-unit wires **work-item create/read/update/list** only (design §6 hierarchy, §9 templates). Claim/heartbeat, pick, archive, non-ticket Docs, milestone, and migration remain later path-units.
+This path-unit wires **work-item create/read/update/list** only (design §6 hierarchy, §9 templates). Claim/heartbeat/pick/status/unblock/resume are REQ-292; archive, non-ticket Docs, milestone, and migration remain later path-units.
 
 **Hard rules for every CRUD op in this path:**
 
@@ -52,8 +52,8 @@ This path-unit wires **work-item create/read/update/list** only (design §6 hier
 | UR create/read/list sequences | Initiative + Project `do-work/{UR-id}` + InitiativeToProject (or discovered equivalent) | REQ-290 (this section) |
 | REQ create/update/read/list | Issues in that Project; §9.2 body; path-unit `parentId` sub-issues | REQ-290 (this section) |
 | Templates + append/deps/footprint ops | §9 field semantics; `append_ideate` / `append_clarifications` / `set_blocked_by` / `set_files` | REQ-291 |
-| Claim / heartbeat / pick / archive | Deferred | later REQs |
-| Non-ticket homes / migrate | Deferred | later REQs |
+| Claim / heartbeat / pick / status / unblock / resume | Optimistic claim comment protocol (§8); human assignee preserved | REQ-292 |
+| Archive / non-ticket homes / migrate | Deferred | later REQs |
 
 ---
 
@@ -76,6 +76,35 @@ This path-unit **extends** REQ-290 CRUD: templates become the field contract, an
 
 ---
 
+## Path: Linear claim / status / unblock / resume (REQ-292)
+
+| | |
+|---|---|
+| **Entry point** | `/do-work run` \| `status` \| `unblock` \| `resume` with `tracker.backend: linear` |
+| **Terminal state** | Optimistic claim comment protocol works; status reports claimers/heartbeats; unblock/resume match markdown semantics; mid-flight failure leaves claimed |
+
+This path-unit implements design **§8 Claim protocol** as Linear agent sequences for `list_claimable_reqs`, `claim_req`, `heartbeat_req`, `set_req_status`, `unblock_req`, plus **resume** and **status** consumers. Semantics stay in `port.md`; representation is workflow state + claim **comments** (not a local claim stamp file).
+
+**Hard rules (in addition to prior Linear path rules):**
+
+1. **Human assignee is sacred** — `default_assignee_id` on create; agents **never** set/clear/steal Linear **assignee** for claim, heartbeat, unblock, or resume.
+2. **Claim = comment + workflow**, not assignee — `status_map.in_progress` + comment starting with `tracker.linear.agent_claim_marker` (default `<!-- do-work-claim -->`).
+3. **Optimistic re-read** — every `claim_req` re-reads issue + claim comments before write; race lost → `concurrent-conflict` stop; resume allowed.
+4. **Stale age** — `tracker.linear.heartbeat_max_age_seconds` when set; else `parallel.stale_threshold_seconds` (default `900`).
+5. **Mid-flight MCP death** — **leave claimed** (in_progress + last active claim/heartbeat); do not auto-release. Operator uses resume or unblock after MCP recovers.
+6. **No dual-write** — no local `.do-work/working/` claim stamps while `backend: linear`.
+7. **Rediscover tools** — comments, issue get/update, list issues, workflow states, relations — always `search_tool` first; invent nothing.
+
+**Child work under this path:**
+
+| Area | Responsibility | REQ |
+|------|----------------|-----|
+| Claim comment protocol + claim/heartbeat/unblock/resume/status/list_claimable | Full sequences in this section | REQ-292 |
+| `archive_req` (done + proof + release footprint) | Deferred | later REQs |
+| Run-loop phase playbook rewires that *call* these ops | Deferred | later REQs |
+
+---
+
 ## When to load
 
 After config load and backend resolution (`port.md` load path + `agents/config.md` Load Config step 7):
@@ -84,7 +113,7 @@ After config load and backend resolution (`port.md` load path + `agents/config.m
 2. Linear validation passes (team resolvable, MCP discoverable, every `status_map` state exists on the team) — or agent **hard-stops** (see below).
 3. Read `agents/tracker/port.md`.
 4. Read this file.
-5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD sequences**, including templates §9 and append/deps/footprint ops).
+5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD**, templates §9, append/deps/footprint, **and claim/status/unblock/resume** sequences).
 
 Do **not** load this file when backend is `markdown` (including unset/empty).
 
@@ -163,9 +192,10 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | `append_ideate` / `append_clarifications` | Initiatives (description/comments) | **Documented** (REQ-291) — section append under §9.1; rediscover update tools |
 | `create_req` / `update_req` / `read_req` | Issues, Projects, labels, statuses | **Documented** (REQ-290) |
 | `list_reqs_for_ur` | Issues by Project | **Documented** (REQ-290) |
-| `list_claimable_reqs` | Issues + relations + comments + statuses | TBD after claim path |
-| `claim_req` / `heartbeat_req` / `unblock_req` | Issues status + comments | TBD after claim path |
-| `set_req_status` / `archive_req` | Workflow states, issues | TBD after claim path |
+| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292) — pick order; no claim side-effect |
+| `claim_req` / `heartbeat_req` / `unblock_req` | Issues status + comments | **Documented** (REQ-292) — optimistic claim comment protocol |
+| `set_req_status` | Workflow states, issues | **Documented** (REQ-292) — stopped / in-progress without archive or unclaim |
+| `archive_req` | Workflow states, issues, claim release | TBD after archive path |
 | `set_blocked_by` | Issue relations `blocks` (+ body mirror) | **Documented** (REQ-291) — dual-write; if relations **missing** → body-only + one-time warning (port rule) |
 | `set_files` | Issue description headers | **Documented** (REQ-291) — updates `**Files:**` only; no claim side-effect |
 | `append_decision` / calibration | Team Docs | TBD after spike Docs row |
@@ -185,7 +215,7 @@ Bodies are **markdown conventions** in Linear description fields — not custom 
 | Entity | Marker (first non-empty line of structured body) | Op consumers |
 |--------|--------------------------------------------------|--------------|
 | Initiative (UR) | `<!-- do-work-ur -->` | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications`, verify/close writers |
-| Issue (REQ) | `<!-- do-work-req -->` | `create_req`, `update_req`, `read_req`, `set_files`, `set_blocked_by`, claim/archive later |
+| Issue (REQ) | `<!-- do-work-req -->` | `create_req`, `update_req`, `read_req`, `set_files`, `set_blocked_by`, `claim_req` / `heartbeat_req` / `unblock_req` / `set_req_status`, archive later |
 
 On **read/update**: if the marker is missing, treat as template parse failure → **stop the op**; do not invent headers or rewrite the body into template form without an explicit migrate path.
 
@@ -440,7 +470,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 6. **Deps at create (optional):** if dependency Linear ids are known, run the same dual-write as **`set_blocked_by`** (native `blocks` relations when tools exist **and** body `**Depends on:**` mirror). If relations missing → body-only + one-time warning (port rule).
 7. **Labels:** attach `Layer/{name}`, `Size/{S|M|L}`, and `path-unit` (parents only) per **Labels** table when label tools exist.
 8. **State:** create in `status_map.backlog` only (validated id from preflight) — never invent a state name.
-9. Return Linear issue id(s). Human assignee only from config — agents do not steal assignee for claim (claim is later path).
+9. Return Linear issue id(s). Human assignee only from config — agents do not steal assignee for claim (see **Claim protocol**).
 
 ### `update_req`
 
@@ -719,17 +749,45 @@ Team (config)
 
 ---
 
-## Claim protocol reminder (representation only)
+## Claim protocol (design §8 — Linear representation)
 
-Semantics: `port.md`. Linear representation (after spike confirms comment tools):
+Semantics: `port.md` **Claim / Mid-flight MCP failure**. Linear has **no** filesystem atomic rename — atomicity is **optimistic re-read + comment protocol + timestamps** (intentional; same multi-agent recovery story as markdown concurrent-conflict).
 
-- Human owns **assignee** (`default_assignee_id`).
-- Agents claim via workflow state → in_progress + claim **comment** with `agent_claim_marker`.
-- Heartbeat = refreshed claim-protocol comment timestamp.
-- Optimistic re-read before write; loser → concurrent-conflict / stop; resume allowed.
-- Mid-flight MCP death: **leave claimed**; resume/unblock repairs.
+### Config keys (consumers)
 
-Example claim comment body:
+| Key | Default | Role |
+|-----|---------|------|
+| `tracker.linear.agent_claim_marker` | `<!-- do-work-claim -->` | First line of every claim-protocol comment |
+| `tracker.linear.heartbeat_max_age_seconds` | `null` | Max age of latest **active** heartbeat before stale; **`null` → use `parallel.stale_threshold_seconds`** |
+| `parallel.stale_threshold_seconds` | `900` | Fallback stale threshold (seconds) |
+| `tracker.linear.status_map.backlog` | `Todo` | Unclaimed / unblocked |
+| `tracker.linear.status_map.in_progress` | `In Progress` | Claimed / running / resumed |
+| `tracker.linear.status_map.stopped` | `Canceled` | Stopped (claim retained until unblock) |
+| `tracker.linear.default_assignee_id` | `""` | Human operator; set on issue **create** only — claim ops never overwrite |
+
+**Effective stale max age:**
+
+```
+stale_max = tracker.linear.heartbeat_max_age_seconds
+if stale_max is null or missing:
+  stale_max = parallel.stale_threshold_seconds   # default 900
+```
+
+A claim is **stale** when the latest **active** claim block’s `heartbeat` ISO timestamp is older than `stale_max` seconds relative to now (UTC).
+
+### Human assignee vs agent claim
+
+| Field | Owner | Rule |
+|-------|-------|------|
+| Linear **assignee** | Human operator | Set from `default_assignee_id` on `create_req` when configured. **Agents never change assignee** for claim, heartbeat, unblock, resume, or status. |
+| Workflow **state** | Agent claim lifecycle | Maps via `status_map` (backlog / in_progress / stopped / done). |
+| Claim **comment** | Agent | `agent_claim_marker` block with `agent_id`, timestamps, `status: active\|released`. |
+
+Warn operators (status / docs): **do not clear agent claim comments while a run is live** — clearing them breaks multi-agent coordination the same way deleting a markdown claim stamp would.
+
+### Claim comment body (canonical)
+
+Marker text must equal config `agent_claim_marker` (default shown):
 
 ```markdown
 <!-- do-work-claim -->
@@ -739,6 +797,264 @@ heartbeat: 2026-07-31T12:05:00Z
 session: optional-uuid
 status: active
 ```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| marker line | yes | Exactly `tracker.linear.agent_claim_marker` |
+| `agent_id` | yes | Stable per worker (e.g. `hostname.pid` or orchestrator session id) |
+| `claimed_at` | yes on first claim | ISO-8601 UTC; preserve on heartbeat/resume |
+| `heartbeat` | yes | ISO-8601 UTC; consumers take the **latest** active block |
+| `session` | optional | UUID or run id for triage |
+| `status` | yes | `active` (held) or `released` (unblocked / voluntarily dropped) |
+
+**Parse rules:**
+
+1. List issue comments (discovered tools). Consider only comments whose body **starts with** (or whose first non-empty line is) `agent_claim_marker`.
+2. Parse key: value lines case-sensitively for keys above.
+3. **Latest active claim** = among comments with `status: active` (or missing status treated as active only if `agent_id` + `heartbeat` present — prefer explicit `status:`), the one with the newest `heartbeat` (tie-break: newest comment created_at).
+4. A claim with `status: released` is **not** active.
+5. If multiple agents have concurrent `active` comments, the one with the newest **fresh** heartbeat wins for “who holds”; a second agent attempting claim while another is fresh → **concurrent-conflict**.
+
+### Concept → Linear mapping
+
+| Concept | Linear rule |
+|---------|-------------|
+| **Unclaimed** | Workflow maps to `status_map.backlog` **and** no **active** claim comment (or latest claim is `released`) |
+| **Claim** | Re-read issue + comments; if another agent has active claim with **fresh** heartbeat → fail; else set state → `in_progress`; post claim comment (`status: active`) |
+| **Heartbeat** | New claim-protocol comment **or** append/update path that writes updated `heartbeat` (prefer new comment if update-comment tools missing); consumers take latest active block |
+| **Stale** | Latest active `heartbeat` older than effective `stale_max` — eligible for takeover / reclaim under multi-agent rules |
+| **Unblock** | State → `backlog`; post/update claim comment `status: released` (assignee unchanged) |
+| **Resume** | `stopped` → `in_progress`; refresh heartbeat on **same** `agent_id` / claim ownership; assignee unchanged |
+| **Concurrent conflict** | Same stopper as markdown multi-agent: stop with `concurrent-conflict`; `/do-work resume` allowed when claim still held |
+| **Mid-flight MCP death** | **Leave claimed** — do not force backlog or invent cleanup; resume/unblock after MCP recovers |
+
+### Helper: read active claim (shared)
+
+Used by claim, heartbeat, list_claimable, status, unblock, resume:
+
+1. `search_tool` for issue get + list comments (e.g. `"linear issue comments"`, `"linear comments"`).
+2. Get issue by Linear id; read workflow state name → map through inverted `status_map`.
+3. List comments; filter + parse claim blocks (above).
+4. Return: `{ agent_id, claimed_at, heartbeat, session, status, fresh: bool, stale: bool }` for the latest active claim, or empty if none.
+5. `fresh` = active and age(heartbeat) ≤ `stale_max`. `stale` = active and age > `stale_max`.
+
+If comment tools are undiscoverable → **hard-stop** (claim protocol cannot run); never invent comments or fall back to markdown working/.
+
+---
+
+### `list_claimable_reqs`
+
+| | |
+|---|---|
+| **Intent** | Return REQs that are backlog, deps-satisfied, footprint-free, and unclaimed (or stale-eligible) — in pick order. **Does not claim.** |
+| **Preconditions** | Preflight passed; Project scope known (optional `UR-NNN` / project id, or product-wide `do-work/UR-*` scan). |
+| **Authoritative deps** | Native **`blocks` relations** (port). Body `**Depends on:**` is mirror only. |
+| **Ids** | Linear issue ids only. |
+
+**Agent sequence:**
+
+1. **Rediscover** — `search_tool` for: list issues by project; get issue; list relations; list comments; list workflow states (already validated at load).
+2. **Enumerate candidates** — issues in scope Project(s) whose workflow state maps to **`status_map.backlog`**. Exclude `done` / `in_progress` / `stopped` unless a stale active claim is being recovered under explicit reclaim policy (default pick: **backlog + unclaimed only**).
+3. **For each candidate**, in stable order (prefer: Priority header ascending if present, then created_at, then identifier):
+   - **Claim check** — run **Helper: read active claim**. Skip if active claim is **fresh** (another agent holds it). If active claim is **stale**, treat as reclaimable (eligible) unless caller policy forbids takeover.
+   - **Deps check** — list `blocks` relations (deps that block this issue). Every dependency issue must be in workflow state mapping to **`status_map.done`** (archived-equivalent). If relations tools missing → fall back to body `**Depends on:**` with the one-time warning (port); still no markdown store.
+   - **Footprint check** — parse candidate `**Files:**`. For every other **in-flight** issue (workflow `in_progress` or `stopped` **with** active claim, fresh or stale-but-not-yet-unblocked), parse that issue’s `**Files:**`. If path sets **overlap**, reject candidate (same intent as `lib/check-footprint.sh`).
+4. **Return** ordered list of claimable Linear issue ids (and optional titles). Empty list is valid.
+
+| Failure | Behavior |
+|---------|----------|
+| MCP / list tools missing | Hard-stop |
+| Project missing | Empty list or error to caller |
+
+---
+
+### `claim_req`
+
+| | |
+|---|---|
+| **Intent** | Optimistically claim a REQ and move it to in-progress. |
+| **Preconditions** | Issue appears claimable under port rules at **re-read** time; caller supplies `agent_id`. |
+| **Does not** | Change Linear **assignee**. Does not write local `.do-work/working/`. |
+
+**Agent sequence:**
+
+1. **Rediscover** — get issue, update issue (state), list/create comments, list relations (for optional re-check).
+2. **Optimistic re-read** (mandatory before any write):
+   - Get issue by Linear id.
+   - Map workflow state. Prefer candidate still backlog-equivalent **or** stopped/in_progress only if latest active claim is **stale** and takeover is allowed.
+   - Read active claim via helper.
+   - If another `agent_id` holds an **active + fresh** claim → **stop** with reason **`concurrent-conflict`** (do not write). Resume of *that* claimer’s work is for the claim owner / operator, not this agent.
+   - If **this** `agent_id` already holds active fresh claim → treat as idempotent success (refresh heartbeat optional) or no-op claim.
+3. **Write claim** (only after re-read succeeds):
+   - Set workflow state → `status_map.in_progress` (resolved state id from preflight). **Do not** modify assignee.
+   - Post a new comment (preferred) with body:
+
+     ```markdown
+     <!-- do-work-claim -->
+     agent_id: {agent_id}
+     claimed_at: {now_iso}
+     heartbeat: {now_iso}
+     session: {optional}
+     status: active
+     ```
+
+     Use config `agent_claim_marker` as the first line (default `<!-- do-work-claim -->`).
+4. **Post-write re-read (recommended):** re-list claim comments; if another agent’s newer active claim appeared, treat as lost race → **`concurrent-conflict`**; do not fight by overwriting assignee or deleting their comment. Leave both comments; operator/status sees conflict; loser stops.
+5. **Return** issue id + claim fields. On conflict: empty commit hash N/A; caller exits stopped with `concurrent-conflict`.
+
+| Failure | Behavior |
+|---------|----------|
+| Fresh foreign claim | `concurrent-conflict` — stop; resume allowed later for owner |
+| Issue missing | Error to caller |
+| Comment or state tools missing | Hard-stop |
+| MCP dies after state→in_progress but before comment | **Leave claimed** as far as written; operator resume/unblock; do not invent rollback that races siblings |
+| MCP dies after full claim | **Leave claimed** (port mid-flight rule) |
+
+---
+
+### `heartbeat_req`
+
+| | |
+|---|---|
+| **Intent** | Refresh liveness on an active claim so siblings do not treat the slot as stale. |
+| **Preconditions** | Issue has an active claim owned by this `agent_id` (or orchestrator acting as claim owner). |
+| **Does not** | Change workflow state, assignee, or body fields. **No git commit** — comment-only (parity with markdown FS-only heartbeat). |
+
+**Agent sequence:**
+
+1. **Rediscover** — get issue + list/create comments.
+2. **Read active claim** — must be `status: active` and `agent_id` match (or explicit owner handoff policy). If no active claim → error (nothing to heartbeat). If foreign active fresh claim → error / concurrent-conflict (do not stamp over).
+3. **Write heartbeat** — post a new claim-protocol comment (or update the existing comment if update-comment tools exist and schema allows) with:
+   - same `agent_id`, same `claimed_at` (preserve original claim time)
+   - `heartbeat: {now_iso}`
+   - `status: active`
+   - same `session` if known
+4. Consumers always take the **latest** active block by `heartbeat` timestamp.
+5. **Return** issue id + new heartbeat time.
+
+| Failure | Behavior |
+|---------|----------|
+| Not claim owner / no active claim | Error; do not create a new claim (use `claim_req`) |
+| MCP missing mid-heartbeat | Hard-stop; **leave** prior claim/heartbeat as last written |
+
+**Checkpoint usage (run-worker):** stamp at the same logical checkpoints as markdown (`heartbeat.sh`): after read REQ, after red, after each green cycle, after each verification step, immediately before commit — via this op against the Linear issue id.
+
+---
+
+### `set_req_status`
+
+| | |
+|---|---|
+| **Intent** | Set workflow status (e.g. `stopped`, `in-progress`) **without** full archive and **without** clearing claim (unless target is backlog — then prefer `unblock_req`). |
+| **Preconditions** | Issue exists; target status key is in `status_map` and validated on team. |
+| **Does not** | Steal assignee; archive; strip claim when moving to `stopped`. |
+
+**Agent sequence:**
+
+1. **Rediscover** — get/update issue; resolve target Linear state id from `status_map.<key>`.
+2. **Map intent:**
+   - `stopped` — set state → `status_map.stopped`. **Keep** active claim comment (`status: active`); refresh heartbeat optional. Record stopper reason via `append_run_note` or issue comment (not by deleting claim).
+   - `in_progress` — set state → `status_map.in_progress` (usually via `claim_req` or **resume**, not bare status).
+   - `backlog` — **do not** use this op alone to clear a claim; call **`unblock_req`**.
+   - `done` — **do not** use this op; call **`archive_req`** (later path).
+3. **Write** state only (+ optional reason comment). Preserve assignee and claim comments.
+4. **Return** issue id + new do-work status key.
+
+| Failure | Behavior |
+|---------|----------|
+| Unknown status key / missing state on team | Hard-stop (status_map validation) |
+| MCP missing | Hard-stop; if already claimed → leave claimed |
+
+---
+
+### `unblock_req`
+
+| | |
+|---|---|
+| **Intent** | Return a REQ to backlog and **release** the agent claim (markdown: strip stamp + move out of `working/`). |
+| **Preconditions** | Issue is in-flight or stopped with a claim, or explicitly targeted by operator `/do-work unblock`. |
+| **Does not** | Change human assignee; delete issue; auto-revert git commits (git recovery stays local/operator, same as `agents/unblock.md` judgment). |
+
+**Agent sequence:**
+
+1. **Rediscover** — get/update issue, list/create comments.
+2. **Read** current state + active claim (for status report / audit).
+3. **Release claim** — post claim-protocol comment:
+
+   ```markdown
+   <!-- do-work-claim -->
+   agent_id: {prior_or_operator}
+   claimed_at: {prior_claimed_at_or_now}
+   heartbeat: {now_iso}
+   session: {optional}
+   status: released
+   ```
+
+   Prefer preserving prior `agent_id` / `claimed_at` when known so history remains readable. Latest block with `status: released` means **unclaimed**.
+4. **State → backlog** — set workflow to `status_map.backlog`. **Assignee unchanged.**
+5. **Do not** write local backlog files. Optional: `append_run_note` that unblock occurred.
+6. **Return** issue id + released.
+
+| Failure | Behavior |
+|---------|----------|
+| Issue missing | Error (“nothing to unblock”) |
+| MCP missing after partial write | Hard-stop; operator re-runs unblock when healthy — do not silent-markdown |
+| Comment posted but state update fails | Hard-stop with recovery: re-run unblock to set backlog |
+
+**Parity with markdown `agents/unblock.md`:** claim cleared + status backlog + available for `list_claimable_reqs`. Git partial-commit judgment remains outside the tracker port (local).
+
+---
+
+### Resume (Linear — `agents/resume.md` consumer)
+
+Resume is **not** a separate port op name; it composes `set_req_status` + `heartbeat_req` (and preserves claim ownership). Match markdown resume semantics:
+
+| | |
+|---|---|
+| **Intent** | Re-dispatch work for a **stopped** REQ without unclaim / backlog round-trip. |
+| **Preserves** | Active claim (`agent_id`, `claimed_at`); human assignee. |
+| **Changes** | Workflow `stopped` → `in_progress`; heartbeat refreshed. |
+
+**Agent sequence:**
+
+1. **Rediscover** + get issue by Linear id (caller passes e.g. `ENG-123`).
+2. **Confirm stopped** — workflow maps to `status_map.stopped`. If not stopped → refuse (same as markdown: only stopped REQs resume).
+3. **Confirm claim** — latest claim is `status: active` (prefer same agent / operator-approved). If claim is `released` or missing → refuse; tell operator to use run/claim or unblock path, not resume.
+4. **Set state** → `status_map.in_progress` (**assignee unchanged**).
+5. **`heartbeat_req`** — refresh `heartbeat` now; keep `agent_id` / `claimed_at`.
+6. **Return** issue id; orchestrator re-dispatches worker (worktree/branch rules stay local).
+
+| Failure | Behavior |
+|---------|----------|
+| Not stopped | Refuse |
+| No active claim | Refuse — not a resume candidate |
+| Fresh foreign claim | `concurrent-conflict` / refuse |
+| MCP missing | Hard-stop; **leave claimed** (still stopped or partial in_progress) |
+
+---
+
+### Status reporting (claimers / heartbeats)
+
+When `/do-work status` runs with `backend: linear`, do **not** glob `.do-work/working/`. Instead:
+
+1. **Rediscover** list issues (scope: optional UR Project `do-work/{UR-id}`, or all `do-work/UR-*` projects on the team).
+2. For each issue with workflow in `in_progress` or `stopped` (and optionally recent `released` for audit):
+   - Parse latest claim-protocol comment → show **claimer** (`agent_id`), **claimed_at**, **heartbeat**, **fresh/stale** vs effective `stale_max`, claim `status`.
+3. Surface **stale** active claims as warnings (parity with `lib/scan-stale.sh` / deadlock banner intent).
+4. Surface **deps** from authoritative relations when tools exist.
+5. Never invent local REQ paths; identify rows by Linear issue id.
+
+---
+
+### Concurrent-conflict and mid-flight (summary)
+
+| Event | Behavior |
+|-------|----------|
+| Claim re-read sees foreign **fresh** active claim | Stop `concurrent-conflict`; no assignee change; resume allowed for claim owner |
+| Lost race on post-write re-read | Same stopper; do not delete the other agent’s comment |
+| MCP dies after successful claim, before archive/unblock | **Leave claimed** (in_progress + last heartbeat); resume or unblock after recovery |
+| MCP dies before claim completes | Hard-stop; no markdown substitute store |
+| Operator clears claim comments in Linear UI mid-run | Protocol broken — status should warn; treat as unclaimed/ambiguous and stop rather than invent state |
 
 ---
 
@@ -757,19 +1073,21 @@ Dependency ids are **Linear issue identifiers only**.
 
 ## Out of scope for this file state
 
-- Claim / heartbeat / unblock / resume / `list_claimable_reqs` / `archive_req` / `set_req_status` full sequences → later REQs.
-- Capture/ideate/question/verify **phase playbook** rewires that *call* these ops → later REQs (port op sequences for UR/REQ templates + append/deps/footprint are in this file as of REQ-291).
+- `archive_req` full sequence (done + closure proof + outputs + claim release) → later REQs.
+- Capture/ideate/question/verify/run **phase playbook** rewires that *call* these ops → later REQs (port op sequences for UR/REQ, templates, deps/footprint, and claim/status/unblock/resume are in this file as of REQ-292).
 - Non-ticket Docs, run notes, calibration, milestone cursor, migration → later path-units.
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
 - Inventing tool names not returned by live `search_tool` (including treating Linear skill typical-tool tables as proven).
+- True distributed locks on Linear (optimistic claim only — design non-goal).
 
 ---
 
 ## References
 
-- `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative rules
-- `agents/config.md` — `tracker.*` schema and Load Config step 7
+- `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative / claim rules
+- `agents/config.md` — `tracker.*` schema, `agent_claim_marker`, `heartbeat_max_age_seconds`, Load Config step 7
+- `agents/resume.md` / `agents/unblock.md` / `agents/status.md` — markdown semantics these Linear sequences mirror
 - Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§6 hierarchy, §7 config, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint
+- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint; REQ-292 claim/status/unblock/resume
