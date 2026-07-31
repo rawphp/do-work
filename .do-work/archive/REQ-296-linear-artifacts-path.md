@@ -1,19 +1,14 @@
 # REQ-296: Linear non-ticket artifacts and close path
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T06:04:43Z
-**Heartbeat:** 2026-07-31T06:04:43Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** capture append_decision; verify/close write reports; retro calibration; run notes
 **Terminal state:** Artifacts live only in fixed Linear homes (§10); agents never invent ad-hoc locations
 **Parent:** 
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-296 commit:60e2d17 tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 2
 **Size:** M
@@ -30,10 +25,10 @@ Design §10; Done-when non-ticket homes fixed.
 
 ## Acceptance Criteria
 
-- [ ] Decisions + calibration = Team Docs create-if-missing with configured titles
-- [ ] Verify/close = Initiative sections + comments
-- [ ] Run notes = Issue comments (+ optional Project update)
-- [ ] Gate locks remain local state/*
+- [x] Decisions + calibration = Team Docs create-if-missing with configured titles
+- [x] Verify/close = Initiative sections + comments
+- [x] Run notes = Issue comments (+ optional Project update)
+- [x] Gate locks remain local state/*
 
 ## Verification Steps
 
