@@ -1,7 +1,13 @@
 # REQ-300: Idle markdown→Linear migration path
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.32234
+**Claimed at:** 2026-07-31T06:36:18Z
+**Heartbeat:** 2026-07-31T06:36:18Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** /do-work upgrade migrate (or conformance migrate step) when working/ empty
