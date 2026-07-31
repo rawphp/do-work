@@ -1,19 +1,14 @@
 # REQ-291: Linear templates and CRUD op sequences
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:30:09Z
-**Heartbeat:** 2026-07-31T05:30:09Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
 **Terminal state:** 
 **Parent:** REQ-290
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-291 commit:e3269ba tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 2
 **Size:** L
@@ -30,10 +25,10 @@ Design §9 templates; clarification relations authoritative with body mirror on 
 
 ## Acceptance Criteria
 
-- [ ] Templates match design §9.1 and §9.2 including machine markers <!-- do-work-ur --> and <!-- do-work-req -->
-- [ ] set_blocked_by creates blocks relations and mirrors **Depends on:**
-- [ ] Labels Layer/*, Size/*, path-unit documented
-- [ ] status_map used for workflow states; validation hard-fails missing states
+- [x] Templates match design §9.1 and §9.2 including machine markers <!-- do-work-ur --> and <!-- do-work-req -->
+- [x] set_blocked_by creates blocks relations and mirrors **Depends on:**
+- [x] Labels Layer/*, Size/*, path-unit documented
+- [x] status_map used for workflow states; validation hard-fails missing states
 
 ## Verification Steps
 
