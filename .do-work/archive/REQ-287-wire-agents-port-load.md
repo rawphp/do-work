@@ -1,19 +1,14 @@
 # REQ-287: Wire phase agents to tracker load path
 
-<!-- claimed-start -->
-**Claimed by:** Toms-MacBook-Pro.local.98424
-**Claimed at:** 2026-07-31T05:20:59Z
-**Heartbeat:** 2026-07-31T05:20:59Z
-<!-- claimed-end -->
 
 **UR:** UR-045
-**Status:** in-progress
+**Status:** done
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
 **Terminal state:** 
 **Parent:** REQ-283
-**Closure proof:**
+**Closure proof:** checkpoint:.do-work/runs#REQ-287 commit:73569b0 tests:passed
 **Criteria approved:** agent-drafted
 **Priority:** 3
 **Size:** L
@@ -30,11 +25,11 @@ Design §5.2 and §13; ideate risk: missing one agent causes split brain. Clarif
 
 ## Acceptance Criteria
 
-- [ ] Each §13 agent file instructs: load config, resolve tracker.backend, read port.md, read backend md, call only named port ops for work-item storage
-- [ ] No agent documents silent fallback from linear to markdown
-- [ ] Markdown path still references existing lib/file flows via markdown.md ops (no mass rewrite of lib/*.sh required in this REQ)
-- [ ] SKILL.md or config.md points at the load-path contract once
-- [ ] If backend resolves to linear but agents/tracker/linear.md is missing/unreadable, agents hard-stop with setup instructions — never fall through to markdown paths
+- [x] Each §13 agent file instructs: load config, resolve tracker.backend, read port.md, read backend md, call only named port ops for work-item storage
+- [x] No agent documents silent fallback from linear to markdown
+- [x] Markdown path still references existing lib/file flows via markdown.md ops (no mass rewrite of lib/*.sh required in this REQ)
+- [x] SKILL.md or config.md points at the load-path contract once
+- [x] If backend resolves to linear but agents/tracker/linear.md is missing/unreadable, agents hard-stop with setup instructions — never fall through to markdown paths
 
 ## Verification Steps
 
