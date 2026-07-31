@@ -28,6 +28,7 @@ UR-039 upgrade centralization; design §12 step 7 no dual-write after cutover.
 - [ ] Dry-run lists planned Linear creates without writing
 - [ ] Post-cutover work-item ops ignore historical markdown trees
 - [ ] Idempotent enough to re-run safely or clearly refuse if already linear
+- [ ] When `tracker.backend` is already `linear`, upgrade migrate refuses or reports already-migrated without rewriting Issues
 
 ## Verification Steps
 

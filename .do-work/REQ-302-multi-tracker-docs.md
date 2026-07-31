@@ -28,6 +28,8 @@ Design §16 step 9; open risk #5 human UI.
 - [ ] getting-started or troubleshooting covers Linear MCP connect + team_id
 - [ ] Documents no dual-write and hard-stop rules
 - [ ] Documents Linear commit message convention
+- [ ] Documents human-assignee warning: do not clear agent claim comments while a run is live
+- [ ] If a listed guide file is missing, create it or document the pointer in an existing guide (do not leave broken cross-links)
 
 ## Verification Steps
 

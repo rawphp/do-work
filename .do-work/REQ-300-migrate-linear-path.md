@@ -30,6 +30,7 @@ Design §12; clarification migration under upgrade.
 - [ ] Leaves markdown trees read-only historical; ops stop reading them
 - [ ] Supports dry-run reporting planned creates without write
 - [ ] If working/ is non-empty or active claims exist, migration refuses entirely (no partial cutover, config backend left unchanged)
+- [ ] If Linear MCP is unusable during migration, hard-stops with setup instructions and leaves markdown trees + config unchanged (no partial cutover)
 
 ## Verification Steps
 
