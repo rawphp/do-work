@@ -1,7 +1,13 @@
 # REQ-292: Linear claim and status path
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T05:35:09Z
+**Heartbeat:** 2026-07-31T05:35:09Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** /do-work run|status|unblock|resume with backend linear
