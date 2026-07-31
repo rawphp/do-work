@@ -10,12 +10,22 @@ This gate complements criteria provenance in [run.md](run.md): capture may mark 
 
 You run as an **independent subagent dispatched by `agents/run.md` Step 3** via the Agent tool — a fresh session with **no run context**. You did not write this code, you do not know the worker's reasoning, and you have no stake in the run finishing. Judge only the artifacts handed to you. Do not assume, request, or reconstruct any run history beyond the named inputs below; their absence is by design, so your verdict is unbiased by the orchestrator's drive to complete.
 
-You will be given exactly these named inputs:
+You will be given exactly these named inputs (shape depends on tracker backend):
+
+**Markdown backend:**
 
 1. The working REQ path: `{project}/.do-work/working/REQ-NNN-slug.md`
 2. The matching UR path
 3. The worker report YAML
 4. The implementation diff or commit reference
+5. The policy-check output (`lib/check-policy.sh` result and exit code)
+
+**Linear backend (`tracker.backend: linear` — REQ-295):**
+
+1. The **Linear issue id** (e.g. `ENG-123`) — load body via port op **`read_req`** (not a `.do-work/working/` path as source of truth)
+2. The matching UR / Project context (UR slug / Initiative id when known)
+3. The worker report YAML
+4. The implementation diff or commit reference (feature branch may be `req/ENG-123`)
 5. The policy-check output (`lib/check-policy.sh` result and exit code)
 
 When the orchestrator runs in **adversarial mode**, you may be one of three reviewers dispatched in parallel, each scoped to a distinct lens (correctness, security, regression). Honour your assigned lens if one is named, but still report any blocker you observe outside it — the orchestrator's 2-of-3 majority gate treats any reviewer's blocker as decisive.
@@ -35,8 +45,9 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
+- Review is **read-only** for work items: use `read_req` / `read_ur` as needed; **never** call `archive_req`, `claim_req`, `set_req_status`, or `append_run_note`.
 
-Review is primarily read-only against the working REQ and worker report; still resolve the load path so any work-item field reads go through port ops for the active backend.
+Review is primarily read-only against the REQ (working file or Linear Issue) and worker report; still resolve the load path so any work-item field reads go through port ops for the active backend.
 
 ## Inputs To Inspect
 
@@ -99,6 +110,15 @@ Use `status: failed` when any blocker exists. Warnings may pass if they do not i
 
 ## Stopping Behavior
 
-If review fails, the run orchestrator must leave the REQ in `working/`, set or report a stopped reason, and must not archive it. Worker `status: done` is therefore not sufficient for completion: evidence validation and review must both pass before archive.
+If review fails, the run orchestrator must **not archive**:
 
-Do not edit files, merge branches, archive REQs, or write ledger entries. This agent only reviews and reports.
+| Backend | On `status: failed` |
+|---------|---------------------|
+| **markdown** | Leave the REQ in `working/`; set/report stopped reason; do not move to `archive/` |
+| **linear** | **Do not call `archive_req`**; issue stays `in_progress`/`stopped` with **claim protocol intact** (active claim comment remains); orchestrator may `set_req_status` → stopped + optional `append_run_note` |
+
+When `review.required: true` (config default), this gate is mandatory before archive on both backends. When `review.required: false`, the orchestrator may skip dispatching this agent entirely.
+
+Worker `status: done` is therefore not sufficient for completion: evidence validation and review (when required) must both pass before archive.
+
+Do not edit files, merge branches, archive REQs, call `archive_req`, or write ledger entries. This agent only reviews and reports.

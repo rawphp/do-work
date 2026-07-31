@@ -36,8 +36,8 @@ The orchestrator dispatches you with these named inputs:
 
 The worker's responsibilities are bounded:
 
-- **Worker = code.** Creates a worktree on a feature branch (`req/REQ-NNN`). Implements + tests + commits to that branch. Never touches `.do-work/`. Never merges back. Never tears down its worktree.
-- **Orchestrator = state.** Owns `.do-work/` lifecycle. After the worker returns `status: done`, the orchestrator merges the feature branch into the base branch, moves the REQ from `working/` to `archive/`, commits the metadata change, and tears down the worktree.
+- **Worker = code.** Creates a worktree on a feature branch (`req/REQ-NNN` markdown, or `req/<linear-id>` under Linear). Implements + tests + commits to that branch. Never touches `.do-work/` as a work-item store. Never merges back. Never tears down its worktree.
+- **Orchestrator = state.** Owns work-item lifecycle (markdown: `.do-work/` move/archive; Linear: `archive_req` / claim release). After the worker returns `status: done` and gates pass, the orchestrator merges the feature branch into the base branch, archives the REQ, commits metadata when applicable, and tears down the worktree.
 
 This separation makes parallelism safe by construction: workers cannot interfere with each other's working trees because each one has its own. Merge conflicts surface explicitly at the orchestrator's integration step rather than silently corrupting another worker's in-flight edits.
 
@@ -59,23 +59,36 @@ Record the output as `<base-branch>` (typically `main`). All subsequent merge an
 
 ### W2. Create the worktree + feature branch
 
+Resolve names from the tracker backend (load path Step 0). **Linear issue ids are sanitized for git refs** (see `agents/tracker/linear.md` Branch sanitize / design §6.5).
+
+| Backend | Feature branch | Worktree directory |
+|---------|----------------|--------------------|
+| **markdown** | `req/REQ-NNN` (e.g. `req/REQ-117`) | `{project}/.worktrees/req-NNN` (e.g. `req-117`) |
+| **linear** | `req/<sanitized-linear-id>` (e.g. `req/ENG-123`) | `{project}/.worktrees/req-<sanitized-slug>` (e.g. `req-eng-123`) |
+
+**Sanitize algorithm (Linear — REQ-295):** start from the Linear issue id (e.g. `ENG-123`); keep only `[A-Za-z0-9._-]`; map every other character to `-`; collapse consecutive `-`/`.`; strip leading/trailing `-`/`.`; if empty → hard-stop (do not invent a name). Branch = `req/<sanitized-id>`. Worktree dir prefers lowercase slug for FS friendliness (`req-eng-123`) unless the project already standardized on case-preserving names — stay consistent with the orchestrator.
+
 ```bash
+# markdown:
 git worktree add {project}/.worktrees/req-NNN -b req/REQ-NNN <base-branch>
+# linear (example ENG-123):
+# git worktree add {project}/.worktrees/req-eng-123 -b req/ENG-123 <base-branch>
 ```
 
-- Worktree path: `{project}/.worktrees/req-NNN` (where `NNN` is the REQ number, e.g. `req-117`).
-- Branch name: `req/REQ-NNN` (e.g. `req/REQ-117`).
+Record `<feature-branch>` and `<worktree-path>` for Step 8 and the Return Report. The orchestrator merges and tears down using these same strings.
 
 ### W3. REQ file visibility
 
-The REQ file in `{project}/.do-work/working/REQ-NNN-slug.md` is immediately visible from the worktree because `git worktree` shares the repository's object database and tracked index. No physical copy or move is required.
+**Markdown:** The REQ file in `{project}/.do-work/working/REQ-NNN-slug.md` is immediately visible from the worktree because `git worktree` shares the repository's object database and tracked index. No physical copy or move is required.
+
+**Linear:** There is no local working/ REQ file as source of truth. The orchestrator passes the **Linear issue id** (and any exported body snapshot). Load the Issue via port op **`read_req`** when you need the full description; do not invent a parallel `.do-work/working/` store.
 
 ### W3.5 Provision dependencies
 
 Before entering the worktree, run the dependency provisioner so that test tooling (Pest, vitest, etc.) can boot:
 
 ```bash
-bash {skill-root}/lib/provision-worktree.sh {project} {project}/.worktrees/req-NNN
+bash {skill-root}/lib/provision-worktree.sh {project} {project}/.worktrees/<worktree-dir>
 ```
 
 Capture its stdout summary and interpret each line:
@@ -88,20 +101,20 @@ The provisioner always exits 0 — an `unprovisionable:` line is a reported outc
 
 ### W4. Work inside the worktree
 
-`cd` into `{project}/.worktrees/req-NNN` before starting TDD. All edits and commits from `## Steps` Step 3 through Step 8 happen inside this directory.
+`cd` into the worktree path from W2 before starting TDD. All edits and commits from `## Steps` Step 3 through Step 8 happen inside this directory.
 
 ### W5. Commit on the feature branch
 
-The Step 8 commit lands on the feature branch inside the worktree (`req/REQ-NNN` for markdown; may be `req/ENG-123` under Linear). Message format follows tracker backend: `feat(REQ-NNN): …` (markdown) or `feat(ENG-123): …` + `Issue:` footer (Linear §6.5 — see Step 8). This is the normal `## Steps` Step 8 commit, executed from within the worktree directory. After the commit succeeds, capture the commit short hash for the Return Report.
+The Step 8 commit lands on the feature branch inside the worktree (`req/REQ-NNN` markdown; `req/<linear-id>` Linear). Message format follows tracker backend: `feat(REQ-NNN): …` (markdown) or `feat(ENG-123): …` + `Issue:` footer (Linear §6.5 — see Step 8). This is the normal `## Steps` Step 8 commit, executed from within the worktree directory. After the commit succeeds, capture the commit short hash for the Return Report.
 
-**Worker stops here.** Do NOT merge back. Do NOT tear down the worktree. Do NOT touch `.do-work/`. The orchestrator (see `agents/run.md` post-worker integration steps) is responsible for:
+**Worker stops here.** Do NOT merge back. Do NOT tear down the worktree. Do NOT touch `.do-work/` as orchestrator state. Do **not** call `archive_req` (orchestrator + review gate only). The orchestrator (see `agents/run.md` post-worker integration steps) is responsible for:
 
-- Merging `req/REQ-NNN` into `<base-branch>` with conflict-retry handling.
-- Moving the REQ file from `.do-work/working/` to `.do-work/archive/`, setting `**Status:** done`, adding the `## Outputs` section based on the YAML report you returned.
+- Merging `<feature-branch>` into `<base-branch>` with conflict-retry handling.
+- Archiving the REQ (markdown: working/ → archive/; Linear: **`archive_req`** only after evidence + review when required).
 - Tearing down the worktree (`git worktree remove`) and deleting the feature branch (`git branch -d`).
-- Committing the `.do-work/` metadata change.
+- Committing any local `.do-work/` metadata change when the markdown store is used.
 
-Your `Return Report` must list every output path in the `outputs:` array — the orchestrator uses that list to build the `## Outputs` section it appends to the archived REQ. Returning incomplete `outputs:` means the archive record will be incomplete.
+Your `Return Report` must list every output path in the `outputs:` array — the orchestrator uses that list to build the `## Outputs` section (markdown archive or Linear Issue body). Returning incomplete `outputs:` means the archive record will be incomplete.
 
 ---
 
@@ -415,7 +428,7 @@ Output: path/to/primary/output"
 | **markdown** | `feat(REQ-NNN): short title` | `REQ:` working path; `UR:` input path; `Output:` primary path |
 | **linear** | `feat(ENG-123): short title` (Linear issue id) | `Issue: ENG-123`; `UR: UR-NNN` when known; `Output:` primary path — **no** `.do-work/archive/REQ-…` path required |
 
-Branch naming under Linear may use `req/ENG-123` (sanitize for git ref rules). Feature-branch isolation is unchanged.
+**Branch naming (REQ-295):** under Linear, the worktree branch **is** `req/<sanitized-linear-id>` (W2). Feature-branch isolation is unchanged. Never use `req/REQ-NNN` naming when the active backend is `linear`.
 
 Note (markdown): the commit message's `REQ:` line points at `working/` (the live slot at commit time), not `archive/`. The orchestrator will rewrite the file system path when it archives the REQ post-merge, but the commit message text is fine as-is — it documents the REQ id, not a stable filesystem path.
 

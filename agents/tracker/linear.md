@@ -133,6 +133,35 @@ This path-unit closes the **run loop** on Linear (design phasing step 5 + §5.5 
 
 ---
 
+## Path: Linear run pick ordering / footprint / review-gate / branch sanitize (REQ-295)
+
+| | |
+|---|---|
+| **Entry point** | `/do-work run` with `tracker.backend: linear` after REQ-294 archive/notes/commits path |
+| **Terminal state** | `list_claimable_reqs` has deterministic pick order + skip reasons + footprint algorithm parity; `archive_req` / `append_run_note` stay the only Linear archive/note ops; worktree branches use `req/<linear-id>` (sanitized); review gate still blocks archive when `review.required`; failed review/evidence never calls `archive_req`; claim loss → `concurrent-conflict` with resume; **no** Linear-aware bash in `lib/` for v1 |
+
+This path-unit **refines** the REQ-294 run loop for production pick/integrate edge cases. It does **not** re-open claim protocol (REQ-292) or invent new port op names.
+
+**Hard rules (REQ-295):**
+
+1. **Pick order is deterministic** — Priority ascending (1 before 3), then created_at ascending, then Linear identifier ascending. First survivor wins (parity with `lib/pick-req.sh` first-survivor model).
+2. **Skip reasons are emitted** for every rejected candidate (`dep:`, `overlap:`, `scope:`, `claim:`) so the run loop can map to `overlap-blocked` / `deps-blocked` / `scope-blocked` / `truly-empty` without calling `pick-req.sh`.
+3. **Footprint algorithm** matches `lib/check-footprint.sh` intent: parse `**Files:**`, treat empty/missing as free (no overlap), expand globs with nullglob semantics (unmatched globs do not collide), compare expanded path sets against in-flight claims only.
+4. **Review gate before archive** — when `review.required: true` (config default), orchestrator must pass post-build review **before** calling `archive_req`. Failed review or failed acceptance-evidence gate **must not** call `archive_req`; issue stays `in_progress`/`stopped` with claim protocol intact.
+5. **Branch sanitize** — worktree branch may be `req/<linear-id>` after sanitizing for git ref rules (see **Branch sanitize** below). Worktree directory mirrors the sanitized slug under `.worktrees/`.
+6. **Concurrent claim loss** — same stopper as markdown multi-agent: `concurrent-conflict`; `/do-work resume` allowed when the claim is still held by the owner. Never invent a different stopper enum value.
+7. **No Linear-aware bash in `lib/` for v1** — pick/claim/deps/footprint/heartbeat/archive-integrity **semantics** for Linear live as agent sequences in this file (MCP). `lib/*.sh` remain markdown-backend implementations. Runtime helpers that are backend-agnostic (`provision-worktree.sh`, local locks, optional local ledger telemetry) stay local and do **not** call Linear APIs.
+
+**Child work under this path:**
+
+| Area | Responsibility | REQ |
+|------|----------------|-----|
+| Deeper `list_claimable_reqs` order + skip reasons + footprint algorithm | This file | REQ-295 (this section) |
+| Review-gate / failed-gate → no `archive_req`; branch sanitize wiring | `agents/run.md`, `agents/run-worker.md`, `agents/review.md` + this file | REQ-295 |
+| `archive_req` + `append_run_note` (YAML-fenced Issue comment) | Remain as REQ-294 sequences; preconditions tightened here | REQ-294/295 |
+
+---
+
 ## Path: Linear claim phase-agent wiring (REQ-293)
 
 | | |
@@ -247,10 +276,10 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | `append_ideate` / `append_clarifications` | Initiatives (description/comments) | **Documented** (REQ-291) — section append under §9.1; rediscover update tools |
 | `create_req` / `update_req` / `read_req` | Issues, Projects, labels, statuses | **Documented** (REQ-290) |
 | `list_reqs_for_ur` | Issues by Project | **Documented** (REQ-290) |
-| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292/294) — pick order; deps via **blocks**; footprint via `**Files:**` of in-flight claims; no claim side-effect |
+| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292/294/295) — Priority→created_at→id order; skip reasons; deps via **blocks**; footprint algorithm; no claim side-effect |
 | `claim_req` / `heartbeat_req` / `unblock_req` | Issues status + comments | **Documented** (REQ-292) — optimistic claim comment protocol |
 | `set_req_status` | Workflow states, issues | **Documented** (REQ-292) — stopped / in-progress without archive or unclaim |
-| `archive_req` | Workflow states, issues, claim release, body proof/outputs | **Documented** (REQ-294) — done + closure proof + outputs + claim released |
+| `archive_req` | Workflow states, issues, claim release, body proof/outputs | **Documented** (REQ-294/295) — done + proof + outputs + claim released; **not** called after failed review/evidence |
 | `set_blocked_by` | Issue relations `blocks` (+ body mirror) | **Documented** (REQ-291) — dual-write; if relations **missing** → body-only + one-time warning (port rule) |
 | `set_files` | Issue description headers | **Documented** (REQ-291) — updates `**Files:**` only; no claim side-effect |
 | `append_decision` / calibration | Team Docs | TBD after spike Docs row |
@@ -905,16 +934,54 @@ If comment tools are undiscoverable → **hard-stop** (claim protocol cannot run
 | **Preconditions** | Preflight passed; Project scope known (optional `UR-NNN` / project id, or product-wide `do-work/UR-*` scan). |
 | **Authoritative deps** | Native **`blocks` relations** (port). Body `**Depends on:**` is mirror only. |
 | **Ids** | Linear issue ids only. |
+| **v1 lib** | Implemented as agent/MCP steps only — **not** `lib/pick-req.sh` (markdown). No Linear-aware bash required. |
+
+**Pick order (REQ-295 — deterministic first-survivor):**
+
+Sort candidates **before** filtering, then walk in order and return the first survivor (orchestrator typically takes head of the ordered claimable list). Tie-break ladder:
+
+| Rank | Key | Direction | Source |
+|------|-----|-----------|--------|
+| 1 | `**Priority:**` | ascending numeric (`1` before `3`); missing/empty → after all numbered (treat as `99`) | Issue body header |
+| 2 | `created_at` | ascending (older first) | Linear issue create timestamp |
+| 3 | Linear identifier | ascending lexicographic (`ENG-12` before `ENG-100` only if string sort; prefer natural numeric suffix when practical) | e.g. `ENG-123` |
+
+Milestone / scope filters (when caller passes them) apply **before** the walk: only issues in the scoped Project(s) / milestone marker are candidates.
+
+**Skip reasons (emit one line per rejected candidate — drain-classify parity):**
+
+| Reason token | When | Run-loop mapping (`drain-classify` intent) |
+|--------------|------|---------------------------------------------|
+| `scope:<id>` | Caller scope (UR Project / milestone) excludes the issue | `scope-blocked` |
+| `claim:<id>` | Active **fresh** foreign claim holds the issue (not reclaimable) | not claimable; re-pick later |
+| `dep:<id>` | Authoritative **blocks** (or body fallback) has at least one undones dependency | `deps-blocked` |
+| `overlap:<id>` | Footprint path set intersects an in-flight claim’s `**Files:**` | `overlap-blocked` |
+
+When the ordered walk yields **zero** claimable issues, the orchestrator classifies from the skip multiset with precedence **`overlap-blocked` > `deps-blocked` > `scope-blocked` > `truly-empty`** (same as `lib/drain-classify.sh`). Empty candidate set with no skip lines → `truly-empty`.
+
+**Footprint algorithm (REQ-295 — parity with `lib/check-footprint.sh` intent):**
+
+1. Parse candidate Issue body `**Files:**` into a path/glob list (comma- and/or whitespace-separated tokens; trim each).
+2. **Empty or missing `**Files:**`** → candidate is **footprint-free** against every peer (empty set intersects nothing). Do not invent paths.
+3. Expand each token against the **local** project working tree (runtime stays local):
+   - Simple globs (`*`, `?`) expand with **nullglob** semantics — patterns that match nothing contribute **no** paths (two unmatched globs do **not** collide with each other).
+   - `**` (globstar) forms expand by walking descendants under the prefix (same intent as markdown `check-footprint.sh`).
+   - Literal paths that exist are included as-is; missing literals contribute nothing (nullglob-equivalent).
+4. Build the **in-flight peer set**: every other issue whose workflow maps to `in_progress` **or** `stopped` **and** whose latest claim is `status: active` (fresh **or** stale-but-not-yet-unblocked). **Exclude** `done` + `released` (post-`archive_req`) and pure backlog unclaimed issues.
+5. For each peer, parse + expand `**Files:**` the same way. If the intersection of expanded path sets is non-empty → reject candidate with `overlap:<peer-id>` (optionally list intersecting paths in detail for status).
+6. Do **not** call `lib/check-footprint.sh` as the Linear store — that script reads `.do-work/working/`. Reimplement the **semantics** here via Issue bodies + local path expansion.
 
 **Agent sequence:**
 
 1. **Rediscover** — `search_tool` for: list issues by project; get issue; list relations; list comments; list workflow states (already validated at load).
-2. **Enumerate candidates** — issues in scope Project(s) whose workflow state maps to **`status_map.backlog`**. Exclude `done` / `in_progress` / `stopped` unless a stale active claim is being recovered under explicit reclaim policy (default pick: **backlog + unclaimed only**).
-3. **For each candidate**, in stable order (prefer: Priority header ascending if present, then created_at, then identifier):
-   - **Claim check** — run **Helper: read active claim**. Skip if active claim is **fresh** (another agent holds it). If active claim is **stale**, treat as reclaimable (eligible) unless caller policy forbids takeover.
-   - **Deps check** — list `blocks` relations (deps that block this issue). Every dependency issue must be in workflow state mapping to **`status_map.done`** (archived-equivalent). If relations tools missing → fall back to body `**Depends on:**` with the one-time warning (port); still no markdown store.
-   - **Footprint check** — parse candidate `**Files:**`. For every other **in-flight** issue (workflow `in_progress` or `stopped` **with** active claim, fresh or stale-but-not-yet-unblocked), parse that issue’s `**Files:**`. If path sets **overlap**, reject candidate (same intent as `lib/check-footprint.sh`).
-4. **Return** ordered list of claimable Linear issue ids (and optional titles). Empty list is valid.
+2. **Enumerate candidates** — issues in scope Project(s) whose workflow state maps to **`status_map.backlog`**. Exclude `done` / `in_progress` / `stopped` unless a stale active claim is being recovered under explicit reclaim policy (default pick: **backlog + unclaimed only**). Apply scope filter; emit `scope:<id>` for excluded-by-scope backlog issues when useful for classify.
+3. **Sort** candidates by the pick-order ladder above.
+4. **For each candidate** in sorted order:
+   - **Claim check** — run **Helper: read active claim**. Skip with `claim:<id>` if active claim is **fresh** (another agent holds it). If active claim is **stale**, treat as reclaimable (eligible) unless caller policy forbids takeover.
+   - **Deps check** — list `blocks` relations (deps that block this issue). Every dependency issue must be in workflow state mapping to **`status_map.done`** (archived-equivalent). If any dep unsatisfied → `dep:<id>` and continue. If relations tools missing → fall back to body `**Depends on:**` with the one-time warning (port); still no markdown store.
+   - **Footprint check** — apply the footprint algorithm above; on overlap → `overlap:<id>` and continue.
+   - **Survivor** — append to claimable ordered list.
+5. **Return** ordered list of claimable Linear issue ids (and optional titles) **plus** the skip-reason lines for rejected candidates. Empty claimable list is valid.
 
 | Failure | Behavior |
 |---------|----------|
@@ -1027,8 +1094,20 @@ If comment tools are undiscoverable → **hard-stop** (claim protocol cannot run
 | | |
 |---|---|
 | **Intent** | Mark REQ **done** with closure proof and outputs; release the in-flight claim/footprint. Linear is the sole archive store. |
-| **Preconditions** | Worker returned `status: done` with non-empty `closure_proof` and AC evidence; review gate passed when `review.required`; claim owned by the orchestrating flow (or operator-approved). |
-| **Does not** | Steal assignee; delete the Issue; write local `.do-work/archive/REQ-*` as source of truth; auto-merge git (merge/PR stay local in `agents/run.md`). |
+| **Preconditions** | Worker returned `status: done` with non-empty `closure_proof` and AC evidence; **when `review.required: true` (default), post-build review must have returned `status: passed`**; claim owned by the orchestrating flow (or operator-approved). |
+| **Does not** | Steal assignee; delete the Issue; write local `.do-work/archive/REQ-*` as source of truth; auto-merge git (merge/PR stay local in `agents/run.md`); run after a failed review or failed acceptance-evidence gate. |
+
+**Orchestrator gates (REQ-295 — must pass before this op is invoked):**
+
+| Gate | On failure | Call `archive_req`? | Claim / workflow |
+|------|------------|---------------------|------------------|
+| Acceptance evidence (`check-acceptance-evidence` / report AC map) | `stopped` / `verification-failing` | **No** | Leave `in_progress` or set `stopped` via `set_req_status`; **claim stays active** |
+| Policy blocked (`check-policy` exit 1) | `stopped` / policy-blocked path | **No** | Same — claim intact |
+| Review (`agents/review.md`) when `review.required: true` | `stopped` / `review-failed` | **No** | Same — claim intact; optional `append_run_note` with `result: stopped:review-failed` |
+| Review when `review.required: false` | Review may be skipped | Yes (if other gates pass) | — |
+| Missing / empty `closure_proof` | Do not archive | **No** | Leave claimed |
+
+Failed review or failed acceptance-evidence **never** transitions to `status_map.done` and **never** posts claim `status: released` via this op. Resume/unblock remain the recovery paths.
 
 **Agent sequence:**
 
@@ -1036,6 +1115,7 @@ If comment tools are undiscoverable → **hard-stop** (claim protocol cannot run
 2. **Pre-archive re-read** — get issue by Linear id. Confirm:
    - Workflow is `in_progress` or `stopped` (not already `done` unless idempotent re-archive policy is explicit).
    - Latest claim is `status: active` (preferred) owned by this run, **or** operator override documented in the call.
+   - Caller asserts review/evidence gates already passed (this op does not re-run review; it trusts the orchestrator).
    - If MCP fails here after a prior claim → **leave claimed**; stop; never silent-release and never markdown-archive.
 3. **Write body fields** (update Issue description; preserve machine marker `<!-- do-work-req -->` and other headers):
    - Set / replace `**Closure proof:**` with the worker’s non-empty proof string (may cite checkpoint log + commit short hash).
@@ -1139,11 +1219,28 @@ Output: path/to/primary/output
 | Subject scope | `feat(ENG-123):` / `fix(ENG-123):` / `chore(ENG-123):` — Linear identifier, not `REQ-NNN` |
 | Footer | `Issue: ENG-123` (required); `UR: UR-NNN` when known; `Output:` primary path |
 | Archive path | **No** `.do-work/archive/REQ-…` line required |
-| Branch | May use `req/ENG-123` (sanitize for git ref rules: replace disallowed chars) |
+| Branch | **`req/<linear-id>`** after **Branch sanitize** (below) |
+| Worktree dir | `{project}/.worktrees/req-<sanitized-slug>` (see sanitize) |
 | PR title/body | Same id convention when `delivery.mode: pr` |
 | Markdown backend | Unchanged: `feat(REQ-NNN):` + `REQ:` / `UR:` / `Output:` paths |
 
-Workers and orchestrators under `backend: linear` use this convention for implementation commits and PR metadata. See `agents/run-worker.md` Step 8 and `agents/run.md` archive/PR commits.
+Workers and orchestrators under `backend: linear` use this convention for implementation commits and PR metadata. See `agents/run-worker.md` W2 / Step 8 and `agents/run.md` merge/archive/PR steps.
+
+#### Branch sanitize (REQ-295)
+
+Git refs disallow some characters. Derive branch and worktree names from the Linear issue id:
+
+| Step | Rule | Example (`ENG-123`) |
+|------|------|---------------------|
+| 1. Start | Linear issue identifier as returned by Linear | `ENG-123` |
+| 2. Allowed set | Keep `[A-Za-z0-9._-]` only | `ENG-123` |
+| 3. Replace | Map every other character (spaces, `/`, `:`, etc.) to `-` | — |
+| 4. Collapse | Collapse consecutive `-` / `.` runs; strip leading/trailing `-` and `.` | — |
+| 5. Branch | `req/<sanitized-id>` | `req/ENG-123` |
+| 6. Worktree path | `{project}/.worktrees/req-<sanitized-lower>` preferred lowercase dir for FS friendliness **or** `req-<sanitized-id>` if case-preserving FS is required — pick one scheme per project and stay consistent | `.worktrees/req-eng-123` |
+| 7. Empty guard | If sanitize yields empty, hard-stop (do not invent a branch name) | — |
+
+Orchestrator merge / PR / teardown **must** use the same branch string the worker created (pass it through the worker report or reconstruct via the same sanitize function). Never mix `req/REQ-NNN` markdown naming with Linear issue ids on the same run.
 
 ---
 
@@ -1245,16 +1342,30 @@ Do **not** glob `.do-work/working/` or run `lib/synth-status.sh` as the work-ite
 
 ---
 
-## Footprint and deps in the run loop (REQ-294)
+## Footprint and deps in the run loop (REQ-294 / REQ-295)
 
 | Concern | Linear rule | Markdown parity |
 |---------|-------------|-----------------|
-| **Deps satisfied?** | Every issue on the authoritative **`blocks`** graph (deps that block this issue) is in `status_map.done` | `**Depends on:**` ids in `archive/` (or pending-validation per decisions) |
+| **Deps satisfied?** | Every issue on the authoritative **`blocks`** graph (deps that block this issue) is in `status_map.done` | `**Depends on:**` ids in `archive/` |
 | **Deps diverge** | Relations **win**; body `**Depends on:**` is display/mirror | File header is the store |
-| **Footprint free?** | Parse candidate `**Files:**`; for every **in-progress / stopped-with-active-claim** issue, parse that Issue body’s `**Files:**`; reject on path overlap | `lib/check-footprint.sh` vs `working/` |
+| **Footprint free?** | Footprint algorithm under `list_claimable_reqs` (empty Files = free; nullglob; in-flight = active claim on in_progress/stopped) | `lib/check-footprint.sh` vs `working/` |
 | **After `archive_req`** | Done + released claim → no longer in-flight; footprint frees for siblings | File left `working/` |
+| **Pick order** | Priority → created_at → identifier (REQ-295) | Numeric REQ id sort in `pick-req.sh` |
+| **Skip reasons** | `dep:` / `overlap:` / `scope:` / `claim:` lines (REQ-295) | pick-req stderr `dep` / `overlap` / `scope` |
 
 `list_claimable_reqs` (above) implements both checks. Run Step 1 must not re-implement with local REQ files while `backend: linear`.
+
+---
+
+## No Linear-aware bash in `lib/` (v1 — REQ-295)
+
+| Surface | v1 home |
+|---------|---------|
+| Pick / claim / deps / footprint / heartbeat / unblock / archive integrity (Linear) | **Agent sequences in this file** via Linear MCP (`search_tool` → `use_tool`) |
+| Markdown store of the same ops | Existing `lib/pick-req.sh`, `claim-req.sh`, `check-deps.sh`, `check-footprint.sh`, `heartbeat.sh`, `check-archive-integrity.sh`, … |
+| Local runtime (both backends) | `provision-worktree.sh`, worktrees, merges, `state/*` locks, events, optional `run-ledger.sh` telemetry |
+
+**Do not** add Linear API clients, tokens, or GraphQL shells under `lib/` for v1. If a future REQ introduces Linear-aware bash, it must be explicit and tested — out of scope here.
 
 ---
 
@@ -1273,21 +1384,21 @@ Dependency ids are **Linear issue identifiers only**.
 
 ## Out of scope for this file state
 
-- Capture / ideate / question / verify **phase playbook** rewires (beyond load path) → later REQs. **Claim consumers** `status` / `unblock` / `resume` / `run` are wired as of REQ-293; **run archive/notes/commits** as of REQ-294.
+- Capture / ideate / question / verify **phase playbook** rewires (beyond load path) → later REQs. **Claim consumers** `status` / `unblock` / `resume` / `run` are wired as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint algorithm / review-gate / branch sanitize** as of REQ-295.
 - Non-ticket Team Docs (decisions/calibration), verify/close Initiative homes, milestone cursor, migration → later path-units.
-- Deeper list_claimable ordering / review-gate edge cases → REQ-295.
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
 - Inventing tool names not returned by live `search_tool` (including treating Linear skill typical-tool tables as proven).
 - True distributed locks on Linear (optimistic claim only — design non-goal).
+- Linear-aware bash under `lib/` (explicitly deferred; agent/MCP sequences only for v1).
 
 ---
 
 ## References
 
 - `agents/tracker/port.md` — shared ops and hard-stop / leave-claimed / relations-authoritative / claim rules
-- `agents/config.md` — `tracker.*` schema, `agent_claim_marker`, `heartbeat_max_age_seconds`, Load Config step 7
-- `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` / `agents/run-worker.md` — phase agents; markdown steps when backend is markdown; Linear port ops (this file) when backend is linear (REQ-293 claim; REQ-294 run archive/notes/commits)
+- `agents/config.md` — `tracker.*` schema, `agent_claim_marker`, `heartbeat_max_age_seconds`, `review.required`, Load Config step 7
+- `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` / `agents/run-worker.md` / `agents/review.md` — phase agents; markdown steps when backend is markdown; Linear port ops (this file) when backend is linear (REQ-293 claim; REQ-294 run archive/notes/commits; REQ-295 pick order / review-gate / branch sanitize)
 - Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint; REQ-292 claim sequences; REQ-293 phase-agent claim wiring; REQ-294 run coordination (archive / notes / §6.5 / mid-flight)
+- Prior: REQ-288 path + REQ-289 matrix (matrix unavailable without Linear MCP); REQ-290 UR/REQ CRUD path; REQ-291 templates + append/deps/footprint; REQ-292 claim sequences; REQ-293 phase-agent claim wiring; REQ-294 run coordination (archive / notes / §6.5 / mid-flight); REQ-295 pick order / footprint / review-gate / branch sanitize
