@@ -286,14 +286,17 @@ if [ "$TRACKED_MODE" = "1" ]; then
   # (addition). `git mv` already updates the index for both, but we re-add the
   # destination explicitly in case the awk/sed rewrite happened after git mv
   # so the index reflects the stamped content.
-  if ! git add -- "$DEST_PATH" 2>/dev/null; then
+  # -f: consumer projects track .do-work/ normally, but the skill source repo
+  # gitignores .do-work/ while force-tracking REQ files — plain git add rejects
+  # new paths under an ignored parent (e.g. working/ after first claim move).
+  if ! git add -f -- "$DEST_PATH" 2>/dev/null; then
     echo "claim-req.sh: git add failed for $DEST_PATH" >&2
     revert_move
     exit 1
   fi
   # Also ensure the source removal is staged (git mv already does this, but
   # belt-and-braces for the fallback-mv path above).
-  git add -- "$REQ_PATH" 2>/dev/null || true
+  git add -f -- "$REQ_PATH" 2>/dev/null || true
 
   COMMIT_MSG="chore(${REQ_ID}): claim by ${AGENT_ID}"
   if ! git commit -q -m "$COMMIT_MSG" -- "$REQ_PATH" "$DEST_PATH" 2>/dev/null; then
