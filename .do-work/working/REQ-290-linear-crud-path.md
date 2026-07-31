@@ -1,7 +1,13 @@
 # REQ-290: Linear UR/REQ CRUD path
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.98424
+**Claimed at:** 2026-07-31T05:25:55Z
+**Heartbeat:** 2026-07-31T05:25:55Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** none
 **Entry point:** /do-work intake or start with tracker.backend: linear and valid team config
