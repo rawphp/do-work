@@ -1,7 +1,13 @@
 # REQ-299: Implement Linear milestone cursor ops
 
+<!-- claimed-start -->
+**Claimed by:** Toms-MacBook-Pro.local.32234
+**Claimed at:** 2026-07-31T06:28:55Z
+**Heartbeat:** 2026-07-31T06:28:55Z
+<!-- claimed-end -->
+
 **UR:** UR-045
-**Status:** backlog
+**Status:** in-progress
 **Created:** 2026-07-31
 **Layer:** agents
 **Entry point:** 
@@ -27,6 +33,8 @@ Design §11; label M1 or Project milestone entity when MCP supports it.
 - [ ] Project description marker format documented and parsed
 - [ ] Siblings idle on deploy gate same as markdown mode
 - [ ] write_gate_state remains local-allowed
+- [ ] When Project description has no milestone marker, `read_active_milestone` returns empty/not-in-milestone (does not invent a milestone id)
+- [ ] Concurrent gate ownership still serializes via local `state/gate-owner.md` even when milestone content is remote
 
 ## Verification Steps
 
