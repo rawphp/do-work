@@ -11,7 +11,7 @@ Implements the tracker port (`agents/tracker/port.md`) with **Linear as the sole
 | | |
 |---|---|
 | **Entry point** | Operator sets a **sandbox** Linear team (`tracker.linear.team_id` / `team_key`); agent rediscovers MCP tools live before any full CRUD wiring |
-| **Terminal state** | Capability matrix committed (which tools exist for Initiatives, Projects, InitiativeToProject / project–initiative link, issue relations/`blocks`, Team Docs, comments, workflow states); hard-stop copy validated; **no production work-item migration** on this path; CRUD REQs unblocked after live fill |
+| **Terminal state** | Capability matrix present; live probe records **available**/**missing**/**partial** **or** documents **matrix unavailable** + hard-stop when MCP is down; **no production work-item migration** on this path; CRUD REQs unblocked only after a future MCP-connected fill marks required cells |
 
 This path answers design risk §17 #1 (**MCP thin / offline tools**) and the clarification **spike first, then implement**. Full port op sequences, templates, claim, and migration live in later path-units — **not** here.
 
@@ -19,12 +19,12 @@ This path answers design risk §17 #1 (**MCP thin / offline tools**) and the cla
 
 | Area | Responsibility | REQ |
 |------|----------------|-----|
-| Live tool rediscovery on sandbox team | `search_tool` → `use_tool` probes; fill matrix cells from **observed** tools only | REQ-289 |
-| Hard-stop / setup copy | Verbatim operator instructions when MCP missing (this file + Linear skill) | REQ-288 skeleton → REQ-289 confirms |
-| `status_map` vs real team states | Document defaults + hard-fail; validate names on sandbox workflow | REQ-289 (live) after skeleton here |
-| Full op sequences / templates / claim | Deferred — other path-units after matrix is known | REQ-290+ |
+| Live tool rediscovery on sandbox team | `search_tool` → `use_tool` probes; fill matrix cells from **observed** tools only | REQ-289 ran — **matrix unavailable** (no Linear MCP) |
+| Hard-stop / setup copy | Verbatim operator instructions when MCP missing (this file + Linear skill) | REQ-288 skeleton → REQ-289 confirmed |
+| `status_map` vs real team states | Document defaults + hard-fail; validate names on sandbox workflow | Defaults documented; live names **not validated** (MCP missing) |
+| Full op sequences / templates / claim | Deferred — other path-units after matrix is known | REQ-290+ (blocked until MCP-connected fill) |
 
-**Do not** invent Linear tool names as if proven. Until REQ-289 (or any later live probe) records a row as **available**, treat tool names as **unknown**.
+**Do not** invent Linear tool names as if proven. Until a **later** live probe (post-REQ-289, with Linear MCP connected) records a row as **available**, treat tool names as **unknown**.
 
 ---
 
@@ -72,24 +72,39 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | **missing** | Live probe ran; no tool for this need — document fallback or hard gap |
 | **partial** | Related tools exist but not full create/link/read needed by port |
 
-**Session note (REQ-288 path skeleton, 2026-07-31):** this worker’s connected MCP set did **not** include a Linear server (`search_tool` for Linear returned non-Linear tools only). All capability rows remain **unknown**. **REQ-289** must re-run discovery in a session with Linear MCP connected to a **sandbox** team and overwrite statuses with real tool names. No secrets in this file.
+### Matrix availability (REQ-289 live probe)
+
+| | |
+|---|---|
+| **Probe date** | 2026-07-31 |
+| **Protocol** | `search_tool` queries: `"linear"`, `"linear issues initiative project document"`, `"server:linear mcp.linear"` |
+| **Result** | **Matrix unavailable** — Linear MCP server not connected; zero `linear__*` tools discovered |
+| **Connected MCP servers observed** | `github`, `gmail`, `google_calendar`, `google_drive`, `notion`, `skill-seekers`, `tasks` (no `linear`) |
+| **use_tool probes** | **Not run** — no qualified Linear tool names returned; inventing calls is forbidden |
+| **Sandbox team** | Not reachable (no team list/get tools); `tracker.linear.team_id` / `team_key` not validated this session |
+| **Operator action** | Hard-stop applies when `tracker.backend: linear` — follow setup block below (API key / OAuth / `mcp.linear.app`), restart agent, re-run discovery, then fill rows as **available** / **missing** / **partial** from live tools only |
+| **Secrets** | None used or recorded |
+
+**Session note (REQ-288 path skeleton, 2026-07-31):** earlier worker also lacked Linear MCP; all rows left **unknown**.
+
+**Session note (REQ-289 live rediscovery, 2026-07-31):** re-ran `search_tool` for Linear. Confirmed **no Linear MCP handshake** in this session — semantic hits only mentioned Linear as a Notion connected source or GitHub project tools, not a `linear` MCP server. Capability matrix remains **unavailable**; every design-need row stays **unknown**. Do **not** treat skill “typical tools” tables as proven. No secrets in this file.
 
 ### Required capabilities vs port needs
 
 | Capability (design need) | Port / design use | Live status | Qualified tool name(s) | Notes / fallback |
 |--------------------------|-------------------|-------------|------------------------|------------------|
-| **Team resolve** | `ensure_product_container`; config validation | unknown | — | Need list/get team by id or key |
-| **Workflow states** | `status_map` validation; claim/status/archive | unknown | — | Must list team issue statuses; hard-fail if mapped name missing |
-| **Initiatives** (UR) | `create_ur`, `read_ur`, `list_urs`, verify/close homes | unknown | — | Hierarchy: UR = Initiative |
-| **Projects** (`do-work/{UR-id}`) | Intake project; `list_reqs_for_ur` scope | unknown | — | Machine-stable project name pattern |
-| **Initiative ↔ Project link** (`InitiativeToProject`) | Intake link Project → Initiative | unknown | — | Critical spike cell — may be thin/missing (design risk §17 #1) |
-| **Issues** (REQ) | `create_req`, `read_req`, `update_req`, list | unknown | — | Linear issue ids only (e.g. `ENG-123`) |
-| **Sub-issues / parent** | Path-unit parent + layer children (`parentId`) | unknown | — | |
-| **Issue relations `blocks`** | `set_blocked_by`; deps **authoritative** | unknown | — | Body `**Depends on:**` is mirror only |
-| **Comments** | Claim/heartbeat protocol; `append_run_note` | unknown | — | Claim marker `<!-- do-work-claim -->` |
-| **Team Docs** | `append_decision`, calibration | unknown | — | Titles from config: `do-work/decisions`, `do-work/calibration` |
-| **Labels** | Layer / Size / path-unit | unknown | — | |
-| **Assignee** | Human `default_assignee_id` on create | unknown | — | Agents do not steal assignee for claim |
+| **Team resolve** | `ensure_product_container`; config validation | unknown | — | REQ-289: MCP missing — unproven |
+| **Workflow states** | `status_map` validation; claim/status/archive | unknown | — | REQ-289: cannot list team states without MCP |
+| **Initiatives** (UR) | `create_ur`, `read_ur`, `list_urs`, verify/close homes | unknown | — | REQ-289: **unproven** (MCP missing); hierarchy still design-locked |
+| **Projects** (`do-work/{UR-id}`) | Intake project; `list_reqs_for_ur` scope | unknown | — | REQ-289: unproven |
+| **Initiative ↔ Project link** (`InitiativeToProject`) | Intake link Project → Initiative | unknown | — | REQ-289: **critical cell unproven**; if later **missing**, document GraphQL/API fallback before wiring intake |
+| **Issues** (REQ) | `create_req`, `read_req`, `update_req`, list | unknown | — | REQ-289: unproven; Linear issue ids only once available |
+| **Sub-issues / parent** | Path-unit parent + layer children (`parentId`) | unknown | — | REQ-289: unproven |
+| **Issue relations `blocks`** | `set_blocked_by`; deps **authoritative** | unknown | — | REQ-289: **unproven**; if later **missing** → description-only deps + one-time warning (port rule) or GraphQL fallback |
+| **Comments** | Claim/heartbeat protocol; `append_run_note` | unknown | — | REQ-289: unproven |
+| **Team Docs** | `append_decision`, calibration | unknown | — | REQ-289: **unproven** (MCP missing); titles stay config-driven when proven |
+| **Labels** | Layer / Size / path-unit | unknown | — | REQ-289: unproven |
+| **Assignee** | Human `default_assignee_id` on create | unknown | — | REQ-289: unproven |
 
 ### Port op readiness (scaffolding — sequences after spike)
 
@@ -190,9 +205,18 @@ Config defaults (`agents/config.md` / design §7):
 1. Ship the defaults above.
 2. When `backend: linear`, **validate every mapped state exists** on the resolved team’s workflow (live list statuses tool once discovered).
 3. If any mapped name is missing → **hard-fail** with rename-or-override instructions (template above). Do not invent states; do not pick a “close enough” name.
-4. Live sandbox validation results (actual state names on the spike team) are recorded by **REQ-289** in this section or an adjacent “Sandbox findings” subsection — not invented here.
+4. Live sandbox validation results (actual state names on the spike team) are recorded after a successful MCP-connected probe — not invented.
 
-**Sandbox findings:** _empty — fill in REQ-289 after live probe._
+**Sandbox findings (REQ-289, 2026-07-31):**
+
+| Check | Result |
+|-------|--------|
+| Linear MCP discoverable via `search_tool` | **Failed** — no `linear` server; no `linear__*` tools |
+| Authenticated session / sandbox team | **Not attempted** — blocked by missing MCP |
+| Default `status_map` names present on team (`Todo`, `In Progress`, `Canceled`, `Done`) | **Not validated** — no workflow-states tool |
+| Initiatives / InitiativeToProject / issue relations `blocks` / Team Docs | **Unavailable to classify** — matrix unavailable; remain **unknown** (not **missing**; missing requires a live empty probe) |
+
+**Implication for CRUD REQs:** treat all port op sequences as **still blocked** until a later session with Linear MCP connected rewrites matrix rows from observed tools. Hard-stop copy in this file is the operator path.
 
 ---
 
