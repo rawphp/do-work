@@ -104,6 +104,35 @@ Empty `layers: []` opts out of layer gap-checks, but **feature** briefs may halt
 
 Full key list: [`agents/config.md`](../agents/config.md).
 
+### Optional: Linear as work-item store
+
+By default, work items live under `.do-work/` (`tracker.backend` unset or `markdown`). You can point do-work at **Linear** instead so URs/REQs live only in Linear (no dual-write).
+
+Minimal config:
+
+```yaml
+tracker:
+  backend: linear
+  linear:
+    team_id: ""       # required UUID — or set team_key
+    team_key: ""      # optional alternate team resolve
+    # status_map / labels / claim marker: defaults in agents/config.md
+```
+
+**Before enabling `backend: linear`:**
+
+1. Connect **Linear MCP** in your agent host (API key preferred: `LINEAR_API_KEY` + MCP URL `https://mcp.linear.app/mcp`). Details: [Troubleshooting → Linear tracker backend](troubleshooting.md#linear-tracker-backend).
+2. Set a real `team_id` or `team_key` — agents hard-stop if the team cannot be resolved (they never guess).
+3. Confirm team workflow states match `tracker.linear.status_map` defaults (`Todo` / `In Progress` / `Canceled` / `Done`) or override the map.
+
+**Rules that matter day one:**
+
+- **Markdown is the default** — skip this section entirely if you only want local files.
+- **No dual-write** — Linear mode does not keep a second markdown store of URs/REQs.
+- **Hard-stop** — if Linear MCP is down or misconfigured, agents stop with setup instructions; they do not fall back to markdown.
+- **Human assignee** — you stay assignee on Issues; agents claim via comments. **Do not clear agent claim comments in Linear while a run is live** (see troubleshooting).
+- **Migrate existing markdown projects** only when idle: `/do-work upgrade migrate` (dry-run first). See [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends).
+
 ### 5. Execute with go
 
 Use the UR number from the start report (example `UR-001`):
@@ -163,6 +192,7 @@ After a successful `go`:
 | `go` stops below 90% | Read verify gaps; fix REQs, or use `--auto-fix` / `--force` |
 | UR not found | Check `.do-work/user-requests/` for the real `UR-NNN` |
 | REQ stuck in `working/` | `/do-work status` then `/do-work unblock REQ-NNN` or `/do-work resume REQ-NNN` |
+| Linear hard-stop / no MCP | Connect Linear MCP + set `tracker.linear.team_id` (see [troubleshooting](troubleshooting.md#linear-tracker-backend)) |
 
 Full table: [Troubleshooting](troubleshooting.md).
 
@@ -170,4 +200,5 @@ Full table: [Troubleshooting](troubleshooting.md).
 
 - [Concepts](concepts.md) — UR, REQ, gates, evidence
 - [Commands](commands.md) — full command list
-- [How it works](HOW-IT-WORKS.md) — phase design deep dive
+- [How it works](HOW-IT-WORKS.md) — phase design deep dive (includes multi-tracker)
+- [Troubleshooting](troubleshooting.md) — Linear MCP, claim comments, gates

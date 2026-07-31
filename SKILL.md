@@ -102,6 +102,26 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) are stored th
 
 `ledger`, `parallel`, `delivery`, `review`, and `layers` remain valid under Linear. Authoritative run notes are Linear Issue comments; local `.do-work/runs/` is optional telemetry when `ledger.enabled: true`.
 
+**No dual-write.** With `tracker.backend: linear`, Linear is the **only** work-item store. Agents must not mirror URs/REQs into local markdown as a second source of truth, and must not fall back to markdown when Linear fails (hard-stop instead). After idle migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them.
+
+**Linear commit / branch convention** (when `backend: linear`):
+
+```
+feat(ENG-123): short title
+
+Issue: ENG-123
+UR: UR-007
+Output: path/to/primary/output
+```
+
+- Subject uses the **Linear issue id** only (e.g. `ENG-123`) — not `REQ-NNN`.
+- Footer: `Issue:` + id; `UR:` when known; `Output:` primary path. No `.do-work/archive/REQ-…` path required.
+- Feature branch / worktree: `req/<sanitized-linear-id>` (e.g. `req/ENG-123`); worktree dir hard-defaults to lowercase (`req-eng-123`). See `agents/run-worker.md` W2 / design §6.5.
+
+**Human assignee + agent claim comments (operator warning):** under Linear, the **human** remains the Issue assignee; agents claim via workflow state + a claim-protocol comment (`tracker.linear.agent_claim_marker`, default `<!-- do-work-claim -->`) with `agent_id`, timestamps, and `status: active`. **Do not clear, edit, or delete agent claim comments in the Linear UI while a `/do-work run` is live** — that breaks multi-agent claim/heartbeat and can strand or double-claim work. Recover stuck claims with `/do-work status`, then `/do-work resume` or `/do-work unblock` after the run is idle or the agent has stopped. Mid-flight Linear MCP failure leaves the claim active; resume/unblock after MCP recovers.
+
+**Markdown remains the default.** Unset/empty `tracker.backend` → `markdown`. No Linear MCP required for the happy path. Operator setup for Linear (MCP connect + `team_id` / `team_key`): [docs/troubleshooting.md](docs/troubleshooting.md) § Linear tracker backend; deep dive [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) § Multi-tracker; first-run pointer [docs/getting-started.md](docs/getting-started.md). Full sequences: `agents/tracker/linear.md`.
+
 ---
 
 ## Project Root Detection
@@ -380,6 +400,8 @@ The heartbeat timestamp is refreshed in-place by `lib/heartbeat.sh` — this is 
 
 ## Commit Convention
 
+**Markdown backend** (`tracker.backend` unset / `markdown`):
+
 ```
 feat(REQ-NNN): short title
 
@@ -388,7 +410,17 @@ UR: .do-work/user-requests/UR-NNN/input.md
 Output: path/to/primary/output
 ```
 
-Commits are created per-REQ on completion. The claim/heartbeat update path (`lib/heartbeat.sh`) is filesystem-only — it writes directly to the REQ file and does **not** produce a git commit. Unblock operations use `chore(REQ-NNN): unblock — return to backlog` as the commit message.
+**Linear backend** (`tracker.backend: linear`) — Linear issue id only (design §6.5):
+
+```
+feat(ENG-123): short title
+
+Issue: ENG-123
+UR: UR-007
+Output: path/to/primary/output
+```
+
+Commits are created per-REQ (or per Linear issue) on completion. Under markdown, the claim/heartbeat update path (`lib/heartbeat.sh`) is filesystem-only — it writes directly to the REQ file and does **not** produce a git commit. Under Linear, heartbeat is a claim-protocol comment refresh (see Tracker backends). Unblock operations use `chore(REQ-NNN): unblock — return to backlog` (markdown) or the Linear-id equivalent when `backend: linear`.
 
 ## Checkpointed Verification
 

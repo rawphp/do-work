@@ -10,13 +10,81 @@ A walkthrough of the do-work system — every phase, every file it produces, and
 
 do-work is an agent-harness skill that turns a natural-language brief into a sequence of small, traceable, individually-committed tasks — executed autonomously with TDD. It runs on any agent that loads skills from a shared hub.
 
-It is **file-based**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no database, no in-memory queue, no central coordinator.
+It is **file-based by default**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no database, no in-memory queue, no central coordinator. An optional **Linear** backend stores the same work items in Linear only (see [Multi-tracker](#multi-tracker-work-item-backends) below); runtime and git isolation stay local either way.
 
-**Why file-based:** The alternative is a stateful tool (a queue, a server, an MCP backend). Files give you four things for free that a stateful tool charges for:
+**Why file-based (default):** The alternative is a stateful tool (a queue, a server, an MCP backend). Files give you four things for free that a stateful tool charges for:
 1. **Auditability** — `git log` *is* the audit log.
 2. **Resumability** — kill the process, the state survives.
 3. **Multi-agent coordination** — `git mv` is an atomic primitive across processes; no lock service needed.
 4. **Inspectability** — `cat`, `ls`, and `grep` are the debugger.
+
+---
+
+## Multi-tracker (work-item backends)
+
+Work items (URs, REQs, decisions, verify/close reports, run notes) go through a **tracker port**. Config key `tracker.backend` selects the store:
+
+| `tracker.backend` | Work-item store |
+|-------------------|-----------------|
+| **unset / empty / `markdown`** | Default: local `.do-work/` + `lib/*.sh` |
+| **`linear`** | Linear only (Initiatives / Projects / Issues) — **no dual-write** |
+
+**Load path** (every phase agent that touches work items):
+
+1. Load config (`agents/config.md`)
+2. Resolve `tracker.backend` (missing/empty → `markdown`)
+3. Read `agents/tracker/port.md` (shared op catalog + rules)
+4. Read `agents/tracker/<backend>.md` (`markdown.md` or `linear.md`)
+5. Call **only** named port ops for storage — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc
+
+**What stays local on every backend:** worktrees, feature branches, merges, `state/*` locks, events, `config.yml`, optional local run ledger telemetry.
+
+### No dual-write and hard-stop
+
+- With `backend: linear`, Linear is the sole work-item source of truth. Agents do not keep a parallel markdown UR/REQ store.
+- If Linear is unusable (MCP missing/unauthenticated, team unresolved, missing `status_map` state) **or** `agents/tracker/linear.md` is missing, agents **hard-stop** with setup instructions. They never silently fall back to markdown.
+- Mid-flight MCP failure after a claim leaves the Issue **claimed**; recover with `/do-work resume` or `/do-work unblock` after MCP recovers — not by inventing local REQ files.
+
+### Linear hierarchy (when `backend: linear`)
+
+```
+Team (config team_id / team_key)
+└── Initiative (UR brief / ideate / verify / close)
+    └── Project do-work/{UR-id}
+        └── Issue (REQ / path-unit) ± sub-issues (layer children)
+```
+
+REQs use **Linear issue ids** only (e.g. `ENG-123`). `UR-NNN` remains a Project/Initiative slug.
+
+### Commit convention (Linear)
+
+```
+feat(ENG-123): short title
+
+Issue: ENG-123
+UR: UR-007
+Output: path/to/primary/output
+```
+
+Branch / worktree: `req/ENG-123` (sanitized for git refs). Markdown mode still uses `feat(REQ-NNN): …` and `req/REQ-NNN`.
+
+### Claim protocol warning (human operators)
+
+Under Linear, the **human** remains Issue **assignee**; agents claim with a workflow state change plus a claim-protocol comment (`<!-- do-work-claim -->` by default) carrying `agent_id`, heartbeats, and `status: active`.
+
+**Do not clear, edit, or delete agent claim comments in the Linear UI while a run is live.** That breaks claim/heartbeat arbitration. Use `/do-work status`, then `resume` / `unblock` when the agent has stopped.
+
+### Migration (markdown → Linear)
+
+One-shot, **idle-only** cutover: working set empty, no active claims, operator confirms (or dry-run).
+
+```text
+/do-work upgrade migrate
+```
+
+Surfaced under `/do-work upgrade` (and conformance — not a separate forever command). After cutover: `tracker.backend: linear`; historical markdown trees stay as read-only history; **no dual-write**. Details: `agents/tracker/linear.md` + `agents/upgrade.md` Step 9.
+
+**Operator setup** (MCP + `team_id`): [troubleshooting.md § Linear tracker backend](troubleshooting.md#linear-tracker-backend). Config schema: `agents/config.md`. Skill summary: `SKILL.md` § Tracker backends.
 
 ---
 
@@ -330,13 +398,15 @@ Defaults are picked from REQ shape (parallel claim ordering, layer enforcement) 
 
 ## Reference
 
-- [getting-started.md](getting-started.md) — install and first run
+- [getting-started.md](getting-started.md) — install and first run (optional Linear pointer)
 - [concepts.md](concepts.md) — user-facing mental model
 - [commands.md](commands.md) — command reference
-- [troubleshooting.md](troubleshooting.md) — failure symptoms
-- `SKILL.md` — full command reference and migration semantics
+- [troubleshooting.md](troubleshooting.md) — failure symptoms (including Linear MCP / team_id)
+- `SKILL.md` — full command reference, tracker backends, migration semantics
+- `agents/tracker/port.md` — shared work-item op catalog
+- `agents/tracker/markdown.md` / `agents/tracker/linear.md` — backend implementations
 - `agents/*.md` — per-phase agent instructions
-- `lib/*.sh` — coordination primitives (claim, footprint, deps, heartbeat, deadlock, cycle)
+- `lib/*.sh` — coordination primitives (markdown backend claim, footprint, deps, heartbeat, deadlock, cycle)
 - `.do-work/state/` — runtime coordination files (gate-owner, lockfiles, milestone tracking)
-- `.do-work/config.yml` — per-project configuration (layers, log, parallel, test, next_steps)
+- `.do-work/config.yml` — per-project configuration (layers, log, parallel, test, next_steps, `tracker.*`)
 - `.do-work/archive/REQ-144-extend-req-template-schema.md` — canonical REQ header schema reference
