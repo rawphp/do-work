@@ -222,6 +222,36 @@ REQ-296 documented the homes and write sequences. **REQ-297** finishes the consu
 
 ---
 
+## Path: Linear milestone mode (REQ-298)
+
+| | |
+|---|---|
+| **Entry point** | Milestone-shaped UR (`source: /saas-thesis handoff` + `### Milestones`) with `tracker.backend: linear` — capture, run claim loop, deploy gate |
+| **Terminal state** | Active milestone cursor lives on **Project description** `<!-- do-work-milestone -->`; `list_milestone_reqs` / `set_active_milestone` / `read_active_milestone` work via this file; deploy gate remains **local** `state/gate-owner.md` with human y/n; **trigger shape unchanged** |
+
+This path-unit implements design **§11 Milestone mode (Linear)**. Trigger and gate ownership match markdown; only the **cursor store** and **REQ listing** move to Linear.
+
+**Hard rules (REQ-298):**
+
+1. **Trigger unchanged** — Milestone mode activates only when the UR brief has **both** (a) `source: /saas-thesis handoff` and (b) a `### Milestones` heading with at least one `#### M1` (or higher) subheading. Same as markdown capture Step 1b. Do **not** invent a Linear-only trigger.
+2. **Cursor home = Project description** — machine block starting with `<!-- do-work-milestone -->` on the UR’s Project (`do-work/{UR-id}`). **Not** local `state/active-milestone.md` as the work-item store under Linear. **Not** Initiative description. **Not** Team Docs.
+3. **Checklist lives with the cursor** — active id + full milestone checklist (parity with markdown `active-milestone.md` + `milestones.md`) inside that Project description block.
+4. **Deploy gate stays local** — first orchestrator claims via **`write_gate_state`** → `{project}/.do-work/state/gate-owner.md`; human y/n; siblings idle-wait on gate-owner + cursor changes via **`read_active_milestone`**. **Never** put gate ownership in Linear.
+5. **Issue membership** — REQs for a milestone are Issues in the UR Project, filterable by milestone marker: prefer Linear Project milestone entity when MCP tools support it after live rediscovery; else **label** equal to the milestone id (e.g. `M1`) and/or body header `**Milestone:** M1`. `list_milestone_reqs` uses those markers.
+6. **No dual-write** — do not treat local `active-milestone.md` / `milestones.md` as authoritative while `backend: linear`. Local files remain allowed only for **gate locks** (`gate-owner.md`, final-suite locks).
+7. **Rediscover Project tools** — every cursor read/write begins with `search_tool` for Project get/update. Missing tools → hard-stop (never invent a local cursor substitute store).
+
+**Child work under this path:**
+
+| Area | Responsibility | REQ |
+|------|----------------|-----|
+| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` sequences + Project block format + Issue markers | This file | REQ-298 (this section) |
+| Capture trigger + cursor write after decompose | `agents/capture.md` | REQ-298 |
+| Run filter / idle-wait / deploy-gate drain using port ops; local gate-owner | `agents/run.md` | REQ-298 |
+| `write_gate_state` (local) | Remain as REQ-296 | REQ-296 |
+
+---
+
 ## Path: Linear claim phase-agent wiring (REQ-293)
 
 | | |
@@ -257,7 +287,7 @@ After config load and backend resolution (`port.md` load path + `agents/config.m
 2. Linear validation passes (team resolvable, MCP discoverable, every `status_map` state exists on the team) — or agent **hard-stops** (see below).
 3. Read `agents/tracker/port.md`.
 4. Read this file.
-5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD**, templates §9, append/deps/footprint, claim/status/unblock/resume, run archive / append_run_note / §6.5 commits, **and §10 non-ticket artifacts** — `append_decision`, calibration Doc, `write_verify_report`, `write_close_report`; gate locks local).
+5. Perform work-item ops only via port ops mapped here (**UR/REQ CRUD**, templates §9, append/deps/footprint, claim/status/unblock/resume, run archive / append_run_note / §6.5 commits, **§10 non-ticket artifacts** — `append_decision`, calibration Doc, `write_verify_report`, `write_close_report`, **and §11 milestone cursor** — `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`; gate locks local via `write_gate_state`).
 
 Do **not** load this file when backend is `markdown` (including unset/empty).
 
@@ -348,7 +378,7 @@ Official remote MCP: `https://mcp.linear.app/mcp` (read-only variant: `…/mcp/r
 | `write_close_report` | Initiative `## Closure` + Initiative comment | **Documented** (REQ-296/297) — close path-unit walk uses Linear issue ids |
 | `append_run_note` | Issue comments (+ optional project update) | **Documented** (REQ-294) — authoritative run/cost notes; local ledger optional telemetry |
 | List run notes (helper) | Issue comments `<!-- do-work-run-note -->` | **Documented** (REQ-297) — retro prefers Linear notes, falls back to local telemetry |
-| Milestone ops | Project description / labels / milestone entity if any | TBD |
+| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` | Project description `<!-- do-work-milestone -->` + Issue milestone markers | **Documented** (REQ-298) — trigger unchanged; gate local |
 | `write_gate_state` | **Local** `state/gate-owner.md` (not Linear) | **Documented** (REQ-296) — local only; never Linear |
 
 ---
@@ -417,6 +447,7 @@ On **read/update**: if the marker is missing, treat as template parse failure �
 **Parent:** ENG-100 | none
 **Entry point:** …          # path-unit parents only
 **Terminal state:** …       # path-unit parents only
+**Milestone:** M1           # milestone mode only; omit or `none` otherwise
 **Files:** path1 path2
 **Depends on:** ENG-101 ENG-102
 **Size:** S|M|L
@@ -450,6 +481,7 @@ On **read/update**: if the marker is missing, treat as template parse failure �
 | `**Layer:**` | Layer name or `none`; also label `Layer/{name}` when labels available | Capture, footprint |
 | `**Parent:**` | Parent **Linear issue id** or `none`; children also set native `parentId` | Path-units |
 | `**Entry point:**` / `**Terminal state:**` | Path-unit **parents only**; leave empty on leaves | Capture path-units |
+| `**Milestone:**` | Milestone mode only: `M<n>` (e.g. `M1`); omit or `none` otherwise; also label `M<n>` when labels available (REQ-298) | `list_milestone_reqs` |
 | `**Files:**` | Space-separated paths/globs; sole write intent of `set_files` | Footprint / pick |
 | `**Depends on:**` | Space-separated **Linear issue ids** — **mirror only**; authoritative graph is native `blocks` relations via `set_blocked_by` | Display; eligibility uses relations when present |
 | `**Size:**` | `S` \| `M` \| `L`; also label `Size/{S\|M\|L}` when labels available | Capture; optional estimate map |
@@ -894,7 +926,7 @@ Agents **must not invent** homes. Use only the rows below (plus local gate locks
 | Run / cost notes | Comment on Issue after attempt; optional Project update for run rollup | YAML fenced block + `<!-- do-work-run-note -->` | run | **`append_run_note`** (REQ-294) |
 | Verify report | Initiative description `## Verify` + Initiative comment | Full report markdown | verify, go | **`write_verify_report`** |
 | Close report | Initiative description `## Closure` + Initiative comment | Per path-unit results (closure schema) | close | **`write_close_report`** |
-| Milestone cursor | Project description `<!-- do-work-milestone -->` | active M + checklist | capture, run | later path-unit |
+| Milestone cursor | Project description `<!-- do-work-milestone -->` | active M + checklist | capture, run | **`read_active_milestone`** / **`set_active_milestone`** / **`list_milestone_reqs`** (REQ-298) |
 | Gate locks | **Local** `{project}/.do-work/state/gate-owner.md`, `final-suite-*.md` | unchanged | run | **`write_gate_state`** (local only) |
 
 **Create-if-missing (Team Docs):** on first write, if no Doc with the configured title exists for the configured team, create it (title exact match to config), then write. Readers: if missing, treat as empty (no decisions / no calibration) — never invent content.
@@ -1448,12 +1480,152 @@ Brief load under Linear: **`read_ur`** (Initiative description `## Brief` / mach
 
 ---
 
+## Milestone mode (design §11 — REQ-298)
+
+### Trigger (unchanged)
+
+Identical to markdown capture / run:
+
+1. UR brief frontmatter or body contains `source: /saas-thesis handoff`.
+2. Body contains a `### Milestones` heading with at least one `#### M1` (or higher) subheading.
+
+Both required → **milestone mode**. Neither Linear labels nor Project cursor alone turn milestone mode on. Brief load under Linear: **`read_ur`** (`## Brief` / machine sections); do not invent a different trigger.
+
+### Project description cursor block
+
+Authoritative work-item cursor under `backend: linear`. Lives on the UR **Project** description (`do-work/{UR-id}`), not Initiative and not local `active-milestone.md`.
+
+```markdown
+<!-- do-work-milestone -->
+**Active:** M1
+
+# Milestones
+
+- [x] M1 — <name> — captured
+- [ ] M2 — <name> — pending
+- [ ] M3 — <name> — pending
+```
+
+| Field | Rules |
+|-------|--------|
+| `<!-- do-work-milestone -->` | Required first line of the machine block. Absent on Project ⇒ **not** in milestone mode (same as missing `active-milestone.md`). |
+| `**Active:**` | Single token `M<n>` (e.g. `M1`) or empty / `none` when cursor cleared after all deployed or gate stop. |
+| `# Milestones` checklist | One line per bridge milestone. Status suffix: `pending` \| `captured` \| `running` \| `deployed` (parity with markdown `milestones.md`). Checked box when status is `captured` or later; agents may keep `[x]` only for `deployed` if they prefer — **status word is authoritative**. |
+
+**Statuses (same vocabulary as markdown capture):**
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Not yet captured |
+| `captured` | REQs written for this M |
+| `running` | Run loop active for this M (optional stamp) |
+| `deployed` | Deploy gate passed for this M |
+
+### Issue milestone markers (for `list_milestone_reqs`)
+
+When capture creates Issues under milestone mode, mark membership so listing does not depend on markdown `REQ-M1-NNN` filenames:
+
+1. **Prefer** Linear Project **milestone entity** / issue–milestone link when live `search_tool` finds such tools — attach the issue to milestone `M<n>` (or the entity named `M<n>` / matching title).
+2. **Else (v1 default):** apply a **label** whose name is exactly the milestone id (`M1`, `M2`, …) when label tools exist, **and** set body header `**Milestone:** M1` (same id) next to other `<!-- do-work-req -->` headers.
+3. **Parse order for filters:** (entity attachment if present) → label `M<n>` → body `**Milestone:** M<n>`. Any one match includes the issue. Missing all three → issue is **not** in that milestone (do not invent).
+
+Path-unit parents and layer children for the same unit share the same milestone marker.
+
+### `read_active_milestone`
+
+| | |
+|---|---|
+| **Intent** | Read the active milestone cursor (if any). |
+| **Home** | UR Project description block `<!-- do-work-milestone -->`. |
+| **Preconditions** | None beyond readable Project; missing / empty block ⇒ not in milestone mode. |
+| **Returns** | `{ active: "M1" \| null, checklist: [...] }` — `active` null when marker missing, `**Active:**` empty/`none`, or Project unresolved. |
+
+**Agent sequence:**
+
+1. **Rediscover** Project get/list tools (`search_tool` → `use_tool`).
+2. **Resolve Project** — name `do-work/{UR-id}` (or Project id from `read_ur` / `**Project-id:**`). Caller may pass Project id or UR id.
+3. **Read description.** Find the `<!-- do-work-milestone -->` block (from marker through end of checklist section, or next top-level HTML comment / known machine marker).
+4. **Parse** `**Active:**` → trim → if empty, `none`, or missing → `active: null`.
+5. **Parse checklist** lines under `# Milestones` (optional for callers that only need active id).
+6. **Return** structured result. Do **not** read local `state/active-milestone.md` as the store.
+
+| Failure | Behavior |
+|---------|----------|
+| Project tools missing | Hard-stop — Linear setup; do **not** fall back to local `active-milestone.md` as work-item store |
+| Project missing | Hard-stop (UR not provisioned) |
+| Marker missing | Return `active: null` (not milestone mode) — not an error |
+
+### `set_active_milestone`
+
+| | |
+|---|---|
+| **Intent** | Set, advance, or clear the active milestone cursor; maintain checklist status. |
+| **Home** | Same Project description block as `read_active_milestone`. |
+| **Preconditions** | Milestone mode applicable (trigger was true at capture, or block already exists); target id is `M<n>` or clear. |
+| **Does not** | Own the deploy-gate y/n prompt; write `gate-owner.md` (use **`write_gate_state`**); create Issues. |
+
+**Agent sequence:**
+
+1. **Rediscover** Project get/update tools.
+2. **Resolve Project** for the UR.
+3. **Read** current description + existing milestone block (create block if capture is writing first cursor).
+4. **Apply caller intent:**
+   - **Set / advance** to `M<n>`: set `**Active:** M<n>`; update checklist line for prior M to `deployed` (or caller-supplied status); set target line to `captured` / `running` / as requested.
+   - **Capture stamp:** after capture writes REQs for `M<n>`, set `**Active:** M<n>` and mark that line `captured` (create full checklist from brief `### Milestones` on first write).
+   - **Clear** (all deployed, or gate `n` stop): set `**Active:**` empty or remove the active value; mark remaining lines per caller; or strip the whole block when the run stops with no next M. Prefer leaving checklist history with `deployed` marks when useful for humans.
+5. **Write** Project description — replace **only** the milestone machine block; preserve any other Project description content outside the block.
+6. **Return** new `active` value (or null if cleared).
+
+| Failure | Behavior |
+|---------|----------|
+| Project tools missing / update fails | Hard-stop; do **not** write local `active-milestone.md` as substitute store |
+| Invalid target id | Hard-stop / refuse |
+
+**Deploy-gate consumers (run Step 7b):** on human **y**, call `set_active_milestone` with next pending id (or clear if none). On human **n**, clear active. Gate file lifecycle stays on **`write_gate_state`**.
+
+### `list_milestone_reqs`
+
+| | |
+|---|---|
+| **Intent** | List REQs (Linear Issues) belonging to the active or named milestone. |
+| **Preconditions** | Milestone id known (`M<n>`) or active cursor set via `read_active_milestone`. |
+| **Scope** | Issues in the UR Project `do-work/{UR-id}` only. |
+
+**Agent sequence:**
+
+1. **Resolve milestone id** — argument `M<n>`, else `read_active_milestone` → if `active` null, return empty list (not milestone mode).
+2. **Rediscover** issue list tools; optionally milestone-entity tools.
+3. **`list_reqs_for_ur`** (or equivalent Project-scoped issue list) for the UR Project.
+4. **Filter** to issues whose milestone marker matches `M<n>` (entity / label / `**Milestone:**` — see above).
+5. **Optional status filter** (caller):
+   - `backlog` — workflow maps to `status_map.backlog` (claimable candidates for this M).
+   - `in_flight` — `in_progress` or `stopped` with active claim.
+   - `done` — `status_map.done`.
+   - `any` (default) — all membership matches.
+6. **Return** ordered list of Linear issue ids (+ optional titles/status). Sort: Priority DESC (missing→2), created_at ASC, id ASC (same as `list_claimable_reqs` when used for pick).
+
+**Used by:**
+
+| Consumer | How |
+|----------|-----|
+| Run Step 1.0 | Constrain claim pool to active M (`list_milestone_reqs` ∩ `list_claimable_reqs`, or pass milestone scope into claimable walk) |
+| Run Step 7b drain | Backlog for M must be empty; no foreign in-flight claims for M |
+| Worker milestone_complete | No remaining non-done issues for active M in Project (or no backlog + no foreign in-flight) |
+| Capture numbering | Count existing issues for M when assigning sequence metadata (Linear ids remain authoritative identifiers) |
+
+| Failure | Behavior |
+|---------|----------|
+| Issue list tools missing | Hard-stop |
+| Active unknown and no id arg | Empty list |
+
+**No fallback to other milestones** — same rule as markdown: empty list means this M is drained for that filter; do not widen to M2 while active is M1.
+
 ### `write_gate_state`
 
 | | |
 |---|---|
 | **Intent** | Coordinate deploy-gate ownership / final-suite locks. |
-| **Home** | **Local only** — `{project}/.do-work/state/gate-owner.md` (and related `state/final-suite-*.md` locks). **Never** Linear Docs, Issues, or Initiative fields. |
+| **Home** | **Local only** — `{project}/.do-work/state/gate-owner.md` (and related `state/final-suite-*.md` locks). **Never** Linear Docs, Issues, Project description, or Initiative fields. |
 | **Preconditions** | Milestone / gate flow active; project filesystem writable. |
 
 **Agent sequence (backend-agnostic; same under markdown and linear):**
@@ -1467,7 +1639,7 @@ Brief load under Linear: **`read_ur`** (Initiative description `## Brief` / mach
 |---------|----------|
 | Cannot write `state/` | Hard-stop gate coordination; do not invent a Linear lock substitute |
 
-This op is **not** a dual-write of work items — it is the intentional local runtime lock allowed by design §5.5 / §10 / port.md.
+This op is **not** a dual-write of work items — it is the intentional local runtime lock allowed by design §5.5 / §10 / §11 / port.md. Under Linear milestone mode, **cursor** changes go through `set_active_milestone` (Project description); **gate ownership** always goes through this local file.
 
 ---
 
@@ -1653,8 +1825,8 @@ Dependency ids are **Linear issue identifiers only**.
 
 ## Out of scope for this file state
 
-- Full UR/REQ CRUD rewires beyond homes already mapped → later REQs where noted. **Claim consumers** as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296; **artifact home consumers** (capture/ideate/question/verify/close/retro/run-worker decisions readers; close Linear path-unit walk; retro List run notes; hard-stop invent ban) as of **REQ-297**.
-- Milestone cursor on Project description + migration one-shot → later path-units.
+- Full UR/REQ CRUD rewires beyond homes already mapped → later REQs where noted. **Claim consumers** as of REQ-293; **run archive/notes/commits** as of REQ-294; **pick order / footprint / review-gate / branch sanitize** as of REQ-295; **§10 non-ticket homes** as of REQ-296; **artifact home consumers** as of REQ-297; **milestone mode** (Project `<!-- do-work-milestone -->` cursor, `list_milestone_reqs` / `set_active_milestone` / `read_active_milestone`, local gate-owner) as of **REQ-298**.
+- Migration one-shot → later path-unit (REQ-300).
 - Production migration of existing `.do-work/` work items → REQ-300 path.
 - Dual-write or treating local REQ files as source of truth while `backend: linear`.
 - Inventing tool names not returned by live `search_tool` (including treating Linear skill typical-tool tables as proven).
@@ -1669,6 +1841,6 @@ Dependency ids are **Linear issue identifiers only**.
 - `agents/config.md` — `tracker.*` schema including `decisions_doc_title` / `calibration_doc_title`, `agent_claim_marker`, `heartbeat_max_age_seconds`, `review.required`, Load Config step 7
 - `agents/resume.md` / `agents/unblock.md` / `agents/status.md` / `agents/run.md` / `agents/run-worker.md` / `agents/review.md` — claim/run consumers
 - `agents/capture.md` / `agents/ideate.md` / `agents/question.md` / `agents/verify.md` / `agents/close.md` / `agents/retro.md` / `agents/run-worker.md` — §10 artifact consumers (REQ-296 homes; REQ-297 full reader/writer wiring)
-- Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §14 errors, §17 risks)
+- Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` (§5.5 runtime split, §6.5 commits, §7 config/ledger, §8 claim, §9 templates, §10 homes, §11 milestone mode, §14 errors, §17 risks)
 - Linear skill: MCP-first, rediscover tools live (`search_tool` → `use_tool`)
-- Prior: REQ-288–296; this path REQ-297 artifact home consumers
+- Prior: REQ-288–297; this path **REQ-298** Linear milestone mode

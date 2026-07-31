@@ -81,14 +81,21 @@ Each line records a standing decision (`YYYY-MM-DD | UR/REQ ref | decision | rat
 
 ### 1b. Detect milestone mode
 
-Inspect the brief (`UR-NNN/input.md`) for the milestone-mode trigger. Milestone mode is active if BOTH:
+Inspect the brief for the milestone-mode trigger (**unchanged** across backends). Brief source:
+
+- **Markdown:** `UR-NNN/input.md`
+- **Linear:** `read_ur` (Initiative `## Brief` / machine sections); trigger strings must appear in that brief text
+
+Milestone mode is active if BOTH:
 
 1. The frontmatter or body contains the marker `source: /saas-thesis handoff`.
 2. The body contains a `### Milestones` heading with at least one `#### M1` (or higher) subheading.
 
-If both conditions are met, you are in **milestone mode**. Set a flag and continue. Otherwise behave exactly as the existing capture flow (skip to Step 2 unchanged).
+If both conditions are met, you are in **milestone mode**. Set a flag and continue. Otherwise behave exactly as the existing capture flow (skip to Step 2 unchanged). Do **not** invent a Linear-only trigger.
 
 When in milestone mode:
+
+#### Markdown backend
 
 - **Ensure `.do-work/state/` exists.** Run `mkdir -p {project}/.do-work/state` defensively before any state write. Installs from before REQ-170 may not have created the directory.
 - Identify the **active milestone**. Read `{project}/.do-work/state/active-milestone.md` if it exists. If it does not exist, the active milestone is `M1`.
@@ -108,17 +115,27 @@ When in milestone mode:
 
   Mark the active milestone as `captured` once REQ files are written. Other statuses: `pending` (not yet captured), `captured` (REQs written), `running` (run loop active), `deployed` (deploy gate passed).
 
+#### Linear backend (REQ-298)
+
+- **Trigger** is the same two bullets above — no Linear-only activation.
+- Identify the **active milestone** via port op **`read_active_milestone`** (`agents/tracker/linear.md`) on Project `do-work/{UR-id}` (`<!-- do-work-milestone -->`). If `active` is null (no cursor yet), the active milestone is `M1`.
+- Decompose ONLY the active milestone, not the whole brief. R-mapping is built against ONLY that milestone's user-value, deploy gate, and high-level REQs.
+- Create Issues with **`create_req`** only in Project `do-work/{UR-id}`. Linear issue ids are the REQ identifiers (no `REQ-M1-NNN` filenames).
+- On each Issue: set body `**Milestone:** M<n>` and, when labels exist, label `M<n>` (see linear.md Issue milestone markers). Prefer Project milestone entity when MCP supports it.
+- After writing REQs for this milestone, call **`set_active_milestone`** with `active: M<n>` and checklist status `captured` for that M (full checklist from the brief on first write). Do **not** write local `state/active-milestone.md` / `milestones.md` as the work-item store.
+- Deploy-gate ownership remains local (`write_gate_state` / `gate-owner.md`) — capture does not claim the gate.
+
 ### 2. Determine the next REQ number
 
 If **milestone mode** (from Step 1b):
-- Scan for existing `REQ-M<n>-<NNN>-*.md` files matching the active milestone in both backlog root and `archive/`.
-- Find the highest number for this milestone. New REQ = highest + 1, zero-padded to 3 digits.
-- If no REQs for this milestone exist yet, start at `REQ-M<n>-001`.
+
+- **Markdown:** Scan for existing `REQ-M<n>-<NNN>-*.md` files matching the active milestone in both backlog root and `archive/`. Find the highest number for this milestone. New REQ = highest + 1, zero-padded to 3 digits. If no REQs for this milestone exist yet, start at `REQ-M<n>-001`.
+- **Linear:** Call **`list_milestone_reqs`** for active `M<n>` (status `any`). Linear allocates issue ids — do not invent `REQ-NNN` / `REQ-M1-NNN` names. Use the list only for sequence metadata / capture summary counts if needed.
 
 If **not in milestone mode**:
-- Scan the backlog root and `archive/` for existing `REQ-NNN-*.md` files (no milestone prefix).
-- Find the highest existing REQ number. Start from the next one. (Existing behavior — unchanged.)
-- If no REQs exist yet, start at `REQ-001`.
+
+- **Markdown:** Scan the backlog root and `archive/` for existing `REQ-NNN-*.md` files (no milestone prefix). Find the highest existing REQ number. Start from the next one. (Existing behavior — unchanged.) If no REQs exist yet, start at `REQ-001`.
+- **Linear:** Issues are created via **`create_req`**; Linear issue ids are allocated by Linear (no local number allocation).
 
 ### 2b. Classify the brief
 
