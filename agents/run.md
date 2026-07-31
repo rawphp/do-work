@@ -95,28 +95,33 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
-### Claim / pick / heartbeat — backend branch (REQ-293)
+### Claim / pick / heartbeat / archive — backend branch (REQ-293 + REQ-294)
 
-Work-item **pick, claim, heartbeat, set status, unblock** go through named port ops. Runtime (worktrees, merges, `state/*` locks, events) stays local for both backends.
+Work-item **pick, claim, heartbeat, set status, unblock, archive, run notes** go through named port ops. Runtime (worktrees, merges, `state/*` locks, events) stays local for both backends.
 
 | Concern | Markdown (`markdown.md`) | Linear (`linear.md`) |
 |---------|--------------------------|----------------------|
-| Pick claimable | `list_claimable_reqs` → `lib/pick-req.sh` | **`list_claimable_reqs`** — project filter + backlog state + deps via **`blocks` relations** + footprint from `**Files:**` + unclaimed/stale (linear.md sequence) |
+| Pick claimable | `list_claimable_reqs` → `lib/pick-req.sh` | **`list_claimable_reqs`** — project filter + backlog state + deps via **`blocks` relations** (authoritative) + footprint from Issue body `**Files:**` of in-flight claims + unclaimed/stale (linear.md sequence) |
 | Claim | `claim_req` → `lib/claim-req.sh` (FS stamp + working/) | **`claim_req`** — optimistic re-read; workflow `in_progress` + claim comment (`agent_claim_marker` / `<!-- do-work-claim -->`); **never** steal assignee |
 | Heartbeat | `heartbeat_req` → `lib/heartbeat.sh` | **`heartbeat_req`** — new/updated claim-protocol comment with fresh `heartbeat` ISO timestamp |
 | Stopped / resume | header + stamp edits; `agents/resume.md` | **`set_req_status`** + **`heartbeat_req`** (see linear.md Resume); `agents/resume.md` Linear branch |
 | Unblock | `agents/unblock.md` stamp strip | **`unblock_req`** — `status: released` + backlog state; `agents/unblock.md` Linear branch |
-| Mid-flight MCP / worker death after claim | leave working/ slot; stale + resume/unblock | **Leave claimed** (in_progress + last claim/heartbeat); resume or unblock after recovery — **never** auto-release or silent markdown fallback |
+| Archive | post-worker: status/proof/outputs + `working/` → `archive/` + integrity gate | **`archive_req`** — `status_map.done` + `**Closure proof:**` + `## Outputs` on Issue + claim `released` (linear.md REQ-294); **no** local archive file as store |
+| Run / cost notes | `append_run_note` → `lib/run-ledger.sh` when ledger enabled | **`append_run_note`** — Issue comment (YAML fenced, authoritative). If `ledger.enabled`, **optional** local `RUN-NNN.yml` is **telemetry only** — not a second work-item store |
+| Commits / PRs | `feat(REQ-NNN):` + `REQ:` / `UR:` / `Output:` paths | **§6.5** — `feat(ENG-123):` + `Issue: ENG-123` / `UR:` / `Output:` (linear.md Commits and PRs) |
+| Mid-flight MCP / worker death after claim | leave working/ slot; stale + resume/unblock | **Leave claimed** (in_progress + active claim comment + last heartbeat); stop for resume/unblock — **never** silent-release or silent markdown fallback |
 | Status situation room | `agents/status.md` + `synth-status.sh` | `agents/status.md` **1L** — claimers/heartbeats from Linear comments |
 
 **When effective backend is `linear`:**
 
 1. Do **not** call `lib/pick-req.sh` / `lib/claim-req.sh` / `lib/heartbeat.sh` as the work-item store (those scripts implement the markdown backend).
-2. In **The Loop** Step 1 (and pre-flight pick), replace the pick-req/claim-req shell blocks with agent steps that execute **`list_claimable_reqs`** then **`claim_req`** from `agents/tracker/linear.md` (same eligibility semantics: backlog, deps satisfied, footprint free, unclaimed or stale-eligible).
+2. In **The Loop** Step 1 (and pre-flight pick), replace the pick-req/claim-req shell blocks with agent steps that execute **`list_claimable_reqs`** then **`claim_req`** from `agents/tracker/linear.md` (same eligibility semantics: backlog, deps satisfied via **blocks**, footprint free via Issue `**Files:**`, unclaimed or stale-eligible).
 3. On claim race lost → stop / retry with **`concurrent-conflict`** (same stopper as markdown exit 2); resume allowed for the claim owner.
-4. Pass **Linear issue id** (e.g. `ENG-123`) to workers; branch names may use `req/ENG-123` (sanitize for git). Worker heartbeats use **`heartbeat_req`** against that issue id (checkpoints unchanged in intent).
+4. Pass **Linear issue id** (e.g. `ENG-123`) to workers; branch names may use `req/ENG-123` (sanitize for git). Worker heartbeats use **`heartbeat_req`** against that issue id (checkpoints unchanged in intent). Worker **commits** use §6.5 Linear issue id format (see `agents/run-worker.md` Step 8).
 5. Pre-flight “scan working/” is markdown-specific; under Linear, scan **in-flight issues** (workflow in_progress/stopped + active claim comments) via list + Helper: read active claim — same mine/sibling/stale buckets in spirit, different representation.
-6. If Linear MCP dies after a successful **`claim_req`** and before archive/unblock → **leave claimed**; do not invent cleanup that races siblings.
+6. If Linear MCP dies after a successful **`claim_req`** and before archive/unblock → **leave claimed** (active claim + in_progress); stop for resume/unblock; **never** silent-release; **never** fall back to markdown store.
+7. After a successful worker + review, integrate via **`archive_req`** (linear.md) instead of moving a local REQ file to `.do-work/archive/`. Git merge/PR and worktree teardown remain local (Step 4 runtime pieces).
+8. After each attempt, call **`append_run_note`** on the Issue for authoritative run/cost notes. When `ledger.enabled: true`, you **may also** run `lib/run-ledger.sh` for local telemetry — that file is **not** the work-item store.
 
 **When effective backend is `markdown`:** keep the `lib/pick-req.sh` / `lib/claim-req.sh` / `lib/heartbeat.sh` sequences written throughout this file — they are the markdown backend implementation of those port ops.
 
@@ -737,14 +742,23 @@ Read `review.adversarial` (loaded at startup; default `false`).
 
 ### Step 3b: Run Ledger
 
-When `ledger.enabled` is true, record one append-only run ledger entry per worker attempt under `{project}/.do-work/runs/RUN-NNN.yml` using `lib/run-ledger.sh`. Collect the ledger inputs while the run progresses: REQ id, agent id, selected model, branch, started and ended timestamps, command evidence, test evidence, changed files, result, cost estimate or budget note, review outcome, and derived proof status.
+Collect ledger inputs while the run progresses: REQ id (or Linear issue id), agent id, selected model, branch, started and ended timestamps, command evidence, test evidence, changed files, result, cost estimate or budget note, review outcome, and derived proof status.
 
-Finalize the ledger after the attempt reaches a terminal outcome:
+**Backend branch for run notes (REQ-294):**
+
+| Backend | Authoritative note | Optional local file |
+|---------|--------------------|---------------------|
+| **markdown** | When `ledger.enabled`: `lib/run-ledger.sh` → `.do-work/runs/RUN-NNN.yml` (`append_run_note` in `markdown.md`) | same file is the store |
+| **linear** | **`append_run_note`** on the Issue (YAML-fenced comment per `linear.md`) | If `ledger.enabled: true`, **may also** write `RUN-NNN.yml` via `lib/run-ledger.sh` — **telemetry only**, not a second work-item store. Retro prefers Linear comments; falls back to local runs if comments unavailable |
+
+When `ledger.enabled` is true (either backend), record one append-only local run ledger entry per worker attempt under `{project}/.do-work/runs/RUN-NNN.yml` using `lib/run-ledger.sh` — under Linear this is the optional telemetry path above, **in addition to** `append_run_note`.
+
+Finalize the (local) ledger after the attempt reaches a terminal outcome:
 
 ```bash
 bash lib/run-ledger.sh \
   --project {project} \
-  --req <working-or-archived-REQ-path> \
+  --req <working-or-archived-REQ-path-or-linear-issue-id> \
   --agent <agent-id> \
   --model <selected-model> \
   --branch <branch-name> \
@@ -760,7 +774,7 @@ bash lib/run-ledger.sh \
   --changed-files <changed-files-list>
 ```
 
-For stopped workers, write the ledger before returning control to the user, with `result: stopped:<reason>` and the best available evidence lists. For policy-blocked or acceptance-evidence failures before review, use `review: not-run`. If `ledger.enabled` is false, skip ledger creation.
+For stopped workers, write the ledger (and Linear **`append_run_note`** when backend is linear) before returning control to the user, with `result: stopped:<reason>` and the best available evidence lists. For policy-blocked or acceptance-evidence failures before review, use `review: not-run`. If `ledger.enabled` is false, skip **local** ledger creation; under Linear still prefer **`append_run_note`** when the attempt warrants a durable note.
 
 When `deferred_checks:` is non-empty, still write `result: done` with the normal review and evidence fields. Delivery happened and all automated gates passed; any human/device follow-up is advisory data in the archived REQ, not a distinct ledger result.
 
@@ -830,7 +844,17 @@ On text-level conflict (any file contains `<<<<<<<`):
 
 #### 4b. Archive the REQ file
 
-Read the worker's YAML report's `outputs:` list and `closure_proof` value. Rewrite the REQ file in place under `.do-work/working/REQ-NNN-slug.md`:
+Read the worker's YAML report's `outputs:` list and `closure_proof` value.
+
+**Linear backend (`tracker.backend: linear` — REQ-294):** do **not** rewrite/move local `.do-work/working/` or `.do-work/archive/` REQ files as the work-item store. Execute **`archive_req`** from `agents/tracker/linear.md` on the Linear issue id:
+
+1. Same semantic guards: path-unit Entry/Terminal when present; non-empty `closure_proof`; failed review or failed acceptance-evidence gate **must not** call `archive_req` (issue stays in_progress/stopped with claim intact).
+2. `archive_req` sets workflow → `status_map.done`, writes `**Closure proof:**` + `## Outputs` on the Issue, posts claim `status: released`.
+3. On Linear MCP failure mid-archive: **leave claimed** if claim not yet released; stop for resume/unblock; never silent markdown archive.
+4. Optional: `append_run_note` for the done attempt if not already written in Step 3b.
+5. Skip the markdown file rewrite/move/integrity-script steps below. Continue to 4c (worktree teardown) and any local git metadata commit that does not invent a second work-item store.
+
+**Markdown backend** (default): rewrite the REQ file in place under `.do-work/working/REQ-NNN-slug.md`:
 
 0. **Path-unit closure guard.** Before any archive mutation, read `**Entry point:**` and `**Terminal state:**` from the REQ file. If either field is present, both must be present and non-empty. If a path-unit is missing either value, do not archive it. Transition the REQ to `**Status:** stopped`, add `**Reason:** path-unit-incomplete`, and surface: `REQ-NNN cannot close: path-unit requires non-empty Entry point and Terminal state.` Non-path REQs with both fields absent are unaffected.
 1. Require non-empty `closure_proof` when the worker returned `status: done`. If it is missing or empty, transition the REQ to `**Status:** stopped`, add `**Reason:** missing-closure-proof`, and do not archive.

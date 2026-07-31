@@ -92,7 +92,7 @@ The provisioner always exits 0 — an `unprovisionable:` line is a reported outc
 
 ### W5. Commit on the feature branch
 
-The Step 8 commit (`feat(REQ-NNN): ...`) lands on `req/REQ-NNN` inside the worktree. This is the normal `## Steps` Step 8 commit, executed from within the worktree directory. After the commit succeeds, capture the commit short hash for the Return Report.
+The Step 8 commit lands on the feature branch inside the worktree (`req/REQ-NNN` for markdown; may be `req/ENG-123` under Linear). Message format follows tracker backend: `feat(REQ-NNN): …` (markdown) or `feat(ENG-123): …` + `Issue:` footer (Linear §6.5 — see Step 8). This is the normal `## Steps` Step 8 commit, executed from within the worktree directory. After the commit succeeds, capture the commit short hash for the Return Report.
 
 **Worker stops here.** Do NOT merge back. Do NOT tear down the worktree. Do NOT touch `.do-work/`. The orchestrator (see `agents/run.md` post-worker integration steps) is responsible for:
 
@@ -121,6 +121,7 @@ Load config and resolve work-item storage before reading/updating REQs:
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` (including `heartbeat_req` → `lib/heartbeat.sh`) — use those ops; do not re-implement store details here.
 - Runtime/git isolation (worktrees, feature branch, commit) stays local regardless of backend.
+- **Linear mid-flight (REQ-294):** if Linear MCP fails **after** the orchestrator already claimed this issue (`in_progress` + active claim comment) and before you finish, **leave claimed** — do not release the claim, do not write markdown REQ files as a substitute store, do not invent cleanup. Return `status: stopped` with an appropriate reason (`dependency-missing` / `unknown-error` / etc.); operator uses `/do-work resume` or `unblock` after MCP recovers. Heartbeats under Linear use **`heartbeat_req`** against the Linear issue id (not `lib/heartbeat.sh` on a local working/ file) when the orchestrator passed a Linear-backed REQ.
 
 ### 1. Read the REQ
 
@@ -392,14 +393,31 @@ git status                                            # confirm only REQ-NNN pat
 git add path/to/changed/implementation/files...       # implementation files, listed explicitly
 git add {project}/.do-work/user-requests/UR-NNN/...   # only if this REQ touched UR-owned files
 
+# Markdown backend (default) — REQ-NNN scope:
 git commit -m "feat(REQ-NNN): short title
 
 REQ: {project}/.do-work/working/REQ-NNN-slug.md
 UR: {project}/.do-work/user-requests/UR-NNN/input.md
 Output: path/to/primary/output"
+
+# Linear backend (tracker.backend: linear) — design §6.5; Linear issue id only:
+# git commit -m "feat(ENG-123): short title
+#
+# Issue: ENG-123
+# UR: UR-007
+# Output: path/to/primary/output"
 ```
 
-Note the commit message's `REQ:` line points at `working/` (the live slot at commit time), not `archive/`. The orchestrator will rewrite the file system path when it archives the REQ post-merge, but the commit message text is fine as-is — it documents the REQ id, not a stable filesystem path.
+**Commit message by tracker backend (REQ-294 / design §6.5):**
+
+| Backend | Subject | Footer |
+|---------|---------|--------|
+| **markdown** | `feat(REQ-NNN): short title` | `REQ:` working path; `UR:` input path; `Output:` primary path |
+| **linear** | `feat(ENG-123): short title` (Linear issue id) | `Issue: ENG-123`; `UR: UR-NNN` when known; `Output:` primary path — **no** `.do-work/archive/REQ-…` path required |
+
+Branch naming under Linear may use `req/ENG-123` (sanitize for git ref rules). Feature-branch isolation is unchanged.
+
+Note (markdown): the commit message's `REQ:` line points at `working/` (the live slot at commit time), not `archive/`. The orchestrator will rewrite the file system path when it archives the REQ post-merge, but the commit message text is fine as-is — it documents the REQ id, not a stable filesystem path.
 
 If `.do-work/` is gitignored in the project, the `.do-work/...` paths above will fail to add — that is expected. Stage and commit only the implementation files. Do not use `--no-verify`. Do not skip hooks.
 
