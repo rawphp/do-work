@@ -132,7 +132,7 @@ Load config and resolve work-item storage before reading/updating REQs:
 **Hard rules:**
 - **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
-- Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` (including `heartbeat_req` → `lib/heartbeat.sh`) — use those ops; do not re-implement store details here.
+- Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` (including `heartbeat_req` → `lib/heartbeat.sh`) — use those ops; do not re-implement store details here.
 - Runtime/git isolation (worktrees, feature branch, commit) stays local regardless of backend.
 - **Linear mid-flight (REQ-294):** if Linear MCP fails **after** the orchestrator already claimed this issue (`in_progress` + active claim comment) and before you finish, **leave claimed** — do not release the claim, do not write markdown REQ files as a substitute store, do not invent cleanup. Return `status: stopped` with an appropriate reason (`dependency-missing` / `unknown-error` / etc.); operator uses `/do-work resume` or `unblock` after MCP recovers. Heartbeats under Linear use **`heartbeat_req`** against the Linear issue id (not `lib/heartbeat.sh` on a local working/ file) when the orchestrator passed a Linear-backed REQ.
 
