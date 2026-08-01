@@ -29,12 +29,12 @@ to `lib/conformance-scan.sh` and add its fix contract here in the same change.
 
 | row-id | detector | fix | class |
 |---|---|---|---|
-| `legacy-dir` | `safe-blocking` drift line from `bash lib/conformance-scan.sh {project}` when `do-work/` exists and `.do-work/` does not | `git mv do-work .do-work` with fallback plain `mv`, then `.gitignore` rewrite, then consumer-ref advisory scan | auto-apply |
-| `dir-conflict` | `blocking` drift line from `bash lib/conformance-scan.sh {project}` when both `do-work/` and `.do-work/` exist | none — halt with the existing conflict message | manual |
+| `legacy-dir` | `safe-blocking` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when `do-work/` exists and `.do-work/` does not | `git mv do-work .do-work` with fallback plain `mv`, then `.gitignore` rewrite, then consumer-ref advisory scan | auto-apply |
+| `dir-conflict` | `blocking` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when both `do-work/` and `.do-work/` exist | none — halt with the existing conflict message | manual |
 | `config-keys` | `safe-silent` missing or incomplete `.do-work/config.yml`, detected and migrated by the `agents/config.md` loader | load config per `agents/config.md`; its missing-key migration has already applied by Step 0 | auto-apply |
-| `pending-dir` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation | interactive confirm |
-| `stale-config-key` | `destructive` drift line from `bash lib/conformance-scan.sh {project}` when a tombstoned config key is present | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation | interactive confirm |
-| `session-hooks` | `bash lib/install-hooks.sh --check {project}` prints `absent` (session telemetry hooks missing from `.claude/settings.json`) | run `bash lib/install-hooks.sh {project}` — idempotent, additive merge | auto-apply |
+| `pending-dir` | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation | interactive confirm |
+| `stale-config-key` | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when a tombstoned config key is present | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation | interactive confirm |
+| `session-hooks` | `bash {skill-root}/lib/install-hooks.sh --check {project}` prints `absent` (session telemetry hooks missing from `.claude/settings.json`) | run `bash {skill-root}/lib/install-hooks.sh {project}` — idempotent, additive merge | auto-apply |
 | `migrate-linear` | **Optional / opt-in only** — not an auto-scan drift row (`lib/conformance-scan.sh` never emits it; see header comment there). Operator runs `/do-work upgrade migrate` (or upgrade Step 9) when they want design §12 idle markdown→Linear cutover. Detector for *eligibility* is preflight in Step 9 (working empty, no active claims, backend still markdown, Linear MCP usable) | invoke port op **`migrate_markdown_to_linear`** sequences in `agents/tracker/linear.md` (dry-run or apply). **Apply mode is destructive** — requires explicit operator confirm gate. Dry-run is non-destructive. | **destructive** interactive confirm (or dry-run) |
 
 **`session-hooks` detector location.** This row is the one exception to the
@@ -78,7 +78,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 **Hard rules:**
 - **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
-- Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
+- Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 This is also the `config-keys` manifest row. If the loader creates or migrates
 config, report `config-keys: converged`. If it makes no changes, report
@@ -89,7 +89,7 @@ config, report `config-keys: converged`. If it makes no changes, report
 Run:
 
 ```bash
-bash lib/conformance-scan.sh "{project}"
+bash {skill-root}/lib/conformance-scan.sh "{project}"
 ```
 
 Interpret exit codes:
@@ -240,7 +240,7 @@ For each parked REQ file under `{project}/.do-work/pending/` matching
 6. Run:
 
    ```bash
-   bash lib/check-archive-integrity.sh "<rewritten-req-path>"
+   bash {skill-root}/lib/check-archive-integrity.sh "<rewritten-req-path>"
    ```
 
    If the check fails for a file, stop before moving that file and report the
@@ -354,7 +354,7 @@ by `conformance-scan.sh`, because the hooks live in
 1. Check current state:
 
    ```bash
-   bash lib/install-hooks.sh --check "{project}"
+   bash {skill-root}/lib/install-hooks.sh --check "{project}"
    ```
 
 2. If it prints `present`, record `session-hooks: already-conformant` and
@@ -362,7 +362,7 @@ by `conformance-scan.sh`, because the hooks live in
 3. If it prints `absent`, apply the idempotent installer:
 
    ```bash
-   bash lib/install-hooks.sh "{project}"
+   bash {skill-root}/lib/install-hooks.sh "{project}"
    ```
 
    - On `installed`, record `session-hooks: converged`.
@@ -379,7 +379,7 @@ so running upgrade twice yields exactly one entry per hook.
 Run the scanner again:
 
 ```bash
-bash lib/conformance-scan.sh "{project}"
+bash {skill-root}/lib/conformance-scan.sh "{project}"
 ```
 
 `pending-dir`'s outcome is derived from this re-scan, never pre-declared in

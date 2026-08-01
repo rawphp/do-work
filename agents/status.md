@@ -33,13 +33,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 **Hard rules:**
 - **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
-- Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
+- Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 **Branch the render path on effective backend** (after load path):
 
 | Backend | Work-item situation room |
 |---------|--------------------------|
-| **`markdown`** (default) | Steps **1–2** below (`lib/synth-status.sh`, `derive-status`, `coverage-rollup`, `deadlock-check`) |
+| **`markdown`** (default) | Steps **1–2** below (`{skill-root}/lib/synth-status.sh`, `derive-status`, `coverage-rollup`, `deadlock-check`) |
 | **`linear`** | Step **1L** — Linear claimers / heartbeats via port ops in `agents/tracker/linear.md` (**Status reporting**). Do **not** glob `.do-work/working/` or treat local REQ files as the live store. |
 
 ### 1. Render situation (markdown backend)
@@ -49,28 +49,28 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 Run:
 
 ```bash
-bash lib/synth-status.sh [UR-NNN]   # passes the optional scope
+bash {skill-root}/lib/synth-status.sh [UR-NNN]   # passes the optional scope
 ```
 
 Print stdout verbatim to the user.
 
-If `lib/synth-status.sh` is missing, report `"lib/synth-status.sh not found — cannot render status."` and stop.
+If `$SKILL_ROOT/lib/synth-status.sh` is missing, report `"$SKILL_ROOT/lib/synth-status.sh not found — cannot render status."` and stop.
 
 Then render a proof-backed status view. Glob REQ files in backlog, `working/`, and `archive/` (respecting `UR-NNN` scope when provided), and run:
 
 ```bash
-bash lib/derive-status.sh <req-path>...
+bash {skill-root}/lib/derive-status.sh <req-path>...
 ```
 
-Print the result under a `Proven` heading. This is a derived view: `proven` means the REQ is done/archived, has a non-empty `**Closure proof:**`, and does not carry `**Suite:** not-run`; `unproven` means proof is missing, the REQ is not done, or it carries the `**Suite:** not-run` marker (its own test/build suite could not be run — see `agents/run-worker.md` §6 and `agents/run.md` Step 4b sub-step 5a). If `lib/derive-status.sh` is missing, report `"lib/derive-status.sh not found — skipping proven view."` and continue.
+Print the result under a `Proven` heading. This is a derived view: `proven` means the REQ is done/archived, has a non-empty `**Closure proof:**`, and does not carry `**Suite:** not-run`; `unproven` means proof is missing, the REQ is not done, or it carries the `**Suite:** not-run` marker (its own test/build suite could not be run — see `agents/run-worker.md` §6 and `agents/run.md` Step 4b sub-step 5a). If `$SKILL_ROOT/lib/derive-status.sh` is missing, report `"$SKILL_ROOT/lib/derive-status.sh not found — skipping proven view."` and continue.
 
 Then render the intended-vs-proven Coverage section:
 
 ```bash
-bash lib/coverage-rollup.sh [UR-NNN]
+bash {skill-root}/lib/coverage-rollup.sh [UR-NNN]
 ```
 
-Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the UR has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the UR has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the UR declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `lib/coverage-rollup.sh` is missing, report `"lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
+Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the UR has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the UR has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the UR declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `$SKILL_ROOT/lib/coverage-rollup.sh` is missing, report `"$SKILL_ROOT/lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
 
 ### 1L. Render situation (Linear backend)
 
@@ -82,7 +82,7 @@ Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n
    - Parse the latest claim-protocol comment (`tracker.linear.agent_claim_marker`, default `<!-- do-work-claim -->`) via **Helper: read active claim**.
    - Report: **id**, title, do-work status (via inverted `status_map`), **claimer** (`agent_id`), **claimed_at**, **heartbeat**, **fresh/stale** vs effective stale max (`heartbeat_max_age_seconds` or `parallel.stale_threshold_seconds`), claim `status` (`active` / `released`).
 4. **Stale banner** — if any active claim is stale, prepend a clear warning (parity with markdown stale/deadlock intent). Surface deps from authoritative `blocks` relations when tools exist.
-5. **Do not** invent local REQ paths, run `lib/synth-status.sh` / glob `.do-work/working/` as the live claim source, or change Linear state (read-only).
+5. **Do not** invent local REQ paths, run `{skill-root}/lib/synth-status.sh` / glob `.do-work/working/` as the live claim source, or change Linear state (read-only).
 6. Optional local telemetry (e.g. gate-owner files under `state/`) may be mentioned separately; they are **not** the work-item store.
 
 Print a compact table or list under a `Linear status` heading, then stop (skip markdown Step 2 unless a local deadlock helper is useful for **runtime** locks only — never treat markdown REQ globs as Linear truth).
@@ -94,7 +94,7 @@ Print a compact table or list under a `Linear status` heading, then stop (skip m
 Run:
 
 ```bash
-bash lib/deadlock-check.sh
+bash {skill-root}/lib/deadlock-check.sh
 ```
 
 If output is non-empty, prepend it to the status report with a clear header:
@@ -106,7 +106,7 @@ If output is non-empty, prepend it to the status report with a clear header:
 ────────────────────
 ```
 
-If `lib/deadlock-check.sh` is missing, report `"lib/deadlock-check.sh not found — skipping deadlock check."` and continue without it.
+If `$SKILL_ROOT/lib/deadlock-check.sh` is missing, report `"$SKILL_ROOT/lib/deadlock-check.sh not found — skipping deadlock check."` and continue without it.
 
 ### 3. Stop
 
@@ -118,5 +118,5 @@ No prompts, no commits, no state changes.
 
 - Read-only. Never write any file under `{project}/.do-work/` or the source tree (and never write Linear issues while rendering status).
 - No git commits, no AskUserQuestion prompts.
-- **Markdown:** If `lib/synth-status.sh` or `lib/deadlock-check.sh` are missing, report the missing script and stop (synth-status missing) or continue without the check (deadlock-check missing). The deadlock banner always renders above the synth-status output when present.
+- **Markdown:** If `$SKILL_ROOT/lib/synth-status.sh` or `$SKILL_ROOT/lib/deadlock-check.sh` are missing, report the missing script and stop (synth-status missing) or continue without the check (deadlock-check missing). The deadlock banner always renders above the synth-status output when present.
 - **Linear:** Use only `agents/tracker/linear.md` status / claim-comment sequences; hard-stop if Linear MCP is unusable; no silent markdown situation room.

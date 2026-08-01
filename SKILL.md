@@ -98,7 +98,7 @@ Full multi-backend deep dive: [references/tracker.md](references/tracker.md).
 
 **Load path** (every phase that touches work items): (1) [agents/config.md](agents/config.md), (2) resolve `tracker.backend` (default **markdown**), (3) [agents/tracker/port.md](agents/tracker/port.md), (4) `agents/tracker/<backend>.md`, (5) call only named port ops for storage.
 
-**Hard-stop (no silent fallback):** when effective backend is `linear` and Linear is unusable (MCP missing/unauthenticated, team unresolved, missing `status_map` state) **or** `agents/tracker/linear.md` is missing/unreadable, agents **hard-stop** with setup instructions — they never fall through to markdown work-item paths. Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 in `agents/config.md`.
+**Hard-stop (no silent fallback):** when effective backend is `linear` and Linear is unusable (MCP missing/unauthenticated, team unresolved, missing `status_map` state) **or** `agents/tracker/linear.md` is missing/unreadable, agents **hard-stop** with setup instructions — they never fall through to markdown work-item paths. Also hard-stop when skill-root cannot be resolved at entry (Project Root Detection) or later (Load Config step 8). Canonical contract: `agents/tracker/port.md` + Load Config steps 6–8 in `agents/config.md`.
 
 **No dual-write.** With `tracker.backend: linear`, Linear is the **only** work-item store. Agents must not mirror URs/REQs into local markdown as a second source of truth, and must not fall back to markdown when Linear fails (hard-stop instead). After idle migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them.
 
@@ -123,12 +123,41 @@ git rev-parse --show-toplevel
 If this fails (not a git repo), use the current working directory.
 All references below use `{project}` to mean this resolved root.
 
-### Conformance check
+### Skill-root resolve (before conformance)
 
-Immediately after resolving `{project}` and before executing any subcommand-specific instructions, run the conformance detectors:
+Immediately after resolving `{project}` and **before** the conformance check, resolve `$SKILL_ROOT` / `{skill-root}` — the absolute path of the do-work skill install root (directory containing `lib/` **and** at least one skill marker: `SKILL.md` **or** `agents/`).
+
+**Recipe:** same walk-up as Load Config step 8 in [agents/config.md](agents/config.md) — **not** a second folklore one-level `dirname/..`. Start from the absolute path of **this** file (`SKILL.md`); walk parents until markers match; hard-stop at filesystem root if none found. **No** env / hub / CWD fallback.
 
 ```bash
-bash lib/conformance-scan.sh {project}
+# Start at the directory of this SKILL.md; walk parents until
+# markers match (lib/ AND (SKILL.md OR agents/)). Hard-stop at filesystem
+# root if none found. No env/hub/CWD fallback.
+d="$(cd "$(dirname "<absolute path of SKILL.md>")" && pwd)"
+SKILL_ROOT=""
+while true; do
+  if [ -d "$d/lib" ] && { [ -f "$d/SKILL.md" ] || [ -d "$d/agents" ]; }; then
+    SKILL_ROOT="$d"
+    break
+  fi
+  [ "$d" = "/" ] && break
+  d="$(dirname "$d")"
+done
+# non-empty $SKILL_ROOT required — else hard-stop (see below)
+```
+
+**Inherit for phase agents:** keep this resolved `$SKILL_ROOT` in context for the whole agent turn. Phase agents (and Load Config step 8) **inherit** it when it is still an absolute directory that satisfies the markers — they re-resolve only if missing, empty, non-absolute, or invalid. Do not invent a second resolve recipe in phase docs.
+
+**Hard-stop when skill-root is unknown at entry.** If the harness did not provide an absolute path for this `SKILL.md` **and** walk-up cannot find a valid skill install root, **stop immediately** — do not run conformance, do not dispatch:
+
+`skill-root unknown: cannot resolve $SKILL_ROOT (walk-up from loaded file; no env/hub/CWD fallback). Provide an absolute path to the loaded instruction file under the skill install root, or a valid pre-resolved $SKILL_ROOT that contains lib/ and (SKILL.md or agents/).`
+
+### Conformance check
+
+Immediately after `$SKILL_ROOT` is resolved and before executing any subcommand-specific instructions, run the conformance detectors via the skill install root (**never** bare `bash lib/conformance-scan.sh` — that assumes CWD is the skill root and fails in consumer projects):
+
+```bash
+bash {skill-root}/lib/conformance-scan.sh "{project}"
 ```
 
 The scanner is read-only and may exit `1` when drift is detected. Interpret each output line as `<row-id> <class> <detail>`:

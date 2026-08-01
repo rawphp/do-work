@@ -50,9 +50,9 @@ Full budget/parallel resolution text: original detail lives in [run-loop.md](../
 
 ## Load Config
 
-Read and follow the **Load Config** section of [config.md](config.md).
+Read and follow the **Load Config** section of [config.md](config.md), including **step 8** (resolve `$SKILL_ROOT` / `{skill-root}` via walk-up from the loaded instruction file with marker requirements, or inherit a valid pre-set `$SKILL_ROOT`; hard-stop if unknown).
 
-Keep `model.default`, `model.escalation`, `cost.budget`, and `ledger.enabled` in context. Resolve effective budget once at startup. If non-empty, enforce at the Step 3b budget gate.
+Keep `model.default`, `model.escalation`, `cost.budget`, `ledger.enabled`, and the resolved `$SKILL_ROOT` in context. Resolve effective budget once at startup. If non-empty, enforce at the Step 3b budget gate.
 
 ## Tracker load path
 
@@ -67,7 +67,7 @@ Work-item storage goes **only** through named tracker port ops after config is l
 
 - **No silent fallback** from `linear` to `markdown`.
 - If backend is **`linear`** but `agents/tracker/linear.md` is missing/unreadable → **hard-stop**.
-- Markdown backend: ops map to `lib/*.sh` + flows in `markdown.md`.
+- Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### Claim / pick / heartbeat / archive — backend branch
 
@@ -101,7 +101,7 @@ Full stamp lifecycle: [run-loop.md](../references/run-loop.md) § Agent Identity
 > Default: claim unblocked backlog; stale-slot triage is fallback when backlog empty. Working/ scan is informational, not a start gate.
 
 1. Branch + working-directory checks; `mkdir -p {project}/.do-work/state`.
-2. Resolve `AGENT_ID`; resolve `{skill-root}`; refresh context pack.
+2. Resolve `AGENT_ID`; resolve `{skill-root}` / `$SKILL_ROOT` via **Load Config step 8** (`agents/config.md` — single home; hard-stop if unknown); refresh context pack.
 3. Scan/classify working slots (markdown) or in-flight Linear claims — mine / sibling / stale buckets.
 4. Resume any `mine` slot.
 5. Try backlog (primary); else evaluate working set; else empty-backlog path.

@@ -107,6 +107,47 @@ scan_file() {
   done < "$file"
 }
 
+# bare-runtime-bash-lib: runtime docs under SKILL.md, agents/, and references/
+# must invoke coordination scripts as `bash {skill-root}/lib/...` (Load Config
+# step 8 / entry Project Root Detection). Bare `bash lib/` is a regression of
+# the skill-root contract (UR-003 / ORI-242 / ORI-246).
+# Allowlist skill-dev regression gates only under agents/ + references/:
+# `bash lib/tests/...` and `bash lib/conformance-scan.sh` (tracker docs /
+# CONTRIBUTING). On SKILL.md (skill entry), bare `bash lib/conformance-scan.sh`
+# fails — entry conformance must use the skill-root form. A line that also
+# says "never" is treated as a prohibition note documenting the anti-pattern
+# (parity with same-branch + "retired"). Catalog identity `lib/*.sh` without a
+# leading `bash ` is not matched.
+scan_bare_runtime_bash_lib() {
+  local file="$1"
+  local line_no=0
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_no=$((line_no + 1))
+    case "$line" in
+      *'bash lib/'*)
+        case "$line" in
+          *'bash lib/tests/'*) : ;;  # skill-dev regression suite (any scoped path)
+          *'bash lib/conformance-scan.sh'*)
+            case "$file" in
+              SKILL.md|*/SKILL.md)
+                # Entry hole: do not allowlist bare conformance-scan on SKILL.md.
+                # Permit only explicit prohibition notes (also say "never").
+                case "$line" in
+                  *never*) : ;;
+                  *) report "$file" "$line_no" "bare-runtime-bash-lib" "$line" ;;
+                esac
+                ;;
+              *) : ;;  # skill-dev gate under agents/ + references/
+            esac
+            ;;
+          *) report "$file" "$line_no" "bare-runtime-bash-lib" "$line" ;;
+        esac
+        ;;
+    esac
+  done < "$file"
+}
+
 # --- Per-file structural check: judgment markers vs the file's own table -------
 # A `> **JUDGMENT:** Jn ...` marker must have a matching `| Jn |` row in a
 # Judgment Points table in the SAME file. Orphan markers indicate table drift.
@@ -144,6 +185,31 @@ while IFS= read -r file; do
   scan_file "$file"
   scan_judgment_markers "$file"
 done < "$FILES_LIST"
+
+# Path-scoped pass: SKILL.md + agents/ + references/ (runtime invocation fences).
+# SKILL.md is the skill entry (ORI-246). Not folded into DEFAULT_ROOTS so
+# references/ is not subject to unrelated patterns (e.g. judgment-marker tables
+# that live in agents/). Use a temp list (not a pipeline) so HITS increments in
+# report() are not lost to a subshell — bash 3.2 pipelines run the right-hand
+# side in a subshell.
+BARE_LIST="$(mktemp -t doc-lint-bare.XXXXXX)"
+trap 'rm -f "$FILES_LIST" "$BARE_LIST"' EXIT
+: > "$BARE_LIST"
+if [ -f SKILL.md ]; then
+  printf '%s\n' "SKILL.md" >> "$BARE_LIST"
+fi
+for root in agents references; do
+  [ -d "$root" ] || continue
+  find "$root" -type f -name '*.md' 2>/dev/null | while IFS= read -r f; do
+    is_excluded "$f" && continue
+    printf '%s\n' "$f"
+  done
+done | sort -u >> "$BARE_LIST"
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  [ -f "$file" ] || continue
+  scan_bare_runtime_bash_lib "$file"
+done < "$BARE_LIST"
 
 if [ "$HITS" -ne 0 ]; then
   echo ""

@@ -83,17 +83,9 @@ AGENT_ID="$(hostname).$$"
 
 ### 2a. Resolve `{skill-root}` to a concrete absolute path
 
-`{skill-root}` is the directory these agent instructions were loaded from — the root of the do-work skill clone (the directory containing `agents/`, `lib/`, `SKILL.md`). The lib invocations throughout this file (`{skill-root}/lib/scan-stale.sh`, etc.) and in `agents/run-worker.md` (heartbeat, file-feedback) only resolve when `{skill-root}` is a real absolute path. A worker `cd`'d into a consumer project's worktree has no `lib/` of its own, so the orchestrator must resolve `{skill-root}` **once here** and substitute the concrete path into every `{skill-root}/lib/...` call it makes, and pass it to the worker (Step 2 dispatch) so the worker substitutes it too.
+**Single home:** resolve once via **Load Config step 8** in [`agents/config.md`](../agents/config.md) (walk-up from loaded instruction file with marker requirements + inherit of a valid `$SKILL_ROOT`; hard-stop if the path is unknown). Keep `$SKILL_ROOT` in context for this run. Do **not** re-implement a second full recipe here — no env/hub/CWD fallback.
 
-Resolve it from the absolute path of the loaded agent file:
-
-```bash
-# These instructions live at {skill-root}/agents/run.md, so the parent of agents/ is the root.
-SKILL_ROOT="$(cd "$(dirname "<absolute path of this run.md>")/.." && pwd)"
-# Example: /Users/you/.claude/skills/do-work
-```
-
-When this project IS the do-work skill itself, `SKILL_ROOT` resolves to the project root and the lib calls work directly. When the project is any other repo, `SKILL_ROOT` points back at the skill clone where `lib/` actually lives. Use the resolved `$SKILL_ROOT` value everywhere the steps below write `{skill-root}`.
+`{skill-root}` is the absolute skill install root (directory containing `agents/`, `lib/`, `SKILL.md`). Lib invocations throughout this file (`{skill-root}/lib/scan-stale.sh`, etc.) and in `agents/run-worker.md` (heartbeat, file-feedback) only resolve when `{skill-root}` is a real absolute path. A worker `cd`'d into a consumer project's worktree has no `lib/` of its own, so the orchestrator substitutes `$SKILL_ROOT` into every `{skill-root}/lib/...` call it makes and passes that same absolute value as the worker **Skill root** input (Step 2 dispatch).
 
 ### 2b. Generate or refresh the project context pack
 
@@ -575,7 +567,7 @@ If the worker reports `status: done`, validate acceptance evidence before Step 4
 
 ```bash
 # markdown: path is working/REQ file. linear: pass issue id / exported body via port read_req — same evidence rules; do not invent a second store.
-bash lib/check-acceptance-evidence.sh {project}/.do-work/working/REQ-NNN-slug.md <worker-report-yml>
+bash {skill-root}/lib/check-acceptance-evidence.sh {project}/.do-work/working/REQ-NNN-slug.md <worker-report-yml>
 ```
 
 If validation fails, treat the result as `status: stopped`, `reason: verification-failing`, surface the validator diagnostics, and do not merge, write closure proof, review, or archive. **Under Linear: do not call `archive_req`** — issue stays `in_progress`/`stopped` with claim protocol intact (optional `set_req_status` → stopped + `append_run_note`). This gate extends the checkpoint/closure-proof model; it does not replace `closure_proof`.
@@ -591,7 +583,7 @@ If validation fails, treat the result as `status: stopped`, `reason: verificatio
 Before dispatching review, run deterministic policy checks using changed files, command evidence, and REQ metadata:
 
 ```bash
-bash lib/check-policy.sh \
+bash {skill-root}/lib/check-policy.sh \
   --project {project} \
   --files <changed-files-list> \
   --commands <worker-command-log> \
@@ -672,7 +664,7 @@ When `ledger.enabled` is true (either backend), record one append-only local run
 Finalize the (local) ledger after the attempt reaches a terminal outcome:
 
 ```bash
-bash lib/run-ledger.sh \
+bash {skill-root}/lib/run-ledger.sh \
   --project {project} \
   --req <working-or-archived-REQ-path-or-linear-issue-id> \
   --agent <agent-id> \
@@ -706,7 +698,7 @@ When the budget is non-empty:
 
 1. Sum cumulative estimated spend for this run from the ledger:
    ```bash
-   SPENT="$(bash lib/run-ledger.sh --sum-run {project}/.do-work/runs)"
+   SPENT="$(bash {skill-root}/lib/run-ledger.sh --sum-run {project}/.do-work/runs)"
    ```
 2. Compare `SPENT` against the effective `BUDGET` (numeric, same dollar unit):
    - **`SPENT < BUDGET` ⇒ under budget.** Continue normally to Step 4 (Integrate) and loop.

@@ -114,7 +114,7 @@ tracker:
     team_key: ""             # optional alternate resolve (e.g. team key string)
     default_assignee_id: ""  # human operator; set on issue create when configured
     # Shared Linear Project that holds all UR milestones + Issues (not one Project per UR).
-    # Empty default — NOT the skill name. Resolve when backend=linear (Load Config step 8):
+    # Empty default — NOT the skill name. Resolve when backend=linear (Load Config step 9):
     #   explicit product_project (name|UUID) wins; if empty → project.name; if that empty →
     #   git-root directory basename; ensure_product_container create-if-missing; persist UUID.
     product_project: ""
@@ -218,7 +218,66 @@ routing: []
 
    When the effective backend is **`linear`**: load `agents/tracker/port.md` then `agents/tracker/linear.md` for work-item ops after the validations above pass. If `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the backend doc from the skill install / Linear skill setup) — **never** fall through to `markdown.md` or invent Linear tool sequences.
 
-8. **Resolve and bind `tracker.linear.product_project` when effective backend is `linear`.** Run after step 7 validations pass and the Linear backend docs are loaded — **before** any work-item CRUD that needs the product Project. When effective backend is **`markdown`**, skip this step entirely (`product_project` is inert).
+8. **Resolve skill-root (`$SKILL_ROOT` / `{skill-root}`).** Once per agent turn, resolve the absolute path of the do-work skill install root — a directory that contains `lib/` **and** at least one skill marker (`SKILL.md` **or** `agents/`). **Token definition:** `{skill-root}` means this resolved absolute path for **all later steps in the same agent turn**. Keep `$SKILL_ROOT` in context; substitute it wherever docs or bash lines write `{skill-root}` (especially `{skill-root}/lib/...`).
+
+   **Single home:** this step is the only place that defines the resolve recipe. `references/run-loop.md` §2a and the run-worker **Skill root** input are thin consumers — they must not invent a second folklore recipe.
+
+   **Markers (valid skill install root):** a candidate directory is valid iff **both**:
+   1. it contains a `lib/` directory, **and**
+   2. it contains `SKILL.md` **or** an `agents/` directory (or both).
+
+   Requiring a co-marker with `lib/` avoids monorepo false roots that happen to have a bare `lib/` higher in the tree.
+
+   **Inherit rule:** If `$SKILL_ROOT` is already set in this agent turn's context (orchestrator-passed **Skill root**, or resolved earlier in the same turn) **and** that path is an absolute directory that satisfies the markers above, **keep it — do not re-resolve**. If missing, empty, non-absolute, or invalid (fails markers), clear it and run the walk-up recipe below. Nested agents inherit the entry-resolved root this way.
+
+   **Recipe (walk-up from loaded instruction file — no env / hub / CWD fallback):**
+
+   One-level `dirname/..` is **not** the algorithm — nested paths (e.g. `agents/tracker/linear.md`) and `SKILL.md` at the skill root need more than a single parent hop.
+
+   ```bash
+   # Start at the directory of the loaded instruction file; walk parents until
+   # markers match (lib/ AND (SKILL.md OR agents/)). Hard-stop at filesystem
+   # root if none found. No env/hub/CWD fallback.
+   d="$(cd "$(dirname "<absolute path of the loaded agent or reference file>")" && pwd)"
+   SKILL_ROOT=""
+   while true; do
+     if [ -d "$d/lib" ] && { [ -f "$d/SKILL.md" ] || [ -d "$d/agents" ]; }; then
+       SKILL_ROOT="$d"
+       break
+     fi
+     [ "$d" = "/" ] && break
+     d="$(dirname "$d")"
+   done
+   # non-empty $SKILL_ROOT required — else hard-stop (see below)
+   ```
+
+   **Examples** (all resolve to the skill install root):
+
+   | Loaded file | Walk starts at | Resolves to |
+   |-------------|----------------|-------------|
+   | `{skill}/agents/run.md` | `…/agents` | `{skill}` (parent has `lib/` + markers) |
+   | `{skill}/agents/tracker/linear.md` | `…/agents/tracker` | `{skill}` (walk past `tracker` → `agents` → skill root; one-level `..` would wrongly stop at `agents/`) |
+   | `{skill}/references/run-loop.md` | `…/references` | `{skill}` |
+   | `{skill}/SKILL.md` | `{skill}` itself | `{skill}` (start directory already matches markers) |
+
+   - Prefer the absolute path of the instruction file the agent is currently executing when walk-up is needed (e.g. `agents/run.md`, `agents/config.md`, `agents/run-worker.md`, `agents/tracker/linear.md`, a loaded `references/*.md`, or `SKILL.md`).
+   - Use the walk-up result as `$SKILL_ROOT` only when it satisfies the markers.
+   - When this project **is** the do-work skill itself, `$SKILL_ROOT` equals the project root and lib calls work directly. When the project is any other consumer repo, `$SKILL_ROOT` points at the skill clone where `lib/` actually lives — not at the consumer project root.
+   - Orchestrators that dispatch workers pass the same absolute `$SKILL_ROOT` as the worker **Skill root** input and substitute it into pasted `run-worker.md` instructions (see `agents/run-worker.md` When Invoked #5 and `references/run-loop.md` Step 2 dispatch). Workers and nested agents **inherit** that value when it still satisfies markers.
+
+   **Hard-stop when the path cannot be determined.** If any of the following is true, **stop immediately** with a clear operator message — do not guess:
+
+   - Inherit failed (missing/invalid `$SKILL_ROOT`) **and** the harness did not provide an absolute path for the loaded instruction file
+   - Walk-up from the loaded file reaches the filesystem root without finding a directory that satisfies the markers (`lib/` **and** (`SKILL.md` **or** `agents/`))
+   - The path is empty or otherwise unknown after the recipe
+
+   Operator message (example):
+
+   `skill-root unknown: cannot resolve $SKILL_ROOT (walk-up from loaded file; no env/hub/CWD fallback). Provide an absolute path to the loaded instruction file under the skill install root, or a valid pre-resolved $SKILL_ROOT that contains lib/ and (SKILL.md or agents/).`
+
+   **Do not** fall back to process CWD, hub paths (`~/.agents/skills/do-work`, `~/.claude/skills/do-work`), or invent a path from `DO_WORK_SKILL_ROOT` / other env vars when inherit markers fail. **Do** inherit a **valid** `$SKILL_ROOT` already set in this turn's context (see inherit rule above).
+
+9. **Resolve and bind `tracker.linear.product_project` when effective backend is `linear`.** Run after step 7 validations pass and the Linear backend docs are loaded — **before** any work-item CRUD that needs the product Project. When effective backend is **`markdown`**, skip this step entirely (`product_project` is inert).
 
    **Resolve order (name/lookup key only — does not rewrite an already-set value):**
 
@@ -231,9 +290,9 @@ routing: []
 
    **Rewrite rules:** The empty → `project.name` → basename chain runs **only** when `product_project` is truly empty. It must never overwrite an explicit existing value. The only write after a non-empty start is ensure's **UUID bind** (e.g. name → UUID once resolved). After a true empty state, ensure binds and step 5 persists the UUID so subsequent loads take the explicit-UUID path.
 
-**Phase-agent contract:** every phase agent that touches work items follows the **Tracker load path** (config → resolve `tracker.backend` → `port.md` → `agents/tracker/<backend>.md` → only named port ops). The shared load path is defined once here and in `agents/tracker/port.md`; each phase agent restates a short copy so a missing wire cannot cause split-brain storage.
+**Phase-agent contract:** every phase agent that touches work items follows the **Tracker load path** (config → resolve `tracker.backend` → `port.md` → `agents/tracker/<backend>.md` → only named port ops). The shared load path is defined once here and in `agents/tracker/port.md`; each phase agent restates a short copy so a missing wire cannot cause split-brain storage. Every phase agent that invokes skill `lib/` scripts also depends on step 8 (`$SKILL_ROOT` / `{skill-root}`) from this same Load Config block.
 
-**Never fail or stop because of a missing or incomplete config file** (steps 1–5, including 4b seed). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exception:** step 7 Linear validation, missing `linear.md`, and step 8 product_project ensure/bind are deliberate hard-stops when the operator has opted into `backend: linear` — those are not config-file completeness problems.
+**Never fail or stop because of a missing or incomplete config file** (steps 1–5, including 4b seed). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exceptions (deliberate hard-stops, not config-file completeness problems):** step 7 Linear validation (and missing `linear.md`) and step 9 product_project ensure/bind when the operator has opted into `backend: linear`; step 8 skill-root resolve when walk-up (or inherit) cannot determine an absolute skill install root.
 
 ---
 
@@ -241,7 +300,7 @@ routing: []
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `project.name` | string | `""` (seeded from git-root directory basename when empty on create/first load — Load Config step 4b; never overwrites a non-empty name) | Project display name. Also the preferred empty-`product_project` fallback when `backend: linear` (Load Config step 8). |
+| `project.name` | string | `""` (seeded from git-root directory basename when empty on create/first load — Load Config step 4b; never overwrites a non-empty name) | Project display name. Also the preferred empty-`product_project` fallback when `backend: linear` (Load Config step 9). |
 | `layers` | list of strings | `[]` | Project's declared layers for gap-aware capture. Capture and verify check that REQs cover each declared layer. Empty = opt out (feature briefs will halt until declared or `--no-layers` is passed). |
 | `log.enabled` | boolean | `true` | Whether the log step runs after Go |
 | `log.platforms` | list | `[]` | Platforms to generate draft posts for (e.g. `[x, linkedin]`) |
@@ -277,7 +336,7 @@ routing: []
 | `tracker.linear.team_id` | string | `""` | Linear team UUID. **Required when `backend: linear`** unless `team_key` alone resolves the team. Empty + unresolvable team_key → hard-fail (do not guess). Consumers: `agents/tracker/linear.md`, Load Config step 7. |
 | `tracker.linear.team_key` | string | `""` | Optional alternate team resolve (Linear team key string). Used when `team_id` is empty. Consumers: `agents/tracker/linear.md`, Load Config step 7. |
 | `tracker.linear.default_assignee_id` | string | `""` | Human operator Linear user id set as issue **assignee** on create when non-empty. Agents claim via workflow status + claim comments — they do not steal assignee. Consumers: `agents/tracker/linear.md` create/claim ops. |
-| `tracker.linear.product_project` | string | `""` | Shared Linear Project (**name or UUID**) that holds all UR Project Milestones + Issues — **not** one Project per UR. **Default is empty**, not the skill name `do-work`. When `backend: linear`, Load Config step 8 resolve order: (1) explicit non-empty `product_project` (name\|UUID) wins and is never replaced by the empty-fallback chain; (2) if empty/missing → `project.name`; (3) if that empty → git-root directory basename; (4) `ensure_product_container` create-if-missing; (5) **always persist** the resolved Project **UUID** back to this key. Explicit existing values (including a bound UUID) are left alone by the fallback chain; only ensure's UUID bind may update the field after a true empty (or name→UUID bind). Consumers: `agents/tracker/linear.md`, `ensure_product_container`, intake/`create_ur`. |
+| `tracker.linear.product_project` | string | `""` | Shared Linear Project (**name or UUID**) that holds all UR Project Milestones + Issues — **not** one Project per UR. **Default is empty**, not the skill name `do-work`. When `backend: linear`, Load Config step 9 resolve order: (1) explicit non-empty `product_project` (name\|UUID) wins and is never replaced by the empty-fallback chain; (2) if empty/missing → `project.name`; (3) if that empty → git-root directory basename; (4) `ensure_product_container` create-if-missing; (5) **always persist** the resolved Project **UUID** back to this key. Explicit existing values (including a bound UUID) are left alone by the fallback chain; only ensure's UUID bind may update the field after a true empty (or name→UUID bind). Consumers: `agents/tracker/linear.md`, `ensure_product_container`, intake/`create_ur`. |
 | `tracker.linear.ur_milestone_name_pattern` | string | `"{ur_id}: {title}"` | Human-facing Project Milestone name pattern for each UR. `{ur_id}` is the sequential UR slug; `{title}` is the brief title. Consumers: `agents/tracker/linear.md` create_ur / list_urs. |
 | `tracker.linear.project_name_pattern` | string | `"do-work/{ur_id}"` | **Deprecated** pattern for per-UR Linear Project name (ignored for UR home; URs are Project Milestones on `product_project`). Kept for migrate compatibility. Consumers: legacy notes only. |
 | `tracker.linear.initiative_title_pattern` | string | `"{ur_id}: {title}"` | Pattern for Initiative title. `{title}` is the human-facing brief title. Consumers: `agents/tracker/linear.md` intake. |
