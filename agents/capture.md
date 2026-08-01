@@ -44,7 +44,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 **Hard rules:**
 - **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
-- Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
+- Markdown backend: ops map to existing `{skill-root}/lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### Capture REQ store — backend branch (ORI-9)
 
@@ -335,7 +335,7 @@ Decomposition content (Task / Context / AC / Verification / Integration fields) 
 
 **Every REQ must carry a `**Layer:**` field.** Set it from the R-number's tag (Step 3b). If multiple R-numbers map to the same REQ, they must all share the same tag — otherwise split the REQ. Bug-fix briefs (classification from Step 2b) write `**Layer:** none` on every REQ.
 
-> **JUDGMENT:** [J1 — Files] Before writing the `**Files:**` line, enumerate the project-relative paths this REQ will touch. For agents: list the specific `agents/*.md` file(s). For commands: list `commands/*.md`. For lib scripts: list `lib/<name>.sh` and its test. For templates: list the specific template file. Globs are allowed but prefer named paths. A blank `**Files:**` line is a signal the REQ is under-specified — think harder before leaving it empty.
+> **JUDGMENT:** [J1 — Files] Before writing the `**Files:**` line, enumerate the project-relative paths this REQ will touch. For agents: list the specific `agents/*.md` file(s). For commands: list `commands/*.md`. For lib scripts: list `{skill-root}/lib/<name>.sh` and its test. For templates: list the specific template file. Globs are allowed but prefer named paths. A blank `**Files:**` line is a signal the REQ is under-specified — think harder before leaving it empty.
 
 > **JUDGMENT:** [J2 — Depends on] Before writing the `**Depends on:**` line, scan the decomposition from Step 3 for hard ordering constraints: does this REQ assume another REQ's output file exists, or call a function that another REQ will write? If yes, list those REQ ids. If the REQ is independently implementable from HEAD, write an empty value (the field must still appear). Do not add soft ordering preferences — only blocking dependencies.
 
@@ -606,7 +606,7 @@ Background about the rename...
 After all REQ files are written (Steps 4, 4b, 4c, 4d complete), validate that the `**Depends on:**` graph is acyclic.
 
 ```bash
-bash lib/cycle-check.sh UR-NNN
+bash {skill-root}/lib/cycle-check.sh UR-NNN
 ```
 
 Replace `UR-NNN` with the actual UR identifier. The script scans all REQs matching that UR across backlog, working, and archive, builds the dep graph, and runs DFS cycle detection.
@@ -619,7 +619,7 @@ Replace `UR-NNN` with the actual UR identifier. The script scans all REQs matchi
 2. Build a fingerprint: `cap-cycle-UR-NNN` (replace UR-NNN with the actual id).
 3. Call file-feedback to log the event:
    ```bash
-   bash lib/file-feedback.sh cap-cycle "cap-cycle-UR-NNN" \
+   bash {skill-root}/lib/file-feedback.sh cap-cycle "cap-cycle-UR-NNN" \
      '{"ur":"UR-NNN","cycle":"'"$cycle_path"'"}' \
      "cap-cycle: circular dependency in UR-NNN" \
      "Cycle detected during capture of UR-NNN: $cycle_path"

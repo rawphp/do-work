@@ -30,6 +30,17 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map to existing `lib/*.sh` + file flows in `markdown.md` — use those ops; do not re-implement store details here.
 
+
+### 0b. Skill-root for optional lib helpers
+
+If you invoke any coordination script, resolve it from the skill install root (the directory containing `lib/`), never from `{project}` CWD:
+
+```bash
+bash {skill-root}/lib/<script>.sh ...
+```
+
+State detection below may use filesystem checks directly; when using `scan-stale.sh` / `derive-status.sh` / `synth-status.sh`, prefer the `{skill-root}/lib/` form so consumer projects without a local `lib/` still work.
+
 ### 1. Detect project state
 
 Check the following conditions in order:
