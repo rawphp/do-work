@@ -269,8 +269,8 @@ Non-executable step hits (Step 4g) are reported as named Issues on individual RE
 
 Run `{skill-root}/lib/score-coverage.sh` with the manifest flags and use its printed integer as the Confidence Score. Do **not** compute the deductions or base ratio by hand — the script is the single arithmetic authority. Example for an 8-full / 1-partial / 1-missing backlog with 2 layer-coverage gaps:
 
-```
-{skill-root}/lib/score-coverage.sh --full 8 --partial 1 --missing 1 --layer-gaps 2
+```bash
+bash {skill-root}/lib/score-coverage.sh --full 8 --partial 1 --missing 1 --layer-gaps 2
 # → 65
 ```
 

@@ -567,7 +567,7 @@ If the worker reports `status: done`, validate acceptance evidence before Step 4
 
 ```bash
 # markdown: path is working/REQ file. linear: pass issue id / exported body via port read_req — same evidence rules; do not invent a second store.
-bash lib/check-acceptance-evidence.sh {project}/.do-work/working/REQ-NNN-slug.md <worker-report-yml>
+bash {skill-root}/lib/check-acceptance-evidence.sh {project}/.do-work/working/REQ-NNN-slug.md <worker-report-yml>
 ```
 
 If validation fails, treat the result as `status: stopped`, `reason: verification-failing`, surface the validator diagnostics, and do not merge, write closure proof, review, or archive. **Under Linear: do not call `archive_req`** — issue stays `in_progress`/`stopped` with claim protocol intact (optional `set_req_status` → stopped + `append_run_note`). This gate extends the checkpoint/closure-proof model; it does not replace `closure_proof`.
@@ -583,7 +583,7 @@ If validation fails, treat the result as `status: stopped`, `reason: verificatio
 Before dispatching review, run deterministic policy checks using changed files, command evidence, and REQ metadata:
 
 ```bash
-bash lib/check-policy.sh \
+bash {skill-root}/lib/check-policy.sh \
   --project {project} \
   --files <changed-files-list> \
   --commands <worker-command-log> \
@@ -664,7 +664,7 @@ When `ledger.enabled` is true (either backend), record one append-only local run
 Finalize the (local) ledger after the attempt reaches a terminal outcome:
 
 ```bash
-bash lib/run-ledger.sh \
+bash {skill-root}/lib/run-ledger.sh \
   --project {project} \
   --req <working-or-archived-REQ-path-or-linear-issue-id> \
   --agent <agent-id> \
@@ -698,7 +698,7 @@ When the budget is non-empty:
 
 1. Sum cumulative estimated spend for this run from the ledger:
    ```bash
-   SPENT="$(bash lib/run-ledger.sh --sum-run {project}/.do-work/runs)"
+   SPENT="$(bash {skill-root}/lib/run-ledger.sh --sum-run {project}/.do-work/runs)"
    ```
 2. Compare `SPENT` against the effective `BUDGET` (numeric, same dollar unit):
    - **`SPENT < BUDGET` ⇒ under budget.** Continue normally to Step 4 (Integrate) and loop.
