@@ -67,7 +67,7 @@ Work-item storage goes **only** through named tracker port ops after config is l
 
 - **No silent fallback** from `linear` to `markdown`.
 - If backend is **`linear`** but `agents/tracker/linear.md` is missing/unreadable → **hard-stop**.
-- Markdown backend: ops map to `lib/*.sh` + flows in `markdown.md`.
+- Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### Claim / pick / heartbeat / archive — backend branch
 
