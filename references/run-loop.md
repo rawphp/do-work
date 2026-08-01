@@ -83,17 +83,9 @@ AGENT_ID="$(hostname).$$"
 
 ### 2a. Resolve `{skill-root}` to a concrete absolute path
 
-`{skill-root}` is the directory these agent instructions were loaded from — the root of the do-work skill clone (the directory containing `agents/`, `lib/`, `SKILL.md`). The lib invocations throughout this file (`{skill-root}/lib/scan-stale.sh`, etc.) and in `agents/run-worker.md` (heartbeat, file-feedback) only resolve when `{skill-root}` is a real absolute path. A worker `cd`'d into a consumer project's worktree has no `lib/` of its own, so the orchestrator must resolve `{skill-root}` **once here** and substitute the concrete path into every `{skill-root}/lib/...` call it makes, and pass it to the worker (Step 2 dispatch) so the worker substitutes it too.
+**Single home:** resolve once via **Load Config step 8** in [`agents/config.md`](../agents/config.md) (dirname-of-loaded-agent-file recipe; hard-stop if the path is unknown). Keep `$SKILL_ROOT` in context for this run. Do **not** re-implement a second full recipe here — no env/hub/CWD fallback.
 
-Resolve it from the absolute path of the loaded agent file:
-
-```bash
-# These instructions live at {skill-root}/agents/run.md, so the parent of agents/ is the root.
-SKILL_ROOT="$(cd "$(dirname "<absolute path of this run.md>")/.." && pwd)"
-# Example: /Users/you/.claude/skills/do-work
-```
-
-When this project IS the do-work skill itself, `SKILL_ROOT` resolves to the project root and the lib calls work directly. When the project is any other repo, `SKILL_ROOT` points back at the skill clone where `lib/` actually lives. Use the resolved `$SKILL_ROOT` value everywhere the steps below write `{skill-root}`.
+`{skill-root}` is the absolute skill install root (directory containing `agents/`, `lib/`, `SKILL.md`). Lib invocations throughout this file (`{skill-root}/lib/scan-stale.sh`, etc.) and in `agents/run-worker.md` (heartbeat, file-feedback) only resolve when `{skill-root}` is a real absolute path. A worker `cd`'d into a consumer project's worktree has no `lib/` of its own, so the orchestrator substitutes `$SKILL_ROOT` into every `{skill-root}/lib/...` call it makes and passes that same absolute value as the worker **Skill root** input (Step 2 dispatch).
 
 ### 2b. Generate or refresh the project context pack
 
