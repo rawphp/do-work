@@ -50,7 +50,7 @@ Full budget/parallel resolution text: original detail lives in [run-loop.md](../
 
 ## Load Config
 
-Read and follow the **Load Config** section of [config.md](config.md), including **step 8** (resolve `$SKILL_ROOT` / `{skill-root}` via the dirname-of-loaded-agent-file recipe; hard-stop if unknown).
+Read and follow the **Load Config** section of [config.md](config.md), including **step 8** (resolve `$SKILL_ROOT` / `{skill-root}` via walk-up from the loaded instruction file with marker requirements, or inherit a valid pre-set `$SKILL_ROOT`; hard-stop if unknown).
 
 Keep `model.default`, `model.escalation`, `cost.budget`, `ledger.enabled`, and the resolved `$SKILL_ROOT` in context. Resolve effective budget once at startup. If non-empty, enforce at the Step 3b budget gate.
 

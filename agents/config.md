@@ -208,39 +208,68 @@ routing: []
 
    When the effective backend is **`linear`**: load `agents/tracker/port.md` then `agents/tracker/linear.md` for work-item ops after the validations above pass. If `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the backend doc from the skill install / Linear skill setup) — **never** fall through to `markdown.md` or invent Linear tool sequences.
 
-8. **Resolve skill-root (`$SKILL_ROOT` / `{skill-root}`).** Once per agent turn, resolve the absolute path of the do-work skill install root — the directory that contains `agents/`, `lib/`, and `SKILL.md`. **Token definition:** `{skill-root}` means this resolved absolute path for **all later steps in the same agent turn**. Keep `$SKILL_ROOT` in context; substitute it wherever docs or bash lines write `{skill-root}` (especially `{skill-root}/lib/...`).
+8. **Resolve skill-root (`$SKILL_ROOT` / `{skill-root}`).** Once per agent turn, resolve the absolute path of the do-work skill install root — a directory that contains `lib/` **and** at least one skill marker (`SKILL.md` **or** `agents/`). **Token definition:** `{skill-root}` means this resolved absolute path for **all later steps in the same agent turn**. Keep `$SKILL_ROOT` in context; substitute it wherever docs or bash lines write `{skill-root}` (especially `{skill-root}/lib/...`).
 
    **Single home:** this step is the only place that defines the resolve recipe. `references/run-loop.md` §2a and the run-worker **Skill root** input are thin consumers — they must not invent a second folklore recipe.
 
-   **Recipe (dirname of loaded agent file only — no env / hub / CWD fallback):**
+   **Markers (valid skill install root):** a candidate directory is valid iff **both**:
+   1. it contains a `lib/` directory, **and**
+   2. it contains `SKILL.md` **or** an `agents/` directory (or both).
+
+   Requiring a co-marker with `lib/` avoids monorepo false roots that happen to have a bare `lib/` higher in the tree.
+
+   **Inherit rule:** If `$SKILL_ROOT` is already set in this agent turn's context (orchestrator-passed **Skill root**, or resolved earlier in the same turn) **and** that path is an absolute directory that satisfies the markers above, **keep it — do not re-resolve**. If missing, empty, non-absolute, or invalid (fails markers), clear it and run the walk-up recipe below. Nested agents inherit the entry-resolved root this way.
+
+   **Recipe (walk-up from loaded instruction file — no env / hub / CWD fallback):**
+
+   One-level `dirname/..` is **not** the algorithm — nested paths (e.g. `agents/tracker/linear.md`) and `SKILL.md` at the skill root need more than a single parent hop.
 
    ```bash
-   # These instructions live at {skill-root}/agents/<file>.md (or under references/),
-   # so the parent of agents/ (or references/) is the skill install root.
-   SKILL_ROOT="$(cd "$(dirname "<absolute path of the loaded agent or reference file>")/.." && pwd)"
-   # Example: /Users/you/.claude/skills/do-work
+   # Start at the directory of the loaded instruction file; walk parents until
+   # markers match (lib/ AND (SKILL.md OR agents/)). Hard-stop at filesystem
+   # root if none found. No env/hub/CWD fallback.
+   d="$(cd "$(dirname "<absolute path of the loaded agent or reference file>")" && pwd)"
+   SKILL_ROOT=""
+   while true; do
+     if [ -d "$d/lib" ] && { [ -f "$d/SKILL.md" ] || [ -d "$d/agents" ]; }; then
+       SKILL_ROOT="$d"
+       break
+     fi
+     [ "$d" = "/" ] && break
+     d="$(dirname "$d")"
+   done
+   # non-empty $SKILL_ROOT required — else hard-stop (see below)
    ```
 
-   - Prefer the absolute path of the instruction file the agent is currently executing (e.g. `agents/run.md`, `agents/config.md`, `agents/run-worker.md`, or a loaded `references/*.md`).
-   - The resolved directory MUST contain `lib/` (and typically `SKILL.md` and `agents/`). Use that absolute path as `$SKILL_ROOT`.
+   **Examples** (all resolve to the skill install root):
+
+   | Loaded file | Walk starts at | Resolves to |
+   |-------------|----------------|-------------|
+   | `{skill}/agents/run.md` | `…/agents` | `{skill}` (parent has `lib/` + markers) |
+   | `{skill}/agents/tracker/linear.md` | `…/agents/tracker` | `{skill}` (walk past `tracker` → `agents` → skill root; one-level `..` would wrongly stop at `agents/`) |
+   | `{skill}/references/run-loop.md` | `…/references` | `{skill}` |
+   | `{skill}/SKILL.md` | `{skill}` itself | `{skill}` (start directory already matches markers) |
+
+   - Prefer the absolute path of the instruction file the agent is currently executing when walk-up is needed (e.g. `agents/run.md`, `agents/config.md`, `agents/run-worker.md`, `agents/tracker/linear.md`, a loaded `references/*.md`, or `SKILL.md`).
+   - Use the walk-up result as `$SKILL_ROOT` only when it satisfies the markers.
    - When this project **is** the do-work skill itself, `$SKILL_ROOT` equals the project root and lib calls work directly. When the project is any other consumer repo, `$SKILL_ROOT` points at the skill clone where `lib/` actually lives — not at the consumer project root.
-   - Orchestrators that dispatch workers pass the same absolute `$SKILL_ROOT` as the worker **Skill root** input and substitute it into pasted `run-worker.md` instructions (see `agents/run-worker.md` When Invoked #5 and `references/run-loop.md` Step 2 dispatch).
+   - Orchestrators that dispatch workers pass the same absolute `$SKILL_ROOT` as the worker **Skill root** input and substitute it into pasted `run-worker.md` instructions (see `agents/run-worker.md` When Invoked #5 and `references/run-loop.md` Step 2 dispatch). Workers and nested agents **inherit** that value when it still satisfies markers.
 
    **Hard-stop when the path cannot be determined.** If any of the following is true, **stop immediately** with a clear operator message — do not guess:
 
-   - The harness did not provide an absolute path for the loaded instruction file
-   - `dirname` / parent resolution does not yield a directory that contains `lib/`
+   - Inherit failed (missing/invalid `$SKILL_ROOT`) **and** the harness did not provide an absolute path for the loaded instruction file
+   - Walk-up from the loaded file reaches the filesystem root without finding a directory that satisfies the markers (`lib/` **and** (`SKILL.md` **or** `agents/`))
    - The path is empty or otherwise unknown after the recipe
 
    Operator message (example):
 
-   `skill-root unknown: cannot resolve $SKILL_ROOT from loaded agent file path (dirname recipe only; no env/hub fallback). Provide an absolute path to the loaded agent file under the skill install root.`
+   `skill-root unknown: cannot resolve $SKILL_ROOT (walk-up from loaded file; no env/hub/CWD fallback). Provide an absolute path to the loaded instruction file under the skill install root, or a valid pre-resolved $SKILL_ROOT that contains lib/ and (SKILL.md or agents/).`
 
-   **Do not** fall back to process CWD, environment variables (e.g. `DO_WORK_SKILL_ROOT`, `SKILL_ROOT` already in the environment), hub paths (`~/.agents/skills/do-work`, `~/.claude/skills/do-work`), or any other guessed location.
+   **Do not** fall back to process CWD, hub paths (`~/.agents/skills/do-work`, `~/.claude/skills/do-work`), or invent a path from `DO_WORK_SKILL_ROOT` / other env vars when inherit markers fail. **Do** inherit a **valid** `$SKILL_ROOT` already set in this turn's context (see inherit rule above).
 
 **Phase-agent contract:** every phase agent that touches work items follows the **Tracker load path** (config → resolve `tracker.backend` → `port.md` → `agents/tracker/<backend>.md` → only named port ops). The shared load path is defined once here and in `agents/tracker/port.md`; each phase agent restates a short copy so a missing wire cannot cause split-brain storage. Every phase agent that invokes skill `lib/` scripts also depends on step 8 (`$SKILL_ROOT` / `{skill-root}`) from this same Load Config block.
 
-**Never fail or stop because of a missing or incomplete config file** (steps 1–5). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exceptions (deliberate hard-stops, not config-file completeness problems):** step 7 Linear validation (and missing `linear.md`) when the operator has opted into `backend: linear`; step 8 skill-root resolve when the dirname recipe cannot determine an absolute skill install root.
+**Never fail or stop because of a missing or incomplete config file** (steps 1–5). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exceptions (deliberate hard-stops, not config-file completeness problems):** step 7 Linear validation (and missing `linear.md`) when the operator has opted into `backend: linear`; step 8 skill-root resolve when walk-up (or inherit) cannot determine an absolute skill install root.
 
 ---
 
