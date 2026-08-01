@@ -25,7 +25,7 @@ working directory.
 ## Conformance Manifest
 
 Rows accrete over time. When a future maintenance row is added, add its detector
-to `{skill-root}/lib/conformance-scan.sh` and add its fix contract here in the same change.
+to `lib/conformance-scan.sh` and add its fix contract here in the same change.
 
 | row-id | detector | fix | class |
 |---|---|---|---|
@@ -35,11 +35,11 @@ to `{skill-root}/lib/conformance-scan.sh` and add its fix contract here in the s
 | `pending-dir` | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation | interactive confirm |
 | `stale-config-key` | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when a tombstoned config key is present | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation | interactive confirm |
 | `session-hooks` | `bash {skill-root}/lib/install-hooks.sh --check {project}` prints `absent` (session telemetry hooks missing from `.claude/settings.json`) | run `bash {skill-root}/lib/install-hooks.sh {project}` — idempotent, additive merge | auto-apply |
-| `migrate-linear` | **Optional / opt-in only** — not an auto-scan drift row (`{skill-root}/lib/conformance-scan.sh` never emits it; see header comment there). Operator runs `/do-work upgrade migrate` (or upgrade Step 9) when they want design §12 idle markdown→Linear cutover. Detector for *eligibility* is preflight in Step 9 (working empty, no active claims, backend still markdown, Linear MCP usable) | invoke port op **`migrate_markdown_to_linear`** sequences in `agents/tracker/linear.md` (dry-run or apply). **Apply mode is destructive** — requires explicit operator confirm gate. Dry-run is non-destructive. | **destructive** interactive confirm (or dry-run) |
+| `migrate-linear` | **Optional / opt-in only** — not an auto-scan drift row (`lib/conformance-scan.sh` never emits it; see header comment there). Operator runs `/do-work upgrade migrate` (or upgrade Step 9) when they want design §12 idle markdown→Linear cutover. Detector for *eligibility* is preflight in Step 9 (working empty, no active claims, backend still markdown, Linear MCP usable) | invoke port op **`migrate_markdown_to_linear`** sequences in `agents/tracker/linear.md` (dry-run or apply). **Apply mode is destructive** — requires explicit operator confirm gate. Dry-run is non-destructive. | **destructive** interactive confirm (or dry-run) |
 
 **`session-hooks` detector location.** This row is the one exception to the
-accretion rule below: its detector lives in `{skill-root}/lib/install-hooks.sh --check`, not
-in `{skill-root}/lib/conformance-scan.sh`. The hooks are written to
+accretion rule below: its detector lives in `lib/install-hooks.sh --check`, not
+in `lib/conformance-scan.sh`. The hooks are written to
 `{project}/.claude/settings.json`, which is outside the `.do-work/` tree that
 `conformance-scan.sh` scans, so the scan is the wrong home for it. The installer
 owns both detection (`--check`) and the idempotent fix.
@@ -55,7 +55,7 @@ stay aligned without auto-flagging markdown projects.
 `.do-work/config.yml` keys — key paths the skill itself has removed, which
 `stale-config-key` flags if still present. v1: `notifications.on_pending_validation`
 (removed by the UR-039 cleanup). The executable list lives in
-`{skill-root}/lib/conformance-scan.sh` (`STALE_CONFIG_KEYS`); the two must be updated
+`lib/conformance-scan.sh` (`STALE_CONFIG_KEYS`); the two must be updated
 together whenever a key is tombstoned, per the accretion rule above.
 
 ---
@@ -235,7 +235,7 @@ For each parked REQ file under `{project}/.do-work/pending/` matching
    `## Manual checks (advisory)` by renaming only the heading and preserving the
    checklist items exactly. Do not check or delete unchecked advisory items.
 5. Do not modify `## Acceptance Criteria` checklist state. The archival rewrite
-   must not hide unchecked acceptance criteria; `{skill-root}/lib/check-archive-integrity.sh`
+   must not hide unchecked acceptance criteria; `lib/check-archive-integrity.sh`
    remains the gate.
 6. Run:
 
@@ -371,7 +371,7 @@ by `conformance-scan.sh`, because the hooks live in
      not fail.
 
 The installer merges a `SessionStart` and `Stop` hook (each calling
-`{skill-root}/lib/session-hook.sh`) into `.claude/settings.json`, deduping by command string,
+`lib/session-hook.sh`) into `.claude/settings.json`, deduping by command string,
 so running upgrade twice yields exactly one entry per hook.
 
 ### 8. Re-scan And Report
@@ -444,7 +444,7 @@ Port op: **`migrate_markdown_to_linear`**. Full agent sequence, dry-run report
 format, status/parent/deps mapping, and failure matrix live in
 `agents/tracker/linear.md` (**Path: Idle markdown→Linear migration**).
 Shared refuse / hard-stop / no-partial-cutover rules live in
-`agents/tracker/port.md`. Scanner relationship: `{skill-root}/lib/conformance-scan.sh`
+`agents/tracker/port.md`. Scanner relationship: `lib/conformance-scan.sh`
 documents that `migrate-linear` is never a drift row.
 
 #### 9a. When this step runs
@@ -547,8 +547,8 @@ only asked for migrate — but preflight remains mandatory.
   advisory only.
 - Do not use a config version stamp. Detectors are ground truth.
 - The manifest accretes: future **scanner** rows must be added here and in
-  `{skill-root}/lib/conformance-scan.sh` together. Opt-in `migrate-linear` is documented
-  here **and** in the `{skill-root}/lib/conformance-scan.sh` header (never emitted as a
+  `lib/conformance-scan.sh` together. Opt-in `migrate-linear` is documented
+  here **and** in the `lib/conformance-scan.sh` header (never emitted as a
   drift line — REQ-301).
 - Do not invent fixes for unknown scanner row ids.
 - `dir-conflict` is manual-only. The agent must not choose between two data
@@ -559,7 +559,7 @@ only asked for migrate — but preflight remains mandatory.
   by a scanner drift row. Never remove a key absent from the tombstone list,
   even one that looks unfamiliar — that may be a user-added custom key.
 - Do not mark unchecked acceptance criteria as complete during upgrade. If
-  `{skill-root}/lib/check-archive-integrity.sh` rejects a parked REQ, stop and report the
+  `lib/check-archive-integrity.sh` rejects a parked REQ, stop and report the
   file instead of forcing archive.
 - **markdown→Linear migration (Step 9 / REQ-301 wiring):**
   - **Destructive/confirm gate** for apply; dry-run lists planned creates

@@ -56,7 +56,7 @@ bash {skill-root}/lib/retro-rollup.sh
 
 Run the script from the project root (the directory containing `.do-work/`). Capture stdout verbatim. Warnings on stderr (e.g. `skip malformed ledger row ...`) are informational; note them but do not stop.
 
-If `{skill-root}/lib/retro-rollup.sh` is missing **and** backend is markdown, report `"{skill-root}/lib/retro-rollup.sh not found — cannot run retro."` and stop. If backend is linear and the script is missing but **List run notes** returned rows, continue interpreting from those notes only.
+If `$SKILL_ROOT/lib/retro-rollup.sh` is missing **and** backend is markdown, report `"$SKILL_ROOT/lib/retro-rollup.sh not found — cannot run retro."` and stop. If backend is linear and the script is missing but **List run notes** returned rows, continue interpreting from those notes only.
 
 **Interpretation priority under Linear:**
 
@@ -96,7 +96,7 @@ The shape key reads `<layer>/<ac-bucket>/<files-bucket>` (e.g. `agents/>4AC/>3fi
 From the stats, derive **imperative, capture-facing** rules — one line each, naming a concrete REQ shape or file glob and the historical signal that justifies it. Examples of the translation you own:
 
 - `stop_rate agents/>4AC/>3file=0.67` → "Split `agents/*` REQs with >4 acceptance criteria — historical stop rate 67%."
-- `footprint_missed lib/*.test.sh=5` → "REQs touching `{skill-root}/lib/*.sh`: always declare the matching `*.test.sh` in **Files:** — missed on 5 REQs."
+- `footprint_missed lib/*.test.sh=5` → "REQs touching `lib/*.sh`: always declare the matching `*.test.sh` in **Files:** — missed on 5 REQs."
 - `escalation agents/>4AC/>3file=...` → "`agents/*` REQs with >3 files escalate sonnet→opus often — size them down or start on opus."
 
 Rank candidate rules by the recurrence weight (the rollup's `weighted=` value) and by stop/escalation rate. Keep only the **top 8**, highest-signal first. If fewer than 8 exist, write only those.
@@ -152,4 +152,4 @@ Print the report. Confirm the calibration home written (local path or Linear Doc
 - **Advisory, never blocking.** Calibration informs capture; it is not a requirement. Nothing you produce blocks the pipeline.
 - **No git commits, no AskUserQuestion prompts, no deploys.**
 - **Linear homes are fixed (REQ-296 / REQ-297).** Never invent ad-hoc Doc titles; use `calibration_doc_title` only. Prefer **List run notes** over local telemetry when backend is linear. Doc create/update failure → hard-stop (no local substitute store).
-- If `{skill-root}/lib/retro-rollup.sh` is missing under markdown, report it and stop. Under linear, missing script alone is not fatal when Linear run notes were listed successfully.
+- If `$SKILL_ROOT/lib/retro-rollup.sh` is missing under markdown, report it and stop. Under linear, missing script alone is not fatal when Linear run notes were listed successfully.
