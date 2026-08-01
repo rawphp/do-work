@@ -184,6 +184,67 @@ assert_eq "1" "$RC" "$CURRENT_CASE rc"
 assert_contains "dl-fixture.md:3" "$OUT" "$CURRENT_CASE file:line"
 teardown_fixture
 
+# --- bare runtime `bash lib/` under agents/ (runtime invocation) -> exit 1 ---
+CURRENT_CASE="bare-runtime-bash-lib-agents-exit-1"
+CASES=$((CASES + 1))
+setup_fixture
+printf '# Run\n\nbash lib/claim-req.sh "$REQ_PATH"\n' > "$TMP/agents/run.md"
+run_lint
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+assert_contains "bare-runtime-bash-lib" "$OUT" "$CURRENT_CASE pattern name"
+assert_contains "agents/run.md" "$OUT" "$CURRENT_CASE file"
+teardown_fixture
+
+# --- bare runtime `bash lib/` under references/ -> exit 1 ---
+CURRENT_CASE="bare-runtime-bash-lib-references-exit-1"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/references"
+printf '# Loop\n\nREQ_PATH=$(bash lib/pick-req.sh "$SCOPE" "$AGENT_ID")\n' > "$TMP/references/run-loop.md"
+run_lint
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+assert_contains "bare-runtime-bash-lib" "$OUT" "$CURRENT_CASE pattern name"
+assert_contains "references/run-loop.md" "$OUT" "$CURRENT_CASE file"
+teardown_fixture
+
+# --- skill-dev allowlist: bash lib/tests/... under agents/ -> exit 0 ---
+CURRENT_CASE="bare-runtime-bash-lib-allowlist-tests-exit-0"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/agents/tracker"
+printf '# Markdown\n\nRun `bash lib/tests/run-all.sh` as the regression gate.\n' > "$TMP/agents/tracker/markdown.md"
+run_lint
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_fixture
+
+# --- skill-dev allowlist: bash lib/conformance-scan.sh under agents/ -> exit 0 ---
+CURRENT_CASE="bare-runtime-bash-lib-allowlist-conformance-exit-0"
+CASES=$((CASES + 1))
+setup_fixture
+mkdir -p "$TMP/agents/tracker"
+printf '# Port\n\n`bash lib/conformance-scan.sh` remains the regression gate.\n' > "$TMP/agents/tracker/port.md"
+run_lint
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_fixture
+
+# --- correct skill-root form is allowed under agents/ -> exit 0 ---
+CURRENT_CASE="skill-root-bash-lib-agents-exit-0"
+CASES=$((CASES + 1))
+setup_fixture
+printf '# Run\n\nbash {skill-root}/lib/claim-req.sh "$REQ_PATH"\n' > "$TMP/agents/run.md"
+run_lint
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_fixture
+
+# --- bare bash lib/ outside agents/ and references/ is out of scope -> exit 0 ---
+CURRENT_CASE="bare-bash-lib-docs-out-of-scope-exit-0"
+CASES=$((CASES + 1))
+setup_fixture
+printf '# How\n\nHistorically agents ran bash lib/claim-req.sh from CWD.\n' > "$TMP/docs/HOW-IT-WORKS.md"
+run_lint
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_fixture
+
 echo ""
 echo "doc-lint tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then
