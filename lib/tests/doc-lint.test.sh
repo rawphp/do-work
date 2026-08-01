@@ -236,11 +236,41 @@ run_lint
 assert_eq "0" "$RC" "$CURRENT_CASE rc"
 teardown_fixture
 
-# --- bare bash lib/ outside agents/ and references/ is out of scope -> exit 0 ---
+# --- bare bash lib/ outside agents/, references/, and SKILL.md is out of scope -> exit 0 ---
 CURRENT_CASE="bare-bash-lib-docs-out-of-scope-exit-0"
 CASES=$((CASES + 1))
 setup_fixture
 printf '# How\n\nHistorically agents ran bash lib/claim-req.sh from CWD.\n' > "$TMP/docs/HOW-IT-WORKS.md"
+run_lint
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_fixture
+
+# --- bare runtime `bash lib/conformance-scan.sh` in SKILL.md (entry) -> exit 1 ---
+# Entry must use skill-root form; skill-dev allowlist does NOT apply on SKILL.md.
+CURRENT_CASE="bare-runtime-bash-lib-skill-md-exit-1"
+CASES=$((CASES + 1))
+setup_fixture
+printf '# Skill\n\nbash lib/conformance-scan.sh "{project}"\n' > "$TMP/SKILL.md"
+run_lint
+assert_eq "1" "$RC" "$CURRENT_CASE rc"
+assert_contains "bare-runtime-bash-lib" "$OUT" "$CURRENT_CASE pattern name"
+assert_contains "SKILL.md" "$OUT" "$CURRENT_CASE file"
+teardown_fixture
+
+# --- correct skill-root form in SKILL.md -> exit 0 ---
+CURRENT_CASE="skill-root-bash-lib-skill-md-exit-0"
+CASES=$((CASES + 1))
+setup_fixture
+printf '# Skill\n\nbash {skill-root}/lib/conformance-scan.sh "{project}"\n' > "$TMP/SKILL.md"
+run_lint
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_fixture
+
+# --- SKILL.md prohibition note documenting the bare form (contains "never") -> exit 0 ---
+CURRENT_CASE="bare-runtime-bash-lib-skill-md-never-note-exit-0"
+CASES=$((CASES + 1))
+setup_fixture
+printf '# Skill\n\n(**never** bare `bash lib/conformance-scan.sh` — use skill-root form)\n' > "$TMP/SKILL.md"
 run_lint
 assert_eq "0" "$RC" "$CURRENT_CASE rc"
 teardown_fixture
