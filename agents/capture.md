@@ -335,7 +335,7 @@ Decomposition content (Task / Context / AC / Verification / Integration fields) 
 
 **Every REQ must carry a `**Layer:**` field.** Set it from the R-number's tag (Step 3b). If multiple R-numbers map to the same REQ, they must all share the same tag — otherwise split the REQ. Bug-fix briefs (classification from Step 2b) write `**Layer:** none` on every REQ.
 
-> **JUDGMENT:** [J1 — Files] Before writing the `**Files:**` line, enumerate the project-relative paths this REQ will touch. For agents: list the specific `agents/*.md` file(s). For commands: list `commands/*.md`. For lib scripts: list `{skill-root}/lib/<name>.sh` and its test. For templates: list the specific template file. Globs are allowed but prefer named paths. A blank `**Files:**` line is a signal the REQ is under-specified — think harder before leaving it empty.
+> **JUDGMENT:** [J1 — Files] Before writing the `**Files:**` line, enumerate the project-relative paths this REQ will touch. For agents: list the specific `agents/*.md` file(s). For commands: list `commands/*.md`. For lib scripts: list `lib/<name>.sh` and its test. For templates: list the specific template file. Globs are allowed but prefer named paths. A blank `**Files:**` line is a signal the REQ is under-specified — think harder before leaving it empty.
 
 > **JUDGMENT:** [J2 — Depends on] Before writing the `**Depends on:**` line, scan the decomposition from Step 3 for hard ordering constraints: does this REQ assume another REQ's output file exists, or call a function that another REQ will write? If yes, list those REQ ids. If the REQ is independently implementable from HEAD, write an empty value (the field must still appear). Do not add soft ordering preferences — only blocking dependencies.
 

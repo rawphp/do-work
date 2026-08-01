@@ -54,7 +54,7 @@ bash {skill-root}/lib/synth-status.sh [UR-NNN]   # passes the optional scope
 
 Print stdout verbatim to the user.
 
-If `{skill-root}/lib/synth-status.sh` is missing, report `"{skill-root}/lib/synth-status.sh not found — cannot render status."` and stop.
+If `$SKILL_ROOT/lib/synth-status.sh` is missing, report `"$SKILL_ROOT/lib/synth-status.sh not found — cannot render status."` and stop.
 
 Then render a proof-backed status view. Glob REQ files in backlog, `working/`, and `archive/` (respecting `UR-NNN` scope when provided), and run:
 
@@ -62,7 +62,7 @@ Then render a proof-backed status view. Glob REQ files in backlog, `working/`, a
 bash {skill-root}/lib/derive-status.sh <req-path>...
 ```
 
-Print the result under a `Proven` heading. This is a derived view: `proven` means the REQ is done/archived, has a non-empty `**Closure proof:**`, and does not carry `**Suite:** not-run`; `unproven` means proof is missing, the REQ is not done, or it carries the `**Suite:** not-run` marker (its own test/build suite could not be run — see `agents/run-worker.md` §6 and `agents/run.md` Step 4b sub-step 5a). If `{skill-root}/lib/derive-status.sh` is missing, report `"{skill-root}/lib/derive-status.sh not found — skipping proven view."` and continue.
+Print the result under a `Proven` heading. This is a derived view: `proven` means the REQ is done/archived, has a non-empty `**Closure proof:**`, and does not carry `**Suite:** not-run`; `unproven` means proof is missing, the REQ is not done, or it carries the `**Suite:** not-run` marker (its own test/build suite could not be run — see `agents/run-worker.md` §6 and `agents/run.md` Step 4b sub-step 5a). If `$SKILL_ROOT/lib/derive-status.sh` is missing, report `"$SKILL_ROOT/lib/derive-status.sh not found — skipping proven view."` and continue.
 
 Then render the intended-vs-proven Coverage section:
 
@@ -70,7 +70,7 @@ Then render the intended-vs-proven Coverage section:
 bash {skill-root}/lib/coverage-rollup.sh [UR-NNN]
 ```
 
-Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the UR has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the UR has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the UR declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `{skill-root}/lib/coverage-rollup.sh` is missing, report `"{skill-root}/lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
+Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the UR has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the UR has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the UR declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `$SKILL_ROOT/lib/coverage-rollup.sh` is missing, report `"$SKILL_ROOT/lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
 
 ### 1L. Render situation (Linear backend)
 
@@ -106,7 +106,7 @@ If output is non-empty, prepend it to the status report with a clear header:
 ────────────────────
 ```
 
-If `{skill-root}/lib/deadlock-check.sh` is missing, report `"{skill-root}/lib/deadlock-check.sh not found — skipping deadlock check."` and continue without it.
+If `$SKILL_ROOT/lib/deadlock-check.sh` is missing, report `"$SKILL_ROOT/lib/deadlock-check.sh not found — skipping deadlock check."` and continue without it.
 
 ### 3. Stop
 
@@ -118,5 +118,5 @@ No prompts, no commits, no state changes.
 
 - Read-only. Never write any file under `{project}/.do-work/` or the source tree (and never write Linear issues while rendering status).
 - No git commits, no AskUserQuestion prompts.
-- **Markdown:** If `{skill-root}/lib/synth-status.sh` or `{skill-root}/lib/deadlock-check.sh` are missing, report the missing script and stop (synth-status missing) or continue without the check (deadlock-check missing). The deadlock banner always renders above the synth-status output when present.
+- **Markdown:** If `$SKILL_ROOT/lib/synth-status.sh` or `$SKILL_ROOT/lib/deadlock-check.sh` are missing, report the missing script and stop (synth-status missing) or continue without the check (deadlock-check missing). The deadlock banner always renders above the synth-status output when present.
 - **Linear:** Use only `agents/tracker/linear.md` status / claim-comment sequences; hard-stop if Linear MCP is unusable; no silent markdown situation room.
