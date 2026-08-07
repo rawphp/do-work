@@ -161,7 +161,7 @@ If `config.next_steps.enabled` is `true`:
 
 The go agent is a top-level orchestrator — it is never a delegate, so no suppression logic is needed. Sub-agents (verify, run, log) must suppress their own AskUserQuestion prompts when running inside go.
 
-If `config.next_steps.enabled` is `false` or missing: skip the AskUserQuestion and stop.
+If `config.next_steps.enabled` is `false` or missing: output `Next step: /do-work status` (or `/do-work start "…" for new work) and stop.
 
 ---
 

@@ -283,6 +283,70 @@ fi
 teardown_fixture
 
 # ----------------------------------------------------------------------
+# Case 8: unscoped archive is capped; totals still count all archived.
+# ----------------------------------------------------------------------
+CURRENT_CASE="archive-cap"
+CASES=$((CASES + 1))
+setup_fixture
+i=1
+while [ "$i" -le 20 ]; do
+  # Zero-pad so glob order matches numeric order (REQ-01 … REQ-20).
+  id="$(printf 'REQ-%03d' "$i")"
+  write_archive_req "$TMP/.do-work/archive/${id}-a.md" "$id" "UR-020"
+  i=$((i + 1))
+done
+run_synth
+assert_eq "0" "$RC" "$CURRENT_CASE rc=0"
+assert_contains "archived=20" "$STDOUT" "$CURRENT_CASE totals count all 20"
+assert_contains "No live work" "$STDOUT" "$CURRENT_CASE idle cue"
+assert_contains "and 5 more archived" "$STDOUT" "$CURRENT_CASE cap note"
+assert_contains "REQ-020" "$STDOUT" "$CURRENT_CASE newest archive row shown"
+assert_not_contains "REQ-001" "$STDOUT" "$CURRENT_CASE oldest archive row hidden"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 9: archive bucket always shows status done (stale header ignored).
+# ----------------------------------------------------------------------
+CURRENT_CASE="archive-status-done"
+CASES=$((CASES + 1))
+setup_fixture
+cat > "$TMP/.do-work/archive/REQ-900-stale-header.md" <<EOF
+# REQ-900: Stale header
+
+**UR:** UR-900
+**Status:** in-progress
+**Created:** 2026-05-21
+**Layer:** agents
+**Files:** src/a.ts
+**Depends on:**
+EOF
+run_synth
+assert_eq "0" "$RC" "$CURRENT_CASE rc=0"
+assert_contains "REQ-900" "$STDOUT" "$CURRENT_CASE row present"
+assert_contains "| REQ-900 | UR-900 | done |" "$STDOUT" "$CURRENT_CASE forced done"
+assert_not_contains "| REQ-900 | UR-900 | in-progress |" "$STDOUT" "$CURRENT_CASE no stale in-progress"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 10: scoped status still lists all archive rows for that UR.
+# ----------------------------------------------------------------------
+CURRENT_CASE="archive-cap-scoped"
+CASES=$((CASES + 1))
+setup_fixture
+i=1
+while [ "$i" -le 18 ]; do
+  id="$(printf 'REQ-%03d' "$i")"
+  write_archive_req "$TMP/.do-work/archive/${id}-a.md" "$id" "UR-021"
+  i=$((i + 1))
+done
+run_synth "UR-021"
+assert_eq "0" "$RC" "$CURRENT_CASE rc=0"
+assert_contains "REQ-001" "$STDOUT" "$CURRENT_CASE scoped keeps oldest"
+assert_contains "REQ-018" "$STDOUT" "$CURRENT_CASE scoped keeps newest"
+assert_not_contains "more archived" "$STDOUT" "$CURRENT_CASE no cap note when scoped"
+teardown_fixture
+
+# ----------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------
 echo ""

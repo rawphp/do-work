@@ -18,6 +18,19 @@ Start → Go. (Or granular: Intake → Capture → Verify → Run.)
 
 Work-item storage is pluggable (`tracker.backend`: **markdown** default, or **linear**). Runtime/git (worktrees, merges, state locks, `config.yml`) always stay local.
 
+## Primary loop
+
+Most days you only need these:
+
+| Command | What it does |
+|---------|-------------|
+| `/do-work start [brief]` | Record a brief and build the REQ backlog (ideate on by default; auto-installs). |
+| `/do-work go [UR-NNN]` | Verify coverage, then audit + run when confidence ≥ threshold (default 90%). |
+| `/do-work status [UR-NNN]` | Live situation room: in-flight, backlog, recent done, coverage. |
+| `/do-work` | Help + suggested next steps for this project. |
+
+Flags for start/go (`--no-ideate`, `--force`, `--auto-fix`, …) are in the full table below.
+
 ## Quick Reference
 
 | Command | What it does |

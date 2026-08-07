@@ -163,7 +163,7 @@ Does **not** run the verify confidence gate (unlike `go`).
 
 ### `/do-work status [UR-NNN]`
 
-Read-only situation room: REQs, claimers (`hostname.pid`), heartbeats, deadlock warnings, coverage rollup. Optional UR scope.
+Read-only situation room: live REQs first (working + backlog), claimers (`hostname.pid`), heartbeats, deadlock warnings, coverage rollup. Unscoped archive is capped to recent completed rows; pass `UR-NNN` to list every matching archived REQ.
 
 Use whenever something looks stuck or you are running parallel workers.
 

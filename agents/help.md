@@ -88,14 +88,34 @@ path-unit backlog detected: top-level path REQs define reachable flows; child RE
 
 **If URs exist but backlog is empty:**
 
+Do **not** treat every empty-backlog project the same. Distinguish URs that still need decomposition from a drained project whose REQs already live in `archive/` (or Linear done):
+
+1. Find the **most recent** `UR-NNN` under `user-requests/` (highest N).
+2. Check whether **any** REQ for that UR exists in backlog, `working/`, or `archive/` (markdown: `**UR:** UR-NNN` on REQ files; Linear: `list_reqs_for_ur`).
+3. Also scan older open URs for any with **zero** REQs anywhere — those still need capture.
+
+**A — Latest UR has no REQs yet (or any open UR has zero REQs):**
+
 ```
 Suggested next steps:
-  /do-work capture UR-NNN                           — Decompose the latest request into tasks
-  /do-work go UR-NNN                                — Verify and run for a specific request
-  /do-work start "describe your feature or task"    — Record a new brief
+  /do-work capture UR-NNN                           — Decompose the request into tasks
+  /do-work go UR-NNN                                — Verify and run after capture
+  /do-work start "describe your feature or task"    — Record a new brief instead
 ```
 
-Replace `UR-NNN` with the most recent UR number.
+Prefer the **oldest** zero-REQ open UR for the capture line when more than one exists; otherwise use the latest UR. Replace `UR-NNN` with that real number.
+
+**B — Backlog empty and all open URs already have REQs (drained / archive-only):**
+
+```
+Suggested next steps:
+  /do-work start "describe your feature or task"    — Record a new brief
+  /do-work status                                   — Review the situation room
+```
+
+Do **not** suggest `capture` for a UR that already has REQs in archive — that re-decomposes finished work and confuses operators.
+
+Then (when the 4-suggestion cap allows) still add retro / close from the heuristics below.
 
 **If `runs/` has entries but `.do-work/state/calibration.md` does not exist:**
 
@@ -107,7 +127,7 @@ Suggest retro alongside other applicable suggestions (do not replace them — ad
 
 **If archived path-unit REQs exist for a UR but that UR has no `closure.md`:**
 
-Suggest close alongside other applicable suggestions (add it when this condition is true and the 4-suggestion cap allows). Use the most recently completed UR:
+Suggest close alongside other applicable suggestions (add it when this condition is true and the 4-suggestion cap allows). Use the most recently completed UR that still needs closure:
 
 ```
   /do-work close UR-NNN                             — Walk path-unit entry points end-to-end and write the UR closure report

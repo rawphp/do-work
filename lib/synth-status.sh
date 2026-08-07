@@ -13,9 +13,9 @@
 #      Sources:
 #        - `.do-work/REQ-*.md`              (Status: backlog)
 #        - `.do-work/working/REQ-*.md`      (Status: in-progress / stopped)
-#        - `.do-work/archive/REQ-*.md`      (Status: done; only shown when
-#                                            present so the snapshot reflects
-#                                            completed work in this run)
+#        - `.do-work/archive/REQ-*.md`      (Status: always rendered as done;
+#                                            unscoped runs cap archive rows so
+#                                            the situation room stays scannable)
 #   3. Empty case: a single "no REQs" message in place of the table when there
 #      are zero REQs across all three buckets.
 #   4. Footer: deadlock warnings from `lib/deadlock-check.sh` if executable;
@@ -51,6 +51,9 @@ ARCHIVE_DIR="$DOWORK/archive"
 CONFIG="$DOWORK/config.yml"
 DEFAULT_THRESHOLD=300
 FOOTPRINT_MAX=60
+# Unscoped archive rows shown in the table (totals still count all archived).
+# Scoped runs (`synth-status.sh UR-NNN`) list every matching archive row.
+ARCHIVE_CAP=15
 
 # Resolve sibling lib scripts via $0's directory so the script works from any
 # cwd inside the project.
@@ -238,7 +241,8 @@ md_cell() {
 # Bucket: backlog | working | archive
 # Status column is derived from the file's own `**Status:**` field so that
 # `stopped` is rendered correctly when a worker has marked a working slot
-# stopped.
+# stopped — except archive rows, which always display as `done` (location is
+# authoritative; stale in-progress headers in archive used to confuse operators).
 render_row() {
   local path="$1"
   local bucket="$2"
@@ -259,8 +263,12 @@ render_row() {
     return 0
   fi
 
-  status="$F_STATUS"
-  [ -z "$status" ] && status="—"
+  if [ "$bucket" = "archive" ]; then
+    status="done"
+  else
+    status="$F_STATUS"
+    [ -z "$status" ] && status="—"
+  fi
 
   layer="$F_LAYER"
   [ -z "$layer" ] && layer="—"
@@ -383,8 +391,13 @@ fi
 printf '**Totals:** backlog=%d, working=%d, archived=%d\n\n' \
   "$BACKLOG_N" "$WORKING_N" "$ARCHIVE_N"
 
+# Idle project with history (unscoped only): no live work. Lead with a scan cue.
+if [ -z "$UR_FILTER" ] && [ "$BACKLOG_N" -eq 0 ] && [ "$WORKING_N" -eq 0 ] && [ "$ARCHIVE_N" -gt 0 ]; then
+  printf '_No live work (backlog empty, nothing in-flight). Showing recent completed REQs only._\n\n'
+fi
+
 if [ "$TOTAL_N" -eq 0 ]; then
-  printf '_no REQs found in backlog, working, or archive._\n'
+  printf '_no REQs found in backlog, working, or archive. Next: `/do-work start "your brief"`._\n'
 else
   # Table header.
   printf '| REQ | UR | Status | Layer | Claimer | Heartbeat-age | Deps-status | Footprint |\n'
@@ -403,9 +416,33 @@ else
     done
   fi
   if [ "$ARCHIVE_N" -gt 0 ]; then
-    for f in "${ARCHIVE_FILES[@]}"; do
-      render_row "$f" "archive"
-    done
+    # Unscoped: cap archive rows (newest REQ ids last in glob → take tail).
+    # Scoped (UR-NNN): list every matching archive row — the filter already
+    # narrows the set and operators asked for that UR deliberately.
+    if [ -n "$UR_FILTER" ]; then
+      for f in "${ARCHIVE_FILES[@]}"; do
+        render_row "$f" "archive"
+      done
+    else
+      archive_shown=0
+      archive_start=0
+      if [ "$ARCHIVE_N" -gt "$ARCHIVE_CAP" ]; then
+        archive_start=$(( ARCHIVE_N - ARCHIVE_CAP ))
+      fi
+      i=0
+      for f in "${ARCHIVE_FILES[@]}"; do
+        if [ "$i" -ge "$archive_start" ]; then
+          render_row "$f" "archive"
+          archive_shown=$(( archive_shown + 1 ))
+        fi
+        i=$(( i + 1 ))
+      done
+      if [ "$ARCHIVE_N" -gt "$ARCHIVE_CAP" ]; then
+        hidden=$(( ARCHIVE_N - archive_shown ))
+        printf '\n_… and %d more archived. Scope with `/do-work status UR-NNN`, or inspect `.do-work/archive/`._\n' \
+          "$hidden"
+      fi
+    fi
   fi
 fi
 

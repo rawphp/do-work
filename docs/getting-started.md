@@ -163,7 +163,7 @@ Flags:
 /do-work status UR-001
 ```
 
-Read-only situation room: backlog vs working vs archive, claimers, heartbeats, deadlock warnings, coverage rollup.
+Read-only situation room: backlog vs working first, recent completed (archive capped when unscoped), claimers, heartbeats, deadlock warnings, coverage rollup.
 
 ## How you know it worked
 

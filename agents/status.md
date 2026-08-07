@@ -54,6 +54,8 @@ bash {skill-root}/lib/synth-status.sh [UR-NNN]   # passes the optional scope
 
 Print stdout verbatim to the user.
 
+Unscoped output prioritizes live work: backlog + working list fully; archive is capped to recent completed rows with a note when more exist. Scope with `UR-NNN` to list every matching archived REQ. Archive rows always show Status `done` even if a file header is stale.
+
 If `$SKILL_ROOT/lib/synth-status.sh` is missing, report `"$SKILL_ROOT/lib/synth-status.sh not found — cannot render status."` and stop.
 
 Then render a proof-backed status view. Glob REQ files in backlog, `working/`, and `archive/` (respecting `UR-NNN` scope when provided), and run:

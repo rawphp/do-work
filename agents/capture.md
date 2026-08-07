@@ -849,7 +849,7 @@ If `config.next_steps.enabled` is `true` **and** this agent is running standalon
 2. **"Run Go"** — Skip to verify + run in one shot
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output "Next step: run verify to check coverage, or run the loop to start executing." and stop.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output `Next step: /do-work go UR-NNN to verify coverage and run.` (substitute the real UR number) and stop.
 
 ---
 
