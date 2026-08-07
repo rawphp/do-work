@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**Operator status / help UX (scannable situation room)**
+
+**Changed**
+- `/do-work status` (unscoped): archive rows in the situation-room table are capped to the **15 newest** REQ ids (lexicographic / zero-padded `REQ-NNN` order). Totals still count every archived REQ. When more exist, output includes `_… and N more archived_` and points operators at `status UR-NNN` or `.do-work/archive/`. **Consumer impact:** scripts that scrape unscoped status for a full archive inventory will miss older rows — scope with `UR-NNN` or read `archive/` directly.
+- Archive rows always render Status **`done`** (bucket location is authoritative; stale `**Status:**` headers in archive files are ignored in the table). **Consumer impact:** parsers that expected archive-row status to mirror the file header will now always see `done`.
+- Idle unscoped projects (backlog=0, working=0, archive>0) print a short “no live work” scan cue above the table; empty projects suggest `/do-work start "…"`.
+- `/do-work` help next steps: empty backlog no longer suggests `capture` for URs whose REQs already live in `archive/` (drained project); capture is only suggested for open URs with zero REQs anywhere.
+- Agent/docs copy for status and primary-loop commands updated (`agents/status.md`, `agents/help.md`, `docs/commands.md`, `docs/getting-started.md`, `SKILL.md`).
+
 **Hub-only skill install (UR-044 / REQ-278)**
 
 **Changed**
