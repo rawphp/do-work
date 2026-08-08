@@ -100,13 +100,13 @@ bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
 
 | Outcome | Action |
 |---------|--------|
-| **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (dirty tree, detached HEAD, invalid UR slug, checkout failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. |
+| **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (detached HEAD, invalid UR slug, checkout/merge failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. Dirty trees on a protected default are allowed — uncommitted changes carry onto `new-work`. |
 | **Exit 0** | Script prints the final branch name on stdout. Record it as the run's **integration base**. Subsequent worker W1 reads this branch via `git rev-parse --abbrev-ref HEAD` (or `git branch --show-current`) on the orchestrator checkout at worktree create — workers do not call ensure themselves. |
 
 **Hard rules (do not invent branch switches):**
 
-1. **Only `ensure-integration-base.sh` may create or checkout `ur/*` / `work/*` on the orchestrator checkout.** Agents must not run `git checkout` / `git switch` / `git checkout -b` to force an integration base.
-2. **Skip is binding.** If the orchestrator was already on a non-protected branch (any feature branch, existing `ur/*`, etc.), the script prints that branch and **does not switch**. Stay there for the whole run — do **not** hop to `ur/UR-NNN` because the run is UR-scoped or because another agent used a different base.
+1. **Only `ensure-integration-base.sh` may create or checkout `new-work` on the orchestrator checkout.** Leave-default always targets `new-work` (UR arg ignored for naming). If `new-work` exists, the script checkouts it and **merges** the protected tip just left; dirty trees carry. Agents must not run `git checkout` / `git switch` / `git checkout -b` to force an integration base.
+2. **Skip is binding.** If the orchestrator was already on a non-protected branch (any feature branch, existing `new-work`, etc.), the script prints that branch and **does not switch**. Stay there for the whole run — do **not** hop to `new-work` because the run is UR-scoped or because another agent used a different base.
 3. After exit 0, `git branch --show-current` must equal the printed name. If not, hard-stop; do not "repair" with another checkout.
 4. Worker worktrees on `req/*` are isolated; they never retarget the orchestrator's branch.
 
@@ -873,10 +873,10 @@ git push -u origin req/REQ-NNN
 
 - **`req`** (default) — open the PR immediately, from `req/REQ-NNN` into the base branch. Continue to 4-pr.3.
 - **`ur`** — do NOT open a per-REQ PR. Instead accumulate this REQ onto the UR's shared integration branch:
-  1. Resolve the UR id from the REQ's `**UR:**` field → integration branch `ur/UR-NNN`.
-  2. If `ur/UR-NNN` does not yet exist on the remote, create it from the base branch and push it.
-  3. Merge `req/REQ-NNN` into `ur/UR-NNN` (`git merge --no-ff`, applying the same conflict/retry policy as 4a) and push `ur/UR-NNN`.
-  4. Archive this REQ now (4-pr.4) recording the `ur/UR-NNN` branch, but **defer PR creation**: the single PR opens at UR drain. After the last REQ for this UR archives and the UR's backlog is empty (see `## When the Backlog is Empty` drain check), open one PR from `ur/UR-NNN` into the base branch using the same title/body shape as 4-pr.3 (title/body keyed to the UR rather than a single REQ; the body links the UR and lists each integrated REQ). Record that PR's URL on the UR. Then continue past 4-pr.5 to Step 7.
+  1. Integration branch for `granularity: ur` is always `new-work` (same leave-default name as `ensure-integration-base`).
+  2. If `new-work` does not yet exist on the remote, create it from the base branch and push it.
+  3. Merge `req/REQ-NNN` into `new-work` (`git merge --no-ff`, applying the same conflict/retry policy as 4a) and push `new-work`.
+  4. Archive this REQ now (4-pr.4) recording the `new-work` branch, but **defer PR creation**: the single PR opens at UR drain. After the last REQ for this UR archives and the UR's backlog is empty (see `## When the Backlog is Empty` drain check), open one PR from `new-work` into the base branch using the same title/body shape as 4-pr.3 (title/body keyed to the UR rather than a single REQ; the body links the UR and lists each integrated REQ). Record that PR's URL on the UR. Then continue past 4-pr.5 to Step 7.
 
 **4-pr.3 Open the PR (`req` granularity, or the single UR-drain PR).**
 
@@ -906,7 +906,7 @@ Capture the PR URL printed by `gh pr create`.
 
 ```bash
 git worktree remove {project}/.worktrees/req-NNN
-# NO `git branch -d` — the open PR owns req/REQ-NNN (or it lives on in ur/UR-NNN).
+# NO `git branch -d` — the open PR owns req/REQ-NNN (or it lives on in new-work).
 ```
 
 **4-pr.6 Record the PR URL in the ledger.** When `ledger.enabled` is true, pass the captured URL to the ledger via `--pr` (see Step 3b) so the run record's `pr_url` field carries it. If the metadata commit (4d-equivalent) runs for a tracked `.do-work/`, stage and commit the archive move per 4d — `chore(REQ-NNN): archive`.

@@ -251,14 +251,13 @@ Before any claim, worker dispatch, or worktree provision, go and run call `lib/e
 | Orchestrator checkout | Behaviour |
 |-----------------------|-----------|
 | Already off a protected default | Keep that branch; it is the integration base |
-| On protected default + **clean** tree + scoped (`go` / `run UR-NNN`) | Create-or-checkout `ur/UR-NNN` from current HEAD |
-| On protected default + **clean** tree + unscoped (`run` with no UR) | Create `work/<UTC-timestamp>` (e.g. `work/20260808T143022Z`) |
-| On protected default + **dirty** tree | **Hard-stop** — no stash, no switch; clean the tree first |
+| On protected default (scoped or unscoped) | Create-or-checkout fixed branch `new-work`; if it already exists, checkout and **merge** the protected tip just left into `new-work` |
+| On protected default + **dirty** tree | Allowed — uncommitted changes **carry** onto `new-work` (no dirt-only hard-stop) |
 | Detached HEAD | **Hard-stop** |
 
 `/do-work start` does **not** call this helper and does not switch branches — only go/run enforce the guard.
 
-The `ur/UR-NNN` name is shared with `delivery.pr.granularity: ur` (one PR per UR). Merge mode reuses the same branch name for accumulation; using `ur/` does **not** require `delivery.mode: pr`.
+The same `new-work` name is shared with `delivery.pr.granularity: ur` (one PR per UR). Merge mode reuses that branch for accumulation; using `new-work` does **not** require `delivery.mode: pr`.
 
 **Why leave the default:** Landing REQ merges on `main`/`master` while agents run makes it easy to ship half-finished work or fight over the shared default. An integration base keeps the default clean until the operator promotes deliberately.
 
@@ -284,7 +283,7 @@ The orchestrator then validates the report, merges the worktree branch into the 
 
 #### Isolation mode
 
-Every REQ runs in a dedicated git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch forked from the integration base (`ur/UR-NNN` or `work/<UTC>`). The orchestrator creates the worktree before dispatch and tears it down after merging the worker's commit into that base. Worktree-always is the canonical mode — same-branch execution is retired.
+Every REQ runs in a dedicated git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch forked from the integration base (`new-work` after leave-default, or the non-protected branch already checked out). The orchestrator creates the worktree before dispatch and tears it down after merging the worker's commit into that base. Worktree-always is the canonical mode — same-branch execution is retired.
 
 **Why worktree-always:** Uniform isolation removes a per-REQ judgment call and eliminates the class of conflicts that arises when two workers touch overlapping files on the same branch. The worktree overhead is negligible compared to the TDD loop.
 

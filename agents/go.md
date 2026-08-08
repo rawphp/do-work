@@ -62,9 +62,9 @@ bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
 
 **Hard rules (agents must not invent branch switches):**
 
-1. **Only the script may create/checkout `ur/*` or `work/*`.** Never run `git checkout`, `git switch`, or `git checkout -b` yourself to "set up" an integration base.
-2. **Already on a non-default branch (feature, `ur/*`, `req/*`, etc.) → skip.** The script prints the current branch and does not switch. Stay on that branch for the entire go/run — do **not** move to `ur/UR-NNN` "for consistency" or because a sibling session used a different base.
-3. **Switch only when the script already switched** — i.e. stdout is a new `ur/UR-NNN` or `work/*` you were not on before; after the script returns, `git branch --show-current` must already equal the printed name. If they differ, hard-stop (do not fix with another checkout).
+1. **Only the script may create/checkout `new-work` (leave-default target).** Never run `git checkout`, `git switch`, or `git checkout -b` yourself to "set up" an integration base.
+2. **Already on a non-default branch (feature, `new-work`, `req/*`, etc.) → skip.** The script prints the current branch and does not switch. Stay on that branch for the entire go/run — do **not** force `new-work` "for consistency" or because a sibling session used a different base.
+3. **Switch only when the script already switched** — i.e. stdout is `new-work` you were not on before; after the script returns, `git branch --show-current` must already equal the printed name. If they differ, hard-stop (do not fix with another checkout). Leave-default creates `new-work` if missing, or checkouts existing `new-work` and **merges** the protected tip left into it; dirty trees carry onto `new-work`.
 4. Worker `req/*` worktrees are separate checkouts; they must not change the orchestrator main checkout's branch.
 
 `/do-work start` must **not** call this helper — only go and run enforce the guard.

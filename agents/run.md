@@ -106,7 +106,7 @@ Full stamp lifecycle: [run-loop.md](../references/run-loop.md) § Agent Identity
    ```bash
    bash {skill-root}/lib/ensure-integration-base.sh [UR-NNN]
    ```
-   Pass the UR slug when this run is scoped (`/do-work run UR-NNN`); omit the arg when unscoped. Non-zero exit → hard-stop the run (surface stderr); do **not** claim or dispatch workers. Success → record printed branch as integration base (same base for `delivery.mode` merge and pr). **If already on a non-default branch, the script skips (prints current branch) — do not invent a further `git checkout` to `ur/*` or `work/*`.** Only the script may switch the orchestrator checkout. Full sequence + hard rules: [run-loop.md](../references/run-loop.md) § Pre-flight Check §2a.1.
+   Pass the UR slug when this run is scoped (`/do-work run UR-NNN`); omit the arg when unscoped (UR arg does not change the leave-default branch name). Non-zero exit → hard-stop the run (surface stderr); do **not** claim or dispatch workers. Success → record printed branch as integration base (same base for `delivery.mode` merge and pr). **If already on a non-default branch, the script skips (prints current branch) — do not invent a further `git checkout` to `new-work`.** Only the script may switch the orchestrator checkout. Leave-default target is always `new-work` (create-if-missing; existing → checkout + merge protected tip; dirty carry). Full sequence + hard rules: [run-loop.md](../references/run-loop.md) § Pre-flight Check §2a.1.
 4. Scan/classify working slots (markdown) or in-flight Linear claims — mine / sibling / stale buckets.
 5. Resume any `mine` slot.
 6. Try backlog (primary); else evaluate working set; else empty-backlog path.
