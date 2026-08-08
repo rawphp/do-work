@@ -11,12 +11,12 @@
 # Behaviour:
 #   - Detached HEAD → hard-stop non-zero (no branch create).
 #   - Current branch not protected → print branch name, exit 0 (skip).
-#   - On protected default + dirty tree → hard-stop non-zero; no branch change,
-#     no stash. Message on stderr mentions dirty working tree.
-#   - On protected default + clean + UR-NNN arg → create-if-missing and
-#     checkout ur/UR-NNN from current HEAD; print final branch; exit 0.
-#   - On protected default + clean + no UR arg → create/checkout
-#     work/<UTC-timestamp>; print final branch; exit 0.
+#   - On protected default → leave for fixed branch `new-work`:
+#       * create from current tip if missing
+#       * if present: checkout and merge the protected tip just left into new-work
+#       * dirty tree is allowed; uncommitted changes carry onto new-work
+#     UR-NNN arg is accepted for CLI compatibility but does not change the name.
+#   - Print final branch name on stdout; exit 0.
 #
 # Compatible with macOS bash 3.2. set -u. Pure bash + git.
 
@@ -69,7 +69,7 @@ is_protected() {
 }
 
 # --- skip when already off a protected default ------------------------------
-# Binding skip: callers must NOT invent ur/* or work/* checkouts when we skip.
+# Binding skip: callers must NOT invent new-work checkouts when we skip.
 # Printing the current branch name is the only success signal for this path.
 
 if ! is_protected "$CURRENT"; then
@@ -77,26 +77,18 @@ if ! is_protected "$CURRENT"; then
   exit 0
 fi
 
-# --- on protected default: dirty tree is a hard-stop ------------------------
+# --- leave default: always fixed integration branch new-work ----------------
+# Remember the protected tip we are leaving so we can merge it into new-work.
 
-if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-  echo "ensure-integration-base.sh: working tree is dirty on protected branch '$CURRENT' — clean the tree (commit or discard) before creating an integration base; refusing to stash or switch" >&2
-  exit 1
-fi
+PROTECTED_TIP="$CURRENT"
+TARGET="new-work"
 
-# --- leave default: ur/UR-NNN or work/<UTC-timestamp> -----------------------
-
-TARGET=""
+# Optional UR-NNN arg: accept for CLI compatibility; ignore for naming.
 UR_ARG="${1:-}"
-
 if [ -n "$UR_ARG" ]; then
-  # Accept UR-NNN style (UR- + digits). Reject other shapes.
   case "$UR_ARG" in
     UR-[0-9]*)
-      # require full match: UR- then only digits
-      if printf '%s' "$UR_ARG" | grep -Eq '^UR-[0-9]+$'; then
-        TARGET="ur/$UR_ARG"
-      else
+      if ! printf '%s' "$UR_ARG" | grep -Eq '^UR-[0-9]+$'; then
         echo "ensure-integration-base.sh: invalid UR slug '$UR_ARG' (expected UR-NNN)" >&2
         exit 1
       fi
@@ -106,14 +98,16 @@ if [ -n "$UR_ARG" ]; then
       exit 1
       ;;
   esac
-else
-  ts="$(date -u +%Y%m%dT%H%M%SZ)"
-  TARGET="work/$ts"
 fi
 
 if git show-ref --verify --quiet "refs/heads/$TARGET" 2>/dev/null; then
   if ! git checkout -q "$TARGET"; then
     echo "ensure-integration-base.sh: failed to checkout existing branch '$TARGET'" >&2
+    exit 1
+  fi
+  # Update from the protected tip we left (merge main/master/… into new-work).
+  if ! git merge -q --no-edit "$PROTECTED_TIP"; then
+    echo "ensure-integration-base.sh: failed to merge '$PROTECTED_TIP' into '$TARGET'" >&2
     exit 1
   fi
 else

@@ -132,100 +132,90 @@ assert_eq "feat/something" "$(current_branch)" "$CURRENT_CASE still on feature"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 2: create ur/UR-001 when on main, clean tree, UR arg given
+# Case 2: create new-work when on main, clean tree, UR arg given (ignored for name)
 # ----------------------------------------------------------------------
-CURRENT_CASE="create-ur-branch"
+CURRENT_CASE="create-new-work-scoped"
 CASES=$((CASES + 1))
 setup_repo "main" 0
 run_helper "UR-001"
 assert_eq "0" "$RUN_RC" "$CURRENT_CASE rc"
-assert_eq "ur/UR-001" "$RUN_STDOUT" "$CURRENT_CASE stdout"
-assert_eq "ur/UR-001" "$(current_branch)" "$CURRENT_CASE checked out"
-# create-if-missing: second run should skip (already non-default) and print same
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "new-work" "$(current_branch)" "$CURRENT_CASE checked out"
+# second run is already off protected → skip, print new-work
 run_helper "UR-001"
 assert_eq "0" "$RUN_RC" "$CURRENT_CASE re-run rc"
-assert_eq "ur/UR-001" "$RUN_STDOUT" "$CURRENT_CASE re-run stdout"
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE re-run stdout"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 3: create work/* when on main, clean, no UR arg
+# Case 3: create new-work when on main, clean, no UR arg
 # ----------------------------------------------------------------------
-CURRENT_CASE="create-work-branch"
+CURRENT_CASE="create-new-work-unscoped"
 CASES=$((CASES + 1))
 setup_repo "main" 0
 run_helper
 assert_eq "0" "$RUN_RC" "$CURRENT_CASE rc"
-assert_match '^work/[0-9]{8}T[0-9]{6}Z$' "$RUN_STDOUT" "$CURRENT_CASE stdout pattern"
-assert_eq "$RUN_STDOUT" "$(current_branch)" "$CURRENT_CASE checked out work/*"
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "new-work" "$(current_branch)" "$CURRENT_CASE checked out"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 4: dirty hard-stop stays on main, no stash, no branch change
+# Case 4: dirty tree carries onto new-work (no hard-stop)
 # ----------------------------------------------------------------------
-CURRENT_CASE="dirty-hard-stop"
+CURRENT_CASE="dirty-carry"
 CASES=$((CASES + 1))
 setup_repo "main" 0
 (
   cd "$TMP"
   echo "dirty" > dirty.txt
-  # untracked dirt is enough for porcelain non-empty
 )
 run_helper "UR-002"
-assert_eq "0" "$( [ "$RUN_RC" -ne 0 ] && echo 0 || echo 1 )" "$CURRENT_CASE non-zero exit (got $RUN_RC)"
-# clearer:
-if [ "$RUN_RC" -eq 0 ]; then
-  fail "$CURRENT_CASE: expected non-zero exit, got 0"
-fi
-assert_contains "dirty" "$RUN_STDERR" "$CURRENT_CASE stderr mentions dirty"
-assert_eq "main" "$(current_branch)" "$CURRENT_CASE stayed on main"
-# no stash created
+assert_eq "0" "$RUN_RC" "$CURRENT_CASE rc"
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "new-work" "$(current_branch)" "$CURRENT_CASE on new-work"
+porcelain="$(cd "$TMP" && git status --porcelain)"
+assert_contains "dirty.txt" "$porcelain" "$CURRENT_CASE dirt preserved"
 stash_count="$(cd "$TMP" && git stash list | wc -l | tr -d ' ')"
 assert_eq "0" "$stash_count" "$CURRENT_CASE no stash"
-# ur branch must not exist
-if ( cd "$TMP" && git show-ref --verify --quiet refs/heads/ur/UR-002 ); then
-  fail "$CURRENT_CASE: ur/UR-002 should not have been created"
-fi
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 5: master is protected the same as main
+# Case 5: master is protected the same as main → new-work
 # ----------------------------------------------------------------------
 CURRENT_CASE="master-protected"
 CASES=$((CASES + 1))
 setup_repo "master" 0
 run_helper "UR-003"
 assert_eq "0" "$RUN_RC" "$CURRENT_CASE rc"
-assert_eq "ur/UR-003" "$RUN_STDOUT" "$CURRENT_CASE stdout"
-assert_eq "ur/UR-003" "$(current_branch)" "$CURRENT_CASE left master"
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "new-work" "$(current_branch)" "$CURRENT_CASE left master"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 6: remote HEAD missing still protects main/master
+# Case 6: remote HEAD missing still protects main → new-work
 # ----------------------------------------------------------------------
 CURRENT_CASE="remote-head-missing-protects-main"
 CASES=$((CASES + 1))
 setup_repo "main" 0
-# Confirm no origin remote / no origin/HEAD
 if ( cd "$TMP" && git rev-parse --abbrev-ref origin/HEAD >/dev/null 2>&1 ); then
   fail "$CURRENT_CASE: fixture unexpectedly has origin/HEAD"
 fi
 run_helper
 assert_eq "0" "$RUN_RC" "$CURRENT_CASE rc"
-assert_match '^work/' "$RUN_STDOUT" "$CURRENT_CASE left main via work/*"
-assert_match '^work/' "$(current_branch)" "$CURRENT_CASE not on main"
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE left main via new-work"
+assert_eq "new-work" "$(current_branch)" "$CURRENT_CASE not on main"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 7 (extra AC): remote HEAD short name is also protected when present
+# Case 7: remote HEAD short name is also protected when present
 # ----------------------------------------------------------------------
 CURRENT_CASE="remote-head-protected"
 CASES=$((CASES + 1))
 setup_repo "develop" 1
-# On develop with origin/HEAD → develop; should leave default
 run_helper "UR-004"
 assert_eq "0" "$RUN_RC" "$CURRENT_CASE rc"
-assert_eq "ur/UR-004" "$RUN_STDOUT" "$CURRENT_CASE stdout"
-assert_eq "ur/UR-004" "$(current_branch)" "$CURRENT_CASE left develop"
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "new-work" "$(current_branch)" "$CURRENT_CASE left develop"
 teardown_fixture
 
 # ----------------------------------------------------------------------
@@ -243,9 +233,35 @@ if [ "$RUN_RC" -eq 0 ]; then
   fail "$CURRENT_CASE: expected non-zero exit on detached HEAD, got 0"
 fi
 assert_contains "detached" "$RUN_STDERR" "$CURRENT_CASE stderr mentions detached"
-# still detached
 show_cur="$(cd "$TMP" && git branch --show-current)"
 assert_eq "" "$show_cur" "$CURRENT_CASE still detached (empty show-current)"
+teardown_fixture
+
+# ----------------------------------------------------------------------
+# Case 9: existing stale new-work is checked out and merged from main
+# ----------------------------------------------------------------------
+CURRENT_CASE="merge-stale-new-work"
+CASES=$((CASES + 1))
+setup_repo "main" 0
+(
+  cd "$TMP"
+  # Point new-work at first commit, then advance main
+  git branch new-work
+  echo "second" > second.txt
+  git add second.txt
+  git commit -q -m "second on main"
+)
+run_helper "UR-005"
+assert_eq "0" "$RUN_RC" "$CURRENT_CASE rc"
+assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE stdout"
+assert_eq "new-work" "$(current_branch)" "$CURRENT_CASE on new-work"
+# main tip must be reachable from new-work after merge
+if ! ( cd "$TMP" && git merge-base --is-ancestor main HEAD ); then
+  fail "$CURRENT_CASE: main tip is not ancestor of new-work after merge"
+fi
+if ! ( cd "$TMP" && test -f second.txt ); then
+  fail "$CURRENT_CASE: second.txt from main missing on new-work"
+fi
 teardown_fixture
 
 # ----------------------------------------------------------------------
