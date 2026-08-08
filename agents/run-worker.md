@@ -53,9 +53,10 @@ Execute these steps in order before proceeding to the normal `## Steps`. **This 
 
 ```bash
 git rev-parse --abbrev-ref HEAD
+# equivalent: git branch --show-current
 ```
 
-Record the output as `<base-branch>` (typically `main`). All subsequent merge and teardown steps reference this value.
+Record the output as `<base-branch>`. This is the orchestrator checkout's **current branch after** `ensure-integration-base` has already run in go/run pre-flight — not necessarily `main`/`master`. Workers **do not** call `ensure-integration-base` themselves; they inherit the post-ensure base by reading `HEAD` at worktree create. All subsequent merge and teardown steps (orchestrator Step 4, both `delivery.mode: merge` and `pr`) reference this same value.
 
 ### W2. Create the worktree + feature branch
 

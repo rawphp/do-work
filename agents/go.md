@@ -45,6 +45,20 @@ Before delegating to any sub-agent, confirm the UR directory exists:
 - Check if `{project}/.do-work/user-requests/UR-NNN/input.md` exists
 - If it does not exist, report: "UR-NNN not found at {project}/.do-work/user-requests/UR-NNN/. Check the UR number and try again." and stop.
 
+### 0c. Ensure integration base
+
+After Load Config resolves `{skill-root}` / `$SKILL_ROOT` (step 8) and **before** any verify, run, or worker dispatch, leave protected default branches:
+
+```bash
+# Go is always UR-scoped — pass the UR slug from When Invoked.
+bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
+```
+
+- **Non-zero exit:** hard-stop the go phase. Surface the script's stderr to the user. Do **not** dispatch verify, audit, run, or workers.
+- **Success (exit 0):** the script prints the integration-base branch name on stdout. Record it as the run's integration base (workers later inherit it via the orchestrator checkout's current branch at worktree create — see [run-worker.md](run-worker.md) W1).
+
+`/do-work start` must **not** call this helper — only go and run enforce the guard.
+
 ### 1. Run Verify
 
 Read and follow [verify.md](verify.md) in full.
