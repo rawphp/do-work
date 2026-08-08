@@ -69,6 +69,8 @@ is_protected() {
 }
 
 # --- skip when already off a protected default ------------------------------
+# Binding skip: callers must NOT invent ur/* or work/* checkouts when we skip.
+# Printing the current branch name is the only success signal for this path.
 
 if ! is_protected "$CURRENT"; then
   printf '%s\n' "$CURRENT"

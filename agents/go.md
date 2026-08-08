@@ -47,15 +47,25 @@ Before delegating to any sub-agent, confirm the UR directory exists:
 
 ### 0c. Ensure integration base
 
-After Load Config resolves `{skill-root}` / `$SKILL_ROOT` (step 8) and **before** any verify, run, or worker dispatch, leave protected default branches:
+After Load Config resolves `{skill-root}` / `$SKILL_ROOT` (step 8) and **before** any verify, run, or worker dispatch, leave protected default branches **only**:
 
 ```bash
-# Go is always UR-scoped — pass the UR slug from When Invoked.
+# When go is scoped to a UR, pass the slug. Unscoped go (no UR-NNN): omit the arg.
 bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
+# unscoped: bash {skill-root}/lib/ensure-integration-base.sh
 ```
 
-- **Non-zero exit:** hard-stop the go phase. Surface the script's stderr to the user. Do **not** dispatch verify, audit, run, or workers.
-- **Success (exit 0):** the script prints the integration-base branch name on stdout. Record it as the run's integration base (workers later inherit it via the orchestrator checkout's current branch at worktree create — see [run-worker.md](run-worker.md) W1).
+| Outcome | Action |
+|---------|--------|
+| **Non-zero exit** | Hard-stop the go phase. Surface the script's stderr. Do **not** dispatch verify, audit, run, or workers. |
+| **Exit 0** | Script prints the integration-base branch name on stdout. Record it. **That printed name is authoritative.** |
+
+**Hard rules (agents must not invent branch switches):**
+
+1. **Only the script may create/checkout `ur/*` or `work/*`.** Never run `git checkout`, `git switch`, or `git checkout -b` yourself to "set up" an integration base.
+2. **Already on a non-default branch (feature, `ur/*`, `req/*`, etc.) → skip.** The script prints the current branch and does not switch. Stay on that branch for the entire go/run — do **not** move to `ur/UR-NNN` "for consistency" or because a sibling session used a different base.
+3. **Switch only when the script already switched** — i.e. stdout is a new `ur/UR-NNN` or `work/*` you were not on before; after the script returns, `git branch --show-current` must already equal the printed name. If they differ, hard-stop (do not fix with another checkout).
+4. Worker `req/*` worktrees are separate checkouts; they must not change the orchestrator main checkout's branch.
 
 `/do-work start` must **not** call this helper — only go and run enforce the guard.
 

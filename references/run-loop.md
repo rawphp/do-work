@@ -103,6 +103,13 @@ bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
 | **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (dirty tree, detached HEAD, invalid UR slug, checkout failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. |
 | **Exit 0** | Script prints the final branch name on stdout. Record it as the run's **integration base**. Subsequent worker W1 reads this branch via `git rev-parse --abbrev-ref HEAD` (or `git branch --show-current`) on the orchestrator checkout at worktree create — workers do not call ensure themselves. |
 
+**Hard rules (do not invent branch switches):**
+
+1. **Only `ensure-integration-base.sh` may create or checkout `ur/*` / `work/*` on the orchestrator checkout.** Agents must not run `git checkout` / `git switch` / `git checkout -b` to force an integration base.
+2. **Skip is binding.** If the orchestrator was already on a non-protected branch (any feature branch, existing `ur/*`, etc.), the script prints that branch and **does not switch**. Stay there for the whole run — do **not** hop to `ur/UR-NNN` because the run is UR-scoped or because another agent used a different base.
+3. After exit 0, `git branch --show-current` must equal the printed name. If not, hard-stop; do not "repair" with another checkout.
+4. Worker worktrees on `req/*` are isolated; they never retarget the orchestrator's branch.
+
 `/do-work start` must **not** invoke this helper (start is git-read-only for branch switching). Only go and run pre-flight enforce the guard.
 
 ### 2b. Generate or refresh the project context pack
