@@ -209,6 +209,22 @@ Fix dependency declarations in backlog REQs if the graph is wrong. Capture-time 
 
 **Fix:** Configure remote + authenticated `gh`, or set `delivery.mode: merge` in `.do-work/config.yml` if local merge is intended.
 
+### Integration base: dirty tree on `main` / `master` (hard-stop)
+
+**Symptom:** `/do-work go` or `/do-work run` stops immediately with stderr from `ensure-integration-base.sh` about a dirty working tree on a protected branch; no workers start.
+
+**Cause:** Pre-flight will not create `ur/UR-NNN` or `work/<UTC>` while the orchestrator is on a protected default (`main`, `master`, or remote HEAD) with uncommitted changes. It never stashes and never switches over dirt.
+
+**Fix:** Commit or discard local changes on that branch, then re-run go/run. If you already intend a non-default base, check out that branch yourself first (clean or dirty is fine once off the protected default — ensure only auto-switches when leaving the default).
+
+### Integration base: auto-switched off the default branch
+
+**Symptom:** After go/run, the main checkout is on `ur/UR-NNN` (scoped) or `work/<timestamp>` (unscoped), not `main`/`master`.
+
+**Cause:** Expected. `lib/ensure-integration-base.sh` leaves protected defaults so REQ merges never land on remote HEAD. Scoped runs reuse `ur/UR-NNN` (same name as `delivery.pr.granularity: ur`; pr mode is not required). `/do-work start` does not switch branches.
+
+**Fix:** None required for the run. When you want to promote, merge or open a PR from the integration base to the default branch yourself. To stay on a long-lived feature base, check it out before go/run so ensure is a no-op.
+
 ### Review or evidence gate failed
 
 **Cause:** Worker finished coding but orchestrator rejected evidence, policy, or post-build review.

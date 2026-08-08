@@ -244,11 +244,29 @@ Triggered by `/do-work run` (or implicitly by `/do-work go` when verify passes).
 
 Executes the backlog autonomously, one REQ at a time, until empty or a stopper is hit.
 
+#### Integration base (pre-flight)
+
+Before any claim, worker dispatch, or worktree provision, go and run call `lib/ensure-integration-base.sh` so workers never integrate into a protected default branch (`main`, `master`, or the remote HEAD short name when resolvable):
+
+| Orchestrator checkout | Behaviour |
+|-----------------------|-----------|
+| Already off a protected default | Keep that branch; it is the integration base |
+| On protected default + **clean** tree + scoped (`go` / `run UR-NNN`) | Create-or-checkout `ur/UR-NNN` from current HEAD |
+| On protected default + **clean** tree + unscoped (`run` with no UR) | Create `work/<UTC-timestamp>` (e.g. `work/20260808T143022Z`) |
+| On protected default + **dirty** tree | **Hard-stop** — no stash, no switch; clean the tree first |
+| Detached HEAD | **Hard-stop** |
+
+`/do-work start` does **not** call this helper and does not switch branches — only go/run enforce the guard.
+
+The `ur/UR-NNN` name is shared with `delivery.pr.granularity: ur` (one PR per UR). Merge mode reuses the same branch name for accumulation; using `ur/` does **not** require `delivery.mode: pr`.
+
+**Why leave the default:** Landing REQ merges on `main`/`master` while agents run makes it easy to ship half-finished work or fight over the shared default. An integration base keeps the default clean until the operator promotes deliberately.
+
 #### The TDD loop (per REQ)
 
 The orchestrator claims the REQ (atomic `git mv` from backlog root into `working/`, plus a claim stamp written to the file via `lib/claim-req.sh`), then dispatches a **fresh worker subagent** for each REQ (see `agents/run-worker.md`). The worker:
 
-1. Creates a git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch
+1. Creates a git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch (from the post-ensure integration base)
 2. Writes a failing test for the first acceptance criterion
 3. Implements until the test passes
 4. Repeats for remaining criteria
@@ -256,7 +274,7 @@ The orchestrator claims the REQ (atomic `git mv` from backlog root into `working
 6. Commits with `feat(REQ-NNN): short title` and a body pointing back to the REQ, UR, and primary output
 7. Returns a structured YAML report to the orchestrator
 
-The orchestrator then validates the report, merges the worktree branch, moves the REQ from `working/` to `archive/` with `Status: done`, tears down the worktree, and records the ledger entry.
+The orchestrator then validates the report, merges the worktree branch into the **integration base** (not `main`/`master`), moves the REQ from `working/` to `archive/` with `Status: done`, tears down the worktree, and records the ledger entry.
 
 **Why a fresh subagent per REQ:** Context isolation. A worker that just finished implementing REQ-007 carries 30k tokens of context that are irrelevant — and often actively misleading — for REQ-008. Spawning a fresh subagent enforces a clean room per REQ. The orchestrator (the parent) only sees structured return reports, not the worker's internal monologue, so the parent's context stays small even across hundreds of REQs.
 
@@ -266,7 +284,7 @@ The orchestrator then validates the report, merges the worktree branch, moves th
 
 #### Isolation mode
 
-Every REQ runs in a dedicated git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch. The orchestrator creates the worktree before dispatch and tears it down after merging the worker's commit. Worktree-always is the canonical mode — same-branch execution is retired.
+Every REQ runs in a dedicated git worktree at `{project}/.worktrees/req-NNN` on a `req/REQ-NNN` branch forked from the integration base (`ur/UR-NNN` or `work/<UTC>`). The orchestrator creates the worktree before dispatch and tears it down after merging the worker's commit into that base. Worktree-always is the canonical mode — same-branch execution is retired.
 
 **Why worktree-always:** Uniform isolation removes a per-REQ judgment call and eliminates the class of conflicts that arises when two workers touch overlapping files on the same branch. The worktree overhead is negligible compared to the TDD loop.
 
