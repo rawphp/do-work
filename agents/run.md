@@ -102,9 +102,14 @@ Full stamp lifecycle: [run-loop.md](../references/run-loop.md) § Agent Identity
 
 1. Branch + working-directory checks; `mkdir -p {project}/.do-work/state`.
 2. Resolve `AGENT_ID`; resolve `{skill-root}` / `$SKILL_ROOT` via **Load Config step 8** (`agents/config.md` — single home; hard-stop if unknown); refresh context pack.
-3. Scan/classify working slots (markdown) or in-flight Linear claims — mine / sibling / stale buckets.
-4. Resume any `mine` slot.
-5. Try backlog (primary); else evaluate working set; else empty-backlog path.
+3. **Ensure integration base** — after skill-root resolve, **before** claim / worker dispatch / worktree provision:
+   ```bash
+   bash {skill-root}/lib/ensure-integration-base.sh [UR-NNN]
+   ```
+   Pass the UR slug when this run is scoped (`/do-work run UR-NNN`); omit the arg when unscoped. Non-zero exit → hard-stop the run (surface stderr); do **not** claim or dispatch workers. Success → record printed branch as integration base (same base for `delivery.mode` merge and pr). Full sequence: [run-loop.md](../references/run-loop.md) § Pre-flight Check.
+4. Scan/classify working slots (markdown) or in-flight Linear claims — mine / sibling / stale buckets.
+5. Resume any `mine` slot.
+6. Try backlog (primary); else evaluate working set; else empty-backlog path.
 
 Full pre-flight sequences: [run-loop.md](../references/run-loop.md) § Pre-flight Check.
 

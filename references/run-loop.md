@@ -87,6 +87,24 @@ AGENT_ID="$(hostname).$$"
 
 `{skill-root}` is the absolute skill install root (directory containing `agents/`, `lib/`, `SKILL.md`). Lib invocations throughout this file (`{skill-root}/lib/scan-stale.sh`, etc.) and in `agents/run-worker.md` (heartbeat, file-feedback) only resolve when `{skill-root}` is a real absolute path. A worker `cd`'d into a consumer project's worktree has no `lib/` of its own, so the orchestrator substitutes `$SKILL_ROOT` into every `{skill-root}/lib/...` call it makes and passes that same absolute value as the worker **Skill root** input (Step 2 dispatch).
 
+### 2a.1 Ensure integration base (before claim / dispatch / worktree provision)
+
+After skill-root is resolved and **before** any claim, worker dispatch, or worktree provision, ensure the orchestrator checkout is not on a protected default branch:
+
+```bash
+# When this run is scoped to a UR (`/do-work run UR-NNN` or go-delegated run for UR-NNN):
+bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
+# When unscoped (`/do-work run` with no UR):
+# bash {skill-root}/lib/ensure-integration-base.sh
+```
+
+| Outcome | Action |
+|---------|--------|
+| **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (dirty tree, detached HEAD, invalid UR slug, checkout failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. |
+| **Exit 0** | Script prints the final branch name on stdout. Record it as the run's **integration base**. Subsequent worker W1 reads this branch via `git rev-parse --abbrev-ref HEAD` (or `git branch --show-current`) on the orchestrator checkout at worktree create — workers do not call ensure themselves. |
+
+`/do-work start` must **not** invoke this helper (start is git-read-only for branch switching). Only go and run pre-flight enforce the guard.
+
 ### 2b. Generate or refresh the project context pack
 
 Workers run context-starved by design (their "When Invoked" rule). To raise implementation quality without making each worker re-explore the repo, the orchestrator maintains **one** project context pack at `{project}/.do-work/state/context-pack.md` and passes its path to every worker. One orchestrator-level scan amortises across every worker in every run.
@@ -733,6 +751,8 @@ Reached only when `status: done` and both acceptance evidence validation and pos
 - **`pr`** — skip 4a–4d entirely and execute the **PR delivery** sequence (`#### 4-pr`) instead. PR mode never runs the local merge.
 
 The guards in 4b and 4-pr.4 (path-unit closure and non-empty closure proof) and the closure-proof model are identical in both delivery modes — only the delivery vehicle differs. Whichever path runs, proceed to Step 7 when it completes.
+
+**Integration base (both modes):** `<base-branch>` is the post-`ensure-integration-base` orchestrator checkout (Pre-flight §2a.1 / worker W1). Merge mode merges the feature branch into that base; PR mode uses the same value for `--base` / integration-branch ancestry. Do **not** invent a second naming scheme for merge vs pr.
 
 #### 4a. Merge the feature branch
 
