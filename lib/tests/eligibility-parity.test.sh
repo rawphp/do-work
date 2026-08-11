@@ -226,6 +226,96 @@ CURRENT_CASE="footprint-unmatched-literal-parity"; CASES=$((CASES + 1))
   assert_contains "overlap:REQ-501" "$PICK_ERR" "pick-req overlap-rejects literal peer REQ-501"
 }
 
+# ============================================================================
+# CROSS-BACKEND PARITY (REQ-014) — pin dw-db eligibility to the same contract.
+# Each scenario builds an equivalent sqlite fixture and asserts dw-db's
+# list-claimable makes the logically-correct decision. RESULT-parity, not
+# mechanism-parity: dw-db's status-based deps / claims table are the correct
+# sqlite analogue of markdown's archive/ + working/.
+# ============================================================================
+DWDB="$LIB_DIR/dw-db.sh"
+mkdbproject() {
+  local root
+  root="$(mktemp -d -t elig-parity-db.XXXXXX)"
+  bash "$DWDB" ensure "$root" >/dev/null 2>&1
+  echo "$root"
+}
+
+# CB1: dep satisfied (depended-on REQ archived) → claimable.
+CURRENT_CASE="xdb-dep-satisfied"; CASES=$((CASES + 1))
+{
+  R="$(mkdbproject)"; register "$R"
+  UR="$(bash "$DWDB" create-ur "$R" --title t --brief b 2>/dev/null)"
+  B="$(bash "$DWDB" create-req "$R" --ur "$UR" --title B 2>/dev/null)"
+  A="$(bash "$DWDB" create-req "$R" --ur "$UR" --title A --deps "$B" --files "src/a.php" 2>/dev/null)"
+  bash "$DWDB" update-req "$R" "$B" --closure-proof "test" >/dev/null 2>&1
+  bash "$DWDB" archive-req "$R" "$B" >/dev/null 2>&1   # B → done
+  lc="$(bash "$DWDB" list-claimable "$R" --ur "$UR" 2>/dev/null)"
+  assert_contains "$A" "$lc" "dw-db lists A as claimable when its dep is done"
+}
+
+# CB2: dep unsatisfied (depended-on REQ not archived) → not claimable.
+CURRENT_CASE="xdb-dep-unsatisfied"; CASES=$((CASES + 1))
+{
+  R="$(mkdbproject)"; register "$R"
+  UR="$(bash "$DWDB" create-ur "$R" --title t --brief b 2>/dev/null)"
+  B="$(bash "$DWDB" create-req "$R" --ur "$UR" --title B 2>/dev/null)"
+  A="$(bash "$DWDB" create-req "$R" --ur "$UR" --title A --deps "$B" --files "src/a.php" 2>/dev/null)"
+  lc="$(bash "$DWDB" list-claimable "$R" --ur "$UR" 2>/dev/null)"
+  assert_not_contains "$A" "$lc" "dw-db omits A while its dep is not done"
+}
+
+# CB3: footprint free → claimable.
+CURRENT_CASE="xdb-footprint-free"; CASES=$((CASES + 1))
+{
+  R="$(mkdbproject)"; register "$R"
+  mkdir -p "$R/src"; touch "$R/src/a.php" "$R/src/c.php"
+  UR="$(bash "$DWDB" create-ur "$R" --title t --brief b 2>/dev/null)"
+  C="$(bash "$DWDB" create-req "$R" --ur "$UR" --title C --files "src/c.php" 2>/dev/null)"
+  A="$(bash "$DWDB" create-req "$R" --ur "$UR" --title A --files "src/a.php" 2>/dev/null)"
+  bash "$DWDB" claim "$R" "$C" test-agent >/dev/null 2>&1   # C in-flight
+  lc="$(bash "$DWDB" list-claimable "$R" --ur "$UR" 2>/dev/null)"
+  assert_contains "$A" "$lc" "dw-db lists A when footprint is free of in-flight C"
+}
+
+# CB4: footprint overlap (literal path) → not claimable.
+CURRENT_CASE="xdb-footprint-overlap"; CASES=$((CASES + 1))
+{
+  R="$(mkdbproject)"; register "$R"
+  mkdir -p "$R/src"; touch "$R/src/shared.php"
+  UR="$(bash "$DWDB" create-ur "$R" --title t --brief b 2>/dev/null)"
+  C="$(bash "$DWDB" create-req "$R" --ur "$UR" --title C --files "src/shared.php" 2>/dev/null)"
+  A="$(bash "$DWDB" create-req "$R" --ur "$UR" --title A --files "src/shared.php" 2>/dev/null)"
+  bash "$DWDB" claim "$R" "$C" test-agent >/dev/null 2>&1   # C in-flight
+  lc="$(bash "$DWDB" list-claimable "$R" --ur "$UR" 2>/dev/null)"
+  assert_not_contains "$A" "$lc" "dw-db omits A when footprint overlaps in-flight C"
+}
+
+# CB5: empty Files → claimable (no overlap possible).
+CURRENT_CASE="xdb-footprint-empty"; CASES=$((CASES + 1))
+{
+  R="$(mkdbproject)"; register "$R"
+  UR="$(bash "$DWDB" create-ur "$R" --title t --brief b 2>/dev/null)"
+  C="$(bash "$DWDB" create-req "$R" --ur "$UR" --title C --files "src/c.php" 2>/dev/null)"
+  A="$(bash "$DWDB" create-req "$R" --ur "$UR" --title A 2>/dev/null)"   # no files
+  bash "$DWDB" claim "$R" "$C" test-agent >/dev/null 2>&1
+  lc="$(bash "$DWDB" list-claimable "$R" --ur "$UR" 2>/dev/null)"
+  assert_contains "$A" "$lc" "dw-db lists A when its footprint is empty"
+}
+
+# CB6: ** globstar footprint overlap → not claimable.
+CURRENT_CASE="xdb-footprint-globstar"; CASES=$((CASES + 1))
+{
+  R="$(mkdbproject)"; register "$R"
+  mkdir -p "$R/src/deep/nested"; touch "$R/src/deep/nested/a.ts"
+  UR="$(bash "$DWDB" create-ur "$R" --title t --brief b 2>/dev/null)"
+  C="$(bash "$DWDB" create-req "$R" --ur "$UR" --title C --files "src/**/*.ts" 2>/dev/null)"
+  A="$(bash "$DWDB" create-req "$R" --ur "$UR" --title A --files "src/deep/nested/a.ts" 2>/dev/null)"
+  bash "$DWDB" claim "$R" "$C" test-agent >/dev/null 2>&1
+  lc="$(bash "$DWDB" list-claimable "$R" --ur "$UR" 2>/dev/null)"
+  assert_not_contains "$A" "$lc" "dw-db omits A when ** footprint overlaps in-flight C"
+}
+
 echo "-----------------------------------------"
 echo "Cases: $CASES run, $FAILED failed"
 if [ "$FAILED" -ne 0 ]; then exit 1; fi
