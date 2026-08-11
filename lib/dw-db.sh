@@ -1191,6 +1191,309 @@ cmd_pick() {
   printf '%s\n' "$first"
 }
 
+# --- artifact helpers (ur_artifacts) ---
+# kind write modes: append (concat with blank line) | replace
+_artifact_write() {
+  local db="$1" ur_id="$2" kind="$3" mode="$4" body="$5" now="$6"
+  local kind_q body_q now_q
+  kind_q="$(sql_quote "$kind")"
+  body_q="$(sql_quote "$body")"
+  now_q="$(sql_quote "$now")"
+  if [ "$mode" = "append" ]; then
+    sql_exec "$db" "
+INSERT INTO ur_artifacts(ur_id, kind, body, updated_at)
+VALUES($ur_id, $kind_q, $body_q, $now_q)
+ON CONFLICT(ur_id, kind) DO UPDATE SET
+  body = CASE
+    WHEN ur_artifacts.body = '' THEN excluded.body
+    ELSE ur_artifacts.body || char(10) || char(10) || excluded.body
+  END,
+  updated_at = excluded.updated_at;
+" || die "artifact write failed (kind=$kind)"
+  else
+    sql_exec "$db" "
+INSERT INTO ur_artifacts(ur_id, kind, body, updated_at)
+VALUES($ur_id, $kind_q, $body_q, $now_q)
+ON CONFLICT(ur_id, kind) DO UPDATE SET
+  body = excluded.body,
+  updated_at = excluded.updated_at;
+" || die "artifact write failed (kind=$kind)"
+  fi
+}
+
+_parse_body_arg() {
+  # Sets global _BODY from --body VAL or remaining single positional.
+  _BODY=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --body) _BODY="${2:-}"; shift 2 ;;
+      --) shift; _BODY="${*}"; break ;;
+      *)
+        if [ -z "$_BODY" ]; then
+          _BODY="$1"
+          shift
+        else
+          die "unexpected arg: $1"
+        fi
+        ;;
+    esac
+  done
+}
+
+# --- append-ideate <root> <UR-NNN> --body TEXT ---
+cmd_append_ideate() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "append-ideate: usage: append-ideate <root> <UR-NNN> --body TEXT"
+  _parse_body_arg "$@"
+  [ -n "$_BODY" ] || die "append-ideate: --body required"
+  require_sqlite3
+  local db ur_id now brief_before brief_after
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "append-ideate: unknown UR slug: $slug"
+  brief_before="$(sqlite3 "$db" "SELECT brief FROM urs WHERE id=$ur_id;")"
+  now="$(iso_now)"
+  _artifact_write "$db" "$ur_id" "ideate" "append" "$_BODY" "$now"
+  brief_after="$(sqlite3 "$db" "SELECT brief FROM urs WHERE id=$ur_id;")"
+  [ "$brief_before" = "$brief_after" ] || die "append-ideate: brief mutated (bug)"
+}
+
+# --- append-clarifications <root> <UR-NNN> --body TEXT ---
+cmd_append_clarifications() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "append-clarifications: usage: append-clarifications <root> <UR-NNN> --body TEXT"
+  _parse_body_arg "$@"
+  [ -n "$_BODY" ] || die "append-clarifications: --body required"
+  require_sqlite3
+  local db ur_id now
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "append-clarifications: unknown UR slug: $slug"
+  now="$(iso_now)"
+  _artifact_write "$db" "$ur_id" "clarifications" "append" "$_BODY" "$now"
+}
+
+# --- write-verify <root> <UR-NNN> --body TEXT ---
+cmd_write_verify() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "write-verify: usage: write-verify <root> <UR-NNN> --body TEXT"
+  _parse_body_arg "$@"
+  [ -n "$_BODY" ] || die "write-verify: --body required"
+  require_sqlite3
+  local db ur_id now
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "write-verify: unknown UR slug: $slug"
+  now="$(iso_now)"
+  _artifact_write "$db" "$ur_id" "verify" "replace" "$_BODY" "$now"
+}
+
+# --- write-close <root> <UR-NNN> --body TEXT ---
+# Replace close artifact and set urs.closed_at (first close time preserved).
+cmd_write_close() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "write-close: usage: write-close <root> <UR-NNN> --body TEXT"
+  _parse_body_arg "$@"
+  [ -n "$_BODY" ] || die "write-close: --body required"
+  require_sqlite3
+  local db ur_id now body_q now_q
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "write-close: unknown UR slug: $slug"
+  now="$(iso_now)"
+  body_q="$(sql_quote "$_BODY")"
+  now_q="$(sql_quote "$now")"
+  sqlite3 "$db" >/dev/null <<SQL || die "write-close: transaction failed"
+PRAGMA busy_timeout=5000;
+PRAGMA journal_mode=WAL;
+PRAGMA foreign_keys=ON;
+BEGIN IMMEDIATE;
+INSERT INTO ur_artifacts(ur_id, kind, body, updated_at)
+VALUES($ur_id, 'close', $body_q, $now_q)
+ON CONFLICT(ur_id, kind) DO UPDATE SET
+  body = excluded.body,
+  updated_at = excluded.updated_at;
+UPDATE urs SET closed_at = COALESCE(closed_at, $now_q) WHERE id=$ur_id;
+COMMIT;
+SQL
+}
+
+# --- write-open-gaps / write-capture-summary (replace kinds; helpers for agents) ---
+cmd_write_open_gaps() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "write-open-gaps: usage: write-open-gaps <root> <UR-NNN> --body TEXT"
+  _parse_body_arg "$@"
+  [ -n "$_BODY" ] || die "write-open-gaps: --body required"
+  require_sqlite3
+  local db ur_id now
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "write-open-gaps: unknown UR slug: $slug"
+  now="$(iso_now)"
+  _artifact_write "$db" "$ur_id" "open_gaps" "replace" "$_BODY" "$now"
+}
+
+cmd_write_capture_summary() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "write-capture-summary: usage: write-capture-summary <root> <UR-NNN> --body TEXT"
+  _parse_body_arg "$@"
+  [ -n "$_BODY" ] || die "write-capture-summary: --body required"
+  require_sqlite3
+  local db ur_id now
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "write-capture-summary: unknown UR slug: $slug"
+  now="$(iso_now)"
+  _artifact_write "$db" "$ur_id" "capture_summary" "replace" "$_BODY" "$now"
+}
+
+# --- append-decision <root> <line> ---
+cmd_append_decision() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "append-decision: usage: append-decision <root> <line>"
+  local line="$*"
+  [ -n "$line" ] || die "append-decision: decision line required"
+  require_sqlite3
+  local db now
+  db="$(open_db "$root")"
+  now="$(iso_now)"
+  sql_exec "$db" "INSERT INTO decisions(line, created_at) VALUES($(sql_quote "$line"), $(sql_quote "$now"));" \
+    || die "append-decision: insert failed"
+}
+
+# --- write-calibration <root> --body TEXT ---
+cmd_write_calibration() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "write-calibration: usage: write-calibration <root> --body TEXT"
+  _parse_body_arg "$@"
+  # allow empty body (clear)
+  require_sqlite3
+  local db now
+  db="$(open_db "$root")"
+  now="$(iso_now)"
+  sql_exec "$db" "
+INSERT INTO calibration(id, body, updated_at) VALUES(1, $(sql_quote "$_BODY"), $(sql_quote "$now"))
+ON CONFLICT(id) DO UPDATE SET body=excluded.body, updated_at=excluded.updated_at;
+" || die "write-calibration failed"
+}
+
+# --- read-calibration <root> ---
+cmd_read_calibration() {
+  local root="${1:-}"
+  [ -n "$root" ] || die "read-calibration: usage: read-calibration <root>"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  sqlite3 "$db" "SELECT COALESCE(body,'') FROM calibration WHERE id=1;"
+}
+
+# --- set-active-milestone <root> <UR-NNN> <M1|''> [--checklist JSON] ---
+cmd_set_active_milestone() {
+  local root="${1:-}" slug="${2:-}" active="${3:-}"; shift 3 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "set-active-milestone: usage: set-active-milestone <root> <UR-NNN> <M1|''> [--checklist JSON]"
+  local checklist=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --checklist) checklist="${2:-}"; shift 2 ;;
+      *) die "set-active-milestone: unknown arg: $1" ;;
+    esac
+  done
+  require_sqlite3
+  local db ur_id active_sql checklist_sql
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "set-active-milestone: unknown UR slug: $slug"
+  if [ -z "$active" ]; then
+    active_sql="NULL"
+  else
+    active_sql="$(sql_quote "$active")"
+  fi
+  checklist_sql="$(sql_quote "$checklist")"
+  sql_exec "$db" "
+INSERT INTO milestone_state(ur_id, active, checklist_json)
+VALUES($ur_id, $active_sql, $checklist_sql)
+ON CONFLICT(ur_id) DO UPDATE SET
+  active = excluded.active,
+  checklist_json = CASE
+    WHEN excluded.checklist_json = '' THEN milestone_state.checklist_json
+    ELSE excluded.checklist_json
+  END;
+" || die "set-active-milestone failed"
+}
+
+# --- get-active-milestone <root> <UR-NNN> ---
+# Prints active id or empty line when none.
+cmd_get_active_milestone() {
+  local root="${1:-}" slug="${2:-}"
+  [ -n "$root" ] && [ -n "$slug" ] || die "get-active-milestone: usage: get-active-milestone <root> <UR-NNN>"
+  require_sqlite3
+  local db ur_id
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "get-active-milestone: unknown UR slug: $slug"
+  ur_active_milestone "$db" "$ur_id"
+}
+
+# --- list-milestone-reqs <root> <UR-NNN> [--milestone M1] ---
+# Defaults to that UR's active milestone; empty active → empty list.
+cmd_list_milestone_reqs() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "list-milestone-reqs: usage: list-milestone-reqs <root> <UR-NNN> [--milestone M1]"
+  local milestone=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --milestone) milestone="${2:-}"; shift 2 ;;
+      *) die "list-milestone-reqs: unknown arg: $1" ;;
+    esac
+  done
+  require_sqlite3
+  local db ur_id
+  db="$(open_db "$root")"
+  ur_id="$(ur_id_for_slug "$db" "$slug")"
+  [ -n "$ur_id" ] || die "list-milestone-reqs: unknown UR slug: $slug"
+  if [ -z "$milestone" ]; then
+    milestone="$(ur_active_milestone "$db" "$ur_id")"
+  fi
+  if [ -z "$milestone" ]; then
+    return 0
+  fi
+  sqlite3 -separator $'\t' "$db" "
+SELECT r.slug, r.title, r.status, COALESCE(r.path_milestone,'')
+FROM reqs r
+WHERE r.ur_id = $ur_id AND r.path_milestone = $(sql_quote "$milestone")
+ORDER BY CAST(substr(r.slug, instr(r.slug,'-')+1) AS INTEGER) ASC;"
+}
+
+# --- append-run-note <root> <REQ-NNN> --payload TEXT ---
+cmd_append_run_note() {
+  local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] || die "append-run-note: usage: append-run-note <root> <REQ-NNN> --payload TEXT"
+  local payload=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --payload) payload="${2:-}"; shift 2 ;;
+      --body) payload="${2:-}"; shift 2 ;;
+      *)
+        if [ -z "$payload" ]; then
+          payload="$1"; shift
+        else
+          die "append-run-note: unknown arg: $1"
+        fi
+        ;;
+    esac
+  done
+  [ -n "$payload" ] || die "append-run-note: --payload required"
+  require_sqlite3
+  local db rid now
+  db="$(open_db "$root")"
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || die "append-run-note: unknown REQ slug: $slug"
+  now="$(iso_now)"
+  sql_exec "$db" "INSERT INTO run_notes(req_id, payload, created_at)
+VALUES($rid, $(sql_quote "$payload"), $(sql_quote "$now"));" \
+    || die "append-run-note: insert failed"
+}
+
 main() {
   local cmd="${1:-}"; shift || true
   case "$cmd" in
@@ -1215,6 +1518,19 @@ main() {
     archive-req) cmd_archive_req "$@" ;;
     list-claimable) cmd_list_claimable "$@" ;;
     pick) cmd_pick "$@" ;;
+    append-ideate) cmd_append_ideate "$@" ;;
+    append-clarifications) cmd_append_clarifications "$@" ;;
+    write-verify) cmd_write_verify "$@" ;;
+    write-close) cmd_write_close "$@" ;;
+    write-open-gaps) cmd_write_open_gaps "$@" ;;
+    write-capture-summary) cmd_write_capture_summary "$@" ;;
+    append-decision) cmd_append_decision "$@" ;;
+    write-calibration) cmd_write_calibration "$@" ;;
+    read-calibration) cmd_read_calibration "$@" ;;
+    set-active-milestone) cmd_set_active_milestone "$@" ;;
+    get-active-milestone) cmd_get_active_milestone "$@" ;;
+    list-milestone-reqs) cmd_list_milestone_reqs "$@" ;;
+    append-run-note) cmd_append_run_note "$@" ;;
     "") die "usage: dw-db.sh <command> ..." ;;
     *) die "unknown command: $cmd" ;;
   esac
