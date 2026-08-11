@@ -42,3 +42,10 @@ not this file. No product names/ticket ids as substance.
 | Feature commits exist but integration tip missing files | Merged onto wrong branch first | Cherry-pick / re-merge feature commits onto the recorded base; leave foreign branch as-is or reset only if operator owns that WIP |
 
 **Rule:** integration base is a **recorded name**, not “whatever the shell is on.” Parallel waves + multi-branch monorepos make silent checkout drift common.
+
+## 6. Bash `read` + empty SQLite columns
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Multi-column CLI filters drop/mis-assign fields when a middle column is empty | `IFS=$'\t' read` treats tab as **IFS whitespace** and collapses consecutive delimiters | Use a non-whitespace record separator for `sqlite3 -separator` (e.g. `$'\x1e'`) when empty fields are possible |
+
