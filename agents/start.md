@@ -44,8 +44,11 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 |---------|-------------|-------------|--------------|
 | **linear** | **`create_ur`** → UR Project Milestone; report Linear ids | **`append_ideate`** on that milestone; **`read_ur`** for brief/ideate | **`create_req`** Issues on product Project + UR milestone; **`list_reqs_for_ur`** to list |
 | **markdown** | Local `user-requests/UR-NNN/input.md` | Local `ideate.md` | Local `REQ-*.md` backlog files |
+| **sqlite** | `create_ur` via dw-db | `append_ideate` via dw-db | `create_req` / `list-reqs` via dw-db — **no** live `REQ-*.md` / `user-requests/` |
 
 When backend is **`linear`**, start **must not** require or create `.do-work/user-requests/` as the work-item store. Hard-stop if Linear MCP unusable — never silent markdown fallback.
+
+When backend is **`sqlite` (1S)**, start uses dw-db only (`create_ur` / capture path via port). Hard-stop if sqlite unusable — never silent markdown fallback.
 
 ### 1. Run Intake
 

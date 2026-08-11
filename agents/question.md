@@ -44,6 +44,14 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | Backend | Persist Q&A |
 |---------|-------------|
 | **markdown** | Append `## Clarifications` to `{project}/.do-work/user-requests/UR-NNN/input.md` |
+| **sqlite** | Port op **`append_clarifications`** → `bash {skill-root}/lib/dw-db.sh append-clarifications {project} UR-NNN --body TEXT`. **Do not** dual-write `input.md` as the store. |
+
+
+### When backend is sqlite (1S)
+
+- Append clarifications via `bash {skill-root}/lib/dw-db.sh append-clarifications {project} UR-NNN --body TEXT` only
+- Do not dual-write `user-requests/…/input.md` as the store
+- Hard-stop if dw-db fails
 | **linear** | Port op **`append_clarifications`** — append Q&A under `## Clarifications` on the **UR Project Milestone** description. Never overwrite `## Brief`. **No** local `input.md` dual-write. |
 
 ### 1. Read the brief
@@ -80,7 +88,7 @@ Before asking the user anything, attempt to resolve each ambiguity from existing
 - The project codebase (source files, configs, existing tests)
 - Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear:** UR Project Milestone clarifications via port `read_ur` / `list_urs` (never invent a dual store)
 - Prior REQs — **markdown:** `.do-work/archive/REQ-*.md`; **linear:** Issues via port `list_reqs_for_ur` / `read_req` (Linear issue ids)
-- **Decisions memory (REQ-297):** **markdown** — `.do-work/decisions.md` if present; **linear** — **Read decisions** helper (`agents/tracker/linear.md`, Team Doc `decisions_doc_title` / default `do-work/decisions`). Same one-line grammar either backend. Do not read local `decisions.md` when backend is linear.
+- **Decisions memory (REQ-297):** **markdown** — `.do-work/decisions.md` if present; **linear** — **Read decisions** helper (`agents/tracker/linear.md`, Team Doc `decisions_doc_title` / default `do-work/decisions`). Same one-line grammar either backend. Do not read local `decisions.md` when backend is linear. When backend is **sqlite**, read decisions via `dw-db` / port (not local `decisions.md`); clarifications only via `append-clarifications`.
 
 For each ambiguity, classify the resolution into one of three buckets:
 

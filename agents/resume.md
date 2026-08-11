@@ -45,8 +45,16 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 |---------|------------------|
 | **`markdown`** | Steps **1–6** below (working/ stamp + `heartbeat.sh`) |
 | **`linear`** | Steps **L1–L5** — linear.md **Resume** (compose **`set_req_status`** + **`heartbeat_req`**). Id is a **Linear issue id**. Assignee and claim ownership preserved. |
+| **`sqlite`** | **1S** — `get-req` / `set-status in_progress` / `heartbeat` by **REQ slug** via `lib/dw-db.sh` only. Do not glob `working/REQ`. |
 
-Invocation under Linear may be `/do-work resume ENG-123`. Worktree/branch isolation stays **local** regardless of backend.
+Invocation under Linear may be `/do-work resume ENG-123`. Under sqlite: `/do-work resume REQ-NNN` (slug). Worktree/branch isolation stays **local** regardless of backend.
+
+### When backend is sqlite (1S)
+
+1. `bash {skill-root}/lib/dw-db.sh get-req {project} REQ-NNN` — must be `stopped` (or eligible) with an active claim for this agent when required
+2. `set-status` → `in_progress`; `heartbeat` for agent
+3. Do **not** require or create `working/REQ-*.md`
+4. Hard-stop if dw-db fails — never markdown fallback
 
 ---
 

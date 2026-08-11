@@ -32,15 +32,17 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 ### 1. Detect project state
 
-Check the following conditions in order:
+**When backend is sqlite (1S):** do **not** glob `REQ-*.md` / `user-requests/` as live truth. Use `bash {skill-root}/lib/dw-db.sh list-urs {project}`, `list-reqs`, `status-synth`, and optional `/do-work board`. Suggest based on DB state (open URs, claimable REQs, closed_at). Markdown FS heuristics below apply only when backend is **markdown** (Linear uses port list ops).
 
-1. Does `{project}/.do-work/` exist?
-2. Are there `REQ-NNN-*.md` files in `{project}/.do-work/` (backlog root)?
-3. Are there `REQ-NNN-*.md` files in `{project}/.do-work/working/`?
-4. Are there `UR-NNN/` folders in `{project}/.do-work/user-requests/`?
-5. Are there REQ files in `{project}/.do-work/archive/`?
-6. Are there `RUN-NNN.yml` files in `{project}/.do-work/runs/`? (Retro heuristic: runs exist but no `calibration.md` → suggest retro.)
-7. Do any archived REQs have a non-empty `**Entry point:**` field (path-unit REQs) for a given UR, and does that UR lack a `closure.md` in `{project}/.do-work/user-requests/UR-NNN/`? (Close heuristic: run has drained for a UR with path-units but no closure report yet.)
+Check the following conditions in order (markdown backend; adapt via port/dw-db for linear/sqlite):
+
+1. Does `{project}/.do-work/` exist? (sqlite: `work.db` present after ensure)
+2. Are there `REQ-NNN-*.md` files in `{project}/.do-work/` (backlog root)? *(markdown only — sqlite: `list-reqs` backlog status)*
+3. Are there `REQ-NNN-*.md` files in `{project}/.do-work/working/`? *(markdown only — sqlite: `in_progress` via dw-db)*
+4. Are there `UR-NNN/` folders in `{project}/.do-work/user-requests/`? *(markdown only — sqlite: `list-urs`)*
+5. Are there REQ files in `{project}/.do-work/archive/`? *(markdown only — sqlite: status `done`)*
+6. Are there `RUN-NNN.yml` files in `{project}/.do-work/runs/`? (Retro heuristic: runs exist but no calibration → suggest retro; sqlite: calibration row / run_notes)
+7. Path-unit close heuristic: path-units without close (markdown: `closure.md`; sqlite: `closed_at` / close artifact missing)
 
 ### 2. Print contextual suggestions
 

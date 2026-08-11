@@ -41,14 +41,16 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 ### Ideate store — backend branch (ORI-9)
 
-| Concern | Markdown | Linear (`linear.md`) |
-|---------|----------|----------------------|
-| Load brief | `UR-NNN/input.md` (+ optional `assets/`) | Port op **`read_ur`** — UR **Project Milestone** §9.1 (`## Brief` + clarifications if any). No local `input.md` required. |
-| Persist observations | Write `{project}/.do-work/user-requests/UR-NNN/ideate.md` | Port op **`append_ideate`** — write/append under `## Ideate` on the **UR milestone** description. **No** local `ideate.md` as the work-item store. |
-| Open gaps (Continue gate) | `open_gaps:` in `input.md` frontmatter (or `## Notes — Open Gaps`) | Append / replace machine-readable open-gaps on the **UR milestone** body (prefer a fenced block or `open_gaps:` under a `## Notes` / frontmatter-equivalent section that does **not** overwrite `## Brief`). Use `read_ur` then milestone update sequence from linear.md (`save_milestone` / discovered update via the same surface as `append_ideate`). |
-| Hard-stop | n/a for local files | If Linear MCP / milestone tools unusable → **hard-stop**. Never write local `user-requests/.../ideate.md` as substitute. |
+| Concern | Markdown | Linear (`linear.md`) | sqlite (1S) |
+|---------|----------|----------------------|-------------|
+| Load brief | `UR-NNN/input.md` (+ optional `assets/`) | Port op **`read_ur`** — UR **Project Milestone** §9.1 (`## Brief` + clarifications if any). No local `input.md` required. | `dw-db get-ur` — no local `input.md` required |
+| Persist observations | Write `{project}/.do-work/user-requests/UR-NNN/ideate.md` | Port op **`append_ideate`** — write/append under `## Ideate` on the **UR milestone** description. **No** local `ideate.md` as the work-item store. | `bash {skill-root}/lib/dw-db.sh append-ideate {project} UR-NNN --body TEXT` — **No** local `ideate.md` as store |
+| Open gaps (Continue gate) | `open_gaps:` in `input.md` frontmatter (or `## Notes — Open Gaps`) | Append / replace machine-readable open-gaps on the **UR milestone** body (prefer a fenced block or `open_gaps:` under a `## Notes` / frontmatter-equivalent section that does **not** overwrite `## Brief`). Use `read_ur` then milestone update sequence from linear.md (`save_milestone` / discovered update via the same surface as `append_ideate`). | `dw-db write-open-gaps` replace kind |
+| Hard-stop | n/a for local files | If Linear MCP / milestone tools unusable → **hard-stop**. Never write local `user-requests/.../ideate.md` as substitute. | dw-db/sqlite unusable → **hard-stop**. Never write local `ideate.md` as substitute. |
 
 **When effective backend is `linear`:** Linear is the sole store. Do **not** dual-write `user-requests/UR-NNN/ideate.md` or require that path to exist. **When `markdown`:** keep the local paths in the steps below.
+
+**When effective backend is `sqlite` (1S):** sole store is `work.db` via dw-db; do **not** dual-write `user-requests/…/ideate.md`.
 
 ### 1. Read the brief
 

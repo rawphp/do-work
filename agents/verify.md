@@ -35,6 +35,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
+### When backend is sqlite (1S)
+
+- List/read REQs via dw-db; persist verify report with `write-verify`
+- Keep `lib/score-coverage.sh` shared (do not reimplement)
+- Hard-stop if dw-db fails; never write local verify under `user-requests/` as the store
+
+
 ### Verify report home — backend branch (REQ-296 / REQ-297)
 
 | Backend | Where the verify report lives |
@@ -51,6 +58,7 @@ After producing the report in Step 5c, when backend is **linear**, call **`write
 | Backend | Brief / REQs |
 |---------|--------------|
 | **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present. Backlog REQs from `.do-work/` as today. |
+| **sqlite** | **1S:** `get-ur` + `list-reqs --ur UR-NNN` via dw-db; write report with `write-verify`. Coverage arithmetic still uses shared `lib/score-coverage.sh`. **No** live `REQ-*.md` / `user-requests/` store. |
 | **linear** | **`read_ur`** for brief (Initiative `## Brief` + sections). **`list_reqs_for_ur`** for Issues in Project `do-work/{UR-id}`. Optional local assets only if the operator keeps them on disk — not a dual work-item store. |
 
 **Markdown path (default):** Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present.

@@ -48,8 +48,15 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 |---------|--------------------------------|
 | **markdown** | `{project}/.do-work/user-requests/UR-NNN/closure.md` (+ optional `closure-evidence/`) |
 | **linear** | Port op **`write_close_report`** — Initiative description **`## Closure`** + Initiative comment with the full report (`agents/tracker/linear.md`). Do **not** dual-write authoritative `closure.md` under `user-requests/`. Optional local evidence files for screenshots are fine; the report home is the Initiative. |
+| **sqlite** | Port op **`write_close_report`** → `bash {skill-root}/lib/dw-db.sh write-close {project} UR-NNN --body TEXT` (sets `closed_at`). Path-units via `list-reqs` + `layer=none`. **Do not** create `user-requests/…/closure.md` as the store. Evidence binaries under `.do-work/evidence/UR-NNN/closure-evidence/` only. |
 
 **When effective backend is `linear`:** load the brief and path-unit Issues via port ops (`read_ur`, `list_reqs_for_ur` / done-equivalent Issues) rather than assuming local `input.md` / `archive/` are the store. Walk still runs against the **merged app** (local git). Persist only via **`write_close_report`**. Path-unit ids are **Linear issue identifiers** (e.g. `ENG-123`) — see linear.md **Close path-unit collection**.
+
+**When effective backend is `sqlite` (1S):**
+- Brief / path-units: `get-ur` / `list-reqs --ur UR-NNN` via dw-db (filter `layer=none`)
+- Persist only via **`write-close`** — never dual-write `user-requests/UR-NNN/closure.md`
+- Evidence screenshots under `.do-work/evidence/UR-NNN/closure-evidence/` only
+- Hard-stop if dw-db fails
 
 Keep these values in context: `test.suite_command` (for degraded `evidence-by-test` verdicts and library walks), `security.blocked_commands` / `security.blocked_paths` (never run a probe that trips these), and any runtime hints.
 
@@ -61,6 +68,7 @@ Keep these values in context: `test.suite_command` (for degraded `evidence-by-te
 |---------|--------------|
 | **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. If missing → report `"UR-NNN/input.md not found at {path}. Cannot close without a brief."` and stop. Do not write a partial `closure.md`. |
 | **linear** | Call port op **`read_ur`** for `UR-NNN` (Initiative description: `## Brief` and machine sections). If Initiative / Project missing → hard-stop with that error; do not invent a brief; do not fall back to local `input.md` as the store. |
+| **sqlite** | `bash {skill-root}/lib/dw-db.sh get-ur {project} UR-NNN` (title/brief). Missing → hard-stop; do not invent a local `input.md`. |
 
 The brief is the user's own words — the contract the integrated app must satisfy. You read it for orientation only; the validated contract is each path-unit's declared entry point and terminal state (Step 2).
 

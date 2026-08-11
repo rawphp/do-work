@@ -47,6 +47,14 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
+### When backend is sqlite (1S)
+
+- Load brief/REQs via `get-ur` / `list-reqs` / `get-req`; update via `update-req` / `create-req`
+- Do not glob or rewrite live `REQ-*.md` or `user-requests/` as the store
+- UI evidence paths in criteria: `.do-work/evidence/UR-NNN/ui-evidence/` (not `user-requests/…/ui-evidence/`)
+- Hard-stop if dw-db fails
+
+
 ### 1. Read ground truth
 
 Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full — including the `## Clarifications` section if it exists. Clarifications are user-verified answers from the Question agent and carry the highest authority for interpreting intent.
