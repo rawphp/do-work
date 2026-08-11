@@ -216,6 +216,6 @@ Load only when the active task needs them (one hop from this file):
 | [references/commands.md](references/commands.md) | Executing a subcommand; install bootstrap YAML; full step stubs |
 | [references/tracker.md](references/tracker.md) | Configuring or debugging multi-tracker / Linear keys, claims, commits |
 | [references/concepts.md](references/concepts.md) | Naming, milestone mode, parallel coordination, layers, path-units, decisions, REQ header schema, commit convention, checkpointed verification |
-| [references/field-lessons.md](references/field-lessons.md) | Start of a skill run (read); end of run when a portable lesson exists (append). Always read before acting if present. |
+| [references/field-lessons.md](references/field-lessons.md) | Start of a skill run (read); end of run append **only** if **“Will this improve do-work?”** is Yes (skill process for the next run). Product/repo lessons → project via session-capture, never here. Always read before acting if present. |
 
 Recovery (stuck / stopped / deadlock): `/do-work unblock`, `/do-work resume`, `/do-work status` — see agent files and [references/concepts.md](references/concepts.md#recovery-commands).
