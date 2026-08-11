@@ -27,6 +27,21 @@
 # `.do-work/user-requests/`, backlog `REQ-*.md`, and `archive/` trees are
 # historical read-only. They are also not drift — work-item ops ignore them
 # as the store (Linear is sole truth); runtime/git/config stay local.
+#
+# sqlite sole store (tracker.backend: sqlite) — ORI-1444 / design
+# ---------------------------------------------------------------------------
+# When backend is sqlite, work items live only in `.do-work/work.db`
+# (lib/dw-db.sh). Missing or empty `.do-work/user-requests/`, backlog
+# `REQ-*.md`, and markdown `archive/` trees are **not** conformance drift —
+# they are unused by work-item ops under sqlite (greenfield switch; no
+# history import). Do not invent scanner rows for "missing user-requests"
+# or "no REQ-*.md files" while sqlite is the active backend.
+#
+# This scanner also never emits sqlite-specific drift for "still on
+# markdown" or "sqlite3 not installed" — those are Load Config / runtime
+# hard-stops when the operator has opted into `backend: sqlite`, not
+# project layout conformance. `/do-work upgrade migrate` refuses under
+# sqlite (agents/upgrade.md Step 9 — refused-sqlite-backend).
 # ---------------------------------------------------------------------------
 
 set -u

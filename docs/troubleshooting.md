@@ -333,6 +333,100 @@ Use dry-run first when offered. After cutover: no dual-write; historical markdow
 
 ---
 
+## SQLite tracker backend
+
+Optional local work-item store when `tracker.backend: sqlite` in `.do-work/config.yml`. Markdown remains the default when the key is unset or `markdown`. Deep dive: [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends). Canonical sequences: `agents/tracker/sqlite.md`. CLI: `lib/dw-db.sh`.
+
+### Switch to sqlite (greenfield)
+
+**Cause:** You want a single local DB for URs/REQs instead of markdown files or Linear.
+
+**Fix — opt in:**
+
+```yaml
+tracker:
+  backend: sqlite
+  sqlite:
+    path: ""                 # default .do-work/work.db
+    board_path: ""           # default .do-work/board/index.html
+    busy_timeout_ms: 5000
+```
+
+Rules that matter:
+
+- **Greenfield only** — first ensure creates an **empty** `.do-work/work.db`. Prior markdown URs/REQs and Linear history are **not** imported in v1.
+- **No dual-write** — with `backend: sqlite`, `.do-work/work.db` is the sole work-item store. Do not treat `REQ-*.md` / `user-requests/` as live truth.
+- **`work.db` is gitignored** — `/do-work upgrade` ensures `.gitignore` has `.do-work/work.db`, `.do-work/work.db-*`, and board output paths.
+- **No markdown→Linear migrate under sqlite** — `/do-work upgrade migrate` **refuses** when `tracker.backend` is `sqlite` (`migrate-linear: refused-sqlite-backend`). There is no sqlite→Linear path either.
+
+To leave sqlite: set `tracker.backend: markdown` (or remove the key) or `linear` when that backend is ready. Switching **away** does not export DB rows into markdown.
+
+### HARD STOP: `sqlite3` not on PATH
+
+**Cause:** `tracker.backend` is `sqlite` but the `sqlite3` CLI is missing or not executable. do-work **does not** fall back to markdown.
+
+**Fix — install sqlite3:**
+
+```bash
+# macOS (Homebrew)
+brew install sqlite
+
+# Debian / Ubuntu
+sudo apt-get install sqlite3
+
+# Verify
+command -v sqlite3 && sqlite3 -version
+```
+
+Then re-run the phase. Agents call `lib/dw-db.sh` only — do not invent freehand `sqlite3` one-liners for work items.
+
+### HARD STOP: corrupt DB or bad `user_version`
+
+**Cause:** `.do-work/work.db` exists but is unreadable, not a SQLite database, or `PRAGMA user_version` is not the schema the skill expects (v1 = `1`).
+
+**Fix:**
+
+1. Confirm the path (empty `tracker.sqlite.path` → `{project}/.do-work/work.db`)
+2. Inspect version (read-only):
+   ```bash
+   sqlite3 .do-work/work.db 'PRAGMA user_version;'
+   ```
+3. If the file is corrupt or from an incompatible experiment: **back it up**, remove `work.db` and WAL sidecars (`work.db-wal`, `work.db-shm`), then re-run — ensure recreates an empty greenfield DB
+4. Do **not** hand-edit schema SQL to “force” a version; do **not** fall back to markdown trees as live store while config still says `sqlite`
+
+### Board not updating
+
+**Cause:** `/do-work board` is **sqlite-only** and regenerates the static HTML snapshot **only when you invoke it**. It is not a live server and does not auto-refresh on every claim/archive.
+
+**Fix:**
+
+```text
+/do-work board
+```
+
+Default output: `.do-work/board/index.html` (override with `tracker.sqlite.board_path`). Hard-stop if `backend` is not `sqlite`. Open the HTML file in a browser after regenerate.
+
+### Accidentally set `backend: sqlite` without sqlite3
+
+**Cause:** Config flipped before the CLI was installed.
+
+**Fix:** Install `sqlite3` (above), or set `tracker.backend: markdown` (or remove the key) to return to the default local file store. Do not dual-write.
+
+### Tried `/do-work upgrade migrate` on sqlite
+
+**Cause:** `upgrade migrate` is **markdown→Linear only**.
+
+**Fix:** Expect refuse:
+
+```text
+Migration refused: tracker.backend is sqlite.
+/do-work upgrade migrate is markdown→Linear only. No sqlite→Linear path.
+```
+
+Stay on sqlite, or switch backend intentionally (greenfield implications apply). See `agents/upgrade.md` Step 9.
+
+---
+
 ## Upgrade and legacy layout
 
 ### Prompt to run `/do-work upgrade`

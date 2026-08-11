@@ -10,7 +10,7 @@ A walkthrough of the do-work system — every phase, every file it produces, and
 
 do-work is an agent-harness skill that turns a natural-language brief into a sequence of small, traceable, individually-committed tasks — executed autonomously with TDD. It runs on any agent that loads skills from a shared hub.
 
-It is **file-based by default**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no database, no in-memory queue, no central coordinator. An optional **Linear** backend stores the same work items in Linear only (see [Multi-tracker](#multi-tracker-work-item-backends) below); runtime and git isolation stay local either way.
+It is **file-based by default**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no in-memory queue, no central coordinator. Optional backends store the same work items in **Linear** or a local **SQLite** DB only (see [Multi-tracker](#multi-tracker-work-item-backends) below); runtime and git isolation stay local on every backend.
 
 **Why file-based (default):** The alternative is a stateful tool (a queue, a server, an MCP backend). Files give you four things for free that a stateful tool charges for:
 1. **Auditability** — `git log` *is* the audit log.
@@ -28,22 +28,41 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 |-------------------|-----------------|
 | **unset / empty / `markdown`** | Default: local `.do-work/` + `lib/*.sh` |
 | **`linear`** | Linear only (product Project / **UR milestones** / Issues) — **no dual-write** |
+| **`sqlite`** | Local `.do-work/work.db` only via `lib/dw-db.sh` — **no dual-write**; greenfield empty DB on switch |
 
 **Load path** (every phase agent that touches work items):
 
 1. Load config (`agents/config.md`)
 2. Resolve `tracker.backend` (missing/empty → `markdown`)
 3. Read `agents/tracker/port.md` (shared op catalog + rules)
-4. Read `agents/tracker/<backend>.md` (`markdown.md` or `linear.md`)
-5. Call **only** named port ops for storage — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc
+4. Read `agents/tracker/<backend>.md` (`markdown.md`, `linear.md`, or `sqlite.md`)
+5. Call **only** named port ops for storage — never raw `.do-work/REQ-*` paths, raw Linear tools, or freehand `sqlite3` outside the backend doc / `dw-db.sh`
 
 **What stays local on every backend:** worktrees, feature branches, merges, `state/*` locks, events, `config.yml`, optional local run ledger telemetry.
 
 ### No dual-write and hard-stop
 
-- With `backend: linear`, Linear is the sole work-item source of truth. Agents do not keep a parallel markdown UR/REQ store.
+- With `backend: linear` **or** `backend: sqlite`, that store is the sole work-item source of truth. Agents do not keep a parallel markdown UR/REQ store.
 - If Linear is unusable (MCP missing/unauthenticated, team unresolved, missing `status_map` state) **or** `agents/tracker/linear.md` is missing, agents **hard-stop** with setup instructions. They never silently fall back to markdown.
-- Mid-flight MCP failure after a claim leaves the Issue **claimed**; recover with `/do-work resume` or `/do-work unblock` after MCP recovers — not by inventing local REQ files.
+- If sqlite is unusable (`sqlite3` missing, corrupt DB / bad `user_version`, missing `agents/tracker/sqlite.md`), agents **hard-stop** the same way — **never** fall back to markdown or Linear.
+- Mid-flight MCP failure after a Linear claim leaves the Issue **claimed**; recover with `/do-work resume` or `/do-work unblock` after MCP recovers — not by inventing local REQ files. Under sqlite, active claims live in `work.db`; same resume/unblock recovery.
+
+### SQLite hierarchy (when `backend: sqlite`)
+
+```
+.do-work/work.db   (sole work-item store; gitignored)
+├── urs            (UR briefs / status / artifacts)
+├── reqs           (REQ rows + parent UR + status)
+├── claims         (active claim / heartbeat rows)
+└── …              (decisions, milestones, artifacts — see schema)
+
+.do-work/board/index.html   (static HTML snapshot; regenerated only by `/do-work board`)
+```
+
+- **Greenfield switch:** setting `tracker.backend: sqlite` does **not** import markdown or Linear history. First `dw-db ensure` creates an empty schema (`user_version=1`, WAL).
+- **Board:** `/do-work board` is **sqlite-only** — regenerates `tracker.sqlite.board_path` (default `.do-work/board/index.html`) when invoked; not a live server.
+- **Commit / branch:** same as markdown (`feat(REQ-NNN): …`, worktree `req/REQ-NNN`) — ids stay `UR-NNN` / `REQ-NNN` in the DB.
+- **Config keys:** `tracker.sqlite.path`, `board_path`, `busy_timeout_ms` — defaults in `agents/config.md`.
 
 ### Linear hierarchy (when `backend: linear`)
 
@@ -90,7 +109,9 @@ One-shot, **idle-only** cutover: working set empty, no active claims, operator c
 
 Surfaced under `/do-work upgrade` (and conformance — not a separate forever command). After cutover: `tracker.backend: linear`; historical markdown trees stay as read-only history; **no dual-write**. Details: `agents/tracker/linear.md` + `agents/upgrade.md` Step 9.
 
-**Operator setup** (MCP + `team_id`): [troubleshooting.md § Linear tracker backend](troubleshooting.md#linear-tracker-backend). Config schema: `agents/config.md`. Skill summary: `SKILL.md` § Tracker backends.
+**Refuse under sqlite:** if `tracker.backend` is already `sqlite`, migrate **stops** with `migrate-linear: refused-sqlite-backend` — markdown→Linear does not apply, and there is no sqlite history import or sqlite→Linear path.
+
+**Operator setup:** Linear (MCP + `team_id`) — [troubleshooting.md § Linear tracker backend](troubleshooting.md#linear-tracker-backend). SQLite (`sqlite3` + greenfield switch + board) — [troubleshooting.md § SQLite tracker backend](troubleshooting.md#sqlite-tracker-backend). Config schema: `agents/config.md`. Skill summary: `SKILL.md` § Tracker backends.
 
 ---
 
@@ -421,15 +442,15 @@ Defaults are picked from REQ shape (parallel claim ordering, layer enforcement) 
 
 ## Reference
 
-- [getting-started.md](getting-started.md) — install and first run (optional Linear pointer)
+- [getting-started.md](getting-started.md) — install and first run (optional Linear / SQLite pointers)
 - [concepts.md](concepts.md) — user-facing mental model
 - [commands.md](commands.md) — command reference
-- [troubleshooting.md](troubleshooting.md) — failure symptoms (including Linear MCP / team_id)
+- [troubleshooting.md](troubleshooting.md) — failure symptoms (including Linear MCP / team_id / sqlite3 / work.db)
 - `SKILL.md` — full command reference, tracker backends, migration semantics
 - `agents/tracker/port.md` — shared work-item op catalog
-- `agents/tracker/markdown.md` / `agents/tracker/linear.md` — backend implementations
+- `agents/tracker/markdown.md` / `agents/tracker/linear.md` / `agents/tracker/sqlite.md` — backend implementations
 - `agents/*.md` — per-phase agent instructions
-- `lib/*.sh` — coordination primitives (markdown backend claim, footprint, deps, heartbeat, deadlock, cycle)
+- `lib/*.sh` — coordination primitives (markdown claim/footprint; `lib/dw-db.sh` for sqlite)
 - `.do-work/state/` — runtime coordination files (gate-owner, lockfiles, milestone tracking)
 - `.do-work/config.yml` — per-project configuration (layers, log, parallel, test, next_steps, `tracker.*`)
 - `.do-work/archive/REQ-144-extend-req-template-schema.md` — canonical REQ header schema reference
