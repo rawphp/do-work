@@ -158,6 +158,54 @@ case "$STDERR" in
   *) fail "$CURRENT_CASE: expected a usage line on stderr, got: $STDERR" ;;
 esac
 
+# ---- worker-doc sync with canonical source (anti-drift, REQ-008) -------------
+# run-worker.md hand-lists the 8 worker reasons in its "Never invent stopper
+# reasons" rule for readability. To prevent that prose drifting from
+# lib/stop-reasons.sh (the canonical source from REQ-007), this section locks:
+#   1. The rule NAMES lib/stop-reasons.sh and its --worker subset (AC1).
+#   2. The rule's enumerated enum set equals `stop-reasons.sh --worker`
+#      exactly — same set, no extras, none missing (AC2).
+#
+# Extraction strategy (deliberate, not free-form prose grep):
+# The 8 reasons live in a single clause of the rule:
+#     "... MUST be one of the documented enum values: `a`, `b`, ... `concurrent-conflict`. Do not improvise ..."
+# We isolate that clause (text between "documented enum values:" and
+# "Do not improvise") and extract every backtick-wrapped token matching
+# [a-z][a-z-]+ inside it. That clause contains ONLY the enum reasons by
+# construction — the rule's non-example tokens (`awaiting-human-verification`,
+# `status: deferred`, `deferred_checks:`) sit AFTER "Do not improvise", outside
+# the clause — so the extracted sorted set is exactly the worker enum.
+# Mutation-proof: dropping/renaming a reason in either the doc or the script,
+# or removing the canonical-source reference, makes this fail loudly.
+REPO_ROOT="$( cd "$LIB_DIR/.." && pwd )"
+RUN_WORKER_MD="$REPO_ROOT/agents/run-worker.md"
+
+CURRENT_CASE="worker-doc-names-canonical-source"
+CASES=$((CASES + 1))
+RULE_LINE="$(grep 'Never invent stopper reasons' "$RUN_WORKER_MD" || true)"
+if [ -z "$RULE_LINE" ]; then
+  fail "$CURRENT_CASE: no 'Never invent stopper reasons' rule found in $RUN_WORKER_MD"
+fi
+case "$RULE_LINE" in
+  *lib/stop-reasons.sh*--worker*) : ;;
+  *) fail "$CURRENT_CASE: rule must name lib/stop-reasons.sh and its --worker subset" ;;
+esac
+
+CURRENT_CASE="worker-doc-sync-set"
+CASES=$((CASES + 1))
+# Isolate the enum clause, extract backtick reason tokens, compare sorted set.
+DOC_CLAUSE="$(printf '%s' "$RULE_LINE" | grep -o 'documented enum values:.*Do not improvise' || true)"
+DOC_REASON_SET="$(printf '%s\n' "$DOC_CLAUSE" | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sort -u)"
+run_sel "--worker"
+SCRIPT_REASON_SET="$(sort -u "$OUT")"
+assert_eq "$SCRIPT_REASON_SET" "$DOC_REASON_SET" "$CURRENT_CASE run-worker.md enum == stop-reasons.sh --worker (sorted)"
+
+CURRENT_CASE="worker-doc-sync-count"
+CASES=$((CASES + 1))
+# Sanity: exactly 8 distinct reason tokens in the clause (not 7, not 9).
+DOC_REASON_COUNT="$(printf '%s\n' "$DOC_CLAUSE" | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sort -u | wc -l | tr -d '[:space:]')"
+assert_eq "8" "$DOC_REASON_COUNT" "$CURRENT_CASE clause enumerates exactly 8 worker reasons"
+
 echo ""
 echo "stop-reasons tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then
