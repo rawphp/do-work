@@ -516,6 +516,13 @@ Before any Linear write or config flip:
      ```
 2. **`working/` empty** — zero `REQ-*.md` under `{project}/.do-work/working/`. If any exist → **refuse entirely**:
 
+### When backend is sqlite (1S)
+
+- Work-item ops use `sqlite.md` / dw-db — no markdown dual store
+- **Refuse** `migrate_markdown_to_linear` / Linear cutover while `tracker.backend: sqlite`
+- Gitignore must keep `work.db`, `work.db-*`, `board/` ignored
+
+
    ```text
    Migration refused: .do-work/working/ is non-empty (active or stranded REQs).
    Finish, unblock, or archive in-flight work first. tracker.backend unchanged.

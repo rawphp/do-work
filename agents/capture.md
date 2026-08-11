@@ -48,27 +48,31 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 ### Capture REQ store — backend branch (ORI-9)
 
-| Concern | Markdown | Linear |
-|---------|----------|--------|
-| Brief / ideate / clarifications | `input.md`, optional `ideate.md` | **`read_ur`** (UR Project Milestone §9.1: Brief, Ideate, Clarifications) |
-| Create REQs | Write `{project}/.do-work/REQ-NNN-*.md` | Port op **`create_req`** only — Issues on **product Project** + **UR milestone**; Linear issue ids only (e.g. `ENG-123`). **No** local `REQ-*.md` as store. |
-| List REQs for this UR | Glob backlog/working/archive | Port op **`list_reqs_for_ur`** (product Project + UR milestone filter) — same op verify uses later |
-| Capture summary / status | `input.md` body + frontmatter | Update UR milestone description sections/status fields (never overwrite `## Brief` verbatim intake); no local `input.md` dual-write |
-| Hard-stop | n/a | MCP / create-issue tools missing → hard-stop; never write local backlog REQs as substitute |
+| Concern | Markdown | Linear | sqlite (1S) |
+|---------|----------|--------|-------------|
+| Brief / ideate / clarifications | `input.md`, optional `ideate.md` | **`read_ur`** (UR Project Milestone §9.1: Brief, Ideate, Clarifications) | **`get-ur`** + artifact kinds via dw-db |
+| Create REQs | Write `{project}/.do-work/REQ-NNN-*.md` | Port op **`create_req`** only — Issues on **product Project** + **UR milestone**; Linear issue ids only (e.g. `ENG-123`). **No** local `REQ-*.md` as store. | `bash {skill-root}/lib/dw-db.sh create-req {project} --ur UR-NNN …` — **No** local `REQ-*.md` |
+| List REQs for this UR | Glob backlog/working/archive | Port op **`list_reqs_for_ur`** (product Project + UR milestone filter) — same op verify uses later | `dw-db list-reqs --ur UR-NNN` |
+| Capture summary / status | `input.md` body + frontmatter | Update UR milestone description sections/status fields (never overwrite `## Brief` verbatim intake); no local `input.md` dual-write | `write-capture-summary` via dw-db; never dual-write `input.md` |
+| Hard-stop | n/a | MCP / create-issue tools missing → hard-stop; never write local backlog REQs as substitute | dw-db/sqlite unusable → hard-stop; never write local backlog REQs |
 
 **When effective backend is `linear`:** use **`create_req`** exclusively for REQ persistence; after create, optionally **`list_reqs_for_ur`** to verify Issues landed. Do **not** dual-write under `.do-work/REQ-*` or `user-requests/`.
+
+**When effective backend is `sqlite` (1S):** create/update/list via dw-db only; evidence under `.do-work/evidence/UR-NNN/`; no live `REQ-*.md` / `user-requests/` store.
 
 ### Decisions / calibration — backend branch (REQ-296 / REQ-297)
 
 Standing decisions and capture calibration are **work-item memory**, not runtime locks. Homes are fixed by design §10 / the active backend file — never invent alternate paths or Doc titles.
 
-| Concern | Markdown (`markdown.md`) | Linear (`linear.md`) |
-|---------|--------------------------|----------------------|
-| Read decisions | `{project}/.do-work/decisions.md` if present | **Read decisions** helper — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty |
-| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing). Same grammar: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale` |
-| Read calibration | `{project}/.do-work/state/calibration.md` if present | **Read calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`); missing → continue without |
+| Concern | Markdown (`markdown.md`) | Linear (`linear.md`) | sqlite (1S) |
+|---------|--------------------------|----------------------|-------------|
+| Read decisions | `{project}/.do-work/decisions.md` if present | **Read decisions** helper — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty | decisions table via dw-db / port (not local `decisions.md` as store) |
+| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing). Same grammar: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale` | `bash {skill-root}/lib/dw-db.sh append-decision {project} "…"` |
+| Read calibration | `{project}/.do-work/state/calibration.md` if present | **Read calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`); missing → continue without | `dw-db read-calibration` — not `state/calibration.md` as store |
 
 **When effective backend is `linear`:** do **not** read or write local `.do-work/decisions.md` or `state/calibration.md` as the store. Use the sequences in `agents/tracker/linear.md` only. **When `markdown`:** keep the file paths in the steps below.
+
+**When effective backend is `sqlite`:** do **not** use local `decisions.md` / `state/calibration.md` as the store — use dw-db only.
 
 **Hard-stop (Linear writes):** if `append_decision` Doc create/update fails (permission, size, MCP), hard-stop — do **not** invent Issue comments, alternate Doc titles, or a local `decisions.md` dual-write.
 
@@ -80,6 +84,7 @@ Standing decisions and capture calibration are **work-item memory**, not runtime
 |---------|-------------|
 | **markdown** | Read `UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if it exists. Read `UR-NNN/ideate.md` if it exists. |
 | **linear** | Call **`read_ur`** for `UR-NNN`. Use `## Brief` (+ `## Clarifications` if present) as the brief. Use `## Ideate` if present as advisory ideate observations. Optional local assets only if the operator keeps them on disk — not a dual store. **Do not** require `user-requests/UR-NNN/input.md` or local `ideate.md`. |
+| **sqlite** | `get-ur` + artifact bodies via dw-db (`agents/tracker/sqlite.md`). **Do not** require `user-requests/` paths as the store. |
 
 Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If ideate is absent (e.g. `--no-ideate` or standalone capture), continue without it.
 

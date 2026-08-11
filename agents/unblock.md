@@ -53,6 +53,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 |---------|-------------------|
 | **`markdown`** | Steps **1–8** below (working/ stamp strip + backlog move) |
 | **`linear`** | Steps **L1–L4** — port op **`unblock_req`** in `agents/tracker/linear.md`. Id is a **Linear issue id** (e.g. `ENG-123`). No `.do-work/working/` claim stamps. |
+| **`sqlite`** | **1S** — `bash {skill-root}/lib/dw-db.sh unblock {project} REQ-NNN` by **slug**. No `working/` move. |
+
+### When backend is sqlite (1S)
+
+- Unblock via `dw-db unblock` only (sets backlog + releases active claim)
+- Do not `git mv` / `mv` `working/REQ-*.md` or strip markdown claim stamps
+- Hard-stop if dw-db fails — never markdown fallback
 
 Invocation under Linear may be `/do-work unblock ENG-123` (or the issue identifier the operator passes). Treat `REQ-NNN` in the markdown steps as the issue identifier only for markdown.
 

@@ -39,6 +39,14 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
+### When backend is sqlite (1S)
+
+- Resolve UR / REQs via dw-db (`get-ur`, `list-reqs`, `status-synth` for situation)
+- Do not require `user-requests/UR-NNN/input.md` or glob live `REQ-*.md` as the store
+- Board snapshot (when available): `/do-work board` regenerates `.do-work/board/` from `work.db` only
+- Hard-stop if dw-db fails
+
+
 ### 0b. Validate UR exists
 
 Before delegating to any sub-agent, confirm the UR directory exists:

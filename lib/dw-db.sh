@@ -1494,6 +1494,222 @@ VALUES($rid, $(sql_quote "$payload"), $(sql_quote "$now"));" \
     || die "append-run-note: insert failed"
 }
 
+# Derive proven|unproven for one REQ (parity with derive-status.sh + suite not-run).
+# Args: status proof suite → prints proven|unproven
+_derive_req_state() {
+  local status="$1"
+  local proof="$2"
+  local suite="$3"
+  if [ "$status" = "done" ] && [ -n "$proof" ] && [ "$suite" != "not-run" ]; then
+    printf 'proven\n'
+  else
+    printf 'unproven\n'
+  fi
+}
+
+# --- status-synth <root> [UR-NNN|--ur UR-NNN] ---
+# Folds markdown synth-status + derive-status + coverage-rollup (+ closed).
+# Never globs REQ-*.md / user-requests/; DB only.
+cmd_status_synth() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "status-synth: usage: status-synth <root> [UR-NNN]"
+  local ur_filter=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --ur) ur_filter="${2:-}"; shift 2 ;;
+      UR-*|ur-*)
+        ur_filter="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')"
+        shift
+        ;;
+      *) die "status-synth: unknown arg: $1" ;;
+    esac
+  done
+
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+
+  local n_backlog n_ip n_stopped n_done
+  if [ -n "$ur_filter" ]; then
+    local uid
+    uid="$(ur_id_for_slug "$db" "$ur_filter")"
+    if [ -z "$uid" ]; then
+      printf 'Totals: backlog=0 in_progress=0 stopped=0 done=0\n\n'
+      printf 'no REQs for %s\n' "$ur_filter"
+      return 0
+    fi
+    n_backlog="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$ur_filter") AND r.status='backlog';")"
+    n_ip="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$ur_filter") AND r.status='in_progress';")"
+    n_stopped="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$ur_filter") AND r.status='stopped';")"
+    n_done="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$ur_filter") AND r.status='done';")"
+  else
+    n_backlog="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs WHERE status='backlog';")"
+    n_ip="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs WHERE status='in_progress';")"
+    n_stopped="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs WHERE status='stopped';")"
+    n_done="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs WHERE status='done';")"
+  fi
+
+  printf 'Totals: backlog=%s in_progress=%s stopped=%s done=%s\n\n' \
+    "${n_backlog:-0}" "${n_ip:-0}" "${n_stopped:-0}" "${n_done:-0}"
+
+  local total
+  total=$(( ${n_backlog:-0} + ${n_ip:-0} + ${n_stopped:-0} + ${n_done:-0} ))
+  if [ "$total" -eq 0 ]; then
+    printf 'no REQs captured yet.\n'
+    return 0
+  fi
+
+  printf '## Situation\n'
+  printf '| REQ | UR | Status | Layer | Claimer | Heartbeat-age | Footprint |\n'
+  printf '|-----|----|--------|-------|---------|---------------|----------|\n'
+
+  local rows sep
+  sep=$'\x1e'
+  if [ -n "$ur_filter" ]; then
+    rows="$(sqlite3 -separator "$sep" "$db" "
+SELECT r.slug, u.slug, r.status, COALESCE(r.layer,''), COALESCE(r.files,''),
+       COALESCE(c.agent_id,''), COALESCE(c.heartbeat,''),
+       TRIM(COALESCE(r.closure_proof,'')), COALESCE(r.suite,'')
+FROM reqs r
+JOIN urs u ON u.id=r.ur_id
+LEFT JOIN claims c ON c.req_id=r.id AND c.status='active'
+WHERE u.slug=$(sql_quote "$ur_filter")
+ORDER BY CAST(substr(r.slug, instr(r.slug,'-')+1) AS INTEGER) ASC;")"
+  else
+    rows="$(sqlite3 -separator "$sep" "$db" "
+SELECT r.slug, u.slug, r.status, COALESCE(r.layer,''), COALESCE(r.files,''),
+       COALESCE(c.agent_id,''), COALESCE(c.heartbeat,''),
+       TRIM(COALESCE(r.closure_proof,'')), COALESCE(r.suite,'')
+FROM reqs r
+JOIN urs u ON u.id=r.ur_id
+LEFT JOIN claims c ON c.req_id=r.id AND c.status='active'
+ORDER BY CAST(substr(r.slug, instr(r.slug,'-')+1) AS INTEGER) ASC;")"
+  fi
+
+  local proven_lines="" coverage_tmp
+  coverage_tmp="$(mktemp -t dw-status-cov.XXXXXX)"
+
+  local rslug rur rstatus rlayer rfiles ragent rhb rproof rsuite
+  local display_status claimer hb_age age fp derived pathunit
+  while IFS="$sep" read -r rslug rur rstatus rlayer rfiles ragent rhb rproof rsuite; do
+    [ -n "${rslug:-}" ] || continue
+    display_status="$rstatus"
+    [ "$display_status" = "in_progress" ] && display_status="in-progress"
+
+    claimer="—"
+    hb_age="—"
+    if [ -n "$ragent" ]; then
+      claimer="$ragent"
+      if [ -z "$rhb" ]; then
+        hb_age="? (STALE)"
+      else
+        age="$(heartbeat_age_secs "$rhb" 2>/dev/null || true)"
+        if [ -z "${age:-}" ]; then
+          hb_age="? (STALE)"
+        elif [ "$age" -ge "$DEFAULT_STALE_MAX" ]; then
+          hb_age="${age}s (STALE)"
+        else
+          hb_age="${age}s"
+        fi
+      fi
+    fi
+
+    fp="$rfiles"
+    if [ -z "$fp" ]; then
+      fp="—"
+    elif [ "${#fp}" -gt 60 ]; then
+      fp="${fp:0:59}…"
+    fi
+    fp="${fp//$'\n'/ }"
+    fp="${fp//|/\\|}"
+    [ -n "$rlayer" ] || rlayer="—"
+
+    printf '| %s | %s | %s | %s | %s | %s | %s |\n' \
+      "$rslug" "$rur" "$display_status" "$rlayer" "$claimer" "$hb_age" "$fp"
+
+    derived="$(_derive_req_state "$rstatus" "$rproof" "$rsuite")"
+    proven_lines="${proven_lines}${rslug} ${derived}"$'\n'
+
+    pathunit=0
+    [ "$rlayer" = "none" ] && pathunit=1
+    printf 'ROW %s %s %s %s\n' "$rur" "$rslug" "$derived" "$pathunit" >> "$coverage_tmp"
+  done <<EOF
+$rows
+EOF
+
+  printf '\n## Proven\n'
+  if [ -n "$proven_lines" ]; then
+    printf '%s' "$proven_lines"
+  else
+    printf '(none)\n'
+  fi
+
+  local ur_list ur_slug overall closed_at has_close
+  if [ -n "$ur_filter" ]; then
+    ur_list="$ur_filter"
+  else
+    ur_list="$(awk '$1=="ROW" { print $2 }' "$coverage_tmp" 2>/dev/null | sort -u)"
+  fi
+
+  for ur_slug in $ur_list; do
+    [ -n "$ur_slug" ] || continue
+    closed_at="$(sqlite3 "$db" "SELECT COALESCE(closed_at,'') FROM urs WHERE slug=$(sql_quote "$ur_slug");")"
+    has_close="$(sqlite3 "$db" "
+SELECT COUNT(*) FROM ur_artifacts a
+JOIN urs u ON u.id=a.ur_id
+WHERE u.slug=$(sql_quote "$ur_slug") AND a.kind='close';")"
+    if [ -n "$closed_at" ] || [ "${has_close:-0}" -gt 0 ]; then
+      overall="closed"
+    else
+      overall="__none__"
+    fi
+    printf 'CLOSURE %s %s\n' "$ur_slug" "$overall" >> "$coverage_tmp"
+  done
+
+  printf '\n## Coverage\n'
+  if [ ! -s "$coverage_tmp" ] || ! grep -q '^ROW ' "$coverage_tmp" 2>/dev/null; then
+    printf 'Coverage: no REQs captured yet.\n'
+    rm -f "$coverage_tmp"
+    return 0
+  fi
+
+  awk '
+$1 == "CLOSURE" {
+  overall[$2] = $3
+  next
+}
+$1 == "ROW" {
+  ur=$2; id=$3; state=$4; pathunit=$5
+  if (!(ur in seen)) { order[++n]=ur; seen[ur]=1 }
+  intended[ur]++
+  if (pathunit == 1) has_pathunit[ur]=1
+  if (state == "proven") {
+    proven[ur]++
+  } else {
+    unproven[ur]++
+    if (unproven_ids[ur] == "") unproven_ids[ur]=id
+    else unproven_ids[ur]=unproven_ids[ur] "," id
+  }
+}
+END {
+  for (i=1; i<=n; i++) {
+    ur=order[i]
+    printf "%s intended=%d proven=%d unproven=%d", ur, intended[ur]+0, proven[ur]+0, unproven[ur]+0
+    if ((unproven[ur]+0) > 0) printf " unproven_ids=%s", unproven_ids[ur]
+    if (!(ur in has_pathunit)) {
+      closed = "n/a"
+    } else if (overall[ur] == "closed") {
+      closed = "yes"
+    } else {
+      closed = "no"
+    }
+    printf " closed=%s\n", closed
+  }
+}
+' "$coverage_tmp"
+  rm -f "$coverage_tmp"
+}
+
 main() {
   local cmd="${1:-}"; shift || true
   case "$cmd" in
@@ -1531,6 +1747,7 @@ main() {
     get-active-milestone) cmd_get_active_milestone "$@" ;;
     list-milestone-reqs) cmd_list_milestone_reqs "$@" ;;
     append-run-note) cmd_append_run_note "$@" ;;
+    status-synth) cmd_status_synth "$@" ;;
     "") die "usage: dw-db.sh <command> ..." ;;
     *) die "unknown command: $cmd" ;;
   esac

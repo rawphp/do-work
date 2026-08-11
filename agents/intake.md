@@ -37,9 +37,16 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | Backend | How intake records a UR |
 |---------|-------------------------|
 | **linear** | Port op **`create_ur`** only (`agents/tracker/linear.md`) — product Project + **UR Project Milestone** with §9.1 body and verbatim brief. **Do not** create `{project}/.do-work/user-requests/UR-NNN/` or write local `input.md` as the store. Report **UR slug + product project id/name + milestone id/name**. |
+| **sqlite** | Port op **`create_ur`** only via `bash {skill-root}/lib/dw-db.sh create-ur {project} --title T --brief B` (`agents/tracker/sqlite.md`). **Do not** create `user-requests/UR-NNN/` or write local `input.md` as the store. Report **UR slug**. Hard-stop if dw-db/sqlite unusable. |
 | **markdown** | Local folder + `input.md` under `{project}/.do-work/user-requests/UR-NNN/` (steps 1–5 below). |
 
 **When effective backend is `linear`:** run **Linear path** (steps L1–L4) and skip markdown folder steps. If Linear MCP / milestone tools unusable → **hard-stop** — never silent markdown fallback.
+
+**When effective backend is `sqlite` (1S):**
+- `create_ur` / `read_ur` / `list_urs` via `lib/dw-db.sh` only
+- Do **not** mkdir `user-requests/` or write `input.md` as the work-item store
+- Evidence (if any) under `.do-work/evidence/UR-NNN/` only
+- Hard-stop if `dw-db` fails — never fall back to markdown paths
 
 ---
 

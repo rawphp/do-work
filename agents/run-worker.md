@@ -137,6 +137,15 @@ Load config and resolve work-item storage before reading/updating REQs:
 - Runtime/git isolation (worktrees, feature branch, commit) stays local regardless of backend.
 - **Linear mid-flight (REQ-294):** if Linear MCP fails **after** the orchestrator already claimed this issue (`in_progress` + active claim comment) and before you finish, **leave claimed** — do not release the claim, do not write markdown REQ files as a substitute store, do not invent cleanup. Return `status: stopped` with an appropriate reason (`dependency-missing` / `unknown-error` / etc.); operator uses `/do-work resume` or `unblock` after MCP recovers. Heartbeats under Linear use **`heartbeat_req`** against the Linear issue id (not `lib/heartbeat.sh` on a local working/ file) when the orchestrator passed a Linear-backed REQ.
 
+### When backend is sqlite (1S)
+
+- Read REQ via `bash {skill-root}/lib/dw-db.sh get-req {project} REQ-NNN` (slug only — no `working/REQ-*.md` path)
+- Heartbeat: `bash {skill-root}/lib/dw-db.sh heartbeat {project} REQ-NNN $AGENT_ID` (UPDATE active claim only)
+- Files / status / proof via `dw-db` `set-files` / `set-status` / `update-req` — never dual-write `REQ-*.md`
+- UI / closure evidence binaries under `.do-work/evidence/UR-NNN/{ui,closure}-evidence/` only (not `user-requests/…`)
+- Mid-flight dw-db failure: leave claimed; return `status: stopped`; no markdown substitute store
+- Hard-stop if sqlite unusable
+
 ### 1. Read the REQ
 
 Read the REQ file in full. Understand:

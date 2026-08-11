@@ -34,6 +34,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
+### When backend is sqlite (1S)
+
+- Run notes: `append-run-note` / list via dw-db (not only local runs telemetry)
+- Calibration: `write-calibration` / `read-calibration` on DB row — **not** `state/calibration.md` as store
+- Hard-stop if dw-db fails for required writes
+
+
 ### Calibration / run-notes home — backend branch (REQ-296 / REQ-297)
 
 | Concern | Markdown | Linear (`linear.md`) |
