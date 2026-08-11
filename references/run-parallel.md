@@ -61,7 +61,38 @@ Each dequeued report runs **exactly the existing serial Steps 3–4, internals u
 7. Step 4c — tear down the worktree + `git branch -d`
 8. Step 4d — commit the metadata change
 
-**Serialization invariant:** at most one Stage B sequence touches the main working tree and `.do-work/` at any instant — exactly as serial mode. Only after an entry finishes Step 4d (or diverts to Recover) do you admit the next report to Stage B. After each Stage B completion the freed slot triggers a P2 refill.
+**Serialization invariant:** at most one Stage B sequence touches the main working tree and `.do-work/` at any instant — exactly as serial mode. This invariant is enforced by a **real, self-healing lock** (not prose-only). The lock is acquired before Step 4a and released after Step 4d (or immediately on any diversion to Recover). Only after an entry finishes Step 4d (or diverts to Recover) do you admit the next report to Stage B. After each Stage B completion the freed slot triggers a P2 refill.
+
+**Stage B lock implementation.** The lock is provided by `lib/stage-b-lock.sh` with the `with-lock` subcommand:
+
+```bash
+lib/stage-b-lock.sh with-lock <command> [args...]
+```
+
+Runs `<command>` while holding an exclusive lock. The lock uses `python3`'s `fcntl.flock(LOCK_EX)`, which:
+- Is portable across macOS and Linux (no hard `flock(1)` dependency)
+- Auto-releases when the holding process exits (kernel guarantee — no stale locks)
+- Is held in the lock file `$STATE_DIR/stage-b.lock` (runtime-only, gitignored)
+
+**Usage for Stage B:** wrap the 4a–4d sequence (and any diversion to Recover) in the lock wrapper:
+
+```bash
+lib/stage-b-lock.sh with-lock bash -c "
+  git merge --no-ff req/REQ-NNN || exit \$?
+  # ... 4b, 4c, 4d ...
+"
+```
+
+If acquisition fails because another Stage B holds the lock, the wrapper blocks until the lock is available (serialization is enforced). Because the lock auto-releases on process death, an orchestrator crash mid-Stage-B cannot strand the lock — no manual cleanup is needed.
+
+**Stage B MUST NOT be fanned out.** Stage B is a sequence of self-run git/DB ops the orchestrator issues sequentially — it **MUST NOT be fanned out** across parallel Agent/tool dispatches the way Stage A reviews may (see Stage A, item 3, which explicitly allows concurrent review dispatches). Only one Stage B sequence may run at a time, and it must run in the orchestrator's own process (not delegated). The lock enforces this; any attempt to run Stage B concurrently will serialize at the lock.
+
+**Git's index lock is the structural backstop.** Even if the lock were bypassed (e.g., by manual intervention or a bug), git's `.git/index.lock` provides a loud, recoverable failure mode. Any accidental double-admission that reaches `git merge` will fail at the index lock, and the existing 5-retry path (Step 4a conflict handling) will recover. This is not the primary enforcement — the lock is — but it guarantees that a concurrency bug cannot cause silent corruption.
+
+**Why the final-suite lockfile is the wrong model here.** The final-suite committed lockfile (Step C, ~lines 120–148) solves a **cross-orchestrator** race: two orchestrators both passing the drain check and racing to run the suite. That pattern needs a committed lockfile because the lock must be visible to sibling processes (different machines or different terminal sessions). Stage B is **intra-orchestrator** — a single orchestrator's own merge queue. A process-scoped lock (flock) is the right primitive: it auto-releases on crash, avoiding the stale-lock failure mode that a committed lockfile would introduce for intra-process use. The final-suite lockfile would be the wrong model for Stage B because:
+1. It requires explicit release → stale-lock risk if the orchestrator crashes mid-Stage-B
+2. It's designed for cross-orchestrator visibility, which Stage B doesn't need
+3. A process-scoped flock is simpler and safer for single-writer, intra-process serialization
 
 **Conflict handling mid-queue — reuse Step 4a verbatim, do not invent a new retry path.** On text-level conflict (`<<<<<<<`): `git merge --abort`, then the existing **5-retry exponential backoff** (5s / 15s / 30s / 60s), each attempt re-syncing the base branch and re-merging. On the 5th failure: leave the `req/REQ-NNN` branch alive, transition the REQ to `**Status:** stopped`, `**Reason:** concurrent-conflict`, surface to the user, and **continue draining the rest of the queue** — a conflict on one queued REQ must not abort the others. Resumable via `/do-work resume REQ-NNN`. Because footprints are disjoint, a content conflict between two queued REQs should not occur; the retry path absorbs conflicts against concurrent multi-terminal siblings or a remote (P5).
 
