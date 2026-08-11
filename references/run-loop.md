@@ -183,9 +183,11 @@ token from `scan-stale.sh`'s output — not the raw ISO timestamp.
 
 ### 3b. Legacy stranded REQ triage (advisory — no automatic state change)
 
-While classifying `working/` slots in §3, also identify **legacy stranded REQs**: files whose `**Status:**` is `stopped` and whose `**Reason:**` value is not in the documented stopper enum (`tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). The canonical example is `awaiting-human-verification`, an improvised reason from an older human-wait flow.
+While classifying `working/` slots in §3, also identify **legacy stranded REQs**: files whose `**Status:**` is `stopped` and whose `**Reason:**` value is not in the canonical stop-reason vocabulary. The recognized set is the full union printed by `bash lib/stop-reasons.sh --all` — the 8 worker-written reasons (`tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`) **plus** the 5 orchestrator-assigned reasons (`policy-blocked`, `review-failed`, `archive-integrity`, `path-unit-incomplete`, `missing-closure-proof`). A REQ correctly stopped by the orchestrator's own policy/review/archive gate is therefore **not** legacy stranded. The canonical example of a reason that *is* legacy stranded is `awaiting-human-verification`, an improvised reason from an older human-wait flow that is not in `lib/stop-reasons.sh --all`.
 
-**Detection:** for each `working/REQ-*.md` file, read `**Status:**` and `**Reason:**`. If `**Status:** stopped` AND `**Reason:**` is non-empty AND the reason does not match any enum value above, record the file as a **legacy stranded slot**.
+`lib/stop-reasons.sh` is the authority for the recognized set — do not re-hand-copy the list elsewhere; consult `bash lib/stop-reasons.sh --all` for the live vocabulary (adding a reason there automatically extends this triage, so the two copies cannot drift).
+
+**Detection:** for each `working/REQ-*.md` file, read `**Status:**` and `**Reason:**`. If `**Status:** stopped` AND `**Reason:**` is non-empty AND the reason is not a member of `lib/stop-reasons.sh --all`, record the file as a **legacy stranded slot**.
 
 **Advisory output (emit once per run, immediately after §3 classification — do NOT block the run or prompt):**
 
