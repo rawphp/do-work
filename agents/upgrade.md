@@ -374,6 +374,41 @@ The installer merges a `SessionStart` and `Stop` hook (each calling
 `lib/session-hook.sh`) into `.claude/settings.json`, deduping by command string,
 so running upgrade twice yields exactly one entry per hook.
 
+### 7b. Ensure gitignore must (sqlite / board artifacts)
+
+When `{project}/.do-work/` exists and `{project}` is a git repo with a
+`.gitignore` (create the file if missing and the project uses git), ensure the
+following patterns are present so sqlite runtime artifacts are never committed:
+
+```
+.do-work/work.db
+.do-work/work.db-*
+.do-work/board/
+```
+
+**Recommended (append if absent):**
+
+```
+.do-work/evidence/
+```
+
+**Procedure (idempotent, additive only):**
+
+1. If `{project}/.do-work/` is absent, skip (nothing to protect yet).
+2. If the project is not a git repo (`git rev-parse --is-inside-work-tree` fails),
+   skip silently.
+3. Ensure `{project}/.gitignore` exists (create empty if missing).
+4. For each **must** pattern above: if no line matches the pattern exactly
+   (or an equivalent covering rule such as `.do-work/`), **append** the pattern
+   on its own line. Do **not** remove or rewrite existing user rules.
+5. Record `sqlite-gitignore: converged` when any line was appended, or
+   `sqlite-gitignore: already-conformant` when all must patterns were already
+   present.
+
+These paths hold the sqlite sole-store DB (`work.db` + WAL sidecars), the
+static HTML board under `.do-work/board/`, and evidence binaries. They are
+runtime state — never part of the git work-item store.
+
 ### 8. Re-scan And Report
 
 Run the scanner again:
@@ -468,6 +503,17 @@ Before any Linear write or config flip:
    - Config and Linear store left unchanged.
    This makes re-running `/do-work upgrade migrate` **idempotent by clear refuse**
    when cutover already happened.
+   If effective backend is **`sqlite`**, **refuse** with
+   **`migrate-linear: refused-sqlite-backend`** and stop immediately:
+   - markdown→Linear migration does not apply under sqlite (sole store is
+     `.do-work/work.db`; no history import and no Linear cutover from sqlite).
+   - **Do not** create Linear entities or change config.
+   - Message example:
+
+     ```text
+     Migration refused: tracker.backend is sqlite.
+     /do-work upgrade migrate is markdown→Linear only. No sqlite→Linear path.
+     ```
 2. **`working/` empty** — zero `REQ-*.md` under `{project}/.do-work/working/`. If any exist → **refuse entirely**:
 
    ```text
@@ -524,6 +570,7 @@ migrate-linear: skipped (not requested)
 migrate-linear: dry-run-reported
 migrate-linear: converged
 migrate-linear: already-linear
+migrate-linear: refused-sqlite-backend
 migrate-linear: refused-working-non-empty
 migrate-linear: refused-active-claims
 migrate-linear: skipped-by-user
@@ -568,8 +615,14 @@ only asked for migrate — but preflight remains mandatory.
   - Hard-stop when Linear MCP is unusable; **no partial cutover**.
   - **Idempotent refuse:** if `tracker.backend` is already `linear`, report
     `already-linear` / already-migrated and **stop without rewriting Issues**.
+  - **Refuse under sqlite:** if `tracker.backend` is `sqlite`, report
+    `refused-sqlite-backend` and stop (no markdown→Linear path from sqlite).
   - After success: leave markdown trees historical read-only; **post-cutover
     work-item ops ignore historical markdown trees**; set
     `tracker.backend: linear`.
   - Sequence details only in `agents/tracker/linear.md`.
+- **sqlite gitignore must (Step 7b):** when `.do-work/` exists, ensure
+  `.gitignore` contains `.do-work/work.db`, `.do-work/work.db-*`, and
+  `.do-work/board/` (append only; never strip user rules). Recommended:
+  `.do-work/evidence/`.
 - No next-step prompt after the report.
