@@ -206,6 +206,71 @@ CASES=$((CASES + 1))
 DOC_REASON_COUNT="$(printf '%s\n' "$DOC_CLAUSE" | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sort -u | wc -l | tr -d '[:space:]')"
 assert_eq "8" "$DOC_REASON_COUNT" "$CURRENT_CASE clause enumerates exactly 8 worker reasons"
 
+# ---- §3b orchestrator recognition (REQ-009, F3 fix) --------------------------
+# references/run-loop.md §3b ("Legacy stranded REQ triage") classifies a stopped
+# REQ as legacy stranded ONLY when its **Reason:** is non-empty AND not in the
+# canonical stop-reason vocabulary. Before REQ-009 the §3b recognized set was the
+# worker 8-value enum alone, so every orchestrator-assigned stop reason was
+# mis-flagged as an unrecognized "legacy stranded" reason and the operator was
+# nudged to /do-work unblock correctly-stopped work. REQ-009 wires §3b to the
+# full `lib/stop-reasons.sh --all` set (8 worker + 5 orchestrator).
+#
+# This section locks that wiring:
+#   AC1. §3b names lib/stop-reasons.sh (and --all) as its recognized-set authority.
+#   AC2. Every orchestrator reason from `stop-reasons.sh --orchestrator` appears
+#        as a recognized token within the §3b region (the 5 orchestrator reasons
+#        are no longer mis-flagged).
+#   AC3. The improvised `awaiting-human-verification` example is preserved in §3b
+#        (the triage's original purpose — catching non-canonical reasons — survives).
+#
+# Extraction strategy (robust to prose rewording, per REQ-009):
+# The §3b region is bounded — a `### 3b.` heading through the line before the next
+# `### ` heading. We slice exactly that region with awk, then assert on the slice.
+# This isolates §3b from the orchestrator write-sites (~lines 620/662/672/802/803/813)
+# which are OUTSIDE the region and must not satisfy this check on their own.
+# Mutation-proof: reverting §3b to a worker-only whitelist drops all 5 orchestrator
+# tokens (policy-blocked, review-failed, archive-integrity, path-unit-incomplete,
+# missing-closure-proof) from the region, failing AC2 immediately; removing the
+# canonical-source reference fails AC1.
+RUN_LOOP_MD="$REPO_ROOT/references/run-loop.md"
+
+CURRENT_CASE="3b-region-extractable"
+CASES=$((CASES + 1))
+SECTION_3B="$(awk '/^### 3b\./{f=1} f&&/^### /&&!/^### 3b\./{exit} f' "$RUN_LOOP_MD")"
+if [ -z "$SECTION_3B" ]; then
+  fail "$CURRENT_CASE: could not extract §3b region from $RUN_LOOP_MD"
+fi
+
+CURRENT_CASE="3b-names-canonical-source"
+CASES=$((CASES + 1))
+case "$SECTION_3B" in
+  *lib/stop-reasons.sh*--all*) : ;;
+  *) fail "$CURRENT_CASE: §3b must name lib/stop-reasons.sh and --all as its recognized-set authority" ;;
+esac
+
+CURRENT_CASE="3b-recognizes-orchestrator-reasons"
+CASES=$((CASES + 1))
+run_sel "--orchestrator"
+MISSED_3B=""
+while IFS= read -r r; do
+  [ -n "$r" ] || continue
+  case "$SECTION_3B" in
+    *"$r"*) : ;;                     # reason token present in §3b region
+    *) MISSED_3B="${MISSED_3B:+$MISSED_3B }$r" ;;
+  esac
+done < "$OUT"
+if [ -n "$MISSED_3B" ]; then
+  fail "$CURRENT_CASE: §3b must recognize every orchestrator reason; missing: $MISSED_3B"
+fi
+
+CURRENT_CASE="3b-preserves-improvised-example"
+CASES=$((CASES + 1))
+# The triage's original purpose — flagging non-canonical reasons — must survive.
+case "$SECTION_3B" in
+  *awaiting-human-verification*) : ;;
+  *) fail "$CURRENT_CASE: §3b should still cite awaiting-human-verification as the canonical flagged example" ;;
+esac
+
 echo ""
 echo "stop-reasons tests: $CASES cases, $FAILED failure(s)"
 if [ "$FAILED" -ne 0 ]; then
