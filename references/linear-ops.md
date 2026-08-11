@@ -571,13 +571,15 @@ status: active
 4. A claim with `status: released` is **not** active.
 5. If multiple agents have concurrent `active` comments, the one with the newest **fresh** heartbeat wins for “who holds”; a second agent attempting claim while another is fresh → **concurrent-conflict**.
 
+> **Heartbeat intent (F5 / parity with sqlite).** `heartbeat_req` **patches the existing active claim comment in place**; it does not mint a new claim per heartbeat. The “latest active block” resolution in rules 3–5 exists so a stale or fallback comment never strands coordination — it is a safety net, not license to post a new comment each heartbeat. See `heartbeat_req` step 3 and field-lessons §2.
+
 ### Concept → Linear mapping
 
 | Concept | Linear rule |
 |---------|-------------|
 | **Unclaimed** | Workflow maps to `status_map.backlog` **and** no **active** claim comment (or latest claim is `released`) |
 | **Claim** | Re-read issue + comments; if another agent has active claim with **fresh** heartbeat → fail; else set state → `in_progress`; post claim comment (`status: active`) |
-| **Heartbeat** | New claim-protocol comment **or** append/update path that writes updated `heartbeat` (prefer new comment if update-comment tools missing); consumers take latest active block |
+| **Heartbeat** | **Patch the existing active claim comment in place** (update-comment tool, e.g. `save_comment` with its id) — primary; refreshes `heartbeat` on the existing claim (parity with sqlite's heartbeat UPDATE). Post a new claim-protocol comment **only as a fallback** when the MCP surface exposes no update-comment tool. Consumers take the latest active block |
 | **Stale** | Latest active `heartbeat` older than effective `stale_max` — eligible for takeover / reclaim under multi-agent rules |
 | **Unblock** | State → `backlog`; post/update claim comment `status: released` (assignee unchanged) |
 | **Resume** | `stopped` → `in_progress`; refresh heartbeat on **same** `agent_id` / claim ownership; assignee unchanged |
@@ -717,18 +719,20 @@ When the ordered walk yields **zero** claimable issues, the orchestrator classif
 **Agent sequence:**
 
 1. **Rediscover** — get issue + list/create comments.
-2. **Read active claim** — must be `status: active` and `agent_id` match (or explicit owner handoff policy). If no active claim → error (nothing to heartbeat). If foreign active fresh claim → error / concurrent-conflict (do not stamp over).
-3. **Write heartbeat** — post a new claim-protocol comment (or update the existing comment if update-comment tools exist and schema allows) with:
+2. **Read active claim** — must be `status: active` and `agent_id` match (or explicit owner handoff policy). **If no active claim owned by this agent → HARD-STOP** ("nothing to heartbeat — do not create a new claim to recover; use `claim_req`"). This mirrors sqlite's `cmd_heartbeat`, which `die`s when its UPDATE affects 0 rows (no active claim owned by the caller) — absence means stop, not mint a new claim. If a foreign active fresh claim is present → HARD-STOP / `concurrent-conflict` (do not stamp over).
+3. **Write heartbeat — PATCH IN PLACE (primary).** Update the EXISTING active claim comment via the update-comment tool (e.g. `save_comment` with that comment's id), setting:
    - same `agent_id`, same `claimed_at` (preserve original claim time)
    - `heartbeat: {now_iso}`
    - `status: active`
    - same `session` if known
-4. Consumers always take the **latest** active block by `heartbeat` timestamp.
+
+   This is the Linear analog of sqlite's heartbeat UPDATE on the active claim row (`lib/dw-db.sh` `cmd_heartbeat`) — refresh the existing claim's liveness; do **not** mint a new claim entity each heartbeat. Posting a brand-new claim-protocol comment is a **FALLBACK ONLY**, used solely when the MCP surface genuinely exposes no update-comment tool (rediscover and confirm none exists before falling back). If you fall back, post one new comment with the fields above. Never default to posting a new comment when update-comment is available.
+4. Consumers always take the **latest** active block by `heartbeat` timestamp — this is a safety net so a stale or fallback comment never strands coordination, **not** license to post a new comment each heartbeat (step 3 patches in place).
 5. **Return** issue id + new heartbeat time.
 
 | Failure | Behavior |
 |---------|----------|
-| Not claim owner / no active claim | Error; do not create a new claim (use `claim_req`) |
+| Not claim owner / no active claim | **Hard-stop**; do not create a new claim to recover (use `claim_req`). Parity with sqlite's `die` on 0 changed rows |
 | MCP missing mid-heartbeat | Hard-stop; **leave** prior claim/heartbeat as last written |
 
 **Checkpoint usage (run-worker):** stamp at the same logical checkpoints as markdown (`heartbeat.sh`): after read REQ, after red, after each green cycle, after each verification step, immediately before commit — via this op against the Linear issue id.

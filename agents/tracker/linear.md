@@ -223,7 +223,7 @@ Full claim/archive sequences: [linear-ops.md](../../references/linear-ops.md).
 | Pick order | Priority DESC (missing→2) → created_at ASC → id ASC | `list_claimable_reqs` |
 | Archive | Only via **`archive_req`** after evidence + review gates | [linear-ops.md](../../references/linear-ops.md) |
 | Commits | `feat(ENG-123):` + `Issue:` footer; branch `req/<sanitized-id>` | [linear-path-milestones.md](../../references/linear-path-milestones.md) |
-| No Linear bash in `lib/` (v1) | Sequences are agent/MCP only | — |
+| No Linear bash in `lib/` (v1) | Sequences are agent/MCP only | Heartbeat enforcement is therefore **procedural**, not a runtime bash guard: a hard-stop assertion in `heartbeat_req` (patch-in-place; stop on no active claim — sqlite `die`-on-0-rows parity) plus a regression test under `lib/tests/`. See findings-doc F16 and UR-004. |
 
 ---
 
