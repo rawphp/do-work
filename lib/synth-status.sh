@@ -60,6 +60,10 @@ ARCHIVE_CAP=15
 SELF_DIR="$( cd "$( dirname "$0" )" 2>/dev/null && pwd )"
 CHECK_DEPS="$SELF_DIR/check-deps.sh"
 DEADLOCK_CHECK="$SELF_DIR/deadlock-check.sh"
+# Canonical eligibility helpers (id extraction + dep splitting) so synth-status
+# cannot drift from check-deps / pick-req (F1 / UR-003).
+# shellcheck source=eligibility-common.sh
+source "$SELF_DIR/eligibility-common.sh"
 
 # When forking `check-deps.sh` once per REQ, render time on slow shells (BSD
 # bash 3.2) balloons past the < 1s target for 200 REQs. We pre-compute an
@@ -71,11 +75,7 @@ if [ -d "$ARCHIVE_DIR" ]; then
   shopt -s nullglob 2>/dev/null || true
   for f in "$ARCHIVE_DIR"/REQ-*.md; do
     [ -e "$f" ] || continue
-    base="$(basename "$f")"
-    id="$(printf '%s' "$base" | awk '{
-      if (match($0, /^REQ-M[0-9]+-[0-9]+/)) { print substr($0, RSTART, RLENGTH) }
-      else if (match($0, /^REQ-[0-9]+/))     { print substr($0, RSTART, RLENGTH) }
-    }')"
+    id="$(elig_req_id_from_path "$f")"
     [ -n "$id" ] && ARCHIVED_IDS="${ARCHIVED_IDS}${id} "
   done
 fi
@@ -302,30 +302,20 @@ render_row() {
   fi
 
   # Deps-status: resolve against the pre-computed ARCHIVED_IDS set.
-  # Mirrors check-deps.sh parsing (Depends on: csv of REQ ids).
+  # Splitting + id extraction come from lib/eligibility-common.sh so this render
+  # path cannot drift from check-deps / pick-req (F1 / UR-003). The pre-computed
+  # set is preserved as a speed optimization (avoids forking check-deps per REQ).
   local deps_raw missing dep
   deps_raw="$F_DEPS"
   missing=""
   if [ -n "$deps_raw" ]; then
-    # Split on commas, trim, check membership in ARCHIVED_IDS.
-    set +u
-    set -f
-    local oldIFS="$IFS"
-    IFS=','
-    # shellcheck disable=SC2206
-    local arr=( $deps_raw )
-    IFS="$oldIFS"
-    set +f
-    for dep in "${arr[@]}"; do
-      dep="${dep#"${dep%%[![:space:]]*}"}"
-      dep="${dep%"${dep##*[![:space:]]}"}"
+    while IFS= read -r dep; do
       [ -z "$dep" ] && continue
       case "$ARCHIVED_IDS" in
         *" $dep "*) : ;;  # archived → satisfied
         *) missing="${missing}${missing:+,}$dep" ;;
       esac
-    done
-    set -u
+    done < <(elig_split_dep_ids "$deps_raw")
   fi
   if [ -z "$missing" ]; then
     deps_status="ready"

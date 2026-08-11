@@ -6,21 +6,15 @@
 # cases where the three copies currently produce the same result. This is the
 # contract harness that makes drift between the copies LOUD (F1 / UR-003).
 #
-# Scope of this file (REQ-012): currently-passing agreement cases only. It must
-# be GREEN on first commit. The known-drift assertions land red→green in the
-# markdown-consolidation REQ, alongside the shared-helper refactor.
-#
-# KNOWN DRIFT — intentionally NOT asserted here yet:
-#   * `**` globstar footprint: check-footprint.sh expands `**` via a manual
-#     walker; pick-req.sh does plain bash glob (no `**` walker) → the two can
-#     disagree on a footprint like `src/**/*.php`.
-#   * dep-satisfied definition: check-deps.sh = `archive/<id>-*.md` only;
-#     pick-req.sh = that OR exact `archive/<id>.md` → disagree on a bare
-#     archive filename with no `-slug` suffix.
-#   * unmatched-glob semantics: check-footprint.sh drops unmatched globs
-#     (nullglob); pick-req.sh keeps the literal token → can disagree when a
-#     declared path does not yet exist on disk.
-# Each becomes a parity assertion in the consolidation REQ.
+# REQ-012 delivered the currently-passing agreement cases (1–5). REQ-013
+# (markdown consolidation into lib/eligibility-common.sh) added the
+# formerly-drifting cases (6–8); they are GREEN now because all three copies
+# source one canonical helper. Pre-consolidation each would have FAILED:
+#   * `**` globstar footprint — pick-req lacked check-footprint's `**` walker.
+#   * dep-satisfied definition — check-deps used `archive/<id>-*.md` only,
+#     pick-req also accepted exact `archive/<id>.md`.
+#   * unmatched-glob semantics — check-footprint dropped unmatched globs
+#     (nullglob), pick-req retained the literal token.
 #
 # Plain bash (no bats). Exit non-zero on first failure. macOS bash 3.2 compatible.
 
@@ -176,6 +170,60 @@ CURRENT_CASE="footprint-empty-agree"; CASES=$((CASES + 1))
   run_pick "$R"
   assert_eq "" "$fp_out" "check-footprint empty Files → no overlap"
   assert_contains "REQ-500-cand.md" "$PICK_OUT" "pick-req picks REQ-500 (empty footprint)"
+}
+
+# ============================================================================
+# FORMERLY-DRIFTING CASES (REQ-013) — now GREEN via shared canonical helper.
+# ============================================================================
+
+# Case 6: `**` globstar footprint overlap — both detect it.
+# Pre-fix pick-req had no `**` walker; check-footprint did → they disagreed.
+CURRENT_CASE="footprint-globstar-parity"; CASES=$((CASES + 1))
+{
+  R="$(mkproject)"; register "$R"
+  mkdir -p "$R/src/deep/nested"
+  touch "$R/src/deep/nested/a.ts"
+  write_req "$R" "REQ-500-cand.md" "UR-900" "" "src/deep/nested/a.ts"
+  write_req "$R" "REQ-501-slot.md" "UR-900" "" "src/**/*.ts"
+  mv "$R/.do-work/REQ-501-slot.md" "$R/.do-work/working/"
+  fp_out="$(run_fp "$R" "REQ-500-cand.md")"
+  run_pick "$R"
+  assert_contains "REQ-501" "$fp_out" "check-footprint detects ** overlap with REQ-501"
+  assert_eq "" "$PICK_OUT" "pick-req does not pick **-overlap-blocked REQ-500"
+  assert_contains "overlap:REQ-501" "$PICK_ERR" "pick-req overlap-rejects ** peer REQ-501"
+}
+
+# Case 7: dep satisfied via bare archive/<id>.md (no slug) — both agree satisfied.
+# Pre-fix check-deps used glob-only and would have reported it missing.
+CURRENT_CASE="deps-exact-archive-parity"; CASES=$((CASES + 1))
+{
+  R="$(mkproject)"; register "$R"
+  write_req "$R" "REQ-500-cand.md" "UR-900" "REQ-501" "src/cand.php"
+  # Bare exact archive name (no -slug suffix).
+  printf '# REQ-501\n\n**UR:** UR-900\n**Files:** src/done.php\n**Depends on:**\n' \
+    > "$R/.do-work/archive/REQ-501.md"
+  deps_out="$(run_deps "$R" "REQ-500-cand.md")"
+  run_pick "$R"
+  assert_eq "" "$deps_out" "check-deps treats bare archive/<id>.md as satisfied"
+  assert_contains "REQ-500-cand.md" "$PICK_OUT" "pick-req picks REQ-500 (dep satisfied via exact archive)"
+  assert_not_contains "dep:" "$PICK_ERR" "pick-req does not dep-reject (exact archive satisfied)"
+}
+
+# Case 8: unmatched literal footprint — both retain the literal and report overlap.
+# Pre-fix check-footprint dropped unmatched globs → missed the conflict.
+CURRENT_CASE="footprint-unmatched-literal-parity"; CASES=$((CASES + 1))
+{
+  R="$(mkproject)"; register "$R"
+  # NOTE: src/ and the file are intentionally NOT created — the path is a
+  # not-yet-existing literal both copies must retain.
+  write_req "$R" "REQ-500-cand.md" "UR-900" "" "src/nonexistent.php"
+  write_req "$R" "REQ-501-slot.md" "UR-900" "" "src/nonexistent.php"
+  mv "$R/.do-work/REQ-501-slot.md" "$R/.do-work/working/"
+  fp_out="$(run_fp "$R" "REQ-500-cand.md")"
+  run_pick "$R"
+  assert_contains "REQ-501" "$fp_out" "check-footprint retains literal → reports overlap with REQ-501"
+  assert_eq "" "$PICK_OUT" "pick-req does not pick literal-overlap-blocked REQ-500"
+  assert_contains "overlap:REQ-501" "$PICK_ERR" "pick-req overlap-rejects literal peer REQ-501"
 }
 
 echo "-----------------------------------------"

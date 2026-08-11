@@ -16,16 +16,22 @@
 # Decision logic (top to bottom):
 #   1. Glob {project}/.do-work/REQ-*.md (milestone-aware if
 #      state/active-milestone.md exists — only REQ-M<active>-*.md considered).
-#   2. Sort ascending by the leading numeric REQ id (post-M prefix when present).
+#   2. Sort by Priority descending, then numeric REQ id ascending.
 #   3. For each candidate, in order:
 #        a. scope filter: skip if <scope> is a UR id and **UR:** mismatches.
 #        b. dep filter: skip if any **Depends on:** id is absent from archive/.
 #        c. overlap filter: skip if any **Files:** entry intersects the file set
-#           held by any working/ slot (globs expanded against the working tree).
+#           held by any working/ slot (globs expanded against the working tree,
+#           including `**`).
 #   4. Print first survivor; exit 0. No survivor → exit 1.
 #
-# Compatible with macOS bash 3.2 and Linux bash >= 4.
-# Standard POSIX tools only (grep, sed, awk, sort, cut).
+# Field parsing, id splitting, file/glob expansion, and the dep-satisfied
+# predicate come from the shared `lib/eligibility-common.sh` so pick-req,
+# check-deps, and check-footprint cannot drift apart (F1 / UR-003). The stderr
+# wire format (`dep:`/`overlap:`/`scope:`) is consumed by drain-classify.sh and
+# is preserved exactly.
+#
+# Compatible with macOS bash 3.2 and Linux bash >= 4. Standard POSIX tools only.
 
 set -u
 
@@ -42,100 +48,12 @@ if [ ! -d "$DOWORK" ]; then
   exit 1
 fi
 
-# --- helpers -----------------------------------------------------------------
+# --- shared eligibility helpers (canonical; sourced, not duplicated) ---------
+_SELF_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# shellcheck source=eligibility-common.sh
+source "$_SELF_DIR/eligibility-common.sh"
 
-# Extract a single header field value from a REQ file.
-# Args: $1 = field name (e.g. "UR", "Files", "Depends on")
-#       $2 = file path
-# Prints value to stdout (empty if absent).
-extract_field() {
-  local field="$1"
-  local file="$2"
-  # Escape regex specials in field name minimally (we control inputs).
-  # Match line: **<field>:** <value>
-  grep -m1 -E "^\*\*${field}:\*\*[[:space:]]*" "$file" 2>/dev/null \
-    | sed -E "s/^\*\*${field}:\*\*[[:space:]]*//"
-}
-
-# Split a comma-separated list, trim whitespace around each item, print one per line.
-# Used for **Files:** only — do not use for **Depends on:** (see split_dep_ids).
-split_csv() {
-  local s="$1"
-  if [ -z "$s" ]; then
-    return 0
-  fi
-  # POSIX-compatible split. macOS bash 3.2-safe.
-  local IFS=','
-  # shellcheck disable=SC2206
-  local arr=($s)
-  local item
-  for item in "${arr[@]}"; do
-    # Trim leading/trailing whitespace.
-    item="${item#"${item%%[![:space:]]*}"}"
-    item="${item%"${item##*[![:space:]]}"}"
-    if [ -n "$item" ]; then
-      printf '%s\n' "$item"
-    fi
-  done
-}
-
-# Split a **Depends on:** value on commas AND/OR runs of whitespace.
-# Trim each token, drop empties, print one id per line. Delimiter-tolerant so
-# both "REQ-144 REQ-145" and "REQ-144, REQ-145" (and mixed) tokenize the same.
-# Does not validate id shape — callers that need validation do so themselves.
-split_dep_ids() {
-  local s="$1"
-  if [ -z "$s" ]; then
-    return 0
-  fi
-  # Normalize commas to spaces, then word-split on whitespace runs.
-  # bash 3.2 + set -u: relax nounset around empty arrays; disable globbing.
-  set +u
-  set -f
-  s="${s//,/ }"
-  # shellcheck disable=SC2206
-  local arr=($s)
-  set +f
-  local item
-  for item in "${arr[@]}"; do
-    item="${item#"${item%%[![:space:]]*}"}"
-    item="${item%"${item##*[![:space:]]}"}"
-    if [ -n "$item" ]; then
-      printf '%s\n' "$item"
-    fi
-  done
-  set -u
-}
-
-# Extract the REQ id from a REQ filename or first-line heading.
-# Filename convention: REQ-NNN-slug.md or REQ-M<n>-NNN-slug.md
-# Returns just the REQ id stem we use in **Depends on:** and stderr labels.
-req_id_from_path() {
-  local path="$1"
-  local base
-  base="$(basename "$path")"
-  # Strip trailing -slug.md, keep REQ-... prefix up through the numeric part.
-  # Examples:
-  #   REQ-007-add-foo.md       → REQ-007
-  #   REQ-M2-041-bar.md        → REQ-M2-041
-  # Algorithm: drop the .md, then drop the trailing "-<slug>" by keeping the
-  # longest prefix that matches REQ-(M[0-9]+-)?[0-9]+.
-  local stem="${base%.md}"
-  # Match with awk for portability.
-  echo "$stem" | awk '{
-    if (match($0, /^REQ-M[0-9]+-[0-9]+/)) {
-      print substr($0, RSTART, RLENGTH)
-    } else if (match($0, /^REQ-[0-9]+/)) {
-      print substr($0, RSTART, RLENGTH)
-    } else if (match($0, /^REQ-[A-Za-z0-9]+/)) {
-      # Fallback for non-numeric ids (test fixtures, alpha labels).
-      # Stop at first hyphen after REQ-.
-      print substr($0, RSTART, RLENGTH)
-    } else {
-      print ""
-    }
-  }'
-}
+# --- helpers (pick-req-specific sort keys) -----------------------------------
 
 # Extract a sortable numeric key from a REQ path.
 # For REQ-NNN → NNN. For REQ-M<m>-NNN → NNN (within a milestone we still sort by NNN).
@@ -145,7 +63,6 @@ sort_key_from_path() {
   base="$(basename "$path")"
   echo "$base" | awk '{
     if (match($0, /^REQ-M[0-9]+-[0-9]+/)) {
-      # extract the trailing number after M<m>-
       s = substr($0, RSTART, RLENGTH)
       sub(/^REQ-M[0-9]+-/, "", s)
       printf "%010d\n", s + 0
@@ -161,63 +78,20 @@ sort_key_from_path() {
 
 # Extract the **Priority:** value from a REQ file as a sortable ascending key.
 # Priority is 1-3 (3 = most urgent). An absent or malformed Priority sorts
-# exactly as Priority 2 — so legacy REQs behave identically to today.
-# Returns an inverted, zero-padded key (higher Priority => smaller key) so a
-# plain ascending sort selects the most urgent REQ first.
+# exactly as Priority 2. Returns an inverted key (higher Priority => smaller
+# key) so a plain ascending sort selects the most urgent REQ first.
 priority_sort_key_from_path() {
   local path="$1"
   local raw
-  raw="$(extract_field "Priority" "$path")"
-  # Trim whitespace.
+  raw="$(elig_extract_field "Priority" "$path")"
   raw="${raw#"${raw%%[![:space:]]*}"}"
   raw="${raw%"${raw##*[![:space:]]}"}"
   local pri=2
   case "$raw" in
     1|2|3) pri="$raw" ;;
-    *) pri=2 ;;  # absent or out-of-range => default Priority 2
+    *) pri=2 ;;
   esac
-  # Invert so descending Priority becomes ascending sort order.
   printf '%d' "$(( 9 - pri ))"
-}
-
-# Expand a single Files entry into one path per line (resolved against CWD).
-# Globs that don't match anything yield the literal entry (so it can still be
-# compared verbatim against another REQ's literal entry).
-expand_files_entry() {
-  local entry="$1"
-  if [ -z "$entry" ]; then
-    return 0
-  fi
-  # Use bash glob expansion. nullglob is bash 3.2-compatible.
-  local _old_nullglob
-  _old_nullglob="$(shopt -p nullglob 2>/dev/null || true)"
-  shopt -s nullglob 2>/dev/null || true
-  # shellcheck disable=SC2206,SC2086
-  local matches=( $entry )
-  eval "$_old_nullglob" 2>/dev/null || true
-  if [ "${#matches[@]}" -eq 0 ]; then
-    # No filesystem matches — return the literal entry for literal comparison.
-    printf '%s\n' "$entry"
-  else
-    local m
-    for m in "${matches[@]}"; do
-      printf '%s\n' "$m"
-    done
-  fi
-}
-
-# Print all files (expanded) claimed by a REQ at $1.
-files_for_req() {
-  local path="$1"
-  local raw
-  raw="$(extract_field "Files" "$path")"
-  if [ -z "$raw" ]; then
-    return 0
-  fi
-  local item
-  while IFS= read -r item; do
-    expand_files_entry "$item"
-  done < <(split_csv "$raw")
 }
 
 # --- main -------------------------------------------------------------------
@@ -242,11 +116,9 @@ if [ "${#CANDIDATES[@]}" -eq 0 ]; then
 fi
 
 # Order claimable candidates by Priority descending, then by numeric REQ id
-# ascending (the historical tiebreak). Build "<pri-key>\t<num-key>\t<path>"
-# then sort on the first two columns. The Priority key is inverted so a plain
-# ascending sort surfaces the most urgent REQ first; an absent **Priority:**
-# field maps to Priority 2, so a backlog with no Priority fields sorts purely
-# by REQ number exactly as before this feature existed.
+# ascending (the historical tiebreak). An absent **Priority:** field maps to
+# Priority 2, so a backlog with no Priority fields sorts purely by REQ number
+# exactly as before this feature existed.
 SORTED_LIST=""
 for c in "${CANDIDATES[@]}"; do
   pri_key="$(priority_sort_key_from_path "$c")"
@@ -254,39 +126,36 @@ for c in "${CANDIDATES[@]}"; do
   SORTED_LIST="${SORTED_LIST}${pri_key}	${num_key}	${c}
 "
 done
-# Remove trailing newline-ambiguity via printf, then sort on pri then number.
 SORTED_CANDIDATES="$(printf '%s' "$SORTED_LIST" | sort -k1,1 -k2,2 | cut -f3-)"
 
 # Precompute the set of files held by working/ slots.
 # Format: each line = "<req-id>\t<expanded-path>"
 WORKING_FOOTPRINT_FILE="$(mktemp -t pick-req-footprint.XXXXXX)"
-# Cleanup on exit.
 trap 'rm -f "$WORKING_FOOTPRINT_FILE"' EXIT
 
 # Build footprint index.
 for slot in "$DOWORK"/working/REQ-*.md; do
   [ -e "$slot" ] || continue
-  slot_id="$(req_id_from_path "$slot")"
+  slot_id="$(elig_req_id_from_path "$slot")"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     printf '%s\t%s\n' "$slot_id" "$f" >> "$WORKING_FOOTPRINT_FILE"
-  done < <(files_for_req "$slot")
+  done < <(elig_files_for_req "$slot")
 done
 
 # Resolve absolute path of the project root for emitting absolute candidate paths.
 PROJECT_ROOT="$(pwd)"
 
 # Iterate candidates in sorted order.
-# Use a here-string fed via printf to be 3.2-safe.
 while IFS= read -r candidate; do
   [ -n "$candidate" ] || continue
   [ -e "$candidate" ] || continue
 
-  cand_id="$(req_id_from_path "$candidate")"
+  cand_id="$(elig_req_id_from_path "$candidate")"
 
   # --- scope filter ---
   if [ "$SCOPE" != "any" ]; then
-    cand_ur="$(extract_field "UR" "$candidate")"
+    cand_ur="$(elig_extract_field "UR" "$candidate")"
     if [ "$cand_ur" != "$SCOPE" ]; then
       printf 'scope:%s\n' "$cand_ur" >&2
       continue
@@ -294,33 +163,17 @@ while IFS= read -r candidate; do
   fi
 
   # --- dep filter ---
-  deps_raw="$(extract_field "Depends on" "$candidate")"
+  deps_raw="$(elig_extract_field "Depends on" "$candidate")"
   dep_blocked=0
   if [ -n "$deps_raw" ]; then
     while IFS= read -r dep; do
       [ -n "$dep" ] || continue
-      # Is there an archive/<dep>-*.md or archive/<dep>.md?
-      shopt -s nullglob 2>/dev/null || true
-      # shellcheck disable=SC2206
-      archived=( "$DOWORK"/archive/"$dep"-*.md )
-      found=0
-      if [ "${#archived[@]}" -gt 0 ]; then
-        for a in "${archived[@]}"; do
-          if [ -e "$a" ]; then
-            found=1
-            break
-          fi
-        done
-      fi
-      if [ "$found" -eq 0 ] && [ -e "$DOWORK/archive/$dep.md" ]; then
-        found=1
-      fi
-      if [ "$found" -eq 0 ]; then
+      if ! elig_is_dep_satisfied "$dep"; then
         printf 'dep:%s\n' "$dep" >&2
         dep_blocked=1
         break
       fi
-    done < <(split_dep_ids "$deps_raw")
+    done < <(elig_split_dep_ids "$deps_raw")
   fi
   if [ "$dep_blocked" -eq 1 ]; then
     continue
@@ -341,7 +194,7 @@ while IFS= read -r candidate; do
         break
       fi
     fi
-  done < <(files_for_req "$candidate")
+  done < <(elig_files_for_req "$candidate")
 
   if [ "$overlap_found" -eq 1 ]; then
     printf 'overlap:%s\n' "$overlap_slot" >&2
