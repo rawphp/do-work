@@ -135,6 +135,30 @@ tracker:
 - **Human assignee** — you stay assignee on Issues; agents claim via comments. **Do not clear agent claim comments in Linear while a run is live** (see troubleshooting).
 - **Migrate existing markdown projects** only when idle: `/do-work upgrade migrate` (dry-run first). See [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends).
 
+### Optional: SQLite as work-item store
+
+You can also use a **local SQLite DB** (`.do-work/work.db`) as the sole work-item store — still no dual-write, still local git/worktrees.
+
+Minimal config:
+
+```yaml
+tracker:
+  backend: sqlite
+  sqlite:
+    path: ""                 # default .do-work/work.db
+    board_path: ""           # default .do-work/board/index.html
+    busy_timeout_ms: 5000
+```
+
+**Before enabling `backend: sqlite`:**
+
+1. Install **`sqlite3`** on PATH (`brew install sqlite` / distro package). Details: [Troubleshooting → SQLite tracker backend](troubleshooting.md#sqlite-tracker-backend).
+2. Expect a **greenfield** empty DB — prior markdown or Linear history is **not** imported.
+3. Know that `/do-work board` (sqlite-only) regenerates the static HTML board **only when you run it**.
+4. `/do-work upgrade migrate` (markdown→Linear) **refuses** while backend is sqlite.
+
+Skip this section if you want the default markdown files. Full multi-tracker map: [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends).
+
 ### 5. Execute with go
 
 Use the UR number from the start report (example `UR-001`):
