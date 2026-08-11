@@ -121,7 +121,7 @@ Do not fall back to markdown or Linear. Fix sqlite3 / work.db / skill install, t
 | Capture summary | `bash {skill-root}/lib/dw-db.sh write-capture-summary {root} UR-NNN --body TEXT` — **replace** |
 | Pick first claimable | `bash {skill-root}/lib/dw-db.sh pick {root} [--ur UR-NNN]` |
 | Deps / footprint / stale / archive preflight | `check-deps`, `check-footprint`, `scan-stale`, `check-archive` on `dw-db.sh` |
-| Board HTML | `bash {skill-root}/lib/dw-db.sh board {root}` (when implemented) — not a port op |
+| Board HTML | `bash {skill-root}/lib/dw-db.sh board {root} [--path PATH] [--stale-max N]` — not a port op; agent gate in `agents/board.md` |
 | Status situation room | `bash {skill-root}/lib/dw-db.sh status-synth {root} [UR-NNN]` — folds synth + proven/unproven + coverage + closed |
 | Coverage arithmetic | shared `lib/score-coverage.sh` — **not** reimplemented in dw-db |
 

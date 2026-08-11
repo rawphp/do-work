@@ -590,6 +590,11 @@ SQL
 # Default stale threshold (seconds). Design §8.3: parallel.stale_threshold_seconds default 900.
 DEFAULT_STALE_MAX=900
 
+# HTML-escape user-derived text for static board output (& first, then < > ").
+html_escape() {
+  printf '%s' "${1:-}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g'
+}
+
 # ISO-8601 UTC → epoch seconds (macOS BSD date + GNU date).
 iso_to_epoch() {
   local ts="$1"
@@ -1710,6 +1715,250 @@ END {
   rm -f "$coverage_tmp"
 }
 
+# --- board <root> [--path PATH] [--stale-max N] ---
+# Write self-contained static HTML snapshot. Explicit regen only (not claim/archive).
+# Prints absolute path of written file on stdout.
+cmd_board() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "board: usage: board <root> [--path PATH] [--stale-max N]"
+  local out_path="" stale_max="$DEFAULT_STALE_MAX"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --path)
+        out_path="${2:-}"
+        [ -n "$out_path" ] || die "board: --path requires a value"
+        shift 2 ;;
+      --stale-max)
+        case "${2:-}" in
+          ''|*[!0-9]*) die "board: --stale-max must be positive integer" ;;
+        esac
+        stale_max="$2"
+        shift 2 ;;
+      *) die "board: unknown arg: $1" ;;
+    esac
+  done
+
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+
+  if [ -z "$out_path" ]; then
+    out_path="$root/.do-work/board/index.html"
+  else
+    case "$out_path" in
+      /*) : ;;
+      *) out_path="$root/$out_path" ;;
+    esac
+  fi
+
+  local gen_at project_name
+  gen_at="$(iso_now)"
+  project_name="$(basename "$root")"
+
+  local sep
+  sep=$'\x1e'
+
+  # Stale active claims for banner
+  local stale_lines="" stale_count=0
+  local s_slug s_agent s_hb s_age
+  local stale_rows
+  stale_rows="$(sqlite3 -separator "$sep" "$db" "
+SELECT r.slug, c.agent_id, c.heartbeat
+FROM claims c JOIN reqs r ON r.id=c.req_id
+WHERE c.status='active'
+ORDER BY r.slug;")"
+  while IFS="$sep" read -r s_slug s_agent s_hb; do
+    [ -n "${s_slug:-}" ] || continue
+    if is_stale_heartbeat "$s_hb" "$stale_max"; then
+      s_age="$(heartbeat_age_secs "$s_hb" 2>/dev/null || true)"
+      [ -n "${s_age:-}" ] || s_age="unknown"
+      stale_count=$((stale_count + 1))
+      stale_lines="${stale_lines}<li><code>$(html_escape "$s_slug")</code> claimer=$(html_escape "$s_agent") age=${s_age}s heartbeat=$(html_escape "$s_hb")</li>"
+    fi
+  done <<EOF
+$stale_rows
+EOF
+
+  # UR rows with REQ counts
+  local ur_rows_html=""
+  local ur_lines u_slug u_title u_class u_created u_closed
+  local n_req n_backlog n_ip n_done
+  ur_lines="$(sqlite3 -separator "$sep" "$db" "
+SELECT slug, title, class, created_at, COALESCE(closed_at,'')
+FROM urs
+ORDER BY CAST(substr(slug, instr(slug,'-')+1) AS INTEGER) ASC;")"
+  if [ -z "${ur_lines:-}" ]; then
+    ur_rows_html='<tr><td colspan="7" class="empty">No user requests yet.</td></tr>'
+  else
+    while IFS="$sep" read -r u_slug u_title u_class u_created u_closed; do
+      [ -n "${u_slug:-}" ] || continue
+      n_req="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$u_slug");")"
+      n_backlog="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$u_slug") AND r.status='backlog';")"
+      n_ip="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$u_slug") AND r.status='in_progress';")"
+      n_done="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs r JOIN urs u ON u.id=r.ur_id WHERE u.slug=$(sql_quote "$u_slug") AND r.status='done';")"
+      ur_rows_html="${ur_rows_html}<tr>
+<td><code>$(html_escape "$u_slug")</code></td>
+<td>$(html_escape "$u_title")</td>
+<td>$(html_escape "$u_class")</td>
+<td>${n_req:-0}</td>
+<td>${n_backlog:-0}</td>
+<td>${n_ip:-0}</td>
+<td>${n_done:-0}</td>
+</tr>"
+    done <<EOF
+$ur_lines
+EOF
+  fi
+
+  # REQ rows with claimer + heartbeat age
+  local req_rows_html=""
+  local req_lines r_slug r_ur r_title r_status r_layer r_agent r_hb
+  local display_status claimer hb_cell age stale_class
+  req_lines="$(sqlite3 -separator "$sep" "$db" "
+SELECT r.slug, u.slug, r.title, r.status, COALESCE(r.layer,''),
+       COALESCE(c.agent_id,''), COALESCE(c.heartbeat,'')
+FROM reqs r
+JOIN urs u ON u.id=r.ur_id
+LEFT JOIN claims c ON c.req_id=r.id AND c.status='active'
+ORDER BY CAST(substr(r.slug, instr(r.slug,'-')+1) AS INTEGER) ASC;")"
+  if [ -z "${req_lines:-}" ]; then
+    req_rows_html='<tr><td colspan="7" class="empty">No REQs yet.</td></tr>'
+  else
+    while IFS="$sep" read -r r_slug r_ur r_title r_status r_layer r_agent r_hb; do
+      [ -n "${r_slug:-}" ] || continue
+      display_status="$r_status"
+      [ "$display_status" = "in_progress" ] && display_status="in-progress"
+      claimer="—"
+      hb_cell="—"
+      stale_class=""
+      if [ -n "$r_agent" ]; then
+        claimer="$(html_escape "$r_agent")"
+        if [ -z "$r_hb" ]; then
+          hb_cell="? (STALE)"
+          stale_class=" stale"
+        else
+          age="$(heartbeat_age_secs "$r_hb" 2>/dev/null || true)"
+          if [ -z "${age:-}" ]; then
+            hb_cell="? (STALE)"
+            stale_class=" stale"
+          elif [ "$age" -gt "$stale_max" ]; then
+            hb_cell="${age}s (STALE)"
+            stale_class=" stale"
+          else
+            hb_cell="${age}s"
+          fi
+        fi
+      fi
+      [ -n "$r_layer" ] || r_layer="—"
+      req_rows_html="${req_rows_html}<tr class=\"status-$(html_escape "$r_status")${stale_class}\">
+<td><code>$(html_escape "$r_slug")</code></td>
+<td><code>$(html_escape "$r_ur")</code></td>
+<td>$(html_escape "$r_title")</td>
+<td>$(html_escape "$display_status")</td>
+<td>$(html_escape "$r_layer")</td>
+<td>${claimer}</td>
+<td>${hb_cell}</td>
+</tr>"
+    done <<EOF
+$req_lines
+EOF
+  fi
+
+  local stale_banner=""
+  if [ "$stale_count" -gt 0 ]; then
+    stale_banner="<div class=\"banner stale-banner\" role=\"alert\"><strong>Stale claims (${stale_count})</strong> — heartbeat older than ${stale_max}s<ul>${stale_lines}</ul></div>"
+  fi
+
+  local out_dir esc_project esc_gen
+  out_dir="$(dirname "$out_path")"
+  mkdir -p "$out_dir"
+  esc_project="$(html_escape "$project_name")"
+  esc_gen="$(html_escape "$gen_at")"
+
+  # Emit with quoted heredocs + printf so user titles cannot re-expand ($ ` etc.).
+  {
+    cat <<'HEAD'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>do-work board — 
+HEAD
+    printf '%s' "$esc_project"
+    cat <<'HEAD2'
+</title>
+<style>
+  :root { --bg:#0f1419; --fg:#e7ecf1; --muted:#8b9aab; --card:#1a2332; --border:#2a3544;
+          --accent:#3d8bfd; --stale:#f0a030; --backlog:#6b7c8f; --ip:#3d8bfd; --done:#3ecf8e; --stopped:#e85d5d; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+         background:var(--bg); color:var(--fg); line-height:1.45; padding:1.5rem; }
+  h1 { font-size:1.4rem; margin:0 0 .25rem; }
+  h2 { font-size:1.1rem; margin:1.5rem 0 .5rem; border-bottom:1px solid var(--border); padding-bottom:.25rem; }
+  .meta { color:var(--muted); font-size:.9rem; margin-bottom:1rem; }
+  .meta code { color:var(--fg); }
+  .banner { background:#3a2a10; border:1px solid var(--stale); border-radius:6px; padding:.75rem 1rem; margin:1rem 0; }
+  .banner ul { margin:.5rem 0 0; padding-left:1.2rem; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border-radius:8px; overflow:hidden;
+          font-size:.9rem; margin-bottom:1rem; }
+  th, td { text-align:left; padding:.5rem .65rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#121a26; color:var(--muted); font-weight:600; font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; }
+  tr:last-child td { border-bottom:none; }
+  tr.stale td { background:rgba(240,160,48,.08); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.85em; }
+  .empty { color:var(--muted); font-style:italic; }
+  .foot { color:var(--muted); font-size:.8rem; margin-top:2rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>do-work board</h1>
+  <div class="meta">
+    project=<code>
+HEAD2
+    printf '%s' "$esc_project"
+    cat <<'HEAD3'
+</code>
+    · backend=<code>sqlite</code>
+    · generated_at=<code>
+HEAD3
+    printf '%s' "$esc_gen"
+    printf '</code>\n    · stale_max=%ss\n  </div>\n</header>\n' "$stale_max"
+    # stale_banner already built from escaped fragments; print raw (no re-expand)
+    printf '%s\n' "$stale_banner"
+    cat <<'MID'
+<section>
+  <h2>User requests</h2>
+  <table>
+    <thead><tr><th>UR</th><th>Title</th><th>Class</th><th>REQs</th><th>Backlog</th><th>In progress</th><th>Done</th></tr></thead>
+    <tbody>
+MID
+    printf '%s\n' "$ur_rows_html"
+    cat <<'MID2'
+    </tbody>
+  </table>
+</section>
+<section>
+  <h2>REQs</h2>
+  <table>
+    <thead><tr><th>REQ</th><th>UR</th><th>Title</th><th>Status</th><th>Layer</th><th>Claimer</th><th>Heartbeat age</th></tr></thead>
+    <tbody>
+MID2
+    printf '%s\n' "$req_rows_html"
+    cat <<'TAIL'
+    </tbody>
+  </table>
+</section>
+<p class="foot">Static snapshot — regenerate with <code>/do-work board</code> (or <code>dw-db.sh board</code>). Not updated by claim/archive.</p>
+</body>
+</html>
+TAIL
+  } > "$out_path"
+
+  printf '%s\n' "$out_path"
+}
+
 main() {
   local cmd="${1:-}"; shift || true
   case "$cmd" in
@@ -1748,6 +1997,7 @@ main() {
     list-milestone-reqs) cmd_list_milestone_reqs "$@" ;;
     append-run-note) cmd_append_run_note "$@" ;;
     status-synth) cmd_status_synth "$@" ;;
+    board) cmd_board "$@" ;;
     "") die "usage: dw-db.sh <command> ..." ;;
     *) die "unknown command: $cmd" ;;
   esac

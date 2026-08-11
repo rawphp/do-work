@@ -269,6 +269,21 @@ Render a read-only live situation room: all in-flight REQs, their claimers, hear
 
 ---
 
+### board
+
+Regenerate a **static HTML** snapshot of the sqlite work-item store (human browser view). Explicit command only — not a side effect of claim, archive, or run.
+
+1. Detect `{project}`.
+2. Confirm `{project}/.do-work/` exists. If not, report "do-work not installed." and stop.
+3. Read [agents/board.md](../agents/board.md) in full.
+4. Follow the board agent exactly:
+   - Load Config → if effective `tracker.backend` ≠ `sqlite`, **hard-stop** with the message from `agents/board.md` (board is sqlite-only).
+   - Run `bash {skill-root}/lib/dw-db.sh board {project} [--path {board_path}]`.
+   - Default output: `{project}/.do-work/board/index.html` (override with `tracker.sqlite.board_path`).
+5. Print the written path. Open in a browser as needed. No work-item mutations beyond the regenerable board file.
+
+---
+
 ### close UR-NNN
 
 Validate the integrated result of a UR against its verbatim brief — walking every path-unit's entry point to its terminal state in the merged app — and write a per-path-unit closure report.
