@@ -587,6 +587,610 @@ COMMIT;
 SQL
 }
 
+# Default stale threshold (seconds). Design §8.3: parallel.stale_threshold_seconds default 900.
+DEFAULT_STALE_MAX=900
+
+# ISO-8601 UTC → epoch seconds (macOS BSD date + GNU date).
+iso_to_epoch() {
+  local ts="$1"
+  local epoch
+  epoch="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" "+%s" 2>/dev/null)" || true
+  if [ -n "${epoch:-}" ]; then
+    printf '%s\n' "$epoch"
+    return 0
+  fi
+  epoch="$(date -u -d "$ts" "+%s" 2>/dev/null)" || true
+  if [ -n "${epoch:-}" ]; then
+    printf '%s\n' "$epoch"
+    return 0
+  fi
+  return 1
+}
+
+# Age in seconds of an ISO heartbeat; empty if unparseable.
+heartbeat_age_secs() {
+  local hb="$1"
+  local now_e hb_e
+  now_e="$(date -u +%s)"
+  hb_e="$(iso_to_epoch "$hb" 2>/dev/null)" || true
+  if [ -z "${hb_e:-}" ]; then
+    return 1
+  fi
+  echo $(( now_e - hb_e ))
+}
+
+# Return 0 if active claim heartbeat is stale (age > stale_max) or unparseable/missing.
+# Args: heartbeat_iso stale_max
+is_stale_heartbeat() {
+  local hb="$1"
+  local max="$2"
+  if [ -z "$hb" ]; then
+    return 0
+  fi
+  local age
+  age="$(heartbeat_age_secs "$hb" 2>/dev/null)" || return 0
+  if [ "$age" -gt "$max" ]; then
+    return 0
+  fi
+  return 1
+}
+
+# Tokenize files field: whitespace and commas are separators.
+tokenize_files() {
+  local raw="$1"
+  raw="$(printf '%s' "$raw" | tr ',\t' '  ')"
+  local t
+  for t in $raw; do
+    [ -n "$t" ] || continue
+    printf '%s\n' "$t"
+  done
+}
+
+# Expand one files token against project root (nullglob: unmatched → nothing).
+# Prints paths relative to root when possible.
+expand_files_token() {
+  local root="$1"
+  local entry="$2"
+  if [ -z "$entry" ]; then
+    return 0
+  fi
+  (
+    cd "$root" || exit 0
+    case "$entry" in
+      *\*\**)
+        # Manual ** walker (bash 3.2 has no globstar)
+        local before="${entry%%\*\**}"
+        local after="${entry#*\*\*}"
+        local search_root="${before%/}"
+        [ -n "$search_root" ] || search_root="."
+        [ -d "$search_root" ] || exit 0
+        local suffix="${after#/}"
+        local f
+        while IFS= read -r f; do
+          case "$f" in
+            ./*) f="${f#./}" ;;
+          esac
+          if [ -z "$suffix" ]; then
+            [ -f "$f" ] && printf '%s\n' "$f"
+          else
+            case "$f" in
+              $before*$suffix) [ -f "$f" ] && printf '%s\n' "$f" ;;
+            esac
+          fi
+        done < <(find "$search_root" -type f -print 2>/dev/null)
+        ;;
+      *)
+        local _old_nullglob
+        _old_nullglob="$(shopt -p nullglob 2>/dev/null || true)"
+        shopt -s nullglob 2>/dev/null || true
+        # shellcheck disable=SC2206,SC2086
+        local matches=( $entry )
+        eval "$_old_nullglob" 2>/dev/null || true
+        local m
+        for m in "${matches[@]}"; do
+          printf '%s\n' "$m"
+        done
+        ;;
+    esac
+  )
+}
+
+# Expanded unique file set for a files text field. Args: root files_text
+expanded_files_set() {
+  local root="$1"
+  local files="$2"
+  local tok
+  while IFS= read -r tok; do
+    [ -n "$tok" ] || continue
+    expand_files_token "$root" "$tok"
+  done < <(tokenize_files "$files") | LC_ALL=C sort -u
+}
+
+# Active claim row for req_id: prints agent_id|heartbeat|id or empty
+active_claim_row() {
+  local db="$1"
+  local rid="$2"
+  sqlite3 -separator '|' "$db" \
+    "SELECT agent_id, heartbeat, id FROM claims WHERE req_id=$rid AND status='active' LIMIT 1;"
+}
+
+# --- claim <root> <REQ-NNN> <agent_id> [--session S] [--stale-max N] ---
+cmd_claim() {
+  local root="${1:-}" slug="${2:-}" agent="${3:-}"
+  shift 3 2>/dev/null || true
+  [ -n "$root" ] && [ -n "$slug" ] && [ -n "$agent" ] || \
+    die "claim: usage: claim <root> <REQ-NNN> <agent_id> [--session S] [--stale-max N]"
+  local session="" stale_max="$DEFAULT_STALE_MAX"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      --stale-max)
+        case "${2:-}" in
+          ''|*[!0-9]*) die "claim: --stale-max must be positive integer" ;;
+        esac
+        stale_max="$2"
+        shift 2 ;;
+      *) die "claim: unknown arg: $1" ;;
+    esac
+  done
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local rid
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || die "claim: not found: $slug"
+
+  local now
+  now="$(iso_now)"
+
+  # Pre-read outside tx for clearer concurrent-conflict (re-check inside tx).
+  local row agent_cur hb_cur claim_id status_cur
+  row="$(active_claim_row "$db" "$rid")"
+  status_cur="$(sqlite3 "$db" "SELECT status FROM reqs WHERE id=$rid;")"
+  [ "$status_cur" != "done" ] || die "claim: REQ is done: $slug"
+
+  if [ -n "$row" ]; then
+    agent_cur="${row%%|*}"
+    rest="${row#*|}"
+    hb_cur="${rest%%|*}"
+    claim_id="${rest##*|}"
+    if [ "$agent_cur" = "$agent" ]; then
+      # Own active: idempotent refresh
+      sql_exec "$db" "UPDATE claims SET heartbeat=$(sql_quote "$now") WHERE id=$claim_id AND status='active';" \
+        || die "claim: heartbeat refresh failed"
+      return 0
+    fi
+    if ! is_stale_heartbeat "$hb_cur" "$stale_max"; then
+      echo "concurrent-conflict: $slug held by $agent_cur" >&2
+      exit 2
+    fi
+  fi
+
+  # Re-check then release-then-insert / insert in one transaction.
+  local re_row re_agent re_hb re_status rest
+  re_status="$(sqlite3 "$db" "SELECT status FROM reqs WHERE id=$rid;")"
+  [ "$re_status" != "done" ] || die "claim: REQ is done: $slug"
+  re_row="$(active_claim_row "$db" "$rid")"
+
+  if [ -n "$re_row" ]; then
+    re_agent="${re_row%%|*}"
+    rest="${re_row#*|}"
+    re_hb="${rest%%|*}"
+    if [ "$re_agent" = "$agent" ]; then
+      sql_exec "$db" "UPDATE claims SET heartbeat=$(sql_quote "$now") WHERE req_id=$rid AND status='active';" \
+        || die "claim: own refresh failed"
+      return 0
+    fi
+    if ! is_stale_heartbeat "$re_hb" "$stale_max"; then
+      echo "concurrent-conflict: $slug held by $re_agent" >&2
+      exit 2
+    fi
+    # Stale foreign: release-then-insert in one transaction
+    sqlite3 "$db" >/dev/null <<SQL || die "claim: stale takeover failed"
+PRAGMA busy_timeout=5000;
+PRAGMA foreign_keys=ON;
+BEGIN IMMEDIATE;
+UPDATE claims SET status='released' WHERE req_id=$rid AND status='active';
+UPDATE reqs SET status='in_progress', updated_at=$(sql_quote "$now") WHERE id=$rid;
+INSERT INTO claims(req_id, agent_id, claimed_at, heartbeat, session, status)
+  VALUES($rid, $(sql_quote "$agent"), $(sql_quote "$now"), $(sql_quote "$now"), $(sql_quote "$session"), 'active');
+COMMIT;
+SQL
+    return 0
+  fi
+
+  # No active claim: insert + set in_progress
+  sqlite3 "$db" >/dev/null <<SQL || die "claim: insert failed"
+PRAGMA busy_timeout=5000;
+PRAGMA foreign_keys=ON;
+BEGIN IMMEDIATE;
+UPDATE reqs SET status='in_progress', updated_at=$(sql_quote "$now") WHERE id=$rid;
+INSERT INTO claims(req_id, agent_id, claimed_at, heartbeat, session, status)
+  VALUES($rid, $(sql_quote "$agent"), $(sql_quote "$now"), $(sql_quote "$now"), $(sql_quote "$session"), 'active');
+COMMIT;
+SQL
+}
+
+# --- heartbeat <root> <REQ-NNN> <agent_id> ---
+# UPDATE-only; exit 1 if not owner / no active claim. Never INSERT.
+cmd_heartbeat() {
+  local root="${1:-}" slug="${2:-}" agent="${3:-}"
+  [ -n "$root" ] && [ -n "$slug" ] && [ -n "$agent" ] || \
+    die "heartbeat: usage: heartbeat <root> <REQ-NNN> <agent_id>"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local rid
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || die "heartbeat: not found: $slug"
+  local now
+  now="$(iso_now)"
+  local n
+  n="$(sqlite3 "$db" "SELECT changes() FROM (
+    SELECT 1 WHERE 0
+  );" 2>/dev/null || true)"
+  # Perform UPDATE and check changes()
+  n="$(sqlite3 "$db" <<SQL
+PRAGMA busy_timeout=5000;
+UPDATE claims SET heartbeat=$(sql_quote "$now")
+  WHERE req_id=$rid AND status='active' AND agent_id=$(sql_quote "$agent");
+SELECT changes();
+SQL
+)" || die "heartbeat: update failed"
+  # changes() is last line
+  n="$(printf '%s\n' "$n" | tail -1)"
+  if [ "${n:-0}" = "0" ]; then
+    die "heartbeat: not claim owner or no active claim for $slug"
+  fi
+}
+
+# --- unblock <root> <REQ-NNN> ---
+# Set backlog + release active claim.
+cmd_unblock() {
+  local root="${1:-}" slug="${2:-}"
+  [ -n "$root" ] && [ -n "$slug" ] || die "unblock: usage: unblock <root> <REQ-NNN>"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local rid now
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || die "unblock: not found: $slug"
+  now="$(iso_now)"
+  sqlite3 "$db" >/dev/null <<SQL || die "unblock: transaction failed"
+PRAGMA busy_timeout=5000;
+PRAGMA foreign_keys=ON;
+BEGIN IMMEDIATE;
+UPDATE claims SET status='released' WHERE req_id=$rid AND status='active';
+UPDATE reqs SET status='backlog', updated_at=$(sql_quote "$now") WHERE id=$rid;
+COMMIT;
+SQL
+}
+
+# --- check-deps <root> <REQ-NNN> ---
+# Print unsatisfied dep slugs (status ≠ done), one per line. Exit 0 always if REQ exists.
+cmd_check_deps() {
+  local root="${1:-}" slug="${2:-}"
+  [ -n "$root" ] && [ -n "$slug" ] || die "check-deps: usage: check-deps <root> <REQ-NNN>"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local rid
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || die "check-deps: not found: $slug"
+  sqlite3 "$db" "
+SELECT d.slug FROM deps dep
+JOIN reqs d ON d.id = dep.depends_on_req_id
+WHERE dep.req_id = $rid AND d.status != 'done'
+ORDER BY CAST(substr(d.slug, instr(d.slug,'-')+1) AS INTEGER) ASC;"
+}
+
+# --- check-footprint <root> <REQ-NNN> ---
+# Print overlap:<peer-slug> for each in-flight peer with non-empty path intersection.
+cmd_check_footprint() {
+  local root="${1:-}" slug="${2:-}"
+  [ -n "$root" ] && [ -n "$slug" ] || die "check-footprint: usage: check-footprint <root> <REQ-NNN>"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local rid files
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || die "check-footprint: not found: $slug"
+  files="$(sqlite3 "$db" "SELECT files FROM reqs WHERE id=$rid;")"
+  if [ -z "$files" ]; then
+    return 0
+  fi
+  local target_file
+  target_file="$(mktemp -t dw-fp-target.XXXXXX)"
+  expanded_files_set "$root" "$files" > "$target_file"
+  if [ ! -s "$target_file" ]; then
+    rm -f "$target_file"
+    return 0
+  fi
+
+  # Peers: status in (in_progress, stopped) AND active claim, exclude self.
+  # Use RS=0x1e so empty files fields do not collapse (bash read treats tab as IFS whitespace).
+  local peers peer_slug peer_files peer_file intersection
+  peers="$(sqlite3 -separator $'\x1e' "$db" "
+SELECT r.slug, r.files FROM reqs r
+JOIN claims c ON c.req_id = r.id AND c.status = 'active'
+WHERE r.status IN ('in_progress', 'stopped')
+  AND r.id != $rid
+ORDER BY r.slug;")"
+  peer_file="$(mktemp -t dw-fp-peer.XXXXXX)"
+  while IFS=$'\x1e' read -r peer_slug peer_files; do
+    [ -n "$peer_slug" ] || continue
+    expanded_files_set "$root" "$peer_files" > "$peer_file"
+    [ -s "$peer_file" ] || continue
+    intersection="$(LC_ALL=C comm -12 "$target_file" "$peer_file")"
+    if [ -n "$intersection" ]; then
+      printf 'overlap:%s\n' "$peer_slug"
+    fi
+  done <<EOF
+$peers
+EOF
+  rm -f "$target_file" "$peer_file"
+}
+
+# --- scan-stale <root> [--stale-max N] ---
+# Print stale active claims: <slug> <agent_id> <heartbeat> age=<secs|unknown>
+cmd_scan_stale() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "scan-stale: usage: scan-stale <root> [--stale-max N]"
+  local stale_max="$DEFAULT_STALE_MAX"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --stale-max)
+        case "${2:-}" in
+          ''|*[!0-9]*) die "scan-stale: --stale-max must be positive integer" ;;
+        esac
+        stale_max="$2"
+        shift 2 ;;
+      *) die "scan-stale: unknown arg: $1" ;;
+    esac
+  done
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local lines slug agent hb age
+  lines="$(sqlite3 -separator $'\x1e' "$db" "
+SELECT r.slug, c.agent_id, c.heartbeat
+FROM claims c JOIN reqs r ON r.id=c.req_id
+WHERE c.status='active'
+ORDER BY r.slug;")"
+  while IFS=$'\x1e' read -r slug agent hb; do
+    [ -n "$slug" ] || continue
+    if is_stale_heartbeat "$hb" "$stale_max"; then
+      age="$(heartbeat_age_secs "$hb" 2>/dev/null || true)"
+      if [ -z "${age:-}" ]; then
+        age="unknown"
+      fi
+      printf '%s %s %s age=%s\n' "$slug" "$agent" "$hb" "$age"
+    fi
+  done <<EOF
+$lines
+EOF
+}
+
+# Count unchecked `- [ ]` under ## Acceptance Criteria in body.
+# Prints count to stdout.
+count_unchecked_ac() {
+  local body="$1"
+  printf '%s\n' "$body" | awk '
+    /^## *Acceptance Criteria/ { in_ac=1; next }
+    /^## / && in_ac { in_ac=0 }
+    in_ac && /^[[:space:]]*-[[:space:]]*\[[[:space:]]\]/ { n++ }
+    END { print n+0 }
+  '
+}
+
+# Shared archive criteria checks. Args: db slug
+# Sets global __arch_fail reasons on stderr; returns 0 if all pass.
+# Mode: full (status done + proof + AC) | gate (proof + AC only for archive-req pre-set)
+_check_archive_inner() {
+  local db="$1"
+  local slug="$2"
+  local mode="${3:-full}"  # full | gate
+  local rid status proof body unchecked
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || { echo "check-archive: not found: $slug" >&2; return 1; }
+  status="$(sqlite3 "$db" "SELECT status FROM reqs WHERE id=$rid;")"
+  proof="$(sqlite3 "$db" "SELECT TRIM(closure_proof) FROM reqs WHERE id=$rid;")"
+  body="$(sqlite3 "$db" "SELECT body FROM reqs WHERE id=$rid;")"
+  local failed=0
+  if [ "$mode" = "full" ]; then
+    if [ "$status" != "done" ]; then
+      echo "check-archive: $slug status not done (got '$status')" >&2
+      failed=1
+    fi
+  fi
+  if [ -z "$proof" ]; then
+    echo "check-archive: $slug missing closure proof" >&2
+    failed=1
+  fi
+  unchecked="$(count_unchecked_ac "$body")"
+  if [ "${unchecked:-0}" -gt 0 ]; then
+    echo "check-archive: $slug unchecked acceptance criteria: $unchecked" >&2
+    failed=1
+  fi
+  return "$failed"
+}
+
+# --- check-archive <root> <REQ-NNN> ---
+# Three criteria: status=done, non-empty closure_proof, no unchecked AC.
+cmd_check_archive() {
+  local root="${1:-}" slug="${2:-}"
+  [ -n "$root" ] && [ -n "$slug" ] || die "check-archive: usage: check-archive <root> <REQ-NNN>"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  _check_archive_inner "$db" "$slug" full
+}
+
+# --- archive-req <root> <REQ-NNN> ---
+# Gate: proof + no unchecked AC; then set done + release active claim.
+cmd_archive_req() {
+  local root="${1:-}" slug="${2:-}"
+  [ -n "$root" ] && [ -n "$slug" ] || die "archive-req: usage: archive-req <root> <REQ-NNN>"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local rid
+  rid="$(req_id_for_slug "$db" "$slug")"
+  [ -n "$rid" ] || die "archive-req: not found: $slug"
+  _check_archive_inner "$db" "$slug" gate || die "archive-req: integrity checks failed for $slug"
+  local now
+  now="$(iso_now)"
+  sqlite3 "$db" >/dev/null <<SQL || die "archive-req: transaction failed"
+PRAGMA busy_timeout=5000;
+PRAGMA foreign_keys=ON;
+BEGIN IMMEDIATE;
+UPDATE reqs SET status='done', updated_at=$(sql_quote "$now") WHERE id=$rid;
+UPDATE claims SET status='released' WHERE req_id=$rid AND status='active';
+COMMIT;
+SQL
+}
+
+# Active milestone for a UR id (empty if none).
+ur_active_milestone() {
+  local db="$1"
+  local ur_id="$2"
+  sqlite3 "$db" "SELECT COALESCE(active,'') FROM milestone_state WHERE ur_id=$ur_id LIMIT 1;"
+}
+
+# Return 0 if REQ passes deps (all deps done).
+req_deps_satisfied() {
+  local db="$1"
+  local rid="$2"
+  local missing
+  missing="$(sqlite3 "$db" "
+SELECT COUNT(*) FROM deps dep
+JOIN reqs d ON d.id = dep.depends_on_req_id
+WHERE dep.req_id = $rid AND d.status != 'done';")"
+  [ "${missing:-0}" = "0" ]
+}
+
+# Return 0 if REQ has no fresh active claim, or only stale (takeover-eligible).
+# For list-claimable: backlog with fresh active is NOT claimable; stale active IS.
+req_claim_slot_free() {
+  local db="$1"
+  local rid="$2"
+  local stale_max="$3"
+  local row agent hb
+  row="$(active_claim_row "$db" "$rid")"
+  if [ -z "$row" ]; then
+    return 0
+  fi
+  hb="$(printf '%s' "$row" | cut -d'|' -f2)"
+  if is_stale_heartbeat "$hb" "$stale_max"; then
+    return 0
+  fi
+  return 1
+}
+
+# Return 0 if footprint free vs in-flight peers.
+req_footprint_free() {
+  local root="$1"
+  local db="$2"
+  local slug="$3"
+  local rid="$4"
+  local files overlaps
+  files="$(sqlite3 "$db" "SELECT files FROM reqs WHERE id=$rid;")"
+  if [ -z "$files" ]; then
+    return 0
+  fi
+  overlaps="$(cmd_check_footprint "$root" "$slug" 2>/dev/null || true)"
+  [ -z "$overlaps" ]
+}
+
+# --- list-claimable <root> [--ur UR-NNN] [--stale-max N] ---
+# One REQ slug per line, ordered: priority DESC (null→2), numeric REQ ASC, created_at ASC, slug ASC.
+cmd_list_claimable() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "list-claimable: usage: list-claimable <root> [--ur UR-NNN] [--stale-max N]"
+  local ur="" stale_max="$DEFAULT_STALE_MAX"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --ur) ur="${2:-}"; shift 2 ;;
+      --stale-max)
+        case "${2:-}" in
+          ''|*[!0-9]*) die "list-claimable: --stale-max must be positive integer" ;;
+        esac
+        stale_max="$2"
+        shift 2 ;;
+      *) die "list-claimable: unknown arg: $1" ;;
+    esac
+  done
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+
+  local where="r.status = 'backlog'"
+  if [ -n "$ur" ]; then
+    local uid
+    uid="$(ur_id_for_slug "$db" "$ur")"
+    [ -n "$uid" ] || die "list-claimable: unknown UR slug: $ur"
+    where="$where AND r.ur_id = $uid"
+  fi
+
+  # Candidates ordered; filter in bash for footprint/claim/milestone.
+  # RS=0x1e — empty files / path_milestone must not collapse under bash read.
+  local rows slug rid ur_id files path_m
+  rows="$(sqlite3 -separator $'\x1e' "$db" "
+SELECT r.slug, r.id, r.ur_id, r.files, COALESCE(r.path_milestone,'')
+FROM reqs r
+WHERE $where
+ORDER BY
+  COALESCE(r.priority, 2) DESC,
+  CAST(substr(r.slug, instr(r.slug,'-')+1) AS INTEGER) ASC,
+  r.created_at ASC,
+  r.slug ASC;")"
+
+  while IFS=$'\x1e' read -r slug rid ur_id files path_m; do
+    [ -n "$slug" ] || continue
+
+    # Milestone filter (per-UR cursor)
+    local active_m
+    active_m="$(ur_active_milestone "$db" "$ur_id")"
+    if [ -n "$active_m" ]; then
+      if [ "$path_m" != "$active_m" ]; then
+        continue
+      fi
+    fi
+
+    # Fresh active claim blocks (stale allows takeover via pick/claim)
+    if ! req_claim_slot_free "$db" "$rid" "$stale_max"; then
+      continue
+    fi
+
+    # Deps
+    if ! req_deps_satisfied "$db" "$rid"; then
+      continue
+    fi
+
+    # Footprint
+    if ! req_footprint_free "$root" "$db" "$slug" "$rid"; then
+      continue
+    fi
+
+    printf '%s\n' "$slug"
+  done <<EOF
+$rows
+EOF
+}
+
+# --- pick <root> [--ur UR-NNN] [--stale-max N] ---
+# First of list-claimable; empty + exit 1 if none.
+cmd_pick() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "pick: usage: pick <root> [--ur UR-NNN] [--stale-max N]"
+  local first
+  first="$(cmd_list_claimable "$root" "$@" | head -1)"
+  if [ -z "$first" ]; then
+    exit 1
+  fi
+  printf '%s\n' "$first"
+}
+
 main() {
   local cmd="${1:-}"; shift || true
   case "$cmd" in
@@ -601,6 +1205,16 @@ main() {
     set-status) cmd_set_status "$@" ;;
     set-files) cmd_set_files "$@" ;;
     set-blocked-by) cmd_set_blocked_by "$@" ;;
+    claim) cmd_claim "$@" ;;
+    heartbeat) cmd_heartbeat "$@" ;;
+    unblock) cmd_unblock "$@" ;;
+    check-deps) cmd_check_deps "$@" ;;
+    check-footprint) cmd_check_footprint "$@" ;;
+    scan-stale) cmd_scan_stale "$@" ;;
+    check-archive) cmd_check_archive "$@" ;;
+    archive-req) cmd_archive_req "$@" ;;
+    list-claimable) cmd_list_claimable "$@" ;;
+    pick) cmd_pick "$@" ;;
     "") die "usage: dw-db.sh <command> ..." ;;
     *) die "unknown command: $cmd" ;;
   esac
