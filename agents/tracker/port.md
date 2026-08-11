@@ -34,10 +34,11 @@ This path is the happy path for every project that has not opted into Linear. Pr
 2. Resolve `tracker.backend`:
    - **missing key, empty string, or whitespace-only** → treat as **`markdown`**
    - **`markdown`** → continue; **no Linear tools required**, no hard-stop
-   - **`linear`** → Linear backend path; Linear must be usable (see **Hard-stop**)
+   - **`linear`** → Linear backend path; Linear must be usable (see **Hard-stop matrix**)
+   - **`sqlite`** → SQLite backend path; `sqlite3` + `agents/tracker/sqlite.md` + usable DB required (see **Hard-stop matrix**)
    - **any other value** → hard-stop with a clear config error (do not guess)
 3. Read `agents/tracker/port.md` (this file).
-4. Read `agents/tracker/<backend>.md` (for default: `agents/tracker/markdown.md`).
+4. Read `agents/tracker/<backend>.md` (for default: `agents/tracker/markdown.md`; opt-in: `linear.md` or `sqlite.md`).
 5. For work-item storage, call **only** named port ops documented in the backend file.
 
 Phase agents keep product logic (TDD, review, decomposition). They do not re-implement store details and do not dual-write across backends.
@@ -51,6 +52,7 @@ Phase agents keep product logic (TDD, review, decomposition). They do not re-imp
 | `agents/tracker/port.md` | Shared op names, rules, load path (this document) |
 | `agents/tracker/markdown.md` | File + `lib/*.sh` implementation of port ops (default) |
 | `agents/tracker/linear.md` | Linear skill/MCP sequences for the same ops (opt-in) |
+| `agents/tracker/sqlite.md` | SQLite + `lib/dw-db.sh` sequences for the same ops (opt-in) |
 
 Later backends (e.g. GitHub Issues, Jira) add sibling files; they are not part of the markdown-default path.
 
@@ -88,9 +90,22 @@ Claim **semantics** are port rules; claim **representation** is backend-specific
 
 ---
 
-## Hard-stop (Linear unusable)
+## Hard-stop matrix (unusable active backend)
 
-When `tracker.backend` resolves to **`linear`**, an unusable Linear backend is a **hard stop** — never silent markdown fallback.
+**Shared rule:** unusable **active** backend → **hard-stop**; **never** silent fallback to another backend (markdown ↔ linear ↔ sqlite).
+
+| Condition | markdown | linear | sqlite |
+|-----------|----------|--------|--------|
+| Backend doc missing / unreadable | n/a (default file always present) | **hard-stop** (`agents/tracker/linear.md`) | **hard-stop** (`agents/tracker/sqlite.md`) |
+| MCP / team / `status_map` fail | n/a | **hard-stop** | n/a |
+| `sqlite3` missing from PATH | n/a | n/a | **hard-stop** (+ install hint) |
+| DB corrupt / unreadable | n/a | n/a | **hard-stop** |
+| Schema `user_version` unsupported / bad | n/a | n/a | **hard-stop** |
+| Lock timeout after retries | n/a | n/a | **hard-stop** or concurrent-conflict (claim races) |
+| Mid-flight after successful claim | leave claimed | leave claimed | leave claimed (active claims row) |
+| Fallback to another backend | **never** | **never** | **never** |
+
+### Linear detail (when `backend: linear`)
 
 | Condition | Behavior |
 |-----------|----------|
@@ -98,28 +113,37 @@ When `tracker.backend` resolves to **`linear`**, an unusable Linear backend is a
 | Linear MCP missing, offline, or unauthenticated | **Hard stop** with setup instructions from the Linear skill |
 | Team id / team key unresolved | **Hard stop**; do not guess a team |
 | Required `status_map` workflow state missing on the team | **Hard stop** with rename / map-fix instructions |
-| MCP dies mid-op before a safe commit point | **Hard stop** — see **Mid-flight MCP failure** |
+| MCP dies mid-op before a safe commit point | **Hard stop** — see **Mid-flight failure (leave claimed)** |
 
-**Never silent markdown fallback.** Agents must not:
+Agents must not switch to `markdown` or `sqlite` ops “to keep going”, write UR/REQ files under `.do-work/` as a substitute store while backend is `linear`, or invent partial local mirrors of Linear work items.
 
-- switch to `markdown` ops “to keep going” (including when `linear.md` is missing)
-- write UR/REQ files under `.do-work/` as a substitute store while backend is `linear`
-- invent partial local mirrors of Linear work items
+### SQLite detail (when `backend: sqlite`)
 
-When `tracker.backend` resolves to **`markdown`** (including unset/empty), Linear unavailability is irrelevant — no Linear tools required, no hard-stop for Linear.
+| Condition | Behavior |
+|-----------|----------|
+| `agents/tracker/sqlite.md` missing or unreadable | **Hard stop** with setup instructions (restore from skill install; do not invent SQL sequences) |
+| `sqlite3` CLI missing from PATH | **Hard stop** with install hint (`brew install sqlite` / distro package) |
+| DB corrupt, unreadable, or `PRAGMA user_version` unsupported | **Hard stop** — offer recreate-empty option in the operator message; **never** fall back to markdown or Linear |
+| `lib/dw-db.sh` ensure/open fails after retries | **Hard stop** (or concurrent-conflict on claim races) |
+
+Agents must not glob `.do-work/REQ-*` / `user-requests/` as live truth while backend is `sqlite`, dual-write markdown trees, or invent freehand `sqlite3` one-liners outside `lib/dw-db.sh` / `sqlite.md`.
+
+### Markdown detail (when `backend: markdown`, including unset/empty)
+
+Linear MCP and SQLite DB availability are irrelevant — no Linear tools or `sqlite3` required, no hard-stop for those backends.
 
 ---
 
-## Mid-flight MCP failure (leave claimed)
+## Mid-flight failure (leave claimed)
 
-If Linear MCP fails **after** a successful `claim_req` (issue is in-progress + active claim/heartbeat) but **before** `archive_req` / clean `unblock_req`:
+If the active backend becomes unusable **after** a successful `claim_req` but **before** `archive_req` / clean `unblock_req`:
 
 1. **Leave claimed** — do **not** clear the claim, force backlog, or silently release the slot.
-2. Issue stays in-progress with the last claim / heartbeat as written.
-3. Operator recovers with `/do-work resume` or `/do-work unblock` after MCP is healthy again (same multi-agent recovery story as markdown concurrent-conflict).
+2. Work item stays in-progress with the last claim / heartbeat as written (Linear: claim comment; markdown: working/ stamp; sqlite: active claims row).
+3. Operator recovers with `/do-work resume` or `/do-work unblock` after the backend is healthy again (same multi-agent recovery story as concurrent-conflict).
 4. The failing agent exits stopped (e.g. concurrent-conflict / missing-creds / dependency-missing as appropriate to the surface); it does **not** invent a “claimed-but-abandoned” cleanup that races siblings.
 
-Markdown mid-flight failures follow the same spirit: a claimed working/ slot is not auto-released on worker crash; stale heartbeat + resume/unblock repair it.
+This applies to **all** backends (Linear MCP death, markdown worker crash, sqlite lock/DB failure mid-flight).
 
 ---
 
@@ -442,22 +466,22 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 |---|---|
 | **Intent** | One-shot, idle-only cutover from the markdown work-item store to Linear (design §12). Creates Initiatives / Projects / Issues for existing URs and REQs (backlog + archive), Team Docs for decisions/calibration, then flips `tracker.backend` to `linear`. After cutover, local UR/REQ trees are **read-only historical** — not dual-write. |
 | **Preconditions** | Effective backend is still **`markdown`** (cutover target is Linear). **`working/` empty.** No active claims. Operator confirms (or explicit dry-run). Linear team resolvable and MCP usable **before** any write. Surfaced via `/do-work upgrade migrate` (or upgrade migrate step) — see `agents/upgrade.md` + `agents/tracker/linear.md`. |
-| **Notes** | **Not a normal lifecycle op.** Sequences and dry-run live in `linear.md`. **Refuse entirely** if `working/` non-empty or active claims exist — leave config + markdown trees unchanged (no partial cutover). **Hard-stop** if Linear MCP is unusable mid-migration — leave markdown trees + config backend unchanged (no partial cutover). Supports **dry-run** (report planned creates; zero Linear writes; config untouched). |
+| **Notes** | **Not a normal lifecycle op.** Sequences and dry-run live in `linear.md`. **Refuse entirely** if effective backend is already **`sqlite`** or **`linear`** — leave config + store unchanged (no partial cutover; there is no markdown→sqlite migrate in v1). **Refuse entirely** if `working/` non-empty or active claims exist — leave config + markdown trees unchanged (no partial cutover). **Hard-stop** if Linear MCP is unusable mid-migration — leave markdown trees + config backend unchanged (no partial cutover). Supports **dry-run** (report planned creates; zero Linear writes; config untouched). |
 
 ---
 
 ## Shared rules (backend-independent summary)
 
-- **No dual-write.** One active backend owns work-item truth. Markdown does not mirror to Linear; Linear does not write UR/REQ markdown as source of truth.
-- **Port-only storage API.** Phase agents call named ops only — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend file.
+- **No dual-write.** One active backend owns work-item truth. Markdown, Linear, and sqlite do not mirror each other as a second source of truth.
+- **Port-only storage API.** Phase agents call named ops only — never raw `.do-work/REQ-*` paths, raw Linear tools, or freehand SQL outside the backend file.
 - **Claim eligibility** requires deps satisfied + footprint free + unclaimed (or stale claim recoverable per multi-agent rules).
 - **Optimistic claim:** re-read before write; loser stops with concurrent-conflict / resume allowed.
 - **Footprint** is structured `**Files:**` (and related headers) on the REQ — not ad-hoc custom fields.
-- **Deps authority:** Linear native **blocks relations** are authoritative for eligibility; body `**Depends on:**` is mirror. Markdown file header is the store.
-- **Hard-stop on unusable Linear** when `tracker.backend: linear` — **never silent markdown fallback**.
-- **Mid-flight MCP failure:** **leave claimed**; resume/unblock repair after recovery.
+- **Deps authority:** Linear native **blocks relations** are authoritative for eligibility; body `**Depends on:**` is mirror. Markdown file header is the store. SQLite deps live in the DB via `dw-db` (see `sqlite.md`).
+- **Hard-stop on unusable active backend** (see **Hard-stop matrix**) — **never silent fallback** to another backend.
+- **Mid-flight failure:** **leave claimed** on all backends; resume/unblock repair after recovery.
 - **Work-item vs runtime:** work-item data through port ops; git/worktrees/`state/*`/config/gate locks stay local.
-- **Idle markdown→Linear migration (design §12 / `migrate_markdown_to_linear`):** only when idle (`working/` empty, no active claims) + operator confirm (or dry-run). No partial cutover: refuse preflight or hard-stop MCP failure leaves `tracker.backend` and markdown trees unchanged. After successful cutover, ops **stop reading** local `user-requests/` and `archive/` as the work-item store (historical read-only only).
+- **Idle markdown→Linear migration (design §12 / `migrate_markdown_to_linear`):** only when effective backend is still **`markdown`**, idle (`working/` empty, no active claims) + operator confirm (or dry-run). **Refuse** when already `sqlite` or `linear`. No partial cutover: refuse preflight or hard-stop MCP failure leaves `tracker.backend` and markdown trees unchanged. After successful cutover, ops **stop reading** local `user-requests/` and `archive/` as the work-item store (historical read-only only). No markdown→sqlite migrate in v1.
 
 ---
 

@@ -105,10 +105,15 @@ worktree:
                          # (e.g. "composer install --no-interaction"). Empty = no fallback.
 
 # Work-item tracker backend. Default markdown = today's .do-work/ + lib/*.sh loop.
-# When backend is missing, empty, or "markdown", resolve to markdown (no Linear tools).
-# linear is a full second backend (no dual-write); see agents/tracker/{port,markdown,linear}.md.
+# When backend is missing, empty, or "markdown", resolve to markdown (no Linear/sqlite tools).
+# linear and sqlite are full alternate backends (no dual-write); see
+# agents/tracker/{port,markdown,linear,sqlite}.md.
 tracker:
-  backend: markdown          # markdown | linear — unset/empty/missing key also means markdown
+  backend: markdown          # markdown | linear | sqlite — unset/empty/missing key also means markdown
+  sqlite:
+    path: ""                 # default .do-work/work.db (relative to project root)
+    board_path: ""           # default .do-work/board/index.html
+    busy_timeout_ms: 5000
   linear:
     team_id: ""              # required when backend=linear (or resolve via team_key)
     team_key: ""             # optional alternate resolve (e.g. team key string)
@@ -198,11 +203,12 @@ routing: []
    - If `tracker.backend` is **missing**, **null**, **empty**, or **whitespace-only** → effective backend = **`markdown`**.
    - If `tracker.backend` is **`markdown`** (case-sensitive value as stored) → effective backend = **`markdown`**.
    - If `tracker.backend` is **`linear`** → effective backend = **`linear`**.
+   - If `tracker.backend` is **`sqlite`** → effective backend = **`sqlite`**.
    - Otherwise → hard-stop with a config error naming the unknown backend; do not guess.
 
-   When the effective backend is **`markdown`**: load `agents/tracker/port.md` then `agents/tracker/markdown.md` for work-item ops; **do not** require Linear MCP, credentials, or dual-write. Existing `lib/*.sh` + `.do-work/` behavior remains the implementation. `tracker.linear.*` keys may still be migrated onto disk as defaults, but they are **inert** while backend resolves to markdown (no Linear validation).
+   When the effective backend is **`markdown`**: load `agents/tracker/port.md` then `agents/tracker/markdown.md` for work-item ops; **do not** require Linear MCP, `sqlite3`, credentials, or dual-write. Existing `lib/*.sh` + `.do-work/` behavior remains the implementation. `tracker.linear.*` and `tracker.sqlite.*` keys may still be migrated onto disk as defaults, but they are **inert** while backend resolves to markdown (no Linear or sqlite validation).
 
-7. **Validate Linear config when effective backend is `linear`.** Run these checks **before** any work-item op. On failure, **hard-stop** — never silent-fallback to markdown, never invent team ids or workflow states.
+7. **Validate Linear config when effective backend is `linear`.** Run these checks **before** any work-item op. On failure, **hard-stop** — never silent-fallback to markdown or sqlite, never invent team ids or workflow states.
 
    | Check | Hard-fail when | Operator message must include |
    |-------|----------------|-------------------------------|
@@ -216,7 +222,21 @@ routing: []
 
    **Interaction with other keys:** `ledger`, `parallel`, `delivery`, `review`, `layers` remain valid under Linear. Authoritative run/cost notes are Linear Issue comments via port op `append_run_note`. If `ledger.enabled: true`, the orchestrator may **also** append local `.do-work/runs/RUN-NNN.yml` for offline retro tooling — local runs are telemetry only, not a second work-item store. Retro prefers Linear run notes when `backend: linear`, falling back to local runs if comments are unavailable.
 
-   When the effective backend is **`linear`**: load `agents/tracker/port.md` then `agents/tracker/linear.md` for work-item ops after the validations above pass. If `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the backend doc from the skill install / Linear skill setup) — **never** fall through to `markdown.md` or invent Linear tool sequences.
+   When the effective backend is **`linear`**: load `agents/tracker/port.md` then `agents/tracker/linear.md` for work-item ops after the validations above pass. If `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the backend doc from the skill install / Linear skill setup) — **never** fall through to `markdown.md` / `sqlite.md` or invent Linear tool sequences.
+
+7b. **Validate SQLite config when effective backend is `sqlite`.** Run these checks **before** any work-item op. On failure, **hard-stop** — never silent-fallback to markdown or Linear, never invent a parallel REQ tree.
+
+   | Check | Hard-fail when | Operator message must include |
+   |-------|----------------|-------------------------------|
+   | `sqlite3` on PATH | `sqlite3` CLI is missing or not executable | Install hint (`brew install sqlite` / distro package); do not fall back to markdown |
+   | Backend doc | `agents/tracker/sqlite.md` is missing or unreadable | Restore the backend doc from the skill install; do not invent SQL sequences |
+   | DB unusable (after first ensure/open) | Corrupt DB, unreadable file, or unsupported `PRAGMA user_version` | Current vs supported version; recreate-empty option; **never** markdown fallback |
+
+   **Do not** run Linear validation or `product_project` bind when backend is `sqlite`.
+
+   When the effective backend is **`sqlite`**: load `agents/tracker/port.md` then `agents/tracker/sqlite.md` for work-item ops after the `sqlite3` + backend-doc checks pass. Defer DB ensure/create to the first `ensure_product_container` / `lib/dw-db.sh ensure` call (empty greenfield DB on switch — no history migration). If `sqlite.md` is missing/unreadable → **hard-stop** — **never** fall through to `markdown.md` or `linear.md`.
+
+   **Defaults:** empty `tracker.sqlite.path` → `{project}/.do-work/work.db`; empty `tracker.sqlite.board_path` → `{project}/.do-work/board/index.html`; empty/invalid `busy_timeout_ms` → `5000`.
 
 8. **Resolve skill-root (`$SKILL_ROOT` / `{skill-root}`).** Once per agent turn, resolve the absolute path of the do-work skill install root — a directory that contains `lib/` **and** at least one skill marker (`SKILL.md` **or** `agents/`). **Token definition:** `{skill-root}` means this resolved absolute path for **all later steps in the same agent turn**. Keep `$SKILL_ROOT` in context; substitute it wherever docs or bash lines write `{skill-root}` (especially `{skill-root}/lib/...`).
 
@@ -277,7 +297,7 @@ routing: []
 
    **Do not** fall back to process CWD, hub paths (`~/.agents/skills/do-work`, `~/.claude/skills/do-work`), or invent a path from `DO_WORK_SKILL_ROOT` / other env vars when inherit markers fail. **Do** inherit a **valid** `$SKILL_ROOT` already set in this turn's context (see inherit rule above).
 
-9. **Resolve and bind `tracker.linear.product_project` when effective backend is `linear`.** Run after step 7 validations pass and the Linear backend docs are loaded — **before** any work-item CRUD that needs the product Project. When effective backend is **`markdown`**, skip this step entirely (`product_project` is inert).
+9. **Resolve and bind `tracker.linear.product_project` when effective backend is `linear`.** Run after step 7 validations pass and the Linear backend docs are loaded — **before** any work-item CRUD that needs the product Project. When effective backend is **`markdown`** or **`sqlite`**, skip this step entirely (`product_project` is inert).
 
    **Resolve order (name/lookup key only — does not rewrite an already-set value):**
 
@@ -292,7 +312,7 @@ routing: []
 
 **Phase-agent contract:** every phase agent that touches work items follows the **Tracker load path** (config → resolve `tracker.backend` → `port.md` → `agents/tracker/<backend>.md` → only named port ops). The shared load path is defined once here and in `agents/tracker/port.md`; each phase agent restates a short copy so a missing wire cannot cause split-brain storage. Every phase agent that invokes skill `lib/` scripts also depends on step 8 (`$SKILL_ROOT` / `{skill-root}`) from this same Load Config block.
 
-**Never fail or stop because of a missing or incomplete config file** (steps 1–5, including 4b seed). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exceptions (deliberate hard-stops, not config-file completeness problems):** step 7 Linear validation (and missing `linear.md`) and step 9 product_project ensure/bind when the operator has opted into `backend: linear`; step 8 skill-root resolve when walk-up (or inherit) cannot determine an absolute skill install root.
+**Never fail or stop because of a missing or incomplete config file** (steps 1–5, including 4b seed). If config creation or migration fails for any reason, proceed with in-memory defaults (including `tracker.backend: markdown`). **Exceptions (deliberate hard-stops, not config-file completeness problems):** step 6 unknown backend string; step 7 Linear validation (and missing `linear.md`) and step 9 product_project ensure/bind when the operator has opted into `backend: linear`; step **7b** sqlite unusable (`sqlite3` missing, missing `sqlite.md`, corrupt DB / bad `user_version` after ensure attempts) when the operator has opted into `backend: sqlite`; step 8 skill-root resolve when walk-up (or inherit) cannot determine an absolute skill install root.
 
 ---
 
@@ -332,7 +352,10 @@ routing: []
 | `routing` | list of `{match, agent}` maps | `[]` | Ordered subagent-routing rules for the run orchestrator's REQ classification. Each entry is `{match: <signal description or keyword list>, agent: <subagent_type>}`. The classifier scans rules top-to-bottom (first match wins) and dispatches the matching `agent`; if no rule matches — or the list is empty — it falls back to `general-purpose` silently. Ships empty so the stock skill is portable (no machine-specific agents). A commented example block in the template above reproduces the original specialist table for users who want to restore it. Consumers: `agents/run.md`, `agents/resume.md`. |
 | `worktree.link_paths` | list of strings | `[]` | Extra dependency directories to symlink from the main checkout into each worker worktree (e.g. `[server/vendor, web/node_modules]`). Additive to auto-detected dirs: `composer.json` → `vendor`, `package.json` → `node_modules`, `pyproject.toml` / `requirements.txt` → `.venv`. Use this for monorepo or subdir layouts where the auto-detection misses a directory. Consumers: `lib/provision-worktree.sh`. |
 | `worktree.setup_command` | string | `""` | Optional fallback command run inside the worktree when a dependency directory is absent from the main checkout and cannot be symlinked (e.g. `"composer install --no-interaction"`). The provisioner tries symlinking first (symlink-first semantics); this command runs only when a required dir is missing and symlinking fails. Empty = no fallback (the worktree is used as-is). Consumers: `lib/provision-worktree.sh`, `agents/run-worker.md`. |
-| `tracker.backend` | string | `"markdown"` | Work-item store backend: `markdown` (default — local `.do-work/` + `lib/*.sh`) or `linear` (Linear as sole work-item store). **Unset, empty, or missing key resolves to `markdown`** — no hard-stop, no Linear tools required. No dual-write between backends. When `linear`, Load Config step 7 hard-fails if team cannot be resolved, Linear MCP tools are undiscoverable, or any `status_map` state is missing on the team. Consumers: all phase agents that touch URs/REQs via `agents/tracker/port.md` + `agents/tracker/<backend>.md`. |
+| `tracker.backend` | string | `"markdown"` | Work-item store backend: `markdown` (default — local `.do-work/` + `lib/*.sh`), `linear` (Linear as sole work-item store), or `sqlite` (`.do-work/work.db` via `lib/dw-db.sh` as sole store). **Unset, empty, or missing key resolves to `markdown`** — no hard-stop, no Linear/`sqlite3` required. No dual-write between backends. When `linear`, Load Config step 7 hard-fails if team cannot be resolved, Linear MCP tools are undiscoverable, or any `status_map` state is missing on the team. When `sqlite`, Load Config step 7b hard-fails if `sqlite3` is missing, `sqlite.md` is missing/unreadable, or the DB is corrupt / bad `user_version` after ensure — **never** fall back to markdown. Consumers: all phase agents that touch URs/REQs via `agents/tracker/port.md` + `agents/tracker/<backend>.md`. |
+| `tracker.sqlite.path` | string | `""` | Path to the work-item SQLite DB when `backend: sqlite`. Empty → `{project}/.do-work/work.db`. Gitignored binary; not a second store when backend is markdown/linear. Consumers: `lib/dw-db.sh`, `agents/tracker/sqlite.md`, Load Config step 7b. |
+| `tracker.sqlite.board_path` | string | `""` | Path for the static HTML board snapshot (`/do-work board`, sqlite-only). Empty → `{project}/.do-work/board/index.html`. Consumers: board command, `agents/tracker/sqlite.md`. |
+| `tracker.sqlite.busy_timeout_ms` | integer | `5000` | SQLite `busy_timeout` in milliseconds for `dw-db` open. Consumers: `lib/dw-db.sh`. |
 | `tracker.linear.team_id` | string | `""` | Linear team UUID. **Required when `backend: linear`** unless `team_key` alone resolves the team. Empty + unresolvable team_key → hard-fail (do not guess). Consumers: `agents/tracker/linear.md`, Load Config step 7. |
 | `tracker.linear.team_key` | string | `""` | Optional alternate team resolve (Linear team key string). Used when `team_id` is empty. Consumers: `agents/tracker/linear.md`, Load Config step 7. |
 | `tracker.linear.default_assignee_id` | string | `""` | Human operator Linear user id set as issue **assignee** on create when non-empty. Agents claim via workflow status + claim comments — they do not steal assignee. Consumers: `agents/tracker/linear.md` create/claim ops. |
