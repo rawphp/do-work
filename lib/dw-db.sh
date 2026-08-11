@@ -19,9 +19,11 @@ iso_now() {
 }
 
 # Escape a string for use inside a single-quoted SQL literal.
+# Double single-quotes (SQL standard). Do NOT use ${s//\'/\'\'} — bash emits
+# backslash-escaped quotes (it\'s) which break SQLite string literals.
 sql_quote() {
   local s="${1:-}"
-  s="${s//\'/\'\'}"
+  s="${s//\'/''}"
   printf "'%s'" "$s"
 }
 
@@ -49,9 +51,14 @@ open_db() {
 
 sql_exec() {
   local db="$1"; shift
-  # busy_timeout + WAL + foreign_keys on every connection (PRAGMAs must not pollute stdout)
-  sqlite3 "$db" "PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;" >/dev/null 2>&1 || true
-  sqlite3 "$db" "$@"
+  # PRAGMAs are connection-local — must run on the same sqlite3 process as the write.
+  # Write-only helper: discard stdout (journal_mode may print "wal").
+  sqlite3 "$db" >/dev/null <<SQL
+PRAGMA busy_timeout=5000;
+PRAGMA journal_mode=WAL;
+PRAGMA foreign_keys=ON;
+$*
+SQL
 }
 
 # Run a multi-line SQL script with PRAGMAs prepended.
@@ -154,14 +161,15 @@ ur_id_for_slug() {
 }
 
 # Run a write transaction; only SELECT results that match KIND-digits are returned.
-# Sets PRAGMAs on a side channel so they never pollute stdout capture.
+# PRAGMAs ride on the same connection as the write (foreign_keys is connection-local).
 tx_slug_insert() {
   local db="$1"
   local sql="$2"
-  # Apply connection pragmas without capturing their return values.
-  sqlite3 "$db" "PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;" >/dev/null 2>&1 || true
   local out rc
   out="$(sqlite3 "$db" <<SQL
+PRAGMA busy_timeout=5000;
+PRAGMA journal_mode=WAL;
+PRAGMA foreign_keys=ON;
 BEGIN IMMEDIATE;
 $sql
 COMMIT;
@@ -171,7 +179,7 @@ SQL
   if [ "$rc" -ne 0 ]; then
     return "$rc"
   fi
-  # Last line that looks like a slug (PRAGMAs already suppressed)
+  # Last line that looks like a slug (filters PRAGMA journal_mode "wal" noise)
   printf '%s\n' "$out" | grep -E '^(UR|REQ)-[0-9]+$' | tail -1
 }
 
@@ -259,6 +267,9 @@ cmd_create_req() {
 
   local pri_sql="NULL"
   if [ -n "$priority" ]; then
+    case "$priority" in
+      *[!0-9]*|"") die "create-req: --priority must be a non-negative integer" ;;
+    esac
     pri_sql="$priority"
   fi
 
@@ -439,7 +450,10 @@ cmd_update_req() {
         sets="${sets}body=$(sql_quote "${2:-}"), "
         shift 2 ;;
       --priority)
-        sets="${sets}priority=${2:-}, "
+        case "${2:-}" in
+          *[!0-9]*|"") die "update-req: --priority must be a non-negative integer" ;;
+        esac
+        sets="${sets}priority=${2}, "
         shift 2 ;;
       --layer)
         sets="${sets}layer=$(sql_quote "${2:-}"), "
@@ -556,14 +570,15 @@ cmd_set_blocked_by() {
 
   local now
   now="$(iso_now)"
-  # Replace in one transaction
+  # Replace in one transaction (PRAGMAs on same connection as writes)
   local inserts=""
   for did in $dep_ids; do
     inserts="${inserts}INSERT INTO deps(req_id, depends_on_req_id) VALUES($rid, $did);
 "
   done
-  sqlite3 "$db" "PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;" >/dev/null 2>&1 || true
-  sqlite3 "$db" <<SQL || die "set-blocked-by: transaction failed"
+  sqlite3 "$db" >/dev/null <<SQL || die "set-blocked-by: transaction failed"
+PRAGMA busy_timeout=5000;
+PRAGMA foreign_keys=ON;
 BEGIN IMMEDIATE;
 DELETE FROM deps WHERE req_id=$rid;
 $inserts

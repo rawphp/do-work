@@ -29,6 +29,14 @@ case "$gout" in *"My UR"*) : ;; *) fail "get-ur missing title: $gout" ;; esac
 case "$gout" in *"the brief"*) : ;; *) fail "get-ur missing brief: $gout" ;; esac
 case "$gout" in *"feature"*) : ;; *) fail "get-ur missing class: $gout" ;; esac
 
+# Regression: sql_quote must double single-quotes (apostrophe in title)
+ur_apos="$(bash "$DW" create-ur "$TMP" --title "it's broken" --brief "apostrophe ok")" \
+  || { fail "create-ur with apostrophe in title failed"; rm -rf "$TMP"; exit 1; }
+title_db="$(sqlite3 "$db" "SELECT title FROM urs WHERE slug='$ur_apos';")"
+[ "$title_db" = "it's broken" ] || fail "apostrophe title want \"it's broken\" got \"$title_db\""
+gout_apos="$(bash "$DW" get-ur "$TMP" "$ur_apos" 2>&1)" || fail "get-ur apostrophe failed"
+case "$gout_apos" in *"it's broken"*) : ;; *) fail "get-ur missing apostrophe title: $gout_apos" ;; esac
+
 # list-urs
 lout="$(bash "$DW" list-urs "$TMP" 2>&1)" || fail "list-urs failed"
 case "$lout" in *"$ur"*) : ;; *) fail "list-urs missing $ur: $lout" ;; esac
