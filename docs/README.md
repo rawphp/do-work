@@ -15,6 +15,7 @@ Task-based guides for people who install and run `/do-work` in a project. Works 
 
 | Page | Audience |
 |------|----------|
+| [Architecture analysis](architecture-analysis.md) | Owner / architect / operator: full architecture map + ranked improvements |
 | [How it works](HOW-IT-WORKS.md) | Operators who want phase-by-phase design detail |
 | [../README.md](../README.md) | Install one-liner, quick start, config overview |
 | [../agents/config.md](../agents/config.md) | Full `config.yml` schema |
@@ -34,10 +35,11 @@ Task-based guides for people who install and run `/do-work` in a project. Works 
 
 ```text
 docs/
-├── README.md              ← you are here (index)
-├── getting-started.md     ← install → first start → first go
-├── concepts.md            ← mental model
-├── commands.md            ← command reference
-├── troubleshooting.md     ← symptoms → fixes
-└── HOW-IT-WORKS.md        ← deep dive (design + phases)
+├── README.md                  ← you are here (index)
+├── getting-started.md         ← install → first start → first go
+├── concepts.md                ← mental model
+├── commands.md                ← command reference
+├── troubleshooting.md         ← symptoms → fixes
+├── HOW-IT-WORKS.md            ← deep dive (design + phases)
+└── architecture-analysis.md   ← architecture map + recommendations
 ```
