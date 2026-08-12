@@ -608,17 +608,20 @@ Background about the rename...
 
 ### 4e. Cycle-check
 
-After all REQ files are written (Steps 4, 4b, 4c, 4d complete), validate that the `**Depends on:**` graph is acyclic.
+After all REQ files are written (Steps 4, 4b, 4c, 4d complete), validate that the `**Depends on:**` graph is acyclic. The check is **backend-aware** — pick the command for the effective `tracker.backend`. Both forms share identical exit semantics (exit 0 = acyclic, exit 1 = cycle, cycle path on stdout), so the halt-on-cycle + file-feedback behavior below applies unchanged to either.
 
-```bash
-bash {skill-root}/lib/cycle-check.sh UR-NNN
-```
+**Backend branch (ORI-9):**
 
-Replace `UR-NNN` with the actual UR identifier. The script scans all REQs matching that UR across backlog, working, and archive, builds the dep graph, and runs DFS cycle detection.
+| Backend | Command |
+|---------|---------|
+| `markdown` / `linear` | `bash {skill-root}/lib/cycle-check.sh UR-NNN` |
+| `sqlite` | `bash {skill-root}/lib/dw-db.sh cycle-check {project} UR-NNN` |
+
+Replace `UR-NNN` with the actual UR identifier and `{project}` with the project root. The markdown script scans all REQs matching that UR across backlog, working, and archive (`.do-work/REQ-*.md`), builds the dep graph, and runs DFS cycle detection. The sqlite command (`dw-db cycle-check`, REQ-017) reads the `deps` table directly — **under sqlite the markdown script globs `.do-work/REQ-*.md` and finds nothing, exiting 0 vacuously**, so the `dw-db` form is required for the gate to actually fire.
 
 **On exit 0 (no cycle):** Continue to Step 5.
 
-**On exit 1 (cycle detected):** The script prints the cycle path to stdout (e.g. `REQ-007 → REQ-009 → REQ-007`). Capture must:
+**On exit 1 (cycle detected):** The command prints the cycle path to stdout (e.g. `REQ-007 → REQ-009 → REQ-007`). Capture must:
 
 1. Capture the cycle path from stdout as `$cycle_path`.
 2. Build a fingerprint: `cap-cycle-UR-NNN` (replace UR-NNN with the actual id).

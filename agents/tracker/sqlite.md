@@ -121,6 +121,8 @@ Do not fall back to markdown or Linear. Fix sqlite3 / work.db / skill install, t
 | Capture summary | `bash {skill-root}/lib/dw-db.sh write-capture-summary {root} UR-NNN --body TEXT` — **replace** |
 | Pick first claimable | `bash {skill-root}/lib/dw-db.sh pick {root} [--ur UR-NNN]` |
 | Deps / footprint / stale / archive preflight | `check-deps`, `check-footprint`, `scan-stale`, `check-archive` on `dw-db.sh` |
+| Capture cycle-check | `bash {skill-root}/lib/dw-db.sh cycle-check {root} [UR-NNN]` — whole-graph DFS over `deps` (self-loop aware); exit 0 acyclic, exit 1 + cycle path on cycle. REQ-017. (`agents/capture.md` Step 4e sqlite branch.) |
+| Runtime deadlock-check | `bash {skill-root}/lib/dw-db.sh deadlock-check {root}` — runtime-cycle diagnosis over `deps`; structured `deadlock-detected` block (signal: `runtime-cycle`) on cycle, empty stdout when acyclic. REQ-019. (Run loop sqlite branch.) |
 | Board HTML | `bash {skill-root}/lib/dw-db.sh board {root} [--path PATH] [--stale-max N]` — not a port op; agent gate in `agents/board.md` |
 | Status situation room | `bash {skill-root}/lib/dw-db.sh status-synth {root} [UR-NNN]` — folds synth + proven/unproven + coverage + closed |
 | Coverage arithmetic | shared `lib/score-coverage.sh` — **not** reimplemented in dw-db |
