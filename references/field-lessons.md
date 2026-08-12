@@ -128,3 +128,17 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 |---------|--------------|----------------|
 | `php artisan test` / `pest` prints `Tests: 1 warning, N passed` with a `WARNINGS … file_get_contents(…/packages/server/.env): Failed to open stream` trace through `vlucas/phpdotenv`, but every assertion counts as passed and the runner exits 0 | Greenfield worktree has no `.env` (it is gitignored and the main checkout never had one either); phpdotenv's `@file_get_contents` raises a PHP warning that Pest surfaces as a test-warning even though no assertion failed | Treat as **green**. The pass/fail signal is the runner **exit code and the `passed`/`failed` counts**, not the `warning` count. Do not chase the warning by creating a `.env`, and do not return `verification-failing`. Sanity check with `vendor/bin/pest … > /dev/null 2>&1; echo exit=$?` if the summary line is ambiguous |
 
+
+## 18. Acceptance-evidence checker requires block-style YAML — flow-style reports falsely fail
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| `lib/check-acceptance-evidence.sh <req> <report.yml>` prints `acceptance evidence missing evidence item: AC1…ACn` for every AC and exits 1, even though the report clearly lists each AC with `status: passed` + `evidence` | The script parses the worker report with a simple line-based reader (not a full YAML parser); flow-style mappings (`AC1: {status: passed, evidence: [{type: test, ref: t}]}`) are valid YAML but invisible to that reader, so it sees every AC as having no evidence | Write the report in **block style** (`AC1:` newline `  status: passed` newline `  evidence:` newline `    - type: test` newline `      ref: …`). Treat any "all ACs missing evidence" result as a formatting false-fail first — re-run with block style before investigating the report content |
+
+
+## 19. Path-unit definition disagrees: verify is Layer-agnostic, close/go require Layer:none
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| A UR captured with every REQ assigned a `Layer:` (backend/frontend) — none `Layer: none` — yet the endpoint REQs carry real `**Entry point:**`/`**Terminal state:**` pairs; `go` Step 4b fires the closure offer and/or the close agent then finds **zero path-units** and writes an empty `no-path-units` report, skipping the endpoint walk the operator expected | `verify.md` Step 4f treats "Entry point / Terminal state present" as the path-unit signal (Layer-agnostic), but `close.md` Step 2 and `go.md` Step 4b define a path-unit as `**Layer:** none` AND both path fields present. The two definitions disagree, so a UR captured with layered path-field REQs looks walkable to verify but yields nothing to close | When collecting path-units for close on a UR with no `Layer: none` REQs, fall back to the verify signal: every archived REQ with non-empty `**Entry point:**` + `**Terminal state:**`, ignoring `**Layer:**`. (Skill-side fix: align close.md Step 2 / go.md Step 4b with verify's Layer-agnostic detection, or have capture emit `Layer: none` path-unit parents when a REQ's entry point spans the layer model.) |
+
