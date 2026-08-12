@@ -1193,6 +1193,91 @@ cmd_cycle_check() {
   } | cycle_core "$filter"
 }
 
+# --- deadlock-check <root> ---
+# Runtime-cycle diagnosis over the sqlite deps graph — parity with
+# lib/deadlock-check.sh's runtime-cycle case, which is blind under sqlite
+# because it shells to the markdown-only lib/cycle-check.sh (globs
+# .do-work/REQ-*.md and finds nothing). This command reads the deps table
+# directly and reuses REQ-017's cycle_core — it does NOT invoke
+# lib/cycle-check.sh or any markdown glob.
+#
+# On cycle: prints the structured deadlock-detected block (signal: runtime-cycle)
+# with the cycle path in the diagnosis, plus the supporting fields the run loop
+# parses (live-slots/stale-slots/backlog-size/last-commit-age/fingerprint) so the
+# deadlock diagnostic works unchanged across backends. Exit 0 — stdout presence
+# distinguishes detection, matching lib/deadlock-check.sh.
+# Acyclic: empty stdout, exit 0 (clean).
+cmd_deadlock_check() {
+  local root="${1:-}"
+  [ -n "$root" ] || die "deadlock-check: project root required"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+
+  # Runtime-cycle: reuse REQ-017's cycle_core over the whole deps graph.
+  # No UR filter — a runtime deadlock is ANY cycle in the dep graph.
+  local cycle_path
+  cycle_path="$(graph_from_db "$db" | cycle_core "")"
+  if [ -z "$cycle_path" ]; then
+    # Acyclic — clean (parity: empty stdout, exit 0).
+    return 0
+  fi
+
+  # Supporting state for the parity block (lib/deadlock-check.sh fields).
+  local n_backlog
+  n_backlog="$(sqlite3 "$db" "SELECT COUNT(*) FROM reqs WHERE status='backlog';")"
+
+  # Working slots = active claims (in-flight REQs). Stale via heartbeat age.
+  local stale_max="$DEFAULT_STALE_MAX"
+  local n_working=0 n_stale=0
+  local in_flight=""
+  local claim_lines c_slug c_agent c_hb
+  claim_lines="$(sqlite3 -separator $'\x1e' "$db" "
+SELECT r.slug, c.agent_id, c.heartbeat
+FROM claims c JOIN reqs r ON r.id=c.req_id
+WHERE c.status='active'
+ORDER BY r.slug;")"
+  while IFS=$'\x1e' read -r c_slug c_agent c_hb; do
+    [ -n "$c_slug" ] || continue
+    n_working=$((n_working + 1))
+    in_flight="${in_flight}${c_slug}:"
+    if is_stale_heartbeat "$c_hb" "$stale_max"; then
+      n_stale=$((n_stale + 1))
+    fi
+  done <<EOF
+$claim_lines
+EOF
+  local n_live=$(( n_working - n_stale ))
+  [ "$n_live" -ge 0 ] || n_live=0
+
+  # last-commit-age: seconds since the most recent commit touching .do-work/.
+  local now commit_epoch last_age
+  now="$(date -u +%s)"
+  commit_epoch="$(git -C "$root" log -1 --format='%ct' -- .do-work 2>/dev/null || true)"
+  if [ -z "$commit_epoch" ]; then
+    commit_epoch="$(git -C "$root" log -1 --format='%ct' 2>/dev/null || true)"
+  fi
+  if [ -n "$commit_epoch" ]; then
+    last_age=$(( now - commit_epoch ))
+  else
+    last_age=999999
+  fi
+
+  local fp_hash fingerprint diagnosis
+  fp_hash="$(printf '%s' "$in_flight" | cksum | awk '{print $1}')"
+  fingerprint="deadlock:runtime-cycle:${n_live}:${fp_hash}"
+  diagnosis="Dependency cycle detected in REQ graph: ${cycle_path}"
+
+  printf 'deadlock-detected\n'
+  printf 'signal: %s\n'           "runtime-cycle"
+  printf 'live-slots: %s\n'       "$n_live"
+  printf 'stale-slots: %s\n'      "$n_stale"
+  printf 'backlog-size: %s\n'     "$n_backlog"
+  printf 'last-commit-age: %s\n'  "$last_age"
+  printf 'diagnosis: %s\n'        "$diagnosis"
+  printf 'fingerprint: %s\n'      "$fingerprint"
+}
+
 # --- check-footprint <root> <REQ-NNN> ---
 # Print overlap:<peer-slug> for each in-flight peer with non-empty path intersection.
 cmd_check_footprint() {
@@ -2282,6 +2367,7 @@ main() {
     unblock) cmd_unblock "$@" ;;
     check-deps) cmd_check_deps "$@" ;;
     cycle-check) cmd_cycle_check "$@" ;;
+    deadlock-check) cmd_deadlock_check "$@" ;;
     check-footprint) cmd_check_footprint "$@" ;;
     scan-stale) cmd_scan_stale "$@" ;;
     check-archive) cmd_check_archive "$@" ;;
