@@ -61,18 +61,6 @@ $*
 SQL
 }
 
-# Run a multi-line SQL script with PRAGMAs prepended.
-sql_script() {
-  local db="$1"
-  local script="$2"
-  sqlite3 "$db" <<SQL
-PRAGMA busy_timeout=5000;
-PRAGMA journal_mode=WAL;
-PRAGMA foreign_keys=ON;
-$script
-SQL
-}
-
 cmd_ensure() {
   local root="${1:-}"
   [ -n "$root" ] || die "ensure: project root required"
@@ -98,45 +86,6 @@ cmd_ensure() {
     sqlite3 "$db" "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;" >/dev/null
   fi
   echo "$db"
-}
-
-# outer retry helper for write commands
-with_retry() {
-  local attempt=1
-  local delays="0.05 0.1 0.2"
-  local d
-  set -- $delays
-  while true; do
-    if "$@"; then return 0; fi
-    if [ "$attempt" -ge 3 ]; then return 1; fi
-    d="$1"; shift || true
-    sleep "${d:-0.2}"
-    attempt=$((attempt+1))
-  done
-}
-
-# Numeric slug allocation: max integer suffix + 1, min width 3, grows past 3.
-# NEVER use string MAX(slug). Call inside BEGIN IMMEDIATE transaction (or alone).
-# Args: db kind(UR|REQ) → prints KIND-NNN
-next_slug() {
-  local db="$1"
-  local kind="$2"  # UR | REQ
-  local table
-  case "$kind" in
-    UR) table=urs ;;
-    REQ) table=reqs ;;
-    *) die "next_slug: kind must be UR or REQ" ;;
-  esac
-  local max_n
-  # Cast suffix after first '-' as integer; ignore non-matching shapes.
-  max_n="$(sqlite3 "$db" "SELECT COALESCE(MAX(CAST(substr(slug, instr(slug,'-')+1) AS INTEGER)), 0) FROM $table WHERE slug LIKE '${kind}-%';")"
-  [ -n "$max_n" ] || max_n=0
-  local n=$((max_n + 1))
-  local s="$n"
-  while [ ${#s} -lt 3 ]; do
-    s="0$s"
-  done
-  echo "${kind}-$s"
 }
 
 normalize_status() {
@@ -926,10 +875,6 @@ cmd_heartbeat() {
   local now
   now="$(iso_now)"
   local n
-  n="$(sqlite3 "$db" "SELECT changes() FROM (
-    SELECT 1 WHERE 0
-  );" 2>/dev/null || true)"
-  # Perform UPDATE and check changes()
   n="$(sqlite3 "$db" <<SQL
 PRAGMA busy_timeout=5000;
 UPDATE claims SET heartbeat=$(sql_quote "$now")

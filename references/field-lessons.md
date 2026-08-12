@@ -85,42 +85,35 @@ not this file. No product names/ticket ids as substance.
 | Worker vanishes with **no YAML report** (idle/failed — e.g. API usage-limit 429, crash); REQ still `in_progress`, an orphan `.worktrees/req-NNN` + a `req/REQ-NNN` branch with **uncommitted** partial work are left behind | Worker process died mid-TDD on an infrastructure failure — not a clean `status: stopped` report | Do NOT salvage uncommitted partial work. `git log req/REQ-NNN` first — if no `feat(REQ-NNN)` commit, the branch is just the base: `git worktree remove .worktrees/req-NNN --force` then `git branch -D req/REQ-NNN`. Refresh the heartbeat (leave the claim — resume semantics) and re-dispatch a FRESH worker off **current** `new-work`. Skipping the cleanup makes the re-dispatched worker's `git worktree add … -b req/REQ-NNN` fail (worktree/branch already exist). Validated under sqlite; same shape for any backend |
 
 
-## 11. Capture cycle-check is a no-op under sqlite
+## 12. Capture cycle-check is a no-op under sqlite
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
 | `bash {skill-root}/lib/cycle-check.sh UR-NNN` exits 0 under `backend: sqlite`, yet the dep graph was never actually checked | `cycle-check.sh` globs `REQ-*.md` across backlog/working/archive; under sqlite REQs are `work.db` rows (no `REQ-*.md` files), so it finds no edges and returns "no cycle" **vacuously** | Under sqlite, do **not** treat `cycle-check.sh` exit 0 as proof of acyclicity. Verify the graph by querying the `deps` table (`req_id` → `depends_on_req_id`) and running a DFS, or add a `dw-db cycle-check` op. Markdown backend: `cycle-check.sh` remains valid |
 
 
-## 11. cycle-check.sh is vacuous under sqlite
-
-| Symptom | Likely cause | Default action |
-|---------|--------------|----------------|
-| `bash lib/cycle-check.sh UR-NNN` exits 0 instantly but the UR's REQs are in the sqlite DB (deps live in the `deps` junction table) | `cycle-check.sh` globs markdown `.do-work/REQ-*.md`; under `tracker.backend: sqlite` there are none, so it is a vacuous pass that never inspects DB deps | Do **not** treat `cycle-check.sh` exit 0 as acyclicity proof under sqlite. Verify the `deps` junction directly (`SELECT … FROM deps JOIN reqs …`) and confirm `dw-db list-claimable --ur UR-NNN` blocks dependents until their dependency is `done`. The capture Step 4e gate is a markdown-backend artifact; sqlite acyclicity is proven by the junction + claimable filter, not cycle-check |
-
-
-## 12. Capture: never guess a not-yet-allocated REQ slug for `--deps`
+## 13. Capture: never guess a not-yet-allocated REQ slug for `--deps`
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
 | A capture-created REQ's `--deps` points at the **wrong** REQ (a different UR's REQ) — the dependent later claims a satisfied/unrelated dep instead of its real predecessor | `create-req` allocates slugs globally (max+1 across the whole DB / REQ tree); a multi-REQ capture that passes `--deps "REQ-NNN"` with a **guessed** slug has it accepted (that slug already exists for another REQ) and silently wired to the wrong target | Create the dependency-target REQ **first**, read its actual slug from `create-req` stdout, then pass that real slug as `--deps` on the dependent REQ. Or create all REQs first and wire deps after via `set-blocked-by`. **Never** pass a not-yet-allocated slug to `--deps`; always re-verify with `dw-db check-deps REQ-NNN` after |
 
 
-## 13. Worker worktree base: branch off the named integration branch, not HEAD
+## 14. Worker worktree base: branch off the named integration branch, not HEAD
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
 | A worker's worktree is created off the **wrong** branch (a stale `req/*` or unrelated feature branch), so its commit lands outside the recorded integration base and a later merge goes into the wrong branch | `run-worker.md` W1 reads the base from `git rev-parse --abbrev-ref HEAD` in the main checkout; if another session, operator action, or hook moved HEAD between `ensure-integration-base` and worktree creation, the worker branches off the moved HEAD, not `new-work` | When dispatching a worker in any checkout whose HEAD can drift (e.g. a concurrent do-work session sharing the tree), instruct the worker to create its worktree off the **named** integration branch (`git worktree add … -b req/<id> new-work`), not off HEAD. Then re-assert `git branch --show-current == new-work` before **every** merge (see §5). Workers must never run `git checkout`/`switch` in the main checkout |
 
 
-## 14. Run phase: background worker/review dispatches don't return their report — verify independently or dispatch foreground
+## 15. Run phase: background worker/review dispatches don't return their report — verify independently or dispatch foreground
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
 | A run-worker or review subagent dispatched in the background with a `name` returns only an `idle_notification` ("available"); its YAML Return Report never arrives as a readable message, so the orchestrator can't parse `status` / `closure_proof` / `checkpoint_log` | Named background Agent dispatches behave as persistent teammates (idle-and-wait for mailbox messages), not one-shot tasks; the agent's final report is its turn output, which does not route back to the orchestrator as a completion result over the teammate channel | Do **not** block on the worker's/reviewer's self-reported YAML. Treat the **commit + tests as ground truth**: confirm scope (`git show <hash> --stat`), re-run the REQ's tests + the full suite, run the policy gate, and check the docs yourself — then run the gates and archive on that independent evidence. If you need the report inline, dispatch the worker/reviewer **foreground** (`run_in_background: false`) so its YAML returns directly as the tool result |
 
 
-## 15. Symlinked dep dir + worker-side regenerator corrupts the shared copy after teardown
+## 16. Symlinked dep dir + worker-side regenerator corrupts the shared copy after teardown
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
@@ -129,7 +122,7 @@ not this file. No product names/ticket ids as substance.
 Related to §1 (symlinked vendor) but distinct: the symlink **works for running tests** — it breaks only when a worker **regenerates** the shared artifacts, and the failure surfaces in the orchestrator's final suite, not the worker's.
 
 
-## 16. Pest `WARN` from missing `.env` in a greenfield worktree is cosmetic
+## 17. Pest `WARN` from missing `.env` in a greenfield worktree is cosmetic
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
