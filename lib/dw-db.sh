@@ -889,6 +889,215 @@ WHERE dep.req_id = $rid AND d.status != 'done'
 ORDER BY CAST(substr(d.slug, instr(d.slug,'-')+1) AS INTEGER) ASC;"
 }
 
+# ----------------------------------------------------------------------
+# Cycle detection (parity with lib/cycle-check.sh, but over the sqlite
+# deps junction). Two reusable helpers + one command:
+#   - graph_from_db <db>: emit a NODE/EDGE stream for cycle_core.
+#   - cycle_core [UR-NNN]: iterative-DFS cycle detector over that stream.
+#   - cmd_cycle_check: the dw-db cycle-check command.
+#
+# Stream protocol (line-oriented, fed to cycle_core on stdin):
+#   NODE <req-slug> <ur-slug>     — declare a node + its owning UR
+#   EDGE <from-slug> <to-slug>    — "from depends on to"
+# Hypothetical edges (set-blocked-by "would this create a cycle?" probe)
+# are extra EDGE lines appended to the same stream — never persisted.
+# A UR argument is a REPORT FILTER only: the subgraph is always the whole
+# deps table, so cycles routed through another UR's REQs are still detected;
+# a cycle is reported only when at least one node in it belongs to that UR.
+# ----------------------------------------------------------------------
+
+# graph_from_db <db> — print NODE/EDGE lines for every req + every dep edge.
+# Uses a non-whitespace column separator (field lesson: tab collapses empty
+# fields under IFS reads; slugs/URs are non-empty here, but stay bulletproof).
+graph_from_db() {
+  local db="$1"
+  local sep=$'\x1e'
+  sqlite3 -separator "$sep" "$db" \
+    "SELECT r.slug, u.slug FROM reqs r JOIN urs u ON u.id = r.ur_id;" \
+    | awk -F"$sep" '{ printf "NODE %s %s\n", $1, ($2 == "" ? "-" : $2) }'
+  sqlite3 -separator "$sep" "$db" "
+SELECT r1.slug, r2.slug FROM deps d
+JOIN reqs r1 ON r1.id = d.req_id
+JOIN reqs r2 ON r2.id = d.depends_on_req_id;" \
+    | awk -F"$sep" '{ printf "EDGE %s %s\n", $1, $2 }'
+}
+
+# cycle_core [UR-NNN] — reads NODE/EDGE stream on stdin.
+# On cycle: prints "A → B → ... → A" to stdout, exits 1.
+# Acyclic (or no matching cycle under a filter): silent, exits 0.
+# Algorithm: iterative DFS implemented entirely in awk (no shell recursion;
+# safe on linear chains of 1000+ REQs). Adapted from lib/cycle-check.sh.
+cycle_core() {
+  local filter="${1:-}"
+  awk -v filter="$filter" '
+/^NODE / {
+  id = $2
+  ur = ($3 == "" || $3 == "-") ? "" : $3
+  if (!(id in seen)) {
+    seen[id] = 1
+    node_ur[id] = ur
+    node_list[node_n++] = id
+    if (!(id in adj_count)) { adj[id] = ""; adj_count[id] = 0 }
+  } else {
+    # Keep the UR if a later NODE line provides one.
+    if (ur != "") node_ur[id] = ur
+  }
+  next
+}
+/^EDGE / {
+  from = $2
+  to   = $3
+  # Ensure both endpoints exist as nodes (defensive: hypothetical edges
+  # should already have NODE lines, but never assume).
+  if (!(from in seen)) {
+    seen[from] = 1; node_ur[from] = ""; node_list[node_n++] = from
+    if (!(from in adj_count)) { adj[from] = ""; adj_count[from] = 0 }
+  }
+  if (!(to in seen)) {
+    seen[to] = 1; node_ur[to] = ""; node_list[node_n++] = to
+    if (!(to in adj_count)) { adj[to] = ""; adj_count[to] = 0 }
+  }
+  if (adj_count[from] == 0) adj[from] = to
+  else adj[from] = adj[from] " " to
+  adj_count[from]++
+  next
+}
+END {
+  for (ii = 0; ii < node_n; ii++) {
+    start = node_list[ii]
+    if (visited[start]) continue
+
+    stack_top = 0
+    stack[stack_top] = start
+    stack_edge_idx[stack_top] = 0
+    delete on_path
+    delete path_order
+    path_len = 0
+
+    while (stack_top >= 0) {
+      node = stack[stack_top]
+
+      if (!visited[node] && !on_path[node]) {
+        on_path[node] = 1
+        path_order[path_len] = node
+        path_len++
+      }
+
+      found_child = 0
+      if (adj_count[node] > 0) {
+        n_children = split(adj[node], children, " ")
+        edge_start = stack_edge_idx[stack_top]
+        for (ci = edge_start + 1; ci <= n_children; ci++) {
+          child = children[ci]
+          stack_edge_idx[stack_top] = ci
+
+          if (on_path[child]) {
+            # Back-edge → cycle: child ... node -> child.
+            cycle_start = -1
+            for (k = 0; k < path_len; k++) {
+              if (path_order[k] == child) { cycle_start = k; break }
+            }
+            # Decide whether to REPORT this cycle under the UR filter.
+            report = 1
+            if (filter != "") {
+              report = 0
+              if (node_ur[child] == filter) report = 1
+              if (!report) {
+                for (k = cycle_start + 1; k < path_len; k++) {
+                  if (node_ur[path_order[k]] == filter) { report = 1; break }
+                }
+              }
+            }
+            if (report) {
+              cycle_str = child
+              for (k = cycle_start + 1; k < path_len; k++) {
+                cycle_str = cycle_str " → " path_order[k]
+              }
+              cycle_str = cycle_str " → " child
+              print cycle_str
+              exit 1
+            }
+            # Filter mismatch: this cycle is out of scope. Skip this
+            # back-edge and keep searching for one that involves filter.
+            continue
+          }
+
+          if (!visited[child]) {
+            stack_top++
+            stack[stack_top] = child
+            stack_edge_idx[stack_top] = 0
+            found_child = 1
+            break
+          }
+        }
+      }
+
+      if (!found_child) {
+        on_path[node] = 0
+        path_len--
+        visited[node] = 1
+        stack_top--
+      }
+    }
+  }
+  exit 0
+}
+'
+}
+
+# --- cycle-check <root> [UR-NNN] [--add FROM TO]... ---
+# Validate the whole deps graph is acyclic. On cycle: prints the cycle path
+# (e.g. REQ-007 → REQ-009 → REQ-007) and exits 1; acyclic: silent, exit 0.
+# UR-NNN is a REPORT FILTER (see cycle_core). --add FROM TO adds a
+# hypothetical (non-persisting) edge for "would this create a cycle?" probing.
+cmd_cycle_check() {
+  local root="${1:-}"; shift || true
+  [ -n "$root" ] || die "cycle-check: project root required"
+  require_sqlite3
+  local db
+  db="$(open_db "$root")"
+  local filter="" add_edges="" from to fid tid
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --add)
+        [ $# -ge 3 ] || die "cycle-check: --add requires FROM TO"
+        from="${2:-}"; to="${3:-}"
+        [ -n "$from" ] && [ -n "$to" ] || die "cycle-check: --add FROM TO must be non-empty"
+        fid="$(req_id_for_slug "$db" "$from")"
+        tid="$(req_id_for_slug "$db" "$to")"
+        [ -n "$fid" ] || die "cycle-check: --add unknown REQ slug: $from"
+        [ -n "$tid" ] || die "cycle-check: --add unknown REQ slug: $to"
+        add_edges="${add_edges}${from} ${to}
+"
+        shift 3
+        ;;
+      --*)
+        die "cycle-check: unknown option: $1"
+        ;;
+      *)
+        [ -z "$filter" ] || die "cycle-check: only one UR filter allowed"
+        case "$1" in
+          UR-*) filter="$1" ;;
+          *) die "cycle-check: unexpected argument: $1 (want UR-NNN or --add FROM TO)" ;;
+        esac
+        shift
+        ;;
+    esac
+  done
+
+  {
+    graph_from_db "$db"
+    if [ -n "$add_edges" ]; then
+      printf '%s' "$add_edges" | while IFS= read -r pair; do
+        [ -n "$pair" ] || continue
+        # shellcheck disable=SC2086  — pair is "FROM TO", word-split intended
+        set -- $pair
+        printf 'EDGE %s %s\n' "$1" "$2"
+      done
+    fi
+  } | cycle_core "$filter"
+}
+
 # --- check-footprint <root> <REQ-NNN> ---
 # Print overlap:<peer-slug> for each in-flight peer with non-empty path intersection.
 cmd_check_footprint() {
@@ -1977,6 +2186,7 @@ main() {
     heartbeat) cmd_heartbeat "$@" ;;
     unblock) cmd_unblock "$@" ;;
     check-deps) cmd_check_deps "$@" ;;
+    cycle-check) cmd_cycle_check "$@" ;;
     check-footprint) cmd_check_footprint "$@" ;;
     scan-stale) cmd_scan_stale "$@" ;;
     check-archive) cmd_check_archive "$@" ;;
