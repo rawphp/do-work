@@ -227,6 +227,37 @@ Full claim/archive sequences: [linear-ops.md](../../references/linear-ops.md).
 
 ---
 
+## Cycle-check (read-side, best-effort) — REQ-021
+
+A **diagnostic** sequence that reads a UR's Issues' native `blocks` relations client-side, builds the dependency graph, and reports any dependency cycles. This is the Linear analog of the sqlite `cycle-check` (REQ-017) / `deadlock-check` (REQ-019) commands — but **read-side and best-effort only**.
+
+**Critical caveats — read before running:**
+
+- **Read-side / best-effort only.** This is an **audit / diagnostic**, not a gate. It never blocks claim, write, or archive, and is not a `list_claimable_reqs` input.
+- **Linear `blocks` relations are eventually-consistent.** A relation just written via `set_blocked_by` may not be readable immediately. If a cycle-check runs right after a relation write, **re-read after a settle** before trusting a "no cycle" result.
+- **Linear permits cyclic `blocks` relations** — it does **not** enforce acyclicity. Therefore **write-time rejection is infeasible and is NOT claimed** by this sequence. Unlike sqlite (REQ-018 rejects cyclic deps at `set-blocked-by`), Linear has no write-side cycle guard; this command can only *report* cycles after the fact.
+- **Linear MCP read / relation tools only.** No do-work-side store write, no freehand SQL, no `lib/*.sh` Linear client (none exists in v1). The graph is assembled in the agent's working memory from relation reads.
+
+### Agent sequence
+
+1. **Scope the UR** — resolve product Project + UR Project Milestone; call **`list_reqs_for_ur`** ([linear-ops.md](../../references/linear-ops.md)) to enumerate the UR's Issues (any status). Capture each Issue's Linear id.
+2. **Rediscover relation-read tools** — `search_tool` for Linear issue **relations** (queries such as `"linear issue relations"`, `"linear blocks"`, `"linear dependencies"`). Map hits to **observed** tool names + `input_schema` from search — never hard-code tool names. If zero relation-read tools are discoverable → emit a one-time warning and **fall back to each Issue's body `**Depends on:**` mirror** (display only; `blocks` relations are authoritative per **Deps authority** in [port.md](port.md)). Still no markdown store, no SQL.
+3. **Read `blocks` relations per Issue** — for each Issue, list its native `blocks` / "is blocked by" edges. Direction (matches `set_blocked_by` in [linear-ops.md](../../references/linear-ops.md)): a dependency **blocks** the current Issue — i.e. *this Issue is blocked by its dependencies*. Model each edge as a **depends-on** edge `current → dependency`.
+4. **Build the directed graph client-side** — nodes = the UR's Issue ids; edges = depends-on edges from step 3. Only Issues that are dependencies of (or depended-on by) a UR Issue are in scope; do not pull the whole team graph.
+5. **Run cycle detection (DFS)** over the graph. On finding a back-edge, record the **cycle path** as an ordered list of Linear ids (e.g. `ENG-100 → ENG-101 → ENG-102 → ENG-100`).
+6. **Report** — emit `acyclic` when no cycle is found, or a `cycle-detected` block listing every discovered cycle path. When the check ran immediately after a `set_blocked_by` write, note that eventual consistency may hide a fresh edge and advise a re-read after settle.
+7. **Do not mutate.** This sequence writes nothing to Linear, the local store, or git. It only reads and reports.
+
+### Direction & authority cross-ref
+
+| Concern | Source |
+|---------|--------|
+| Graph direction | Matches `set_blocked_by` ([linear-ops.md](../../references/linear-ops.md)): dependency **blocks** the current Issue; depends-on edge `current → dependency` for cycle DFS |
+| Deps authority | [port.md](port.md) **Deps authority** — `blocks` relations authoritative; body `**Depends on:**` mirror only |
+| Parity concept | sqlite `cycle-check` (REQ-017) + `deadlock-check` (REQ-019) in [sqlite.md](sqlite.md) are write-side-enforced; under Linear the graph is **read-side only** |
+
+---
+
 ## References
 
 - [references/linear-ops.md](../../references/linear-ops.md) — CRUD, claim, archive, artifacts, templates
