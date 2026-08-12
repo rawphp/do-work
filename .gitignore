@@ -1,7 +1,13 @@
 .rhythm-section
+.worktrees
 
 # do-work data folders (created per-project, not part of the skill)
 .do-work/
 
 # local testing artifacts
 .playwright-mcp/
+
+# do-work sqlite store + board
+.do-work/work.db
+.do-work/work.db-*
+.do-work/board/
