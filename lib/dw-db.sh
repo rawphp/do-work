@@ -539,6 +539,106 @@ cmd_set_files() {
 
 # --- set-blocked-by <root> <slug> <dep-slugs...> ---
 # Replace deps for REQ. Inputs: REQ slugs (comma and/or whitespace). Invalid → hard error.
+# _sbb_tx <db> <rid> <inserts-sql> <now>
+# Stage + cycle-check + commit a set-blocked-by replacement inside ONE held
+# BEGIN IMMEDIATE transaction on a SINGLE sqlite3 connection.
+#
+#   1. acquire the write lock (BEGIN IMMEDIATE);
+#   2. stage the DELETE + new INSERTs (uncommitted, same connection);
+#   3. re-read the staged dep graph from that SAME connection (it sees its own
+#      uncommitted writes) and run REQ-017's cycle_core over it — so a cycle is
+#      detected on the would-be graph, including a self-loop A→A;
+#   4. on cycle → ROLLBACK (set SBB_CYCLE to the path, return 1, nothing
+#      committed); on acyclic → UPDATE updated_at + COMMIT (return 0).
+#
+# Holding the connection open across check+write means two concurrent
+# cycle-forming writers (A→B and B→A) serialize on the BEGIN IMMEDIATE lock:
+# the second acquires the lock only after the first commits, so its re-read
+# sees the first's edge and it is rejected.
+#
+# Dies on lock/transaction infrastructure failure. Reuses REQ-017's cycle_core
+# — does not reimplement cycle detection.
+_sbb_tx() {
+  local db="$1" rid="$2" inserts="$3" now="$4"
+  SBB_CYCLE=""
+
+  local tx_dir cmd_fifo graph_file marker_file tx_log pid
+  tx_dir="$(mktemp -d -t set-blocked-by-tx.XXXXXX)"
+  cmd_fifo="$tx_dir/cmd"
+  graph_file="$tx_dir/graph"
+  marker_file="$tx_dir/done"
+  tx_log="$tx_dir/log"
+  mkfifo "$cmd_fifo"
+
+  # Held sqlite3 connection reading SQL from cmd_fifo; fd 9 is its write end.
+  # stdout (PRAGMA echoes / errors) goes to tx_log.
+  sqlite3 "$db" <"$cmd_fifo" >"$tx_log" 2>&1 &
+  pid=$!
+  exec 9>"$cmd_fifo"
+
+  # Acquire lock + stage the replacement, then dump the staged EDGE stream to
+  # graph_file (same connection → sees the uncommitted DELETE+INSERT) and drop
+  # a marker file once the graph has been written.
+  {
+    printf '%s\n' ".bail on"
+    printf '%s\n' "PRAGMA busy_timeout=5000;"
+    printf '%s\n' "PRAGMA foreign_keys=ON;"
+    printf '%s\n' "BEGIN IMMEDIATE;"
+    printf '%s\n' "DELETE FROM deps WHERE req_id=$rid;"
+    printf '%s\n' "$inserts"
+    printf '%s\n' ".output $graph_file"
+    printf '%s\n' "SELECT 'EDGE ' || r1.slug || ' ' || r2.slug FROM deps d JOIN reqs r1 ON r1.id = d.req_id JOIN reqs r2 ON r2.id = d.depends_on_req_id;"
+    printf '%s\n' ".output $marker_file"
+    printf '%s\n' "SELECT 'DONE';"
+    printf '%s\n' ".output stdout"
+  } >&9
+
+  # Wait for the marker (graph fully written) or for the held connection to die
+  # (BEGIN IMMEDIATE failed under .bail on).
+  local waited=0
+  while [ ! -f "$marker_file" ]; do
+    if ! kill -0 "$pid" 2>/dev/null; then break; fi
+    sleep 0.05
+    waited=$((waited + 1))
+    [ "$waited" -lt 240 ] || break   # ~12s safety net
+  done
+
+  if [ ! -f "$marker_file" ]; then
+    exec 9>&- 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    local err; err="$(tail -n 1 "$tx_log" 2>/dev/null || true)"
+    rm -rf "$tx_dir"
+    die "set-blocked-by: transaction failed${err:+ ($err)}"
+  fi
+
+  # Reuse REQ-017's cycle detector over the staged graph (no UR filter — a
+  # write may not create ANY cycle).
+  SBB_CYCLE="$(cycle_core "" <"$graph_file")"
+  local cyc_rc=$?
+
+  if [ "$cyc_rc" -ne 0 ]; then
+    # Cycle → roll back the staged DELETE+INSERT (nothing committed).
+    { printf '%s\n' "ROLLBACK;"; printf '%s\n' ".quit"; } >&9
+    exec 9>&-
+    wait "$pid" 2>/dev/null || true
+    rm -rf "$tx_dir"
+    return 1
+  fi
+
+  # Acyclic → finalize updated_at and commit.
+  {
+    printf '%s\n' "UPDATE reqs SET updated_at=$(sql_quote "$now") WHERE id=$rid;"
+    printf '%s\n' "COMMIT;"
+    printf '%s\n' ".quit"
+  } >&9
+  exec 9>&-
+  wait "$pid"
+  local commit_rc=$?
+  rm -rf "$tx_dir"
+  [ "$commit_rc" -eq 0 ] || die "set-blocked-by: transaction failed"
+  return 0
+}
+
 cmd_set_blocked_by() {
   local root="${1:-}" slug="${2:-}"
   shift 2 2>/dev/null || true
@@ -570,21 +670,16 @@ cmd_set_blocked_by() {
 
   local now
   now="$(iso_now)"
-  # Replace in one transaction (PRAGMAs on same connection as writes)
   local inserts=""
   for did in $dep_ids; do
     inserts="${inserts}INSERT INTO deps(req_id, depends_on_req_id) VALUES($rid, $did);
 "
   done
-  sqlite3 "$db" >/dev/null <<SQL || die "set-blocked-by: transaction failed"
-PRAGMA busy_timeout=5000;
-PRAGMA foreign_keys=ON;
-BEGIN IMMEDIATE;
-DELETE FROM deps WHERE req_id=$rid;
-$inserts
-UPDATE reqs SET updated_at=$(sql_quote "$now") WHERE id=$rid;
-COMMIT;
-SQL
+
+  if ! _sbb_tx "$db" "$rid" "$inserts" "$now"; then
+    echo "set-blocked-by: dependency cycle: $SBB_CYCLE" >&2
+    exit 1
+  fi
 }
 
 # Default stale threshold (seconds). Design §8.3: parallel.stale_threshold_seconds default 900.
