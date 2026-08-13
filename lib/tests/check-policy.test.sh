@@ -132,6 +132,43 @@ assert_eq "1" "$RC" "$CURRENT_CASE rc"
 case "$STDOUT" in *"blocked_path: .env.local matches .env.*"*) : ;; *) fail "$CURRENT_CASE stdout" ;; esac
 teardown_project
 
+CURRENT_CASE="allowed-env-example"
+CASES=$((CASES + 1))
+setup_project
+printf '.env.example\n' > "$FILES"
+run_policy
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_project
+
+CURRENT_CASE="allowed-env-example-nested"
+CASES=$((CASES + 1))
+setup_project
+printf 'packages/web/.env.example\n' > "$FILES"
+run_policy
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+teardown_project
+
+CURRENT_CASE="explicit-excluded-path"
+CASES=$((CASES + 1))
+setup_project
+cat > "$TMP/.do-work/config.yml" <<'EOF'
+security:
+  blocked_paths:
+    - docs/*
+  excluded_paths:
+    - docs/public.md
+  blocked_commands: []
+risk:
+  require_review: []
+EOF
+printf 'docs/public.md\n' > "$FILES"
+run_policy
+assert_eq "0" "$RC" "$CURRENT_CASE rc"
+printf 'docs/secret.md\n' > "$FILES"
+run_policy
+assert_eq "1" "$RC" "$CURRENT_CASE still-blocked rc"
+teardown_project
+
 CURRENT_CASE="blocked-command"
 CASES=$((CASES + 1))
 setup_project

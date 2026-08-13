@@ -74,6 +74,9 @@ with_default() {
 }
 
 BLOCKED_PATHS="$(with_default "$(section_list security blocked_paths $'.env\n.env.*')" $'.env\n.env.*')"
+# Public templates are not secrets. Default-exclude .env.example so the
+# shipped .env.* glob cannot policy-block documenting a new env var.
+EXCLUDED_PATHS="$(with_default "$(section_list security excluded_paths $'.env.example')" $'.env.example')"
 BLOCKED_COMMANDS_DEFAULT=$'rm -rf\ngit push --force\ngit push -f\ngit reset --hard\ngit checkout --'
 BLOCKED_COMMANDS="$(with_default "$(section_list security blocked_commands "$BLOCKED_COMMANDS_DEFAULT")" "$BLOCKED_COMMANDS_DEFAULT")"
 RISK_RULES="$(with_default "$(section_list risk require_review $'migrations\nauth\nbilling\npayments\nfiles_changed_over: 8\nacceptance_criteria_over: 6')" $'migrations\nauth\nbilling\npayments\nfiles_changed_over: 8\nacceptance_criteria_over: 6')"
@@ -184,9 +187,26 @@ command_matches() {
   esac
 }
 
+path_is_excluded() {
+  local changed_path="$1"
+  local excluded_path
+  while IFS= read -r excluded_path; do
+    [ -z "$excluded_path" ] && continue
+    if path_matches "$changed_path" "$excluded_path"; then
+      return 0
+    fi
+  done <<EOF
+$EXCLUDED_PATHS
+EOF
+  return 1
+}
+
 if [ -n "$FILES_PATH" ] && [ -f "$FILES_PATH" ]; then
   while IFS= read -r changed_path; do
     [ -z "$changed_path" ] && continue
+    if path_is_excluded "$changed_path"; then
+      continue
+    fi
     while IFS= read -r blocked_path; do
       [ -z "$blocked_path" ] && continue
       if path_matches "$changed_path" "$blocked_path"; then

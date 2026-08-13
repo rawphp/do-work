@@ -142,3 +142,42 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 |---------|--------------|----------------|
 | A UR captured with every REQ assigned a `Layer:` (backend/frontend) — none `Layer: none` — yet the endpoint REQs carry real `**Entry point:**`/`**Terminal state:**` pairs; `go` Step 4b fires the closure offer and/or the close agent then finds **zero path-units** and writes an empty `no-path-units` report, skipping the endpoint walk the operator expected | `verify.md` Step 4f treats "Entry point / Terminal state present" as the path-unit signal (Layer-agnostic), but `close.md` Step 2 and `go.md` Step 4b define a path-unit as `**Layer:** none` AND both path fields present. The two definitions disagree, so a UR captured with layered path-field REQs looks walkable to verify but yields nothing to close | When collecting path-units for close on a UR with no `Layer: none` REQs, fall back to the verify signal: every archived REQ with non-empty `**Entry point:**` + `**Terminal state:**`, ignoring `**Layer:**`. (Skill-side fix: align close.md Step 2 / go.md Step 4b with verify's Layer-agnostic detection, or have capture emit `Layer: none` path-unit parents when a REQ's entry point spans the layer model.) |
 
+## 20. "Validate complete" ≠ empty close report
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Operator asks to validate a UR is complete; close writes `overall: no-path-units` while the product already ships (or while REQs sit in backlog with ACs still `[ ]`) | `close.md` only scans **archived** path-units (`Layer: none` + entry/terminal). A shipped UR whose REQs were never archived, or were captured as layered children without path fields, looks like "nothing to close" | Before treating `no-path-units` as a completeness yes: `list_reqs_for_ur` across backlog + working + archive. If any REQ is not archived, the UR is **not** tracker-complete. Walk the brief on the merged app anyway (web/api/cli as the brief implies) and report product-complete vs tracker-complete as two verdicts |
+
+## 21. Prefer the project's existing `.do-work/` layout over a legacy skill clone
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| `/do-work start` tries to create `do-work/` (legacy tree) on a project that already has `.do-work/` + champion agents | The invoked skill copy is an older `do-work/`-path clone; Grok/hub may register that copy even when the project already runs champion | After `git rev-parse --show-toplevel`, if `{project}/.do-work/config.yml` exists, follow the champion agents (`.do-work/`, tracker port, ideate gate). Do **not** install or write a sibling `do-work/` tree. If only `do-work/` exists, that is `legacy-dir` — migrate via conformance, don't dual-write |
+
+## 22. Private UI Vite must start from the worktree app package
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| UI screenshot is a default Vite page, 404, or the main checkout app instead of the REQ change | `npx vite` ran from process CWD (or repo root), not the worktree package that owns `vite.config` / `package.json` | `cd` into `{worktree}/<app-package>` before starting a **private** evidence server; pass an unused `--port` (never the shared 5173 / project.test host). Confirm the ready URL is that private origin, then screenshot. Stop the private server when the step ends |
+| UI screenshot connection-refused after a "Vite ready" log | The start command was bound to a short tool timeout; the wrapper killed the process group when that call returned/timed out | Start the private server as a **long-lived** process (no short wall-clock kill on the start command). Confirm the private port still listens immediately before screenshot. Stop the server only after the PNG is on disk |
+| UI screenshot of the shared `*.test` / Herd origin shows **old** behaviour while worktree tests are green | Live Herd/nginx serves the **main checkout** `public/build` (no `public/hot`); worktree JS is not on that origin | Do **not** treat the shared project.test host as proof of a worktree frontend change. Start a **private unused-port** Vite whose root/alias loads the **worktree** source (or a tiny harness that mounts the changed component) and screenshot that origin |
+
+## 23. Policy `.env.*` matches committed `.env.example`
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Worker is `done` with tests green, then `check-policy.sh` exits 1: `blocked_path: …/.env.example matches .env.*` | Default `security.blocked_paths` includes `.env` and `.env.*`. The glob is unanchored-suffix: `.env.example` is a public template, not a secret file | Do **not** merge/archive. Treat as `policy-blocked`. Before the next run that must document an env var, narrow `security.blocked_paths` so `.env.*` does not match `.env.example` (keep `.env`, add explicit secret siblings like `.env.local` / `.env.production`). Then `/do-work resume` the stopped REQ — the feature branch can stay. Never bypass the policy gate silently |
+
+## 24. Linear UR slug lookup is zero-padded; evidence checker needs the project root
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| `get_milestone` / `read_ur` for `UR-30` returns not-found while `UR-030: …` exists on the product Project | Capture allocated a zero-padded `UR-NNN` slug; operator typed the unpadded form | List product-Project milestones and match `**UR-id:**` / name prefix `UR-0*30` / `UR-30`. Accept both padded and unpadded operator args. Do not hard-stop on the first exact-name miss |
+| `check-acceptance-evidence.sh` says `ui screenshot file missing` though the PNG exists under `{project}/.do-work/user-requests/…/ui-evidence/` | The REQ snapshot was written under `/tmp` (Linear has no working/ file); the script walks up from that path and never finds `{project}` | Write the Linear body snapshot under `{project}/.do-work/state/` (or another path inside the project) before calling the checker so `resolve_project_root` lands on the real app |
+
+## 25. Close web walk: wait for SPA hydrate before screenshot
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Playwright `screenshot <url>` of a Vite SPA is a blank dark page; every route PNG is the same tiny size | The CLI captures the empty `#app` shell before Vue mounts | Use `--wait-for-selector` on a real heading/testid and `--wait-for-timeout`. Re-vision the PNG. If it is still blank, verdict is `not-reached`, not `closed` |
+

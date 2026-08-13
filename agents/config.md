@@ -73,6 +73,8 @@ security:
   blocked_paths:
     - .env
     - .env.*
+  excluded_paths:
+    - .env.example
   blocked_commands:
     - rm -rf
     - git push --force
@@ -341,6 +343,7 @@ routing: []
 | `acceptance.evidence_required` | boolean | `true` | When true, every acceptance criterion needs passing evidence in the worker report before integration. Consumers: `lib/check-acceptance-evidence.sh`, `agents/run.md`. |
 | `risk.require_review` | list | `[migrations, auth, billing, payments, files_changed_over: 8, acceptance_criteria_over: 6]` | Signals that force explicit review even if implementation checks pass. Consumers: `lib/check-policy.sh`, `agents/review.md`. |
 | `security.blocked_paths` | list | `[.env, .env.*]` | Paths that must not be modified by workers. Consumers: `lib/check-policy.sh`. |
+| `security.excluded_paths` | list | `[.env.example]` | Paths exempt from `blocked_paths` (same glob/basename match). Use for public templates such as `.env.example` that would otherwise match `.env.*`. Consumers: `lib/check-policy.sh`. |
 | `security.blocked_commands` | list | `[rm -rf, git push --force, git push -f, git reset --hard, git checkout --]` | Commands that must stop the run/review path when they appear in a worker's command evidence. **Matching semantics (REQ-205):** each entry is matched as an extended regex (ERE) anchored on **shell-token boundaries** — the entry must appear bounded by whitespace or line start/end, so `production` blocks the standalone token `production` but **not** the `production-notes` path fragment. Short-flag clusters are normalised for flag order: `rm -rf` also blocks `rm -fr` and `rm -r -f`. To match a raw literal substring instead (the pre-REQ-205 behaviour), prefix the entry with `substr:` — e.g. `substr:production` blocks any command merely containing that text, including `deploy-production.sh`; metacharacters after `substr:` are treated literally. **Migration note:** the default semantics changed from substring to token-anchored regex. Existing configs that relied on substring behaviour (e.g. a bare `production` entry matching `deploy-production.sh`) must adopt the `substr:` form, since the word `production` alone no longer blocks commands that merely contain it as a path fragment unless configured with `substr:`. Consumers: `lib/check-policy.sh`. |
 | `model.default` | string | `sonnet` | Default worker model for ordinary REQs. Consumers: `agents/run.md`. |
 | `model.escalation` | string | `opus` | Escalation model for high-risk or failed REQs. Consumers: `agents/run.md`. |
