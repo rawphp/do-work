@@ -1,6 +1,6 @@
 # Tracker backends (work-item store)
 
-Deep dive for multi-tracker configuration. Hard-stop and dual-write rules are summarized in `SKILL.md` (always loaded). Canonical contracts: [agents/tracker/port.md](../agents/tracker/port.md), [agents/config.md](../agents/config.md). Runtime sequences: [agents/tracker/markdown.md](../agents/tracker/markdown.md), [agents/tracker/linear.md](../agents/tracker/linear.md), [agents/tracker/sqlite.md](../agents/tracker/sqlite.md).
+Deep dive for multi-tracker configuration. Hard-stop and dual-write rules are summarized in `SKILL.md` (always loaded). Canonical contracts: [agents/tracker/port.md](../agents/tracker/port.md), [agents/config.md](../agents/config.md). Runtime sequences: [agents/tracker/markdown.md](../agents/tracker/markdown.md), [agents/tracker/linear.md](../agents/tracker/linear.md), [agents/tracker/sqlite.md](../agents/tracker/sqlite.md), [agents/tracker/do-work-io.md](../agents/tracker/do-work-io.md).
 
 Work items (URs, REQs, decisions, verify/close reports, run notes) are stored through a **tracker port**. Config key `tracker.backend` selects the implementation:
 
@@ -10,8 +10,9 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) are stored th
 | **`markdown`** | Default: local `.do-work/` files + `lib/*.sh` (behavior matches today) |
 | **`linear`** | Linear is the sole work-item store (no dual-write; hard-stop if Linear unusable) |
 | **`sqlite`** | `.do-work/work.db` is the sole work-item store via `lib/dw-db.sh` (no dual-write; hard-stop if sqlite unusable; greenfield empty DB on switch) |
+| **`do-work-io`** | do-work.io is the sole work-item store via remote MCP (no dual-write; hard-stop if MCP/PAT/project unusable) |
 
-**Load path** for every phase agent that touches work items: (1) load config (`agents/config.md`), (2) resolve `tracker.backend` (default **`markdown`** if missing/empty), (3) read `agents/tracker/port.md`, (4) read `agents/tracker/<backend>.md`, (5) call only named port ops for storage. Runtime/git (worktrees, merges, state locks, `config.yml`) stay local on every backend. Markdown remains the default; existing tests and conformance do not require Linear or sqlite.
+**Load path** for every phase agent that touches work items: (1) load config (`agents/config.md`), (2) resolve `tracker.backend` (default **`markdown`** if missing/empty; also accepts **linear**, **sqlite**, and **do-work-io**), (3) read `agents/tracker/port.md`, (4) read `agents/tracker/<backend>.md`, (5) call only named port ops for storage. Runtime/git (worktrees, merges, state locks, `config.yml`) stay local on every backend. Markdown remains the default; existing tests and conformance do not require Linear, sqlite, or do-work.io.
 
 **Hard-stop (no silent fallback):** when the **active** backend is unusable, agents **hard-stop** with setup instructions — they never fall through to another backend:
 
@@ -19,9 +20,10 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) are stored th
 |---------|----------------|
 | **linear** | MCP missing/unauthenticated, team unresolved, missing `status_map` state, or `agents/tracker/linear.md` missing/unreadable |
 | **sqlite** | `sqlite3` missing from PATH, `agents/tracker/sqlite.md` missing/unreadable, DB corrupt / bad `user_version` after ensure |
+| **do-work-io** | MCP missing/unauthenticated, PAT/`base_url`/project missing, or `agents/tracker/do-work-io.md` missing/unreadable |
 | **any** | Unknown `tracker.backend` string |
 
-Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 / **7b** in `agents/config.md`.
+Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 / **7b** / **7c** in `agents/config.md`.
 
 **`tracker.linear.*` (when `backend: linear`).** Full schema and defaults live in `agents/config.md` (canonical template + schema reference). Summary:
 
@@ -49,7 +51,18 @@ Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 / **7b** 
 
 **SQLite rules:** greenfield empty DB on switch (no markdown/Linear history import); agents use `lib/dw-db.sh` only (no freehand `sqlite3` work-item SQL); `/do-work upgrade migrate` **refuses** under sqlite (`refused-sqlite-backend`); missing `user-requests/` / backlog `REQ-*.md` trees are **not** conformance drift when backend is sqlite.
 
-**No dual-write.** With `tracker.backend: linear` **or** `sqlite`, that backend is the **only** work-item store. Agents must not mirror URs/REQs into another store as a second source of truth, and must not fall back when the active backend fails (hard-stop instead). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them.
+**`tracker.dowork.*` (when `backend: do-work-io`).** Full schema and defaults live in `agents/config.md`. Summary:
+
+| Key | Default | Rules |
+|-----|---------|-------|
+| `tracker.dowork.base_url` | `""` | API origin (no trailing path). **Hard-fail** if empty or not `http(s)` |
+| `tracker.dowork.token_env` | `DOWORK_IO_PAT` | Process env var name holding the Sanctum PAT. **Hard-fail** if unset/empty. Never paste the token into docs or chat |
+| `tracker.dowork.project` | `""` | Project **slug**. **Hard-fail** if empty; do not guess |
+| `tracker.dowork.mcp_profile` | `dowork.control` | MCP path suffix: `dowork.read` / `dowork.control` / `dowork.admin` |
+
+**do-work-io rules:** remote MCP is the sole work-item store; never fall through to markdown, Linear, or sqlite. `status_map` is identity (`backlog` / `in_progress` / `stopped` / `done`) and **REQ-only**; URs have no status — closed-ness is `closed_at`. `/do-work upgrade migrate` **refuses** under `do-work-io`.
+
+**No dual-write.** With `tracker.backend: linear`, `sqlite`, **or** `do-work-io`, that backend is the **only** work-item store. Agents must not mirror URs/REQs into another store as a second source of truth, and must not fall back when the active backend fails (hard-stop instead). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them.
 
 **Linear commit / branch convention** (when `backend: linear`):
 
@@ -67,6 +80,8 @@ Output: path/to/primary/output
 
 **SQLite commit / branch convention** (when `backend: sqlite`): same shape as markdown — `feat(REQ-NNN): …`, footer `REQ:` / `UR:` / `Output:`, worktree `req/REQ-NNN`. Ids remain `UR-NNN` / `REQ-NNN` rows in `work.db`.
 
+**do-work-io commit / branch convention** (when `backend: do-work-io`): same shape as markdown/sqlite — `feat(REQ-NNN): …`, footer `REQ:` / `UR:` / `Output:`, worktree `req/REQ-NNN`. Ids remain `UR-NNN` / `REQ-NNN` slugs on the remote store.
+
 **Human assignee + agent claim comments (operator warning):** under Linear, the **human** remains the Issue assignee; agents claim via workflow state + a claim-protocol comment (`tracker.linear.agent_claim_marker`, default `<!-- do-work-claim -->`) with `agent_id`, timestamps, and `status: active`. **Do not clear, edit, or delete agent claim comments in the Linear UI while a `/do-work run` is live** — that breaks multi-agent claim/heartbeat and can strand or double-claim work. Recover stuck claims with `/do-work status`, then `/do-work resume` or `/do-work unblock` after the run is idle or the agent has stopped. Mid-flight Linear MCP failure leaves the claim active; resume/unblock after MCP recovers.
 
-**Markdown remains the default.** Unset/empty `tracker.backend` → `markdown`. No Linear MCP or `sqlite3` required for the happy path. Operator setup: Linear — [docs/troubleshooting.md](../docs/troubleshooting.md) § Linear tracker backend; SQLite — same file § SQLite tracker backend; deep dive [docs/HOW-IT-WORKS.md](../docs/HOW-IT-WORKS.md) § Multi-tracker; first-run pointer [docs/getting-started.md](../docs/getting-started.md). Full sequences: `agents/tracker/linear.md`, `agents/tracker/sqlite.md`.
+**Markdown remains the default.** Unset/empty `tracker.backend` → `markdown`. No Linear MCP or `sqlite3` required for the happy path. Operator setup: Linear — [docs/troubleshooting.md](../docs/troubleshooting.md) § Linear tracker backend; SQLite — same file § SQLite tracker backend; do-work.io — set `tracker.backend: do-work-io`, `tracker.dowork.base_url`, `tracker.dowork.project`, and export `${tracker.dowork.token_env}` (default `DOWORK_IO_PAT`); deep dive [docs/HOW-IT-WORKS.md](../docs/HOW-IT-WORKS.md) § Multi-tracker; first-run pointer [docs/getting-started.md](../docs/getting-started.md). Full sequences: `agents/tracker/linear.md`, `agents/tracker/sqlite.md`, `agents/tracker/do-work-io.md`.

@@ -3,9 +3,9 @@ name: do-work
 description: >
   Autonomous project-management loop: natural-language briefs → traceable work
   items (URs/REQs) → isolated TDD workers with one git commit per task. Default
-  store is local markdown under .do-work/; optional Linear or sqlite as sole
-  backend via tracker.backend (no dual-write, hard-stop if the active backend is
-  unusable). Differentiator: multi-agent runs with footprint-aware claims,
+  store is local markdown under .do-work/; optional Linear, sqlite, or
+  do-work-io as sole backend via tracker.backend (no dual-write, hard-stop if
+  the active backend is unusable). Differentiator: multi-agent runs with footprint-aware claims,
   worktree isolation, and verify/review/archive gates — not a generic todo list.
   Triggers on: "do-work", "intake", "capture", "verify", "run the loop",
   "backlog", "user request", "REQ-", "UR-", "question", "audit",
@@ -16,7 +16,7 @@ description: >
 
 Start → Go. (Or granular: Intake → Capture → Verify → Run.)
 
-Work-item storage is pluggable (`tracker.backend`: **markdown** default, **linear**, or **sqlite**). Runtime/git (worktrees, merges, state locks, `config.yml`) always stay local.
+Work-item storage is pluggable (`tracker.backend`: **markdown** default, **linear**, **sqlite**, or **do-work-io**). Runtime/git (worktrees, merges, state locks, `config.yml`) always stay local.
 
 ## Primary loop
 
@@ -97,6 +97,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/tracker/markdown.md](agents/tracker/markdown.md) — Default markdown backend (`.do-work/` + `lib/*.sh`)
 - [agents/tracker/linear.md](agents/tracker/linear.md) — Optional Linear backend (when `tracker.backend: linear`); sequences: [references/linear-ops.md](references/linear-ops.md)
 - [agents/tracker/sqlite.md](agents/tracker/sqlite.md) — Optional SQLite backend (when `tracker.backend: sqlite`; `.do-work/work.db` + `lib/dw-db.sh`)
+- [agents/tracker/do-work-io.md](agents/tracker/do-work-io.md) — Optional do-work.io backend (when `tracker.backend: do-work-io`; remote MCP + PAT)
 - [agents/help.md](agents/help.md) — Contextual help when invoked with no subcommand
 
 Run ledger: when `ledger.enabled: true`, `/do-work run` writes append-only `.do-work/runs/RUN-NNN.yml` records. Set `ledger.enabled: false` to disable.
@@ -113,8 +114,9 @@ Full multi-backend deep dive: [references/tracker.md](references/tracker.md).
 | **`markdown`** | Default: local `.do-work/` files + `lib/*.sh` |
 | **`linear`** | Linear is the sole work-item store |
 | **`sqlite`** | `.do-work/work.db` is the sole work-item store (`lib/dw-db.sh`) |
+| **`do-work-io`** | do-work.io is the sole work-item store (remote MCP; hard-stop if MCP/PAT/project unusable) |
 
-**Load path** (every phase that touches work items): (1) [agents/config.md](agents/config.md), (2) resolve `tracker.backend` (default **markdown**; also accepts **linear** and **sqlite**), (3) [agents/tracker/port.md](agents/tracker/port.md), (4) `agents/tracker/<backend>.md`, (5) call only named port ops for storage.
+**Load path** (every phase that touches work items): (1) [agents/config.md](agents/config.md), (2) resolve `tracker.backend` (default **markdown**; also accepts **linear**, **sqlite**, and **do-work-io**), (3) [agents/tracker/port.md](agents/tracker/port.md), (4) `agents/tracker/<backend>.md`, (5) call only named port ops for storage.
 
 **Hard-stop (no silent fallback):** when the **active** backend is unusable, agents **hard-stop** with setup instructions — they never fall through to another backend:
 
@@ -122,11 +124,12 @@ Full multi-backend deep dive: [references/tracker.md](references/tracker.md).
 |---------|----------------|
 | **linear** | MCP missing/unauthenticated, team unresolved, missing `status_map` state, or `agents/tracker/linear.md` missing/unreadable |
 | **sqlite** | `sqlite3` missing, `agents/tracker/sqlite.md` missing/unreadable, DB corrupt / bad `user_version` (never markdown fallback) |
+| **do-work-io** | MCP missing/unauthenticated, PAT/base_url/project missing, or `agents/tracker/do-work-io.md` missing/unreadable |
 | **any** | Unknown `tracker.backend` string; skill-root cannot be resolved at entry or Load Config step 8 |
 
-Canonical contract: `agents/tracker/port.md` hard-stop matrix + Load Config steps 6–7b / 8 in `agents/config.md`.
+Canonical contract: `agents/tracker/port.md` hard-stop matrix + Load Config steps 6–7c / 8 in `agents/config.md`.
 
-**No dual-write.** One active backend owns work-item truth (markdown, linear, **or** sqlite). Agents must not mirror URs/REQs across stores, and must not fall back when the active backend fails (hard-stop instead). Switching to sqlite is **greenfield** (empty DB; no history migration in v1). `/do-work board` is **sqlite-only** (static HTML snapshot). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them. **Refuse** `migrate_markdown_to_linear` when already on `sqlite`.
+**No dual-write.** One active backend owns work-item truth (markdown, linear, sqlite, **or** do-work-io). Agents must not mirror URs/REQs across stores, and must not fall back when the active backend fails (hard-stop instead). Switching to sqlite is **greenfield** (empty DB; no history migration in v1). `/do-work board` is **sqlite-only** (static HTML snapshot). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them. **Refuse** `migrate_markdown_to_linear` when already on `sqlite` or `do-work-io`.
 
 **Linear hierarchy:** **UR = Project Milestone** on a **shared product Project** per local product (`tracker.linear.product_project` — name or UUID; **default empty**). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Never invent skill name `do-work` for empty config (example name for this skill repo only). REQs = Issues with that milestone. Not Initiatives (MCP has no Initiative create tools).
 
