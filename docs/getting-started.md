@@ -159,6 +159,24 @@ tracker:
 
 Skip this section if you want the default markdown files. Full multi-tracker map: [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends).
 
+### Optional: do-work.io as work-item store
+
+A **fourth backend** stores URs/REQs only on do-work.io (remote MCP) — still no dual-write, still local git/worktrees. Setup details: [Troubleshooting → do-work.io tracker backend](troubleshooting.md#do-workio-tracker-backend).
+
+Minimal config:
+
+```yaml
+tracker:
+  backend: do-work-io
+  dowork:
+    base_url: ""                 # e.g. https://api.do-work.test
+    token_env: DOWORK_IO_PAT     # env var name — never paste the PAT into chat
+    project: ""                  # project slug
+    mcp_profile: dowork.control
+```
+
+**Before enabling `backend: do-work-io`:** mint a control PAT in the web UI (verified email), export it as `DOWORK_IO_PAT` (or `tracker.dowork.token_env`) in the agent’s environment, set `tracker.dowork.base_url` and `tracker.dowork.project`, and point MCP at `{base_url}/mcp/dowork.control`. Unusable MCP / missing PAT / unknown project → hard-stop; no markdown fallback.
+
 ### 5. Execute with go
 
 Use the UR number from the start report (example `UR-001`):
@@ -219,6 +237,7 @@ After a successful `go`:
 | UR not found | Check `.do-work/user-requests/` for the real `UR-NNN` |
 | REQ stuck in `working/` | `/do-work status` then `/do-work unblock REQ-NNN` or `/do-work resume REQ-NNN` |
 | Linear hard-stop / no MCP | Connect Linear MCP + set `tracker.linear.team_id` (see [troubleshooting](troubleshooting.md#linear-tracker-backend)) |
+| do-work.io hard-stop / no MCP | Export `DOWORK_IO_PAT`, set `tracker.dowork.base_url` + `tracker.dowork.project` (see [troubleshooting](troubleshooting.md#do-workio-tracker-backend)) — do not paste the PAT into chat |
 
 Full table: [Troubleshooting](troubleshooting.md).
 

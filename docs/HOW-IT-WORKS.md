@@ -10,7 +10,7 @@ A walkthrough of the do-work system — every phase, every file it produces, and
 
 do-work is an agent-harness skill that turns a natural-language brief into a sequence of small, traceable, individually-committed tasks — executed autonomously with TDD. It runs on any agent that loads skills from a shared hub.
 
-It is **file-based by default**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no in-memory queue, no central coordinator. Optional backends store the same work items in **Linear** or a local **SQLite** DB only (see [Multi-tracker](#multi-tracker-work-item-backends) below); runtime and git isolation stay local on every backend.
+It is **file-based by default**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no in-memory queue, no central coordinator. Optional backends store the same work items in **Linear**, a local **SQLite** DB, or **do-work.io** (remote MCP) only (see [Multi-tracker](#multi-tracker-work-item-backends) below); runtime and git isolation stay local on every backend.
 
 **Why file-based (default):** The alternative is a stateful tool (a queue, a server, an MCP backend). Files give you four things for free that a stateful tool charges for:
 1. **Auditability** — `git log` *is* the audit log.
@@ -29,23 +29,25 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 | **unset / empty / `markdown`** | Default: local `.do-work/` + `lib/*.sh` |
 | **`linear`** | Linear only (product Project / **UR milestones** / Issues) — **no dual-write** |
 | **`sqlite`** | Local `.do-work/work.db` only via `lib/dw-db.sh` — **no dual-write**; greenfield empty DB on switch |
+| **`do-work-io`** | do-work.io only (remote MCP; slugs `UR-NNN` / `REQ-NNN`; identity `status_map`) — **no dual-write**; web UI is the board |
 
 **Load path** (every phase agent that touches work items):
 
 1. Load config (`agents/config.md`)
 2. Resolve `tracker.backend` (missing/empty → `markdown`)
 3. Read `agents/tracker/port.md` (shared op catalog + rules)
-4. Read `agents/tracker/<backend>.md` (`markdown.md`, `linear.md`, or `sqlite.md`)
-5. Call **only** named port ops for storage — never raw `.do-work/REQ-*` paths, raw Linear tools, or freehand `sqlite3` outside the backend doc / `dw-db.sh`
+4. Read `agents/tracker/<backend>.md` (`markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`)
+5. Call **only** named port ops for storage — never raw `.do-work/REQ-*` paths, raw Linear tools, freehand `sqlite3`, or invented HTTP outside the backend doc / `dw-db.sh`
 
 **What stays local on every backend:** worktrees, feature branches, merges, `state/*` locks, events, `config.yml`, optional local run ledger telemetry.
 
 ### No dual-write and hard-stop
 
-- With `backend: linear` **or** `backend: sqlite`, that store is the sole work-item source of truth. Agents do not keep a parallel markdown UR/REQ store.
+- With `backend: linear`, `backend: sqlite`, or `backend: do-work-io`, that store is the sole work-item source of truth. Agents do not keep a parallel markdown UR/REQ store.
 - If Linear is unusable (MCP missing/unauthenticated, team unresolved, missing `status_map` state) **or** `agents/tracker/linear.md` is missing, agents **hard-stop** with setup instructions. They never silently fall back to markdown.
 - If sqlite is unusable (`sqlite3` missing, corrupt DB / bad `user_version`, missing `agents/tracker/sqlite.md`), agents **hard-stop** the same way — **never** fall back to markdown or Linear.
-- Mid-flight MCP failure after a Linear claim leaves the Issue **claimed**; recover with `/do-work resume` or `/do-work unblock` after MCP recovers — not by inventing local REQ files. Under sqlite, active claims live in `work.db`; same resume/unblock recovery.
+- If do-work.io is unusable (`do-work-io.md` missing, empty/invalid `base_url`, missing PAT in `token_env`, empty project slug, or MCP tools undiscoverable), agents **hard-stop** — **never** fall back to markdown, Linear, or sqlite.
+- Mid-flight MCP failure after a Linear or do-work.io claim leaves the item **claimed**; recover with `/do-work resume` or `/do-work unblock` after MCP recovers — not by inventing local REQ files. Under sqlite, active claims live in `work.db`; same resume/unblock recovery.
 
 ### SQLite hierarchy (when `backend: sqlite`)
 
@@ -63,6 +65,22 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 - **Board:** `/do-work board` is **sqlite-only** — regenerates `tracker.sqlite.board_path` (default `.do-work/board/index.html`) when invoked; not a live server.
 - **Commit / branch:** same as markdown (`feat(REQ-NNN): …`, worktree `req/REQ-NNN`) — ids stay `UR-NNN` / `REQ-NNN` in the DB.
 - **Config keys:** `tracker.sqlite.path`, `board_path`, `busy_timeout_ms` — defaults in `agents/config.md`.
+
+### do-work.io hierarchy (when `tracker.backend: do-work-io`)
+
+```
+do-work.io project (tracker.dowork.project slug)
+├── user_requests (UR-NNN)
+│   └── requirements (REQ-NNN) ± active_claim
+└── artifacts / decisions / run_notes
+```
+
+- **Slugs** at the agent surface: `UR-NNN` / `REQ-NNN`. Identity `status_map` (`backlog` / `in_progress` / `stopped` / `done`) is **REQ-only**; UR closure is `closed_at`.
+- **MCP:** `{tracker.dowork.base_url}/mcp/{tracker.dowork.mcp_profile}` (default profile `dowork.control`) with `Authorization: Bearer ${tracker.dowork.token_env}` (default env `DOWORK_IO_PAT`). Mint the PAT in the web UI; **do not paste it into chat**.
+- **Board:** `/do-work board` is sqlite-only. The do-work.io web dashboard is the live board.
+- **Milestone cursor** (`read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`) is **not served** in v1.1 — treat as not in milestone mode. `write_gate_state` stays local.
+- **Commit / branch:** same as markdown/sqlite (`feat(REQ-NNN): …`, worktree `req/REQ-NNN`).
+- **Config keys:** `tracker.dowork.base_url`, `tracker.dowork.token_env`, `tracker.dowork.project`, `tracker.dowork.mcp_profile` — defaults in `agents/config.md`.
 
 ### Linear hierarchy (when `backend: linear`)
 
@@ -111,7 +129,9 @@ Surfaced under `/do-work upgrade` (and conformance — not a separate forever co
 
 **Refuse under sqlite:** if `tracker.backend` is already `sqlite`, migrate **stops** with `migrate-linear: refused-sqlite-backend` — markdown→Linear does not apply, and there is no sqlite history import or sqlite→Linear path.
 
-**Operator setup:** Linear (MCP + `team_id`) — [troubleshooting.md § Linear tracker backend](troubleshooting.md#linear-tracker-backend). SQLite (`sqlite3` + greenfield switch + board) — [troubleshooting.md § SQLite tracker backend](troubleshooting.md#sqlite-tracker-backend). Config schema: `agents/config.md`. Skill summary: `SKILL.md` § Tracker backends.
+**Refuse under do-work-io:** if `tracker.backend` is already `do-work-io`, migrate **refuses**. Leave `tracker.backend` and remote work items unchanged.
+
+**Operator setup:** Linear (MCP + `team_id`) — [troubleshooting.md § Linear tracker backend](troubleshooting.md#linear-tracker-backend). SQLite (`sqlite3` + greenfield switch + board) — [troubleshooting.md § SQLite tracker backend](troubleshooting.md#sqlite-tracker-backend). do-work.io (PAT env + `base_url` + project slug) — [troubleshooting.md § do-work.io tracker backend](troubleshooting.md#do-workio-tracker-backend). Config schema: `agents/config.md`. Skill summary: `SKILL.md` § Tracker backends.
 
 ---
 
@@ -442,13 +462,13 @@ Defaults are picked from REQ shape (parallel claim ordering, layer enforcement) 
 
 ## Reference
 
-- [getting-started.md](getting-started.md) — install and first run (optional Linear / SQLite pointers)
+- [getting-started.md](getting-started.md) — install and first run (optional Linear / SQLite / do-work.io pointers)
 - [concepts.md](concepts.md) — user-facing mental model
 - [commands.md](commands.md) — command reference
-- [troubleshooting.md](troubleshooting.md) — failure symptoms (including Linear MCP / team_id / sqlite3 / work.db)
+- [troubleshooting.md](troubleshooting.md) — failure symptoms (including Linear MCP / team_id / sqlite3 / work.db / do-work.io PAT)
 - `SKILL.md` — full command reference, tracker backends, migration semantics
 - `agents/tracker/port.md` — shared work-item op catalog
-- `agents/tracker/markdown.md` / `agents/tracker/linear.md` / `agents/tracker/sqlite.md` — backend implementations
+- `agents/tracker/markdown.md` / `agents/tracker/linear.md` / `agents/tracker/sqlite.md` / `agents/tracker/do-work-io.md` — backend implementations
 - `agents/*.md` — per-phase agent instructions
 - `lib/*.sh` — coordination primitives (markdown claim/footprint; `lib/dw-db.sh` for sqlite)
 - `.do-work/state/` — runtime coordination files (gate-owner, lockfiles, milestone tracking)

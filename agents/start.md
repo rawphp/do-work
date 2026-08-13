@@ -30,12 +30,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### Start store — backend branch (ORI-9)
@@ -45,10 +46,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | **linear** | **`create_ur`** → UR Project Milestone; report Linear ids | **`append_ideate`** on that milestone; **`read_ur`** for brief/ideate | **`create_req`** Issues on product Project + UR milestone; **`list_reqs_for_ur`** to list |
 | **markdown** | Local `user-requests/UR-NNN/input.md` | Local `ideate.md` | Local `REQ-*.md` backlog files |
 | **sqlite** | `create_ur` via dw-db | `append_ideate` via dw-db | `create_req` / `list-reqs` via dw-db — **no** live `REQ-*.md` / `user-requests/` |
+| **do-work-io** | **`create_ur`** (`ur.create`) via `agents/tracker/do-work-io.md`; report UR slug | **`append_ideate`** (`ur.append-ideate`); **`read_ur`** (`ur.get`) | **`create_req`** / **`list_reqs_for_ur`** (`req.create` / `req.list`) — **no** live `REQ-*.md` / `user-requests/` |
 
 When backend is **`linear`**, start **must not** require or create `.do-work/user-requests/` as the work-item store. Hard-stop if Linear MCP unusable — never silent markdown fallback.
 
 When backend is **`sqlite` (1S)**, start uses dw-db only (`create_ur` / capture path via port). Hard-stop if sqlite unusable — never silent markdown fallback.
+
+**When effective backend is `do-work-io` (1D):** sole store is do-work.io via `agents/tracker/do-work-io.md` MCP tools. Do **not** dual-write `user-requests/` or `REQ-*.md`. Hard-stop if MCP/PAT/project unusable — never silent markdown fallback.
 
 ### 1. Run Intake
 
@@ -174,3 +178,4 @@ In all cases, never leave partial state without reporting it. If a UR was create
 - Ideate runs by default — use `--no-ideate` to skip it
 - Do not run Verify or Run — that is the Go agent's job
 - **Linear:** no dual-write to `user-requests/`; intake reports Linear ids; hard-stop if MCP unusable
+- **do-work-io:** no dual-write to `user-requests/` or Linear; intake reports UR slug; hard-stop if MCP/PAT/project unusable

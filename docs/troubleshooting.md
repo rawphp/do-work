@@ -427,6 +427,58 @@ Stay on sqlite, or switch backend intentionally (greenfield implications apply).
 
 ---
 
+## do-work.io tracker backend
+
+Optional remote work-item store when `tracker.backend: do-work-io` in `.do-work/config.yml`. Markdown remains the default when the key is unset or `markdown`. Deep dive: [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends). Canonical sequences: `agents/tracker/do-work-io.md`.
+
+### Switch to do-work.io
+
+**Cause:** You want URs/REQs to live only on do-work.io (remote MCP), not in local markdown, Linear, or sqlite.
+
+**Fix — opt in:**
+
+- Set `tracker.backend: do-work-io`
+- Mint a **control** PAT in the web UI (email must be verified)
+- Export `DOWORK_IO_PAT` (or the env name in `tracker.dowork.token_env`) in the agent’s environment — never commit it, and **do not paste the token into chat**
+- Set `tracker.dowork.base_url` (e.g. `https://api.do-work.test`) and `tracker.dowork.project` (slug)
+- Point MCP at `{base_url}/mcp/dowork.control` with `Authorization: Bearer $DOWORK_IO_PAT`
+
+```yaml
+tracker:
+  backend: do-work-io
+  dowork:
+    base_url: ""                 # e.g. https://api.do-work.test (origin, no /mcp path)
+    token_env: DOWORK_IO_PAT     # process env var holding the Sanctum PAT
+    project: ""                  # project slug (identity key)
+    mcp_profile: dowork.control  # dowork.read | dowork.control | dowork.admin
+```
+
+Rules that matter:
+
+- **No dual-write** — with `backend: do-work-io`, do-work.io is the sole work-item store. Do not treat `REQ-*.md` / `user-requests/` or Linear as live truth.
+- **Unusable MCP / missing PAT / unknown project → hard-stop**; no markdown fallback
+- **Stale claims:** read `active_claim.heartbeat_at`; recover with `/do-work resume` or `/do-work unblock`, or let the next `req.claim` take over if stale
+- **`/do-work board`** is sqlite-only — the do-work.io web dashboard is the live board
+- **`/do-work upgrade migrate`** (markdown→Linear) **refuses** when `tracker.backend` is `do-work-io`
+
+### HARD STOP: MCP / PAT / project unusable
+
+**Cause:** `tracker.backend` is `do-work-io` but `agents/tracker/do-work-io.md` is missing, `tracker.dowork.base_url` is empty/invalid, `${tracker.dowork.token_env}` is unset, `tracker.dowork.project` is empty, or MCP tools are undiscoverable / 401. do-work **does not** fall back to markdown, Linear, or sqlite.
+
+**Fix:**
+
+1. Export the Sanctum PAT (do **not** paste the token into chat):
+   ```bash
+   export DOWORK_IO_PAT='…'
+   ```
+   Mint a PAT in the do-work.io web UI (verified email). Profile must include the loop tools (default `tracker.dowork.mcp_profile` = `dowork.control`).
+2. Set `tracker.dowork.base_url`, `tracker.dowork.project` (slug), and optionally `tracker.dowork.token_env` / `tracker.dowork.mcp_profile` in `.do-work/config.yml`.
+3. Point the MCP host at `{base_url}/mcp/{mcp_profile}` with `Authorization: Bearer $<token_env>`. Restart / refresh MCP and verify via `search_tool` `req.claim`.
+
+Then re-run the phase. If a claim was already active when MCP died mid-flight, **leave it** — use `/do-work resume` or `/do-work unblock` after MCP recovers.
+
+---
+
 ## Upgrade and legacy layout
 
 ### Prompt to run `/do-work upgrade`

@@ -60,25 +60,26 @@ Work-item storage goes **only** through named tracker port ops after config is l
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md`.
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. Call **only** named port ops — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
 
-- **No silent fallback** from `linear` to `markdown`.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`.
 - If backend is **`linear`** but `agents/tracker/linear.md` is missing/unreadable → **hard-stop**.
+- If backend is **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### Claim / pick / heartbeat / archive — backend branch
 
-| Concern | Markdown | Linear | sqlite (1S) |
-|---------|----------|--------|-------------|
-| Pick | `list_claimable_reqs` → `lib/pick-req.sh` | `list_claimable_reqs` in linear.md / [linear-ops.md](../references/linear-ops.md) | `bash {skill-root}/lib/dw-db.sh list-claimable/pick {project}` |
-| Claim | `claim_req` → `lib/claim-req.sh` | `claim_req` — workflow + claim comment; never steal assignee | `bash {skill-root}/lib/dw-db.sh claim {project} REQ-NNN AGENT_ID` |
-| Heartbeat | `heartbeat_req` → `lib/heartbeat.sh` | `heartbeat_req` — claim-protocol comment | `bash {skill-root}/lib/dw-db.sh heartbeat {project} REQ-NNN AGENT_ID` |
-| Archive | working/ → archive/ | `archive_req` after evidence + review gates | `bash {skill-root}/lib/dw-db.sh archive-req {project} REQ-NNN` |
-| Run notes | `append_run_note` / ledger | Issue comment authoritative; local ledger optional telemetry | `append-run-note` via dw-db |
-| Commits / branches | `feat(REQ-NNN):` + `req/REQ-NNN` | `feat(ENG-123):` + `req/<sanitized-id>` | `feat(REQ-NNN):` + `req/REQ-NNN` (REQ **slug**) |
+| Concern | Markdown | Linear | sqlite (1S) | do-work-io (1D) |
+|---------|----------|--------|-------------|-----------------|
+| Pick | `list_claimable_reqs` → `lib/pick-req.sh` | `list_claimable_reqs` in linear.md / [linear-ops.md](../references/linear-ops.md) | `bash {skill-root}/lib/dw-db.sh list-claimable/pick {project}` | `req.list-claimable` |
+| Claim | `claim_req` → `lib/claim-req.sh` | `claim_req` — workflow + claim comment; never steal assignee | `bash {skill-root}/lib/dw-db.sh claim {project} REQ-NNN AGENT_ID` | `req.claim` `{project, req, agent_id}` |
+| Heartbeat | `heartbeat_req` → `lib/heartbeat.sh` | `heartbeat_req` — claim-protocol comment | `bash {skill-root}/lib/dw-db.sh heartbeat {project} REQ-NNN AGENT_ID` | `req.heartbeat` |
+| Archive | working/ → archive/ | `archive_req` after evidence + review gates | `bash {skill-root}/lib/dw-db.sh archive-req {project} REQ-NNN` | `req.archive` after evidence + review |
+| Run notes | `append_run_note` / ledger | Issue comment authoritative; local ledger optional telemetry | `append-run-note` via dw-db | `req.append-run-note` |
+| Commits / branches | `feat(REQ-NNN):` + `req/REQ-NNN` | `feat(ENG-123):` + `req/<sanitized-id>` | `feat(REQ-NNN):` + `req/REQ-NNN` (REQ **slug**) | `feat(REQ-NNN):` + `req/REQ-NNN` |
 
 **When `linear`:** do not call pick/claim/heartbeat bash as the store; leave claimed on mid-flight MCP death; no silent-release; no markdown fallback. Full table and Linear steps: [run-loop.md](../references/run-loop.md) (Tracker load path section retained in agent above is authoritative for hard rules).
 
@@ -91,6 +92,15 @@ Work-item storage goes **only** through named tracker port ops after config is l
 - Do **not** mkdir `user-requests/`, write `REQ-*.md`, or use `working/` as the claim store
 - Mid-flight dw-db failure: leave claim active; operator uses resume/unblock after recovery
 - Hard-stop if sqlite/dw-db unusable — never silent markdown fallback
+
+### When backend is do-work-io (1D)
+
+- Pick / claim / heartbeat / archive / set-status only via `agents/tracker/do-work-io.md` MCP tools
+- Worker receives REQ **slug**, not a filesystem path
+- Stale triage from `active_claim.heartbeat_at` (no `scan-stale` tool)
+- Mid-flight MCP failure: leave claimed; resume/unblock after recovery
+- Hard-stop if MCP/PAT/project unusable — never silent markdown fallback
+- Milestone deploy-gate (`read_active_milestone` etc.) is **not served** — skip Step 7b milestone cursor; local `write_gate_state` still allowed
 
 ---
 
@@ -186,7 +196,7 @@ Full enum handling + feedback path: [run-loop.md](../references/run-loop.md) § 
 - Verification failures are feedback — fix and re-verify; after 3 failed attempts on the same REQ, stop and ask the user.
 - If `runtime` or `ui` steps need a server, start it and confirm health first.
 - The loop runs until the backlog is empty or a stopper is hit.
-- Tracker hard rules: no linear→markdown silent fallback; leave Linear claims on mid-flight MCP death.
+- Tracker hard rules: no linear/sqlite/do-work-io→markdown silent fallback; leave Linear / do-work.io claims on mid-flight MCP death.
 
 ---
 
@@ -196,3 +206,4 @@ Full enum handling + feedback path: [run-loop.md](../references/run-loop.md) § 
 - [references/run-parallel.md](../references/run-parallel.md) — Parallel window + empty-backlog drain / final suite
 - [agents/run-worker.md](run-worker.md) — Worker contract
 - [agents/tracker/linear.md](tracker/linear.md) — Linear backend index (when `tracker.backend: linear`)
+- [agents/tracker/do-work-io.md](tracker/do-work-io.md) — do-work.io backend index (when `tracker.backend: do-work-io`)

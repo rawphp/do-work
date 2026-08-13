@@ -27,13 +27,14 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` or `sqlite` to `markdown`. If backend is `linear` or `sqlite`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`sqlite`** but `agents/tracker/sqlite.md` is missing / `sqlite3` unusable / `dw-db` fails → **hard-stop**. Never fall through to markdown paths or glob `working/REQ`.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown paths, Linear, or sqlite, or glob `working/REQ`.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 **Branch the render path on effective backend** (after load path):
@@ -43,10 +44,11 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | **`markdown`** (default) | Steps **1–2** below (`{skill-root}/lib/synth-status.sh`, `derive-status`, `coverage-rollup`, `deadlock-check`) |
 | **`linear`** | Step **1L** — Linear claimers / heartbeats via port ops in `agents/tracker/linear.md` (**Status reporting**). Do **not** glob `.do-work/working/` or treat local REQ files as the live store. |
 | **`sqlite`** | Step **1S** — `bash {skill-root}/lib/dw-db.sh status-synth {project} [UR-NNN]`; stale via `dw-db scan-stale`; **never** glob `working/` or `REQ-*.md` as the live store. |
+| **`do-work-io`** | Step **1D** — `ur.list` + `req.list` per UR via `agents/tracker/do-work-io.md`; stale = `active_claim.heartbeat_at` older than `parallel.stale_threshold_seconds`. **Never** glob `working/` or call `synth-status.sh`. |
 
 ### 1. Render situation (markdown backend)
 
-*Skip this step when effective backend is `linear` (use **1L**) or `sqlite` (use **1S**).*
+*Skip this step when effective backend is `linear` (use **1L**), `sqlite` (use **1S**), or `do-work-io` (use **1D**).*
 
 Run:
 
@@ -122,9 +124,21 @@ If non-empty, prepend a clear `STALE CLAIMS` / deadlock-style warning (parity wi
 
 If `status-synth` fails → hard-stop with stderr. Stop after printing (skip markdown Steps 1–2).
 
+### 1D. Render situation (do-work-io backend)
+
+*Only when effective `tracker.backend` is `do-work-io`. Hard-stop if MCP/PAT/project unusable — never fall back to markdown globs.*
+
+1. `project.ensure` / `project.get` for `tracker.dowork.project` (slug).
+2. `ur.list` then `req.list` per UR (optional UR scope).
+3. Table: slug, title, status, `active_claim.agent_id`, `heartbeat_at`, fresh/stale vs `parallel.stale_threshold_seconds`.
+4. Proven: `status=done` + non-empty `closure_proof`. Closed: `closed_at` set.
+5. Do not run `synth-status.sh` / glob `REQ-*.md`.
+
+Stop after printing (skip markdown Steps 1–2).
+
 ### 2. Check for deadlock (markdown backend)
 
-*Skip when backend is `linear` (stale claims already surfaced in **1L**) or `sqlite` (use **1S** + `scan-stale`). Optional: still run for local gate/runtime diagnostics only; do not treat empty `working/` as “idle” under Linear/sqlite.*
+*Skip when backend is `linear` (stale claims already surfaced in **1L**), `sqlite` (use **1S** + `scan-stale`), or `do-work-io` (use **1D**). Optional: still run for local gate/runtime diagnostics only; do not treat empty `working/` as “idle” under Linear/sqlite/do-work-io.*
 
 Run:
 
@@ -151,8 +165,9 @@ No prompts, no commits, no state changes.
 
 ## Rules
 
-- Read-only. Never write any file under `{project}/.do-work/` or the source tree (and never write Linear issues / sqlite claim rows while rendering status).
+- Read-only. Never write any file under `{project}/.do-work/` or the source tree (and never write Linear issues / sqlite claim rows / do-work.io mutations while rendering status).
 - No git commits, no AskUserQuestion prompts.
 - **Markdown:** If `$SKILL_ROOT/lib/synth-status.sh` or `$SKILL_ROOT/lib/deadlock-check.sh` are missing, report the missing script and stop (synth-status missing) or continue without the check (deadlock-check missing). The deadlock banner always renders above the synth-status output when present.
 - **Linear:** Use only `agents/tracker/linear.md` status / claim-comment sequences; hard-stop if Linear MCP is unusable; no silent markdown situation room.
 - **sqlite:** Use only `dw-db status-synth` (+ optional `scan-stale`); hard-stop if dw-db/sqlite unusable; never treat `working/REQ` or `user-requests/` as the live store.
+- **do-work-io:** Use only `ur.list` / `req.list` (and related port ops) in `agents/tracker/do-work-io.md`; hard-stop if MCP/PAT/project unusable; never treat `working/REQ` or `user-requests/` as the live store.

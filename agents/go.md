@@ -31,12 +31,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### When backend is sqlite (1S)
@@ -46,12 +47,27 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - Board snapshot (when available): `/do-work board` regenerates `.do-work/board/` from `work.db` only
 - Hard-stop if dw-db fails
 
+### When backend is do-work-io (1D)
+
+**When effective backend is `do-work-io` (1D):** sole store is do-work.io via `agents/tracker/do-work-io.md` MCP tools. Do **not** dual-write `user-requests/` or `REQ-*.md`. Hard-stop if MCP unusable.
+
+- Resolve UR / REQs via `read_ur` / `list_reqs_for_ur` (`ur.get` / `req.list`)
+- Do not require `user-requests/UR-NNN/input.md` or glob live `REQ-*.md` as the store
+- Milestone deploy-gate cursor is **not served** — skip remote `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`; local `write_gate_state` still allowed
+- Hard-stop if MCP/PAT/project unusable — never silent markdown fallback
 
 ### 0b. Validate UR exists
 
-Before delegating to any sub-agent, confirm the UR directory exists:
-- Check if `{project}/.do-work/user-requests/UR-NNN/input.md` exists
-- If it does not exist, report: "UR-NNN not found at {project}/.do-work/user-requests/UR-NNN/. Check the UR number and try again." and stop.
+Before delegating to any sub-agent, confirm the UR exists on the **active backend**:
+
+| Backend | How to confirm |
+|---------|----------------|
+| **markdown** | `{project}/.do-work/user-requests/UR-NNN/input.md` exists |
+| **sqlite** | `get-ur` via dw-db |
+| **linear** | `read_ur` |
+| **do-work-io** | `read_ur` (`ur.get`) — **never** require local `user-requests/` |
+
+If it does not exist, report: "UR-NNN not found" (name the backend; markdown may include the `user-requests/` path) and stop. Never probe markdown paths when backend is not markdown.
 
 ### 0c. Ensure integration base
 

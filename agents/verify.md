@@ -27,12 +27,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### When backend is sqlite (1S)
@@ -41,6 +42,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 - Keep `lib/score-coverage.sh` shared (do not reimplement)
 - Hard-stop if dw-db fails; never write local verify under `user-requests/` as the store
 
+### When backend is do-work-io (1D)
+
+**When effective backend is `do-work-io` (1D):** sole store is do-work.io via `agents/tracker/do-work-io.md` MCP tools. Do **not** dual-write `user-requests/` or `REQ-*.md`. Hard-stop if MCP unusable.
+
+- List/read REQs via `read_ur` / `list_reqs_for_ur` (`ur.get` / `req.list`); persist verify report with **`write_verify_report`** (`ur.write-verify-report`)
+- Keep `lib/score-coverage.sh` shared (do not reimplement)
+- Hard-stop if MCP/PAT/project unusable; never write local verify under `user-requests/` as the store
 
 ### Verify report home — backend branch (REQ-296 / REQ-297)
 
@@ -48,8 +56,9 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 |---------|-------------------------------|
 | **markdown** | Console-primary (Step 5c). No fixed durable path required (`markdown.md` `write_verify_report`). |
 | **linear** | Port op **`write_verify_report`** — Initiative description **`## Verify`** + Initiative comment with the full report (`agents/tracker/linear.md`). Fixed home; do not invent alternate sections or local files as the store. Description size spill → section pointer + Initiative comment only (§10). If description **and** Initiative comment both fail → hard-stop; never invent Issue comments or alternate Docs. |
+| **do-work-io** | Port op **`write_verify_report`** (`ur.write-verify-report` in `agents/tracker/do-work-io.md`). Do not invent a local `user-requests/` path as the store. If MCP fails → hard-stop. |
 
-After producing the report in Step 5c, when backend is **linear**, call **`write_verify_report`** with the full report body for this UR. Still print the report to the console for the operator. Scoring arithmetic remains `lib/score-coverage.sh` (local).
+After producing the report in Step 5c, when backend is **linear** or **do-work-io**, call **`write_verify_report`** with the full report body for this UR. Still print the report to the console for the operator. Scoring arithmetic remains `lib/score-coverage.sh` (local).
 
 ### 1. Read the brief
 
@@ -60,6 +69,7 @@ After producing the report in Step 5c, when backend is **linear**, call **`write
 | **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present. Backlog REQs from `.do-work/` as today. |
 | **sqlite** | **1S:** `get-ur` + `list-reqs --ur UR-NNN` via dw-db; write report with `write-verify`. Coverage arithmetic still uses shared `lib/score-coverage.sh`. **No** live `REQ-*.md` / `user-requests/` store. |
 | **linear** | **`read_ur`** for brief (Initiative `## Brief` + sections). **`list_reqs_for_ur`** for Issues in Project `do-work/{UR-id}`. Optional local assets only if the operator keeps them on disk — not a dual work-item store. |
+| **do-work-io** | **1D:** **`read_ur`** (`ur.get`) + **`list_reqs_for_ur`** (`req.list`) via `agents/tracker/do-work-io.md`; write report with **`write_verify_report`**. Coverage arithmetic still uses shared `lib/score-coverage.sh`. **No** live `REQ-*.md` / `user-requests/` store. |
 
 **Markdown path (default):** Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present.
 
@@ -329,7 +339,7 @@ Recommendation: [Approved — run the loop / Fix gaps first — re-run capture /
 
 The Confidence Score is whatever `lib/score-coverage.sh` printed in Step 5b. Do not recompute it — see the composition formula documented there.
 
-**Persist (Linear only):** when effective `tracker.backend` is `linear`, call port op **`write_verify_report`** (`agents/tracker/linear.md`) with this full report for `UR-NNN` — Initiative `## Verify` + Initiative comment. Do not invent another home. When backend is `markdown`, leave console-only unless the operator asks to save.
+**Persist (Linear / do-work-io):** when effective `tracker.backend` is `linear`, call port op **`write_verify_report`** (`agents/tracker/linear.md`) with this full report for `UR-NNN` — Initiative `## Verify` + Initiative comment. When backend is **`do-work-io`**, call **`write_verify_report`** (`agents/tracker/do-work-io.md` → `ur.write-verify-report`). Do not invent another home. When backend is `markdown`, leave console-only unless the operator asks to save.
 
 **Then, immediately after the report**, check whether to present next-step options:
 

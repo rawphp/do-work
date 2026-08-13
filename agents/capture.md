@@ -23,6 +23,7 @@ You will be given a UR reference:
 |---------|------------|
 | **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/` |
 | **linear** | UR slug (e.g. `UR-001`) and/or UR Project Milestone id — **no** local folder required |
+| **do-work-io** | UR slug (e.g. `UR-001`) — **no** local folder required |
 
 ---
 
@@ -38,41 +39,46 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### Capture REQ store — backend branch (ORI-9)
 
-| Concern | Markdown | Linear | sqlite (1S) |
-|---------|----------|--------|-------------|
-| Brief / ideate / clarifications | `input.md`, optional `ideate.md` | **`read_ur`** (UR Project Milestone §9.1: Brief, Ideate, Clarifications) | **`get-ur`** + artifact kinds via dw-db |
-| Create REQs | Write `{project}/.do-work/REQ-NNN-*.md` | Port op **`create_req`** only — Issues on **product Project** + **UR milestone**; Linear issue ids only (e.g. `ENG-123`). **No** local `REQ-*.md` as store. | `bash {skill-root}/lib/dw-db.sh create-req {project} --ur UR-NNN …` — **No** local `REQ-*.md` |
-| List REQs for this UR | Glob backlog/working/archive | Port op **`list_reqs_for_ur`** (product Project + UR milestone filter) — same op verify uses later | `dw-db list-reqs --ur UR-NNN` |
-| Capture summary / status | `input.md` body + frontmatter | Update UR milestone description sections/status fields (never overwrite `## Brief` verbatim intake); no local `input.md` dual-write | `write-capture-summary` via dw-db; never dual-write `input.md` |
-| Hard-stop | n/a | MCP / create-issue tools missing → hard-stop; never write local backlog REQs as substitute | dw-db/sqlite unusable → hard-stop; never write local backlog REQs |
+| Concern | Markdown | Linear | sqlite (1S) | do-work-io (1D) |
+|---------|----------|--------|-------------|-----------------|
+| Brief / ideate / clarifications | `input.md`, optional `ideate.md` | **`read_ur`** (UR Project Milestone §9.1: Brief, Ideate, Clarifications) | **`get-ur`** + artifact kinds via dw-db | **`read_ur`** (`ur.get`) via `agents/tracker/do-work-io.md` |
+| Create REQs | Write `{project}/.do-work/REQ-NNN-*.md` | Port op **`create_req`** only — Issues on **product Project** + **UR milestone**; Linear issue ids only (e.g. `ENG-123`). **No** local `REQ-*.md` as store. | `bash {skill-root}/lib/dw-db.sh create-req {project} --ur UR-NNN …` — **No** local `REQ-*.md` | Port op **`create_req`** (`req.create`) — slugs `REQ-NNN`. **No** local `REQ-*.md` as store |
+| List REQs for this UR | Glob backlog/working/archive | Port op **`list_reqs_for_ur`** (product Project + UR milestone filter) — same op verify uses later | `dw-db list-reqs --ur UR-NNN` | Port op **`list_reqs_for_ur`** (`req.list`) |
+| Capture summary / status | `input.md` body + frontmatter | Update UR milestone description sections/status fields (never overwrite `## Brief` verbatim intake); no local `input.md` dual-write | `write-capture-summary` via dw-db; never dual-write `input.md` | Artifact / UR update via `do-work-io.md` only; never dual-write `input.md` |
+| Hard-stop | n/a | MCP / create-issue tools missing → hard-stop; never write local backlog REQs as substitute | dw-db/sqlite unusable → hard-stop; never write local backlog REQs | MCP/PAT/project unusable → hard-stop; never write local backlog REQs |
 
 **When effective backend is `linear`:** use **`create_req`** exclusively for REQ persistence; after create, optionally **`list_reqs_for_ur`** to verify Issues landed. Do **not** dual-write under `.do-work/REQ-*` or `user-requests/`.
 
 **When effective backend is `sqlite` (1S):** create/update/list via dw-db only; evidence under `.do-work/evidence/UR-NNN/`; no live `REQ-*.md` / `user-requests/` store.
 
+**When effective backend is `do-work-io` (1D):** sole store is do-work.io via `agents/tracker/do-work-io.md` MCP tools. Do **not** dual-write `user-requests/` or `REQ-*.md`. Hard-stop if MCP unusable.
+
 ### Decisions / calibration — backend branch (REQ-296 / REQ-297)
 
 Standing decisions and capture calibration are **work-item memory**, not runtime locks. Homes are fixed by design §10 / the active backend file — never invent alternate paths or Doc titles.
 
-| Concern | Markdown (`markdown.md`) | Linear (`linear.md`) | sqlite (1S) |
-|---------|--------------------------|----------------------|-------------|
-| Read decisions | `{project}/.do-work/decisions.md` if present | **Read decisions** helper — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty | decisions table via dw-db / port (not local `decisions.md` as store) |
-| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing). Same grammar: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale` | `bash {skill-root}/lib/dw-db.sh append-decision {project} "…"` |
-| Read calibration | `{project}/.do-work/state/calibration.md` if present | **Read calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`); missing → continue without | `dw-db read-calibration` — not `state/calibration.md` as store |
+| Concern | Markdown (`markdown.md`) | Linear (`linear.md`) | sqlite (1S) | do-work-io (1D) |
+|---------|--------------------------|----------------------|-------------|-----------------|
+| Read decisions | `{project}/.do-work/decisions.md` if present | **Read decisions** helper — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty | decisions table via dw-db / port (not local `decisions.md` as store) | Port ops in `do-work-io.md` (`decision.append` / list) — not local `decisions.md` as store |
+| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing). Same grammar: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale` | `bash {skill-root}/lib/dw-db.sh append-decision {project} "…"` | Port op **`append_decision`** (`decision.append`) |
+| Read calibration | `{project}/.do-work/state/calibration.md` if present | **Read calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`); missing → continue without | `dw-db read-calibration` — not `state/calibration.md` as store | Continue without a remote calibration Doc (not a do-work.io work-item op) |
 
 **When effective backend is `linear`:** do **not** read or write local `.do-work/decisions.md` or `state/calibration.md` as the store. Use the sequences in `agents/tracker/linear.md` only. **When `markdown`:** keep the file paths in the steps below.
 
 **When effective backend is `sqlite`:** do **not** use local `decisions.md` / `state/calibration.md` as the store — use dw-db only.
+
+**When effective backend is `do-work-io`:** do **not** use local `decisions.md` / `state/calibration.md` as the store — use `do-work-io.md` port ops only.
 
 **Hard-stop (Linear writes):** if `append_decision` Doc create/update fails (permission, size, MCP), hard-stop — do **not** invent Issue comments, alternate Doc titles, or a local `decisions.md` dual-write.
 
@@ -85,6 +91,7 @@ Standing decisions and capture calibration are **work-item memory**, not runtime
 | **markdown** | Read `UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if it exists. Read `UR-NNN/ideate.md` if it exists. |
 | **linear** | Call **`read_ur`** for `UR-NNN`. Use `## Brief` (+ `## Clarifications` if present) as the brief. Use `## Ideate` if present as advisory ideate observations. Optional local assets only if the operator keeps them on disk — not a dual store. **Do not** require `user-requests/UR-NNN/input.md` or local `ideate.md`. |
 | **sqlite** | `get-ur` + artifact bodies via dw-db (`agents/tracker/sqlite.md`). **Do not** require `user-requests/` paths as the store. |
+| **do-work-io** | Call **`read_ur`** (`ur.get`) via `agents/tracker/do-work-io.md`. **Do not** require `user-requests/` paths as the store. |
 
 Keep ideate observations in context as advisory input for decomposition — they inform your work but are not requirements to blindly follow. If ideate is absent (e.g. `--no-ideate` or standalone capture), continue without it.
 
@@ -145,6 +152,10 @@ When in milestone mode:
 - On each Issue: set body `**Milestone:** M<n>` and, when labels exist, label `M<n>` (see linear.md Issue milestone markers). Prefer Project milestone entity when MCP supports it.
 - After writing REQs for this milestone, call **`set_active_milestone`** with `active: M<n>` and checklist status `captured` for that M (full checklist from the brief on first write). Do **not** write local `state/active-milestone.md` / `milestones.md` as the work-item store.
 - Deploy-gate ownership remains local (`write_gate_state` / `gate-owner.md` — local-only even when cursor is remote) — capture does not claim the gate.
+
+#### do-work-io backend (1D)
+
+Milestone cursor ops (`read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`) are **refused** (v1.1). Treat as **not in milestone mode**. Do **not** invent a local `active-milestone.md` cursor and do **not** call any milestone capability. `write_gate_state` stays local.
 
 ### 2. Determine the next REQ number
 
@@ -224,6 +235,7 @@ YYYY-MM-DD | UR-NNN | layer-coverage checks skipped for this UR | --no-layers op
 
 - **Markdown:** append to `{project}/.do-work/decisions.md` (create if absent).
 - **Linear:** call port op **`append_decision`** (`agents/tracker/linear.md`) — Team Doc create-if-missing; do not also write local `decisions.md`.
+- **do-work-io:** call port op **`append_decision`** (`agents/tracker/do-work-io.md` → `decision.append`); do not also write local `decisions.md`.
 
 This is a judgment-point choice that shapes the whole decomposition. Append-only; do not write this line when layers are in scope normally.
 
@@ -335,6 +347,7 @@ If you discover a requirement that was missed, add a REQ for it before proceedin
 |---------|------------------------|
 | **markdown** | Write a file to the backlog root: `{project}/.do-work/REQ-NNN-short-slug.md` |
 | **linear** | Call port op **`create_req`** (`agents/tracker/linear.md`) for each planned task — Issue on **product Project**, **milestone** = parent UR Project Milestone, body §9.2, labels as available. Resulting id is the **Linear issue id only** (e.g. `ENG-123`). Path-unit parents first, then children with `parentId`. **Do not** write local `.do-work/REQ-*.md` as the store. After all creates (or on verify), **`list_reqs_for_ur`** may be used to confirm Issues for this UR. |
+| **do-work-io** | Call port op **`create_req`** (`agents/tracker/do-work-io.md` → `req.create`) for each planned task. Resulting id is the **REQ slug** (`REQ-NNN`). Path-unit parents first, then children. **Do not** write local `.do-work/REQ-*.md` as the store. After all creates, **`list_reqs_for_ur`** (`req.list`) may confirm REQs for this UR. |
 
 Decomposition content (Task / Context / AC / Verification / Integration fields) is the same for both backends; only the store differs. Under Linear, `**UR:**` / `**Parent:**` / `**Depends on:**` use Linear issue ids and the UR slug; never invent parallel `REQ-NNN` allocation.
 
@@ -616,6 +629,7 @@ After all REQ files are written (Steps 4, 4b, 4c, 4d complete), validate that th
 |---------|---------|
 | `markdown` / `linear` | `bash {skill-root}/lib/cycle-check.sh UR-NNN` |
 | `sqlite` | `bash {skill-root}/lib/dw-db.sh cycle-check {project} UR-NNN` |
+| `do-work-io` | Server `req.set-blocked-by` rejects cycles. Read-side: `req.list` + each REQ’s `depends_on` slugs; DFS in working memory. **Do not** run markdown `cycle-check.sh` (vacuous — no `REQ-*.md`). |
 
 Replace `UR-NNN` with the actual UR identifier and `{project}` with the project root. The markdown script scans all REQs matching that UR across backlog, working, and archive (`.do-work/REQ-*.md`), builds the dep graph, and runs DFS cycle detection. The sqlite command (`dw-db cycle-check`, REQ-017) reads the `deps` table directly — **under sqlite the markdown script globs `.do-work/REQ-*.md` and finds nothing, exiting 0 vacuously**, so the `dw-db` form is required for the gate to actually fire.
 
@@ -872,6 +886,8 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 - **Markdown:** never modify the original brief text in `input.md` (summary/frontmatter updates are the capture exceptions above); never create REQ files in `working/` or `archive/` — backlog root only
 - **Linear:** create REQs only via **`create_req`**; list via **`list_reqs_for_ur`**; no dual-write to `.do-work/REQ-*` or `user-requests/`
+- **do-work-io:** create REQs only via **`create_req`** (`req.create`); list via **`list_reqs_for_ur`** (`req.list`); no dual-write to `.do-work/REQ-*`, `user-requests/`, or Linear
 - Do not skip tasks that seem small — they are all traceable commitments
 - Slugs: lowercase, kebab-case, max 5 words, derived from the task title (markdown filenames; Linear titles remain short/actionable)
 - Hard-stop if backend is `linear` and Linear MCP is unusable — never silent markdown fallback
+- Hard-stop if backend is `do-work-io` and MCP/PAT/project is unusable — never silent markdown fallback
