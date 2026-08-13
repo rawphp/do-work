@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**MCP wire names (Grok-safe; `.` → `_`)**
+
+**Changed**
+- do-work.io MCP `tools/list` / `tools/call` names are the capability id with `.` replaced by `_` (`project.ensure` → `project_ensure`, `req.claim` → `req_claim`, `ur_append-ideate`, …). HTTP `POST /capabilities/{dotted-id}` is unchanged. **Consumer impact:** refresh the MCP session and rediscover tools; dotted `tools/call` names fail. Search `project_ensure` / `req_claim` first (skill tracker already does; dotted id is fallback search only).
+- `agents/tracker/do-work-io.md`: rediscover the published underscore wire name first, then the dotted capability id; always `use_tool` the **observed** name.
+
 **Operator status / help UX (scannable situation room)**
 
 **Changed**
