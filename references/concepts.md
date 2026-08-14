@@ -4,20 +4,20 @@ On-demand detail for naming, milestones, parallel execution, layers, path-units,
 
 ## File Naming
 
-- User requests: `UR-001`, `UR-002`, ... (zero-padded to 3 digits)
+- Issues (product noun): agent slug `UR-001`, `UR-002`, ... (zero-padded to 3 digits). Wire/param remain `ur` / `ur.*` on do-work-io — not `ISSUE-NNN` / `issue.*`.
 - Feature requests: `REQ-001-short-slug.md`, `REQ-002-short-slug.md`, ...
 - Slugs are lowercase kebab-case, max 5 words
 
 ## Milestone Mode
 
-When a UR file contains both:
+When an Issue (`UR-NNN`) contains both:
 
 1. The marker `source: /saas-thesis handoff` (in frontmatter or body)
 2. A `### Milestones` heading with `#### M1` (or higher) subheadings
 
 `/do-work` enters **milestone mode**. The differences from normal flow:
 
-- Capture decomposes ONE milestone at a time, not the whole UR.
+- Capture decomposes ONE milestone at a time, not the whole Issue.
 - REQ files are prefixed: `REQ-M1-001-<slug>.md`, `REQ-M2-001-<slug>.md`.
 - Run loop halts at the end of each milestone's REQs and prompts for the deploy gate.
 - Deploy-gate sign-off is non-delegable human confirmation.
@@ -25,7 +25,7 @@ When a UR file contains both:
   - `active-milestone.md` — single line, current milestone identifier (e.g. `M1`).
   - `milestones.md` — checklist of all milestones with status: `pending` / `captured` / `running` / `deployed`.
 
-Milestone mode is **implicit** — triggered by UR shape, not a flag. URs that do not match the trigger continue to behave as before. The `/saas-thesis` skill produces UR files with the correct shape for handoff.
+Milestone mode is **implicit** — triggered by Issue shape, not a flag. Issues that do not match the trigger continue to behave as before. The `/saas-thesis` skill produces Issue briefs with the correct shape for handoff.
 
 ## Parallel Execution
 

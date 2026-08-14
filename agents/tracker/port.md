@@ -68,7 +68,7 @@ From the storage inventory: **work-item** data is what the active tracker backen
 
 | Domain | Examples (ops) |
 |--------|----------------|
-| UR lifecycle | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications` |
+| Issue lifecycle (slug `UR-NNN`; ops still `*_ur`) | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications` |
 | REQ lifecycle | `create_req`, `update_req`, `read_req`, `list_reqs_for_ur`, `set_req_status`, `archive_req` |
 | Claim / pick | `list_claimable_reqs`, `claim_req`, `heartbeat_req`, `unblock_req` |
 | Deps / footprint fields | `set_blocked_by`, `set_files` |
@@ -76,7 +76,7 @@ From the storage inventory: **work-item** data is what the active tracker backen
 | Milestone cursor content | `read_active_milestone`, `set_active_milestone`, `list_milestone_reqs` |
 | Product container | `ensure_product_container` |
 
-In Linear mode these live only in Linear (Initiatives, Projects, Issues, Docs, comments) — **no dual-write** to UR/REQ markdown as source of truth.
+In Linear mode these live only in Linear (Initiatives, Projects, Linear Issues for REQs, Docs, comments) — **no dual-write** to Issue/REQ markdown as source of truth. Product noun **Issue** (do-work) ≠ Linear Issue (REQ).
 
 ### Stay local (not port work-item storage)
 
@@ -273,29 +273,29 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 |---|---|
 | **Intent** | Ensure the product/team container for work items is ready. **Markdown:** local `.do-work/` dirs. **Linear:** team resolvable; **create or bind** the shared product Project when missing (`product_project` resolve chain + list/create + **persist UUID**); optional labels ready. |
 | **Preconditions** | Config loaded; backend resolved. For Linear: team resolvable or hard-stop. |
-| **Notes** | Idempotent. Does not create a UR or REQ. Linear never falls through to skill name `do-work` for empty `product_project`. Multi-match by name and empty-name failures hard-stop (no markdown substitute store). |
+| **Notes** | Idempotent. Does not create an Issue or REQ. Linear never falls through to skill name `do-work` for empty `product_project`. Multi-match by name and empty-name failures hard-stop (no markdown substitute store). |
 
 #### `create_ur`
 
 | | |
 |---|---|
-| **Intent** | Record a new intake brief as a UR. |
-| **Preconditions** | `ensure_product_container` satisfied; next UR slug allocatable; backend store writable. |
-| **Notes** | Allocates sequential `UR-NNN` slug (machine-stable). Does not create REQs. |
+| **Intent** | Record a new intake brief as an **Issue** (product noun; wire/slug still `UR-NNN` / `ur.*`). |
+| **Preconditions** | `ensure_product_container` satisfied; next Issue slug (`UR-NNN`) allocatable; backend store writable. |
+| **Notes** | Allocates sequential `UR-NNN` slug (machine-stable). Does not create REQs. Op name stays `create_ur` — not `create_issue`. |
 
 #### `read_ur`
 
 | | |
 |---|---|
-| **Intent** | Load the UR brief and attached sections (ideate, clarifications, etc. if present). |
-| **Preconditions** | UR id known and exists. |
+| **Intent** | Load the Issue brief and attached sections (ideate, clarifications, etc. if present). |
+| **Preconditions** | Issue id (`UR-NNN`) known and exists. |
 | **Notes** | Read-only. |
 
 #### `list_urs`
 
 | | |
 |---|---|
-| **Intent** | Enumerate URs for prompts, status, and migration. |
+| **Intent** | Enumerate Issues for prompts, status, and migration. |
 | **Preconditions** | Product container ready. |
 | **Notes** | May return ids + titles only; use `read_ur` for full body. |
 
@@ -303,24 +303,24 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 
 | | |
 |---|---|
-| **Intent** | Append or write ideate content onto an existing UR. |
-| **Preconditions** | UR exists; ideate phase allowed for that UR. |
+| **Intent** | Append or write ideate content onto an existing Issue. |
+| **Preconditions** | Issue exists; ideate phase allowed for that Issue. |
 | **Notes** | Prefer append over overwrite of intake brief. |
 
 #### `append_clarifications`
 
 | | |
 |---|---|
-| **Intent** | Append question-phase Q&A onto the UR. |
-| **Preconditions** | UR exists. |
+| **Intent** | Append question-phase Q&A onto the Issue. |
+| **Preconditions** | Issue exists. |
 | **Notes** | Does not create REQs. |
 
 #### `create_req`
 
 | | |
 |---|---|
-| **Intent** | Create one REQ in the backlog for a UR (optionally under a path-unit parent). |
-| **Preconditions** | UR exists; capture/schema fields available; backend writable. |
+| **Intent** | Create one REQ in the backlog for an Issue (optionally under a path-unit parent). |
+| **Preconditions** | Issue exists; capture/schema fields available; backend writable. |
 | **Notes** | Starts unclaimed, backlog-equivalent status. Footprint/deps may be set at create or via `set_files` / `set_blocked_by`. |
 
 #### `update_req`
@@ -423,17 +423,17 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 
 | | |
 |---|---|
-| **Intent** | Persist verify-phase output for a UR. |
-| **Preconditions** | UR exists; verify phase has produced a report. |
-| **Notes** | Backend chooses home (UR tree vs Initiative section/comment). |
+| **Intent** | Persist verify-phase output for an Issue. |
+| **Preconditions** | Issue exists; verify phase has produced a report. |
+| **Notes** | Backend chooses home (Issue tree vs Initiative section/comment). |
 
 #### `write_close_report`
 
 | | |
 |---|---|
-| **Intent** | Persist close-phase output for a UR. |
-| **Preconditions** | UR exists; close phase has produced a report. |
-| **Notes** | Backend chooses home (UR tree vs Initiative section/comment). |
+| **Intent** | Persist close-phase output for an Issue. |
+| **Preconditions** | Issue exists; close phase has produced a report. |
+| **Notes** | Backend chooses home (Issue tree vs Initiative section/comment). |
 
 #### `append_run_note`
 

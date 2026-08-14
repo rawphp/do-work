@@ -181,3 +181,31 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 |---------|--------------|----------------|
 | Playwright `screenshot <url>` of a Vite SPA is a blank dark page; every route PNG is the same tiny size | The CLI captures the empty `#app` shell before Vue mounts | Use `--wait-for-selector` on a real heading/testid and `--wait-for-timeout`. Re-vision the PNG. If it is still blank, verdict is `not-reached`, not `closed` |
 
+
+## 26. Close subagent must have Shell (or suite output)
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Close cannot live-walk and cannot honestly emit `degraded:evidence-by-test` | Close was dispatched as a file-only subagent (no Shell / no Playwright) | Parent must grant **Shell** so close can run the covering suite (and a browser for web walks). If the harness cannot, the parent runs the suite and passes **exit code + passing/failing test names** into close. Do not treat unread test source as a passing suite unless the operator explicitly authorizes that fallback |
+
+## 27. do-work-io `req.get` omits body — snapshot locally
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Verify/audit/worker cannot see Task, Integration, or Verification Steps after a successful `req.get` | Server `ReqView` / `ReqGetResult` does not map `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` even though create/update persist them | Not a bad request (get takes only `{project, req}`). Reconstruct from UR artifacts + ACs + files, write a snapshot under `{project}/.do-work/state/REQ-NNN.body.md` for `check-acceptance-evidence.sh` and the worker prompt, and `req.update` the body so it is stored. Do not treat missing body as a coverage miss. Product fix is adding those fields to `ReqView`. |
+
+
+## 28. After worktree create: read and edit only under the worktree path
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Worker implements against the wrong schema/names (or patches tests that don't match the integration base) while the worktree is correct | Main checkout has **dirty WIP** on the same paths; tools defaulted to `{project}/…` instead of `{project}/.worktrees/req-…/…` | After W2/W3.5, treat the **worktree absolute path** as CWD for every read/edit/test. Never use the main checkout tree for source of truth while implementing. Dirty main files are orchestrator/operator WIP — out of bounds |
+| Pest `DatasetMissing` on red tests that reference new model constants in `->with([...])` | Dataset evaluates before implementation exists; undefined class constants collapse the dataset | In red phase, use **string literals** in Pest datasets; switch to constants only after they exist (or keep literals if clearer) |
+
+## 29. Issue is product noun; wire stays `ur.*` / `UR-NNN`
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Agent invents `issue.create` / `issue_create` / `ISSUE-NNN` / param `issue` after docs or UI say **Issue** | Product noun renamed; **wire deliberately frozen** at `ur.*` / slug `UR-NNN` / param `ur` / port ops `*_ur` | Use **Issue** in prose and reports. For MCP/port: still `ur_create`/`ur.create`, `ur`, `UR-NNN`. Tables may be `issues`/`issue_artifacts`. Do not invent capability names. On Linear: do-work Issue = Milestone; Linear Issue = REQ — never conflate |
+| Markdown store probe still looks for `user-requests/` under do-work-io/sqlite/linear | Folder name is markdown-backend only; product noun change did not rename that path | Follow backend resolve: local `user-requests/` only when `backend: markdown` |
+

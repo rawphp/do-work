@@ -17,7 +17,7 @@ The following steps require model judgment that cannot be reduced to a rule. Eac
 
 ## When Invoked
 
-You will be given a UR reference:
+You will be given an Issue reference (slug `UR-NNN`):
 
 | Backend | Invocation |
 |---------|------------|

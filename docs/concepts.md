@@ -4,7 +4,7 @@ Minimal mental model for do-work: what a brief becomes, how work is gated, and w
 
 ## Why it matters
 
-do-work turns a natural-language brief into small, traceable tasks and runs them with tests and evidence—not one opaque “agent did stuff” blob. Knowing the nouns (UR, REQ) and the two-command loop (`start` → `go`) keeps you in control of the gates.
+do-work turns a natural-language brief into small, traceable tasks and runs them with tests and evidence—not one opaque “agent did stuff” blob. Knowing the nouns (Issue, REQ) and the two-command loop (`start` → `go`) keeps you in control of the gates.
 
 ## How it works (minimal model)
 
@@ -12,7 +12,7 @@ do-work turns a natural-language brief into small, traceable tasks and runs them
 Your brief
     │
     ▼
-  UR-NNN          user request (verbatim input + side artifacts)
+  UR-NNN          Issue (verbatim input + side artifacts; slug still UR-NNN)
     │
     ▼
   REQ-NNN-…       backlog tasks (one file each)
@@ -33,16 +33,19 @@ Your brief
 
 Granular commands (`intake`, `capture`, `verify`, `run`, …) are the same building blocks; `start` and `go` chain them with defaults and human gates.
 
-**File-based state.** Everything lives under the project’s `.do-work/` (config, URs, backlog REQs, `working/`, `archive/`, `runs/`, `state/`). There is no separate do-work server. `git` history is the audit trail.
+**File-based state.** Everything lives under the project’s `.do-work/` (config, Issues, backlog REQs, `working/`, `archive/`, `runs/`, `state/`). There is no separate do-work server. `git` history is the audit trail.
 
 ## Key terms
 
-### UR (user request)
+### Issue (slug `UR-NNN`)
 
-- Folder: `.do-work/user-requests/UR-NNN/`
+Product noun for the top-level brief container (formerly “user request”). Wire/slug stay `UR-NNN` / `ur.*` (do-work-io); do **not** invent `ISSUE-NNN` or `issue.create`.
+
+- Folder (markdown backend): `.do-work/user-requests/UR-NNN/`
 - Core file: `input.md` — your brief **verbatim** (do-work does not “improve” the wording on intake)
 - May also hold `ideate.md`, `assets/`, later `closure.md`
 - Numbering: sequential, zero-padded (`UR-001`, `UR-002`, …); next id is max+1 (gaps are not filled)
+- **Linear note:** a do-work Issue is a **Project Milestone**; a **REQ** is a Linear Issue — different entities
 
 ### REQ (requirement / task)
 

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**Product noun: Issue (wire still `ur.*` / `UR-NNN`)**
+
+**Changed**
+- Agent docs use **Issue** as the product noun for the top-level brief container (aligned with do-work.io UI / `issues` table). **Wire frozen:** MCP/capabilities stay `ur.*` / `ur_*`, param `ur`, slug `UR-NNN`, port ops `create_ur` / `read_ur` / … — do **not** invent `issue.create` or `ISSUE-NNN` until a deliberate capability cutover.
+- `agents/tracker/do-work-io.md`: hierarchy documents `issues` / `issue_artifacts`; explicit “Product naming vs wire” table.
+- `SKILL.md`, `docs/concepts.md`, `references/concepts.md`, `references/tracker.md`, `agents/tracker/port.md`, intake/ideate/run-worker, Linear hierarchy notes: Issue vs Linear Issue (REQ) disambiguation; markdown paths still `.do-work/user-requests/`.
+
 **MCP wire names (Grok-safe; `.` → `_`)**
 
 **Changed**

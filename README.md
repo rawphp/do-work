@@ -12,7 +12,7 @@ Task-based guides for installing and running `/do-work` (not contributor interna
 |-------|----------|
 | [docs/README.md](docs/README.md) | Docs index |
 | [docs/getting-started.md](docs/getting-started.md) | Install → first start → first go |
-| [docs/concepts.md](docs/concepts.md) | UR, REQ, gates, evidence |
+| [docs/concepts.md](docs/concepts.md) | Issue (slug `UR-NNN`), REQ, gates, evidence |
 | [docs/commands.md](docs/commands.md) | Command and flag reference |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Common failure symptoms |
 | [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) | Phase-by-phase deep dive |
@@ -72,7 +72,7 @@ Override the hub directory with `AGENTS_SKILLS_HUB` (same as `install.sh`). Wire
 
 This records your brief, runs a creative review (ideate), and decomposes it into REQ files — all in one shot.
 
-Add `--no-ideate` to skip the creative review. Add `--no-layers` to skip layer-coverage checks for this UR (records the choice in UR state for audit).
+Add `--no-ideate` to skip the creative review. Add `--no-layers` to skip layer-coverage checks for this Issue (records the choice in Issue state for audit).
 
 Ideate now ends with an interactive gate — after surfacing gaps, it asks whether you want to be **grilled** with one-at-a-time questions, **continue** to capture as-is, or **stop** to revise the brief yourself.
 
