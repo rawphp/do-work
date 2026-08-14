@@ -148,8 +148,8 @@ If MCP/PAT becomes unusable **after** a successful `claim_req` (`req_claim` / `r
 | `append_clarifications` | `ur_append-clarifications` | `ur.append-clarifications` | `{ project, ur, body }` |
 | `create_req` | `req_create` | `req.create` | `{ project, ur, title, files?, ... }` → `data.slug` is `REQ-NNN` |
 | `update_req` | `req_update` | `req.update` | `{ project, req, ... }` — not for claim/archive |
-| `read_req` | `req_get` | `req.get` | `{ project, req }` — embeds `active_claim: {id, agent_id, heartbeat_at, claimed_at} \| null` |
-| `list_reqs_for_ur` | `req_list` | `req.list` | `{ project, ur }` — same `active_claim` embed |
+| `read_req` | `req_get` | `req.get` | `{ project, req }` — embeds `active_claim: {id, agent_id, heartbeat_at, claimed_at} \| null`; returns at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` |
+| `list_reqs_for_ur` | `req_list` | `req.list` | `{ project, ur }` — same `active_claim` embed; each item returns at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` |
 | `list_claimable_reqs` | `req_list-claimable` | `req.list-claimable` | `{ project }` — Priority DESC, REQ-id ASC; already deps+footprint filtered |
 | `claim_req` | `req_claim` | `req.claim` | `{ project, req, agent_id, session? }` — `concurrent-conflict:` / `footprint-overlap:` / `not-claimable:` in the error message |
 | `heartbeat_req` | `req_heartbeat` | `req.heartbeat` | `{ project, req }` |
@@ -224,11 +224,13 @@ Each sequence starts with rediscovery (`search_tool` **wire name** then dotted c
 
 1. `search_tool` `req_get` then `req.get`
 2. Call the **observed** tool with `{ project, req }` — full REQ + `active_claim` embed.
+3. **Read shape (minimum):** the result includes at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, and `suite` (nullable strings). `create_req` / `update_req` already persist these; `req.get` returns them unchanged (round-trip). Use them for Task text, path fields, and suite — do not reconstruct from local files.
 
 #### `list_reqs_for_ur`
 
 1. `search_tool` `req_list` then `req.list`
 2. Call the **observed** tool with `{ project, ur, page?, per_page? }` — any status; `active_claim` embed.
+3. **Read shape (minimum):** each listed REQ includes at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, and `suite` (same round-trip fields as `req.get`).
 
 #### `list_claimable_reqs`
 
