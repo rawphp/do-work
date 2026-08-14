@@ -31,12 +31,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 **Branch on effective backend** after load path:
@@ -46,8 +47,9 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | **`markdown`** | Steps **1–6** below (working/ stamp + `heartbeat.sh`) |
 | **`linear`** | Steps **L1–L5** — linear.md **Resume** (compose **`set_req_status`** + **`heartbeat_req`**). Id is a **Linear issue id**. Assignee and claim ownership preserved. |
 | **`sqlite`** | **1S** — `get-req` / `set-status in_progress` / `heartbeat` by **REQ slug** via `lib/dw-db.sh` only. Do not glob `working/REQ`. |
+| **`do-work-io`** | **1D** — compose **`set_req_status`** (`in_progress`) + **`heartbeat_req`** via `agents/tracker/do-work-io.md` by **REQ-NNN slug**. Claim ownership preserved. Do not glob `working/REQ`. |
 
-Invocation under Linear may be `/do-work resume ENG-123`. Under sqlite: `/do-work resume REQ-NNN` (slug). Worktree/branch isolation stays **local** regardless of backend.
+Invocation under Linear may be `/do-work resume ENG-123`. Under sqlite / do-work-io: `/do-work resume REQ-NNN` (slug). Worktree/branch isolation stays **local** regardless of backend.
 
 ### When backend is sqlite (1S)
 
@@ -55,6 +57,15 @@ Invocation under Linear may be `/do-work resume ENG-123`. Under sqlite: `/do-wor
 2. `set-status` → `in_progress`; `heartbeat` for agent
 3. Do **not** require or create `working/REQ-*.md`
 4. Hard-stop if dw-db fails — never markdown fallback
+
+### When backend is do-work-io (1D)
+
+1. **`read_req`** (`req.get`) — must be `stopped` (or eligible) with an active claim when required
+2. **`set_req_status`** → `in_progress`; **`heartbeat_req`** (`req.heartbeat`) — preserve claim ownership
+3. Do **not** require or create `working/REQ-*.md`; do not call `lib/heartbeat.sh`
+4. Mid-flight MCP failure → **leave claimed**; hard-stop with resume-later instructions
+5. Hard-stop if MCP/PAT/project unusable — never markdown/Linear/sqlite fallback
+6. Dispatch worker same as markdown/Linear after store steps (local worktree)
 
 ---
 

@@ -103,8 +103,8 @@ Flags:
 | `/do-work go [UR-NNN] --no-layers` | Verifies + runs, but skips layer-coverage checks for this UR. |
 | `/do-work install` | Creates `.do-work/` folder structure in current project. |
 | `/do-work upgrade` | Brings `.do-work/` state into conformance with the current skill. |
-| `/do-work intake [brief]` | Records brief verbatim as next UR file. |
-| `/do-work capture [UR-NNN]` | Decomposes a UR into REQ files. |
+| `/do-work intake [brief]` | Records brief verbatim as next Issue (slug `UR-NNN`). |
+| `/do-work capture [UR-NNN]` | Decomposes an Issue into REQ files. |
 | `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
 | `/do-work audit [UR-NNN]` | Interrogates REQ quality — auto-fixes soft spots, reports changes. |
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections. |

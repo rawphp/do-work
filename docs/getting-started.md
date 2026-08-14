@@ -161,7 +161,7 @@ Skip this section if you want the default markdown files. Full multi-tracker map
 
 ### Optional: do-work.io as work-item store
 
-A **fourth backend** stores URs/REQs only on do-work.io (remote MCP) — still no dual-write, still local git/worktrees. Setup details: [Troubleshooting → do-work.io tracker backend](troubleshooting.md#do-workio-tracker-backend).
+A **fourth backend** stores Issues (slug `UR-NNN`) / REQs only on do-work.io (remote MCP) — still no dual-write, still local git/worktrees. Setup details: [Troubleshooting → do-work.io tracker backend](troubleshooting.md#do-workio-tracker-backend).
 
 Minimal config:
 

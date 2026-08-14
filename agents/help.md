@@ -22,19 +22,22 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### 1. Detect project state
 
 **When backend is sqlite (1S):** do **not** glob `REQ-*.md` / `user-requests/` as live truth. Use `bash {skill-root}/lib/dw-db.sh list-urs {project}`, `list-reqs`, `status-synth`, and optional `/do-work board`. Suggest based on DB state (open URs, claimable REQs, closed_at). Markdown FS heuristics below apply only when backend is **markdown** (Linear uses port list ops).
 
-Check the following conditions in order (markdown backend; adapt via port/dw-db for linear/sqlite):
+**When backend is do-work-io (1D):** do **not** glob `REQ-*.md` / `user-requests/` as live truth. Use `ur.list` / `req.list` / `req.list-claimable` via `agents/tracker/do-work-io.md`. Suggest based on remote state (open Issues, claimable REQs, `closed_at`). Hard-stop if MCP/PAT/project unusable.
+
+Check the following conditions in order (markdown backend; adapt via port/dw-db/MCP for linear/sqlite/do-work-io):
 
 1. Does `{project}/.do-work/` exist? (sqlite: `work.db` present after ensure)
 2. Are there `REQ-NNN-*.md` files in `{project}/.do-work/` (backlog root)? *(markdown only — sqlite: `list-reqs` backlog status)*

@@ -13,11 +13,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `agents/tracker/do-work-io.md`: hierarchy documents `issues` / `issue_artifacts`; explicit “Product naming vs wire” table.
 - `SKILL.md`, `docs/concepts.md`, `references/concepts.md`, `references/tracker.md`, `agents/tracker/port.md`, intake/ideate/run-worker, Linear hierarchy notes: Issue vs Linear Issue (REQ) disambiguation; markdown paths still `.do-work/user-requests/`.
 
+**do-work-io tracker backend (opt-in)**
+
+**Added**
+- `tracker.backend: do-work-io` — remote MCP sole work-item store (`agents/tracker/do-work-io.md` + Load Config **7c**). Config: `tracker.dowork.{base_url,token_env,project,mcp_profile}`. Default backend remains `markdown`. No dual-write; hard-stop when MCP/PAT/project unusable.
+- Phase agents: 1D branches for intake/capture/ideate/verify/go/run/status/close/question/unblock/resume/run-worker (+ thin 1D notes for help/audit/log/retro/review/upgrade migrate refuse).
+
 **MCP wire names (Grok-safe; `.` → `_`)**
 
 **Changed**
 - do-work.io MCP `tools/list` / `tools/call` names are the capability id with `.` replaced by `_` (`project.ensure` → `project_ensure`, `req.claim` → `req_claim`, `ur_append-ideate`, …). HTTP `POST /capabilities/{dotted-id}` is unchanged. **Consumer impact:** refresh the MCP session and rediscover tools; dotted `tools/call` names fail. Search `project_ensure` / `req_claim` first (skill tracker already does; dotted id is fallback search only).
 - `agents/tracker/do-work-io.md`: rediscover the published underscore wire name first, then the dotted capability id; always `use_tool` the **observed** name.
+
+**Policy: public env templates**
+
+**Changed**
+- `security.excluded_paths` (default `.env.example`) exempts public templates from `blocked_paths` so the shipped `.env.*` glob does not policy-block documenting new env vars (`lib/check-policy.sh` + tests).
 
 **Operator status / help UX (scannable situation room)**
 

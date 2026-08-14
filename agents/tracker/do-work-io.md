@@ -252,7 +252,7 @@ Each sequence starts with rediscovery (`search_tool` **wire name** then dotted c
 
 #### `claim_req`
 
-1. Re-read via `req.get` / pick via `req.list-claimable`.
+1. Re-read via observed **`req_get` / `req.get`** / pick via observed **`req_list-claimable` / `req.list-claimable`**.
 2. `search_tool` `req_claim` then `req.claim`
 3. Call the **observed** tool with `{ project, req, agent_id, session? }`
 4. Same `agent_id` refreshes. Fresh foreign claim → error message starts with `concurrent-conflict:` → stop / resume. Footprint clash → `footprint-overlap:`. Not eligible → `not-claimable:`. Stale foreign claim → server takeover.

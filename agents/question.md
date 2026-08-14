@@ -31,12 +31,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 ### Clarifications store — backend branch (ORI-9)
@@ -45,20 +46,30 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 |---------|-------------|
 | **markdown** | Append `## Clarifications` to `{project}/.do-work/user-requests/UR-NNN/input.md` |
 | **sqlite** | Port op **`append_clarifications`** → `bash {skill-root}/lib/dw-db.sh append-clarifications {project} UR-NNN --body TEXT`. **Do not** dual-write `input.md` as the store. |
-
+| **linear** | Port op **`append_clarifications`** — append Q&A under `## Clarifications` on the **UR Project Milestone** description. Never overwrite `## Brief`. **No** local `input.md` dual-write. |
+| **do-work-io** | Port op **`append_clarifications`** (`ur_append-clarifications` / `ur.append-clarifications` in `agents/tracker/do-work-io.md`). **No** local `input.md` dual-write. |
 
 ### When backend is sqlite (1S)
 
 - Append clarifications via `bash {skill-root}/lib/dw-db.sh append-clarifications {project} UR-NNN --body TEXT` only
 - Do not dual-write `user-requests/…/input.md` as the store
 - Hard-stop if dw-db fails
-| **linear** | Port op **`append_clarifications`** — append Q&A under `## Clarifications` on the **UR Project Milestone** description. Never overwrite `## Brief`. **No** local `input.md` dual-write. |
+
+### When backend is do-work-io (1D)
+
+- Append clarifications via **`append_clarifications`** only (`agents/tracker/do-work-io.md`)
+- Do not dual-write `user-requests/…/input.md` as the store
+- Hard-stop if MCP/PAT/project unusable — never markdown/Linear/sqlite fallback
 
 ### 1. Read the brief
 
 **Markdown:** Read `UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if it exists.
 
 **Linear:** Call **`read_ur`** for `UR-NNN`. Use `## Brief` (+ existing `## Clarifications` / `## Ideate` if present). Optional local assets only if the operator keeps them on disk.
+
+**sqlite:** Call **`read_ur`** / `get-ur` via dw-db for `UR-NNN`. Do not treat local `input.md` as the store.
+
+**do-work-io:** Call **`read_ur`** (`ur.get`) for `UR-NNN`. Do not treat local `input.md` as the store.
 
 ### 2. Analyze for ambiguity
 
@@ -86,9 +97,9 @@ Build a prioritized list of ambiguities, ordered by impact on the downstream dec
 Before asking the user anything, attempt to resolve each ambiguity from existing artifacts. Check:
 
 - The project codebase (source files, configs, existing tests)
-- Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear:** UR Project Milestone clarifications via port `read_ur` / `list_urs` (never invent a dual store)
-- Prior REQs — **markdown:** `.do-work/archive/REQ-*.md`; **linear:** Issues via port `list_reqs_for_ur` / `read_req` (Linear issue ids)
-- **Decisions memory (REQ-297):** **markdown** — `.do-work/decisions.md` if present; **linear** — **Read decisions** helper (`agents/tracker/linear.md`, Team Doc `decisions_doc_title` / default `do-work/decisions`). Same one-line grammar either backend. Do not read local `decisions.md` when backend is linear. When backend is **sqlite**, read decisions via `dw-db` / port (not local `decisions.md`); clarifications only via `append-clarifications`.
+- Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear / sqlite / do-work-io:** Issue clarifications via port `read_ur` / `list_urs` (never invent a dual store)
+- Prior REQs — **markdown:** `.do-work/archive/REQ-*.md`; **linear:** Issues via port `list_reqs_for_ur` / `read_req` (Linear issue ids); **sqlite / do-work-io:** `list_reqs_for_ur` / `read_req` by `REQ-NNN` slug
+- **Decisions memory (REQ-297):** **markdown** — `.do-work/decisions.md` if present; **linear** — **Read decisions** helper (`agents/tracker/linear.md`, Team Doc `decisions_doc_title` / default `do-work/decisions`). Same one-line grammar either backend. Do not read local `decisions.md` when backend is linear. When backend is **sqlite** or **do-work-io**, read decisions via port / `decision` list ops (not local `decisions.md`); clarifications only via `append_clarifications`.
 
 For each ambiguity, classify the resolution into one of three buckets:
 
@@ -176,6 +187,8 @@ If the user chose "Correct some" for specific inferences, record the corrected v
 |---------|-----|
 | **markdown** | Append a `## Clarifications` section to `{project}/.do-work/user-requests/UR-NNN/input.md`. If the section already exists, append new Q&A below existing entries. Never overwrite prior clarifications. Never modify the original brief text above the section. |
 | **linear** | Call port op **`append_clarifications`** (`agents/tracker/linear.md`) with each Q&A pair. Appends under `## Clarifications` on the **UR Project Milestone**; creates the section if missing; never overwrites `## Brief` or prior Q&A. **Do not** write local `input.md`. If MCP fails → hard-stop. |
+| **sqlite** | Call port op **`append_clarifications`** via dw-db. **Do not** write local `input.md`. |
+| **do-work-io** | Call port op **`append_clarifications`** (`agents/tracker/do-work-io.md`). **Do not** write local `input.md`. If MCP fails → hard-stop. |
 
 The brief is the source of truth — clarifications are additive context.
 
@@ -190,7 +203,7 @@ git commit -m "chore(UR-NNN): record question session clarifications"
 
 If the project is not a git repo, skip this step silently.
 
-**Linear:** Skip git for work-item storage (clarifications already on the UR milestone). Do not invent a local dual-write commit.
+**Linear / sqlite / do-work-io:** Skip git for work-item storage (clarifications already on the remote/DB store). Do not invent a local dual-write commit.
 
 ### 7. Report and prompt
 
@@ -199,7 +212,7 @@ Output the completion report:
 ```
 Question session complete for UR-NNN.
 
-Updated: <markdown: {project}/.do-work/user-requests/UR-NNN/input.md | linear: UR milestone ## Clarifications via append_clarifications (milestone id)>
+Updated: <markdown: {project}/.do-work/user-requests/UR-NNN/input.md | linear/sqlite/do-work-io: append_clarifications port op>
 
 Clarifications recorded: N questions answered
 ```
@@ -221,7 +234,8 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 ## Rules
 
 - Never modify the original brief text — only append `## Clarifications` below it
-- **Linear:** use **`append_clarifications`** only; never dual-write local `input.md`; hard-stop if MCP unusable
+- **Linear / do-work-io:** use **`append_clarifications`** only; never dual-write local `input.md`; hard-stop if MCP unusable
+- **sqlite:** use **`append_clarifications`** / dw-db only; never dual-write local `input.md`
 - Never suggest changes to scope — only extract what the user already knows but didn't write down
 - Never ask more than one question per message
 - Never ask compound questions (questions joined by "and" or "also")

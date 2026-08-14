@@ -39,12 +39,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 **Branch on effective backend** after load path:
@@ -54,12 +55,20 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | **`markdown`** | Steps **1–8** below (working/ stamp strip + backlog move) |
 | **`linear`** | Steps **L1–L4** — port op **`unblock_req`** in `agents/tracker/linear.md`. Id is a **Linear issue id** (e.g. `ENG-123`). No `.do-work/working/` claim stamps. |
 | **`sqlite`** | **1S** — `bash {skill-root}/lib/dw-db.sh unblock {project} REQ-NNN` by **slug**. No `working/` move. |
+| **`do-work-io`** | **1D** — port op **`unblock_req`** (`req_unblock` / `req.unblock` in `agents/tracker/do-work-io.md`) by **REQ-NNN slug**. No `working/` move. |
 
 ### When backend is sqlite (1S)
 
 - Unblock via `dw-db unblock` only (sets backlog + releases active claim)
 - Do not `git mv` / `mv` `working/REQ-*.md` or strip markdown claim stamps
 - Hard-stop if dw-db fails — never markdown fallback
+
+### When backend is do-work-io (1D)
+
+- Unblock via **`unblock_req`** only (`agents/tracker/do-work-io.md`) — returns REQ to backlog and releases claim
+- Do not `git mv` / `mv` `working/REQ-*.md` or strip markdown claim stamps
+- Hard-stop if MCP/PAT/project unusable — never markdown/Linear/sqlite fallback
+- Invocation: `/do-work unblock REQ-NNN` (slug)
 
 Invocation under Linear may be `/do-work unblock ENG-123` (or the issue identifier the operator passes). Treat `REQ-NNN` in the markdown steps as the issue identifier only for markdown.
 

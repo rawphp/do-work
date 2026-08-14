@@ -72,12 +72,13 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
 This is also the `config-keys` manifest row. If the loader creates or migrates
@@ -514,14 +515,18 @@ Before any Linear write or config flip:
      Migration refused: tracker.backend is sqlite.
      /do-work upgrade migrate is markdown→Linear only. No sqlite→Linear path.
      ```
+   If effective backend is **`do-work-io`**, **refuse** with
+   **`migrate-linear: refused-do-work-io-backend`** and stop immediately:
+   - markdown→Linear migration does not apply under do-work-io (sole store is
+     remote do-work.io; no history import and no Linear cutover from do-work-io).
+   - **Do not** create Linear entities or change config.
+   - Message example:
+
+     ```text
+     Migration refused: tracker.backend is do-work-io.
+     /do-work upgrade migrate is markdown→Linear only. No do-work-io→Linear path.
+     ```
 2. **`working/` empty** — zero `REQ-*.md` under `{project}/.do-work/working/`. If any exist → **refuse entirely**:
-
-### When backend is sqlite (1S)
-
-- Work-item ops use `sqlite.md` / dw-db — no markdown dual store
-- **Refuse** `migrate_markdown_to_linear` / Linear cutover while `tracker.backend: sqlite`
-- Gitignore must keep `work.db`, `work.db-*`, `board/` ignored
-
 
    ```text
    Migration refused: .do-work/working/ is non-empty (active or stranded REQs).
@@ -578,6 +583,7 @@ migrate-linear: dry-run-reported
 migrate-linear: converged
 migrate-linear: already-linear
 migrate-linear: refused-sqlite-backend
+migrate-linear: refused-do-work-io-backend
 migrate-linear: refused-working-non-empty
 migrate-linear: refused-active-claims
 migrate-linear: skipped-by-user
@@ -624,6 +630,8 @@ only asked for migrate — but preflight remains mandatory.
     `already-linear` / already-migrated and **stop without rewriting Issues**.
   - **Refuse under sqlite:** if `tracker.backend` is `sqlite`, report
     `refused-sqlite-backend` and stop (no markdown→Linear path from sqlite).
+  - **Refuse under do-work-io:** if `tracker.backend` is `do-work-io`, report
+    `refused-do-work-io-backend` and stop (no markdown→Linear path from do-work-io).
   - After success: leave markdown trees historical read-only; **post-cutover
     work-item ops ignore historical markdown trees**; set
     `tracker.backend: linear`.

@@ -127,15 +127,17 @@ Load config and resolve work-item storage before reading/updating REQs:
 
 1. Read and follow the **Load Config** section of [config.md](config.md) (resolve effective `tracker.backend`; missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
-3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md` or `linear.md`).
+3. Read `agents/tracker/<backend>.md` (e.g. `markdown.md`, `linear.md`, `sqlite.md`, or `do-work-io.md`).
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
+- If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` (including `heartbeat_req` → `lib/heartbeat.sh`) — use those ops; do not re-implement store details here.
 - Runtime/git isolation (worktrees, feature branch, commit) stays local regardless of backend.
 - **Linear mid-flight (REQ-294):** if Linear MCP fails **after** the orchestrator already claimed this issue (`in_progress` + active claim comment) and before you finish, **leave claimed** — do not release the claim, do not write markdown REQ files as a substitute store, do not invent cleanup. Return `status: stopped` with an appropriate reason (`dependency-missing` / `unknown-error` / etc.); operator uses `/do-work resume` or `unblock` after MCP recovers. Heartbeats under Linear use **`heartbeat_req`** against the Linear issue id (not `lib/heartbeat.sh` on a local working/ file) when the orchestrator passed a Linear-backed REQ.
+- **do-work-io mid-flight:** same leave-claimed rule when MCP fails after claim; heartbeats use **`heartbeat_req`** (`req.heartbeat`) against the `REQ-NNN` slug — not `lib/heartbeat.sh`.
 
 ### When backend is sqlite (1S)
 
@@ -145,6 +147,15 @@ Load config and resolve work-item storage before reading/updating REQs:
 - UI / closure evidence binaries under `.do-work/evidence/UR-NNN/{ui,closure}-evidence/` only (not `user-requests/…`)
 - Mid-flight dw-db failure: leave claimed; return `status: stopped`; no markdown substitute store
 - Hard-stop if sqlite unusable
+
+### When backend is do-work-io (1D)
+
+- Read REQ via **`read_req`** (`req.get`) by **REQ-NNN slug** — no `working/REQ-*.md` path
+- Heartbeat checkpoints: **`heartbeat_req`** (`req.heartbeat`) via `agents/tracker/do-work-io.md` — not `lib/heartbeat.sh`
+- Files / status / proof via port **`set_files`** / **`set_req_status`** / **`update_req`** — never dual-write `REQ-*.md`
+- UI / closure evidence binaries under `.do-work/evidence/UR-NNN/{ui,closure}-evidence/` only (not `user-requests/…`)
+- Mid-flight MCP failure: leave claimed; return `status: stopped`; no markdown substitute store
+- Hard-stop if MCP/PAT/project unusable
 
 ### 1. Read the REQ
 
