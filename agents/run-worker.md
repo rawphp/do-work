@@ -21,8 +21,8 @@ The following steps require model judgment that cannot be reduced to a rule. Eac
 The orchestrator dispatches you with these named inputs:
 
 1. **REQ file path** — absolute path to the REQ markdown file (already moved to `working/` by the orchestrator)
-2. **UR input.md path** — absolute path to the originating user request brief
-3. **Prior-REQ archived paths** — list of absolute paths to previously archived REQs from the same UR (may be empty)
+2. **UR input.md path** — absolute path to the originating Issue brief (slug `UR-NNN`)
+3. **Prior-REQ archived paths** — list of absolute paths to previously archived REQs from the same Issue (may be empty)
 4. **Context pack path** — absolute path to `.do-work/state/context-pack.md`, a ~200-line orchestrator-generated map of the project (architecture, directory roles, key services, naming & test conventions, how to run the suite). Read it in Step 2.
 5. **Skill root** — the absolute `$SKILL_ROOT` the orchestrator resolved once in **Load Config step 8** (`agents/config.md`: walk-up from loaded instruction file with `lib/` + (`SKILL.md` or `agents/`) markers, or inherit of a valid pre-set `$SKILL_ROOT`; hard-stop if unknown) and substituted into these instructions. It is the skill install root (the directory containing `lib/` and skill markers). Wherever these instructions write `{skill-root}/lib/...`, that means this passed-in value — substitute it. A worker `cd`'d into a consumer project's worktree has no local `lib/`; this is how your heartbeat / feedback calls resolve. Do **not** invent a second resolve recipe (no env/hub/CWD fallback). If the orchestrator omitted Skill root or left `{skill-root}` unsubstituted and you cannot determine the path, hard-stop per Load Config step 8 (inherit only when the value still satisfies markers; otherwise walk-up from the loaded instruction file).
 

@@ -2,13 +2,14 @@
 name: do-work
 description: >
   Autonomous project-management loop: natural-language briefs → traceable work
-  items (URs/REQs) → isolated TDD workers with one git commit per task. Default
-  store is local markdown under .do-work/; optional Linear, sqlite, or
-  do-work-io as sole backend via tracker.backend (no dual-write, hard-stop if
-  the active backend is unusable). Differentiator: multi-agent runs with footprint-aware claims,
-  worktree isolation, and verify/review/archive gates — not a generic todo list.
+  items (Issues/REQs; Issue slug still UR-NNN, wire ur.*) → isolated TDD workers
+  with one git commit per task. Default store is local markdown under .do-work/;
+  optional Linear, sqlite, or do-work-io as sole backend via tracker.backend
+  (no dual-write, hard-stop if the active backend is unusable). Differentiator:
+  multi-agent runs with footprint-aware claims, worktree isolation, and
+  verify/review/archive gates — not a generic todo list.
   Triggers on: "do-work", "intake", "capture", "verify", "run the loop",
-  "backlog", "user request", "REQ-", "UR-", "question", "audit",
+  "backlog", "user request", "Issue", "REQ-", "UR-", "question", "audit",
   "linear backlog", "tracker.backend", "migrate to Linear", "sqlite board".
 ---
 
@@ -25,7 +26,7 @@ Most days you only need these:
 | Command | What it does |
 |---------|-------------|
 | `/do-work start [brief]` | Record a brief and build the REQ backlog (ideate on by default; auto-installs). |
-| `/do-work go [UR-NNN]` | Verify coverage, then audit + run when confidence ≥ threshold (default 90%). |
+| `/do-work go [UR-NNN]` | Verify coverage, then audit + run when confidence ≥ threshold (default 90%). Issue slug is still `UR-NNN`. |
 | `/do-work status [UR-NNN]` | Live situation room: in-flight, backlog, recent done, coverage. |
 | `/do-work board` | Regenerate static HTML board from work.db (sqlite only). |
 | `/do-work` | Help + suggested next steps for this project. |
@@ -38,27 +39,27 @@ Flags for start/go (`--no-ideate`, `--force`, `--auto-fix`, …) are in the full
 |---------|-------------|
 | `/do-work start [brief]` | Records brief + decomposes into REQs in one shot. Includes ideate by default. Auto-installs if needed. |
 | `/do-work start [brief] --no-ideate` | Same as start, but skips the creativity review before decomposition. |
-| `/do-work start [brief] --no-layers` | Same as start, but skips layer-coverage checks for this UR (records `layers_in_scope: []`). |
+| `/do-work start [brief] --no-layers` | Same as start, but skips layer-coverage checks for this Issue (records `layers_in_scope: []`). |
 | `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of confidence score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs if >= 90%. |
-| `/do-work go [UR-NNN] --no-layers` | Verify + run, skipping layer-coverage checks for this UR. |
+| `/do-work go [UR-NNN] --no-layers` | Verify + run, skipping layer-coverage checks for this Issue. |
 | `/do-work install` | Creates `.do-work/` structure in current project. |
 | `/do-work upgrade` | Brings the project's .do-work/ state into conformance with the current skill — runs the manifest's detectors and applies fixes (interactive confirmation on destructive rows). Idempotent. |
-| `/do-work intake [brief]` | Records brief verbatim as next UR file. |
-| `/do-work capture [UR-NNN]` | Decomposes a UR brief into REQ files in the backlog. |
+| `/do-work intake [brief]` | Records brief verbatim as next Issue (slug `UR-NNN`). |
+| `/do-work capture [UR-NNN]` | Decomposes an Issue brief into REQ files in the backlog. |
 | `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
 | `/do-work audit [UR-NNN]` | Interrogates REQ quality — auto-fixes soft spots, reports changes. |
 | `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections in a brief. |
 | `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
-| `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional UR-NNN scopes the run to that UR's REQs only. |
+| `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional `UR-NNN` scopes the run to that Issue's REQs only. |
 | `/do-work run [UR-NNN] --parallel N` | Single-session parallel mode: one terminal dispatches up to N concurrent workers (default 1 = serial, capped at 10), serializing merge/archive through a queue. Defaults from `parallel.max_workers`. |
 | `/do-work run [UR-NNN] --budget <amount>` | Caps cumulative estimated model spend for the run; overrides `cost.budget` for this invocation. When estimated spend reaches the budget, the loop finishes the in-flight REQ's integration then stops at the next REQ boundary with a budget-stop report. Empty budget = unlimited (default). |
 | `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md. |
 | `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
 | `/do-work board` | Regenerate static HTML board from work.db (sqlite only). |
-| `/do-work close UR-NNN` | Validates the integrated result of a UR against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report. |
+| `/do-work close UR-NNN` | Validates the integrated result of an Issue against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report. |
 | `/do-work retro` | Mines the run ledger and feedback fingerprints to produce a human report and regenerate `.do-work/state/calibration.md` — advisory capture guidance derived from historical patterns. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
@@ -75,7 +76,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 
 - [agents/start.md](agents/start.md) — Orchestrator: intake + ideate + capture
 - [agents/go.md](agents/go.md) — Orchestrator: verify + conditional run
-- [agents/intake.md](agents/intake.md) — Records brief verbatim as next UR file
+- [agents/intake.md](agents/intake.md) — Records brief verbatim as next Issue (`UR-NNN`)
 - [agents/upgrade.md](agents/upgrade.md) — Brings project state into conformance with the current skill
 - [agents/question.md](agents/question.md) — Interactive brief questioning
 - [agents/audit.md](agents/audit.md) — Autonomous REQ quality audit
@@ -87,7 +88,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/review.md](agents/review.md) — Post-build gate: reviews scope, acceptance evidence, tests, secrets, docs, and regression risk before archive
 - [agents/status.md](agents/status.md) — Read-only situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup
 - [agents/board.md](agents/board.md) — Static HTML board snapshot from work.db (`/do-work board`, sqlite only)
-- [agents/close.md](agents/close.md) — Validates the integrated result of a UR against its verbatim brief; walks path-unit entry points in the merged app; writes `UR-NNN/closure.md`
+- [agents/close.md](agents/close.md) — Validates the integrated result of an Issue against its verbatim brief; walks path-unit entry points in the merged app; writes `UR-NNN/closure.md`
 - [agents/unblock.md](agents/unblock.md) — Force a stuck in-flight REQ back to the backlog
 - [agents/resume.md](agents/resume.md) — Re-dispatch a fresh worker for a stopped REQ
 - [agents/log.md](agents/log.md) — Generates build-in-public draft posts
@@ -129,13 +130,15 @@ Full multi-backend deep dive: [references/tracker.md](references/tracker.md).
 
 Canonical contract: `agents/tracker/port.md` hard-stop matrix + Load Config steps 6–7c / 8 in `agents/config.md`.
 
-**No dual-write.** One active backend owns work-item truth (markdown, linear, sqlite, **or** do-work-io). Agents must not mirror URs/REQs across stores, and must not fall back when the active backend fails (hard-stop instead). Switching to sqlite is **greenfield** (empty DB; no history migration in v1). `/do-work board` is **sqlite-only** (static HTML snapshot). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them. **Refuse** `migrate_markdown_to_linear` when already on `sqlite` or `do-work-io`.
+**No dual-write.** One active backend owns work-item truth (markdown, linear, sqlite, **or** do-work-io). Agents must not mirror Issues/REQs across stores, and must not fall back when the active backend fails (hard-stop instead). Switching to sqlite is **greenfield** (empty DB; no history migration in v1). `/do-work board` is **sqlite-only** (static HTML snapshot). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them. **Refuse** `migrate_markdown_to_linear` when already on `sqlite` or `do-work-io`.
 
-**Linear hierarchy:** **UR = Project Milestone** on a **shared product Project** per local product (`tracker.linear.product_project` — name or UUID; **default empty**). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Never invent skill name `do-work` for empty config (example name for this skill repo only). REQs = Issues with that milestone. Not Initiatives (MCP has no Initiative create tools).
+**Product noun vs wire:** top-level brief container is an **Issue** (UI + agent prose). Agent id / slug remains **`UR-NNN`**; do-work-io MCP stays **`ur.*`** / param **`ur`** until a deliberate capability cutover. Markdown folders stay `.do-work/user-requests/UR-NNN/`. On Linear, **do-work Issue (`UR-NNN`) ≠ Linear Issue** (Linear Issue = REQ).
 
-**Linear commit / branch** (when `backend: linear`): subject uses Linear issue id only (`feat(ENG-123): …`); footer `Issue:` / `UR:` / `Output:`; branch/worktree `req/<sanitized-linear-id>` (dir hard-defaults lowercase). Markdown backend still uses `feat(REQ-NNN): …` with `REQ:` / `UR:` archive paths — see [references/concepts.md](references/concepts.md#commit-convention).
+**Linear hierarchy:** **do-work Issue (`UR-NNN`) = Project Milestone** on a **shared product Project** per local product (`tracker.linear.product_project` — name or UUID; **default empty**). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Never invent skill name `do-work` for empty config (example name for this skill repo only). **REQs = Linear Issues** with that milestone. Not Initiatives (MCP has no Initiative create tools).
 
-**Operator warning (Linear claims):** human remains Issue assignee; agents claim via workflow state + claim-protocol comment (`<!-- do-work-claim -->`). Do not clear/edit/delete agent claim comments in the Linear UI while a run is live. Recover with `/do-work status`, then `resume` or `unblock`.
+**Linear commit / branch** (when `backend: linear`): subject uses Linear issue id only (`feat(ENG-123): …`); footer `Issue:` / `UR:` / `Output:` (`UR:` = parent do-work Issue slug); branch/worktree `req/<sanitized-linear-id>` (dir hard-defaults lowercase). Markdown backend still uses `feat(REQ-NNN): …` with `REQ:` / `UR:` archive paths — see [references/concepts.md](references/concepts.md#commit-convention).
+
+**Operator warning (Linear claims):** human remains Linear Issue assignee; agents claim via workflow state + claim-protocol comment (`<!-- do-work-claim -->`). Do not clear/edit/delete agent claim comments in the Linear UI while a run is live. Recover with `/do-work status`, then `resume` or `unblock`.
 
 Markdown remains the default. Operator setup: [docs/troubleshooting.md](docs/troubleshooting.md) § Linear tracker backend; [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) § Multi-tracker; [docs/getting-started.md](docs/getting-started.md).
 

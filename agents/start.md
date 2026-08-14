@@ -63,7 +63,7 @@ Read and follow [intake.md](intake.md) in full.
 
 **Do not stop after intake.** Unlike standalone intake, the start agent continues immediately.
 
-Note the UR number created (e.g. `UR-003`) — you will need it for the next steps. Under Linear, also keep the milestone id in context.
+Note the Issue slug created (e.g. `UR-003`) — you will need it for the next steps. Under Linear, also keep the milestone id in context.
 
 **Number conflict guard:**
 - **Markdown:** Intake scans existing UR folders and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002).

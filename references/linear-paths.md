@@ -2,16 +2,16 @@
 
 One hop from [`agents/tracker/linear.md`](../agents/tracker/linear.md). Load when implementing or auditing a path-unit (REQ-288…301) or re-filling the capability matrix. **Not** the day-to-day op index — sequences live in [linear-ops.md](linear-ops.md).
 
-**Hierarchy lock (authoritative):** UR = **Project Milestone** on shared `product_project` (default `do-work`). **Not** Initiative-as-UR. Path narratives below may still mention historical Initiative wording in child-work tables; prefer the lock + [linear-ops.md](linear-ops.md) sequences.
+**Hierarchy lock (authoritative):** do-work **Issue** (`UR-NNN`) = **Project Milestone** on shared `product_project` (default `do-work`). **Not** Initiative-as-Issue. REQs = Linear Issues (different entity). Path narratives below may still mention historical Initiative wording in child-work tables; prefer the lock + [linear-ops.md](linear-ops.md) sequences.
 
-## Disambiguation: Milestone-as-UR vs path-milestone mode (M1/M2)
+## Disambiguation: Milestone-as-Issue vs path-milestone mode (M1/M2)
 
 | Concept | What it is | Where it lives |
 |---------|------------|----------------|
-| **Milestone-as-UR** | The Linear **Project Milestone** entity that *is* the User Request (`UR-NNN`) | On shared **product Project** (`product_project`) |
-| **Path-milestone mode (M1/M2)** | Optional *delivery* mode inside one UR when the brief has `source: /saas-thesis handoff` + `### Milestones` | Cursor block `<!-- do-work-milestone -->` on the **UR Project Milestone description**; Issues tagged `M1`/`M2` |
+| **Milestone-as-Issue** | The Linear **Project Milestone** entity that *is* the do-work Issue (`UR-NNN`) | On shared **product Project** (`product_project`) |
+| **Path-milestone mode (M1/M2)** | Optional *delivery* mode inside one Issue when the brief has `source: /saas-thesis handoff` + `### Milestones` | Cursor block `<!-- do-work-milestone -->` on the **Issue Project Milestone description**; Linear Issues (REQs) tagged `M1`/`M2` |
 
-Do **not** create Linear Initiatives for URs. Do **not** treat M1/M2 path-milestones as separate URs.
+Do **not** create Linear Initiatives for do-work Issues. Do **not** treat M1/M2 path-milestones as separate Issues.
 
 ---
 

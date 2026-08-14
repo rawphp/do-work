@@ -6,6 +6,20 @@ Implements the tracker port (`agents/tracker/port.md`) with **do-work.io as the 
 
 ---
 
+## Product naming vs wire (frozen)
+
+| Surface | Value |
+|---------|--------|
+| **Product noun** (UI, agent prose) | **Issue** — top-level brief container |
+| **Agent / wire id** | slug **`UR-NNN`** (zero-padded); param name **`ur`** |
+| **MCP / capability wire** | **`ur.*`** / **`ur_*`** (`ur.create`, `ur_create`, …) |
+| **Port ops** | still `create_ur`, `read_ur`, `list_urs`, … |
+| **DB tables** | `issues`, `issue_artifacts` (FKs `issue_id`) |
+
+**Do not invent** `issue.create`, `issue_create`, `ISSUE-NNN`, or param `issue` for MCP calls. Wire stays `ur.*` until a deliberate product capability cutover. Markdown on-disk path `.do-work/user-requests/` is the **markdown backend only** — not the do-work-io store.
+
+---
+
 ## When to load
 
 After config load and backend resolution (`port.md` + Load Config **7c**):
@@ -25,9 +39,9 @@ Do **not** load this file when backend is `markdown`, `linear`, or `sqlite`.
 | Entity | Home |
 |--------|------|
 | Product container | do-work.io `projects` row; identity = **slug**; REST id = ULID |
-| UR | `user_requests` row; agent id = slug `UR-NNN` |
+| **Issue** | `issues` row; agent id = slug `UR-NNN`; wire param `ur` |
 | REQ | `requirements` row; agent id = slug `REQ-NNN` |
-| Ideate / clarifications / verify / close | `ur_artifacts` (`kind`) |
+| Ideate / clarifications / verify / close | `issue_artifacts` (`kind`) |
 | Decisions | `decisions` (append-only) |
 | Run notes | `run_notes` |
 | Gate locks | **local** `{project}/.do-work/state/gate-owner.md` only |
@@ -35,9 +49,9 @@ Do **not** load this file when backend is `markdown`, `linear`, or `sqlite`.
 ### Hard rules
 
 1. **No dual-write** — do not treat `REQ-*.md` / `user-requests/` / Linear / `work.db` as live truth.
-2. **Slugs at the agent surface** — pass `project` (slug from `tracker.dowork.project`) plus `ur` / `req` slugs. ULIDs are accepted by the server but agents should use slugs.
+2. **Slugs at the agent surface** — pass `project` (slug from `tracker.dowork.project`) plus `ur` / `req` slugs (`ur` = Issue slug `UR-NNN`). ULIDs are accepted by the server but agents should use slugs.
 3. **REQ status underscore** — `in_progress` (never store `in-progress`).
-4. **URs have no status** — closure is `closed_at` from `write_close_report`.
+4. **Issues have no status** — closure is `closed_at` from `write_close_report`.
 5. **`archived` is not a status** — `req.archive` is a separate gate (`done` + `closure_proof` + all AC checked).
 6. **`agent_id` is advisory** — any of the owning user's tokens may heartbeat/unblock.
 7. **Rediscover tools** — `search_tool` the published underscore wire name first, then the dotted capability id; `use_tool` / MCP `tools/call` with the **observed** qualified name. Never hard-code a host-specific `dowork__…` / `server__tool` string.
@@ -70,7 +84,7 @@ Published MCP **wire name** is the Grok-safe form of the capability id (`.` → 
 
 ## Hard-stop template
 
-When `tracker.backend` is **`do-work-io`**, an unusable MCP mount, PAT, project slug, or backend doc is a **hard stop**. **Never** silent-fallback to markdown, Linear, or sqlite. **Never** invent local UR/REQ files as a substitute store.
+When `tracker.backend` is **`do-work-io`**, an unusable MCP mount, PAT, project slug, or backend doc is a **hard stop**. **Never** silent-fallback to markdown, Linear, or sqlite. **Never** invent local Issue/REQ files as a substitute store.
 
 ### Operator-facing message (use as template)
 
@@ -79,7 +93,7 @@ HARD STOP: do-work-io tracker backend is configured but MCP/PAT/project is not u
 
 do-work will not fall back to markdown, Linear, or sqlite work-item storage
 while tracker.backend is "do-work-io".
-No local REQ/UR files, Linear issues, or work.db rows were invented.
+No local REQ/Issue files, Linear issues, or work.db rows were invented.
 
 What failed: <MCP missing | unauthenticated | tools undiscoverable | PAT unset |
               base_url missing | project slug missing | project not found |
@@ -141,12 +155,12 @@ If MCP/PAT becomes unusable **after** a successful `claim_req` (`req_claim` / `r
 | Port op | MCP wire name (primary) | Capability id (fallback search) | Arguments (conceptual) |
 |---------|-------------------------|---------------------------------|------------------------|
 | `ensure_product_container` | `project_ensure` | `project.ensure` | `{ slug: tracker.dowork.project, name?: project.name \|\| slug }` — create-or-return |
-| `create_ur` | `ur_create` | `ur.create` | `{ project, title, brief }` → `data.slug` is `UR-NNN` |
-| `read_ur` | `ur_get` | `ur.get` | `{ project, ur: UR-NNN }` |
-| `list_urs` | `ur_list` | `ur.list` | `{ project }` |
+| `create_ur` | `ur_create` | `ur.create` | Create Issue; `{ project, title, brief }` → `data.slug` is `UR-NNN` |
+| `read_ur` | `ur_get` | `ur.get` | Read Issue; `{ project, ur: UR-NNN }` |
+| `list_urs` | `ur_list` | `ur.list` | List Issues; `{ project }` |
 | `append_ideate` | `ur_append-ideate` | `ur.append-ideate` | `{ project, ur, body }` — append; never overwrite brief |
 | `append_clarifications` | `ur_append-clarifications` | `ur.append-clarifications` | `{ project, ur, body }` |
-| `create_req` | `req_create` | `req.create` | `{ project, ur, title, files?, ... }` → `data.slug` is `REQ-NNN` |
+| `create_req` | `req_create` | `req.create` | `{ project, ur, title, files?, ... }` → `data.slug` is `REQ-NNN` (`ur` = parent Issue) |
 | `update_req` | `req_update` | `req.update` | `{ project, req, ... }` — not for claim/archive |
 | `read_req` | `req_get` | `req.get` | `{ project, req }` — embeds `active_claim: {id, agent_id, heartbeat_at, claimed_at} \| null` |
 | `list_reqs_for_ur` | `req_list` | `req.list` | `{ project, ur }` — same `active_claim` embed |
@@ -288,7 +302,7 @@ Each sequence starts with rediscovery (`search_tool` **wire name** then dotted c
 #### `write_close_report`
 
 1. `search_tool` `ur_write-close-report` then `ur.write-close-report`
-2. Call the **observed** tool with `{ project, ur, body }` — sets UR `closed_at`.
+2. Call the **observed** tool with `{ project, ur, body }` — sets Issue `closed_at`.
 
 #### `append_run_note`
 
@@ -305,7 +319,7 @@ Each sequence starts with rediscovery (`search_tool` **wire name** then dotted c
 
 #### `list_milestone_reqs`
 
-**Refuse (v1.1).** Same. Use `list_reqs_for_ur` (`req.list`) when you need the UR’s REQs.
+**Refuse (v1.1).** Same. Use `list_reqs_for_ur` (`req.list`) when you need the Issue’s REQs.
 
 #### `write_gate_state`
 
@@ -331,7 +345,7 @@ Each sequence starts with rediscovery (`search_tool` **wire name** then dotted c
 
 ## status_map (REQ-only)
 
-Identity: `backlog` / `in_progress` / `stopped` / `done`. Do not invent UR statuses.
+Identity: `backlog` / `in_progress` / `stopped` / `done`. Do not invent Issue statuses (Issues use `closed_at`, not a status enum).
 
 ---
 
