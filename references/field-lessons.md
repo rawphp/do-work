@@ -161,6 +161,8 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 | UI screenshot is a default Vite page, 404, or the main checkout app instead of the REQ change | `npx vite` ran from process CWD (or repo root), not the worktree package that owns `vite.config` / `package.json` | `cd` into `{worktree}/<app-package>` before starting a **private** evidence server; pass an unused `--port` (never the shared 5173 / project.test host). Confirm the ready URL is that private origin, then screenshot. Stop the private server when the step ends |
 | UI screenshot connection-refused after a "Vite ready" log | The start command was bound to a short tool timeout; the wrapper killed the process group when that call returned/timed out | Start the private server as a **long-lived** process (no short wall-clock kill on the start command). Confirm the private port still listens immediately before screenshot. Stop the server only after the PNG is on disk |
 | UI screenshot of the shared `*.test` / Herd origin shows **old** behaviour while worktree tests are green | Live Herd/nginx serves the **main checkout** `public/build` (no `public/hot`); worktree JS is not on that origin | Do **not** treat the shared project.test host as proof of a worktree frontend change. Start a **private unused-port** Vite whose root/alias loads the **worktree** source (or a tiny harness that mounts the changed component) and screenshot that origin |
+| Private Vite listens but every path returns **HTTP 404** (empty body) | Worker passed a harness HTML path as a **positional** Vite CLI arg (`npx vite … harness.html`); Vite treats that as a wrong root, so `/` and `/harness.html` both 404 | Start Vite with **no** HTML positional: `cd {worktree}/<app-package> && npx vite --host 127.0.0.1 --port <free> --strictPort`. Open `http://127.0.0.1:<port>/harness.html` (file under package root). Confirm `curl -s -o /dev/null -w '%{http_code}'` is 200 before screenshot |
+| Need a second UI state (tab click) but `playwright screenshot` CLI cannot click | CLI is navigate+wait only | Prefer a temporary harness `?tab=` (or similar) query that auto-selects the state after mount; or script with Playwright Python/node API. Do not hang forever on a selector that only appears after an unsent click |
 
 ## 23. Policy `.env.*` matches committed `.env.example`
 
@@ -180,4 +182,96 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
 | Playwright `screenshot <url>` of a Vite SPA is a blank dark page; every route PNG is the same tiny size | The CLI captures the empty `#app` shell before Vue mounts | Use `--wait-for-selector` on a real heading/testid and `--wait-for-timeout`. Re-vision the PNG. If it is still blank, verdict is `not-reached`, not `closed` |
+
+
+## 26. Close subagent must have Shell (or suite output)
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Close cannot live-walk and cannot honestly emit `degraded:evidence-by-test` | Close was dispatched as a file-only subagent (no Shell / no Playwright) | Parent must grant **Shell** so close can run the covering suite (and a browser for web walks). If the harness cannot, the parent runs the suite and passes **exit code + passing/failing test names** into close. Do not treat unread test source as a passing suite unless the operator explicitly authorizes that fallback |
+
+## 27. do-work-io `req.get` / `req.list` read shape — use wire fields first
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Verify/audit/worker needs Task text, layer/size, path fields, or suite after `req.get` / `req.list` | Older agents assumed get omitted body/path fields and reconstructed from local files | **Default:** treat `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` as present on get/list (create/update persist; get round-trips). Use wire values; see `agents/tracker/do-work-io.md` read_req / list_reqs_for_ur. **Fallback only** if those keys are truly absent on an old server: snapshot under `{project}/.do-work/state/REQ-NNN.body.md` for evidence scripts / worker prompt, and `req.update` so the body is stored — do not invent a coverage miss from a missing key alone |
+
+
+## 28. After worktree create: read and edit only under the worktree path
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Worker implements against the wrong schema/names (or patches tests that don't match the integration base) while the worktree is correct | Main checkout has **dirty WIP** on the same paths; tools defaulted to `{project}/…` instead of `{project}/.worktrees/req-…/…` | After W2/W3.5, treat the **worktree absolute path** as CWD for every read/edit/test. Never use the main checkout tree for source of truth while implementing. Dirty main files are orchestrator/operator WIP — out of bounds |
+| Pest `DatasetMissing` on red tests that reference new model constants in `->with([...])` | Dataset evaluates before implementation exists; undefined class constants collapse the dataset | In red phase, use **string literals** in Pest datasets; switch to constants only after they exist (or keep literals if clearer) |
+
+## 29. Issue is product noun; wire stays `ur.*` / `UR-NNN`
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Agent invents `issue.create` / `issue_create` / `ISSUE-NNN` / param `issue` after docs or UI say **Issue** | Product noun renamed; **wire deliberately frozen** at `ur.*` / slug `UR-NNN` / param `ur` / port ops `*_ur` | Use **Issue** in prose and reports. For MCP/port: still `ur_create`/`ur.create`, `ur`, `UR-NNN`. Tables may be `issues`/`issue_artifacts`. Do not invent capability names. On Linear: do-work Issue = Milestone; Linear Issue = REQ — never conflate |
+| Markdown store probe still looks for `user-requests/` under do-work-io/sqlite/linear | Folder name is markdown-backend only; product noun change did not rename that path | Follow backend resolve: local `user-requests/` only when `backend: markdown` |
+
+
+## 30. UI evidence path: checker wants user-requests, non-markdown uses evidence/
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| `check-acceptance-evidence.sh` fails: `ui ref must be under .do-work/user-requests/*/ui-evidence/` though PNG exists under `.do-work/evidence/UR-NNN/ui-evidence/` | Worker followed sqlite/do-work-io evidence home; checker still hard-requires the markdown-era `user-requests/` path | Before the evidence gate: copy (or rewrite report `ref:`) the PNG to `{project}/.do-work/user-requests/UR-NNN/ui-evidence/REQ-NNN-step-….png`. Do not fail the REQ for path home alone. Prefer instructing workers to write both, or fix the checker to accept `evidence/` for non-markdown backends |
+
+## 31. Submodule pointer merge needs the object in the main checkout
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Parent merges `req/*` cleanly (only a submodule SHA change) but `git -C <submodule> checkout <sha>` fails with `unable to read tree` / missing object | Worker committed the submodule tip **inside the worktree's nested clone**; that object never existed in the main checkout's submodule clone | After Stage B merge of a submodule-pointer commit, `git -C {project}/.worktrees/req-…/<submodule> rev-parse HEAD` and `git -C {project}/<submodule> fetch {worktree-submodule-path} <sha>` then `checkout <sha>` (stash local dirt first). Do not tear down the worktree until the main submodule can resolve the recorded SHA. Prefer workers that also push the submodule tip when a remote exists |
+| `git submodule status` shows `+` after merge while parent index is clean | Main submodule working tree still on an older tip | Same fetch+checkout; then re-check `git submodule status` is clean (no `+`) before archive/final suite |
+
+## 26. do-work-io capture must populate REQ body before go/run
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| `req.get` returns ACs + files but empty/missing `body` (no Task / Verification Steps); workers under-spec or invent steps | Capture created REQs with title + structured fields only and never wrote the markdown body | In **audit** (before claim) or at capture end: `req.update` with full `## Task` / `## Context` / `## Integration` / `## Verification Steps` body. Path-units also need `entry_point` + `terminal_state`. Do not dispatch workers on AC-only shells |
+| Path-unit claimable before children | `depends_on` left empty on Layer:none parent | After capture, set path-unit `depends_on` to all child slugs before go, or workers re-implement / fail verification |
+
+
+## 32. Pixel-perfect UI briefs: read mockups first; durable evidence copy
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Intake brief invents wrong layout (e.g. dark 3-col when mockups are light Linear) | Agent summarized from placeholders without vision-reading attached images | **Before** writing inventory into the UR brief: open each attached image (session `images/` or message assets) and describe only what is visible |
+| Workers cannot open mockup paths under `/Users/…/.grok/sessions/…` later | Session media is ephemeral | During start/capture, **copy** mockups into `{project}/.do-work/evidence/UR-NNN/mockups/` and cite those paths in REQ Context / Assets |
+
+## 33. Vue private harness: use `RouterView` component, not `h('router-view')`
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Harness mounts `#app` but body stays empty; `html` shows raw `<router-view></router-view>` tag; console `No match found for location with path ""` | `createApp({ render: () => h('router-view') })` does **not** resolve Vue Router’s component — browser treats it as an unknown native element | Import `{ RouterView }` from `vue-router` and `h(RouterView)`; `await router.push(...); await router.isReady()` before `app.mount` |
+
+## 34. do-work-io install: MCP usable ≠ PAT in process env
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| `/do-work install` for do-work-io can `search_tool` loop tools, but `${token_env}` is unset in the agent shell | Host MCP already has the Sanctum PAT in its server headers; it was never exported as `DOWORK_IO_PAT` | Treat MCP discovery as “tools usable.” Write `tracker.backend: do-work-io` + `base_url`/`project`/`token_env`/`mcp_profile`, then `project.ensure`. **Do not** paste the token into chat or config. Report PAT unset for Load Config 7c / non-MCP shells. Do **not** hard-stop install solely because the process env lacks the PAT when MCP already answers. |
+
+## 35. Parallel merge of shared registration files (provider/routes)
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Parallel REQs each add capabilities/routes; after Stage B “ours” resolution, suite fails with missing capability or 404 | Multiple workers edit the same ServiceProvider CAPABILITY_CLASSES list and routes.php; conflict resolution that keeps **ours** drops sibling registrations | After serial Stage B merges that touch shared registration files, **union** CAPABILITY_CLASSES / route groups from each feature tip (or re-read each worktree file before teardown). Never “keep ours” alone for registry/router hubs. Re-run full suite on integration base before archive of the wave |
+| Page/DTO helpers diverge (e.g. `toArray` missing) after add/add conflict | Same: partial DTO kept from one branch | Prefer the fuller DTO (methods used by any sibling) or re-copy from the worktree that owns the consumer capability |
+
+
+## 36. Realtime path-unit walk: Echo key + CORS origin before second-actor
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| SPA open and API mutations succeed, but UI never hydrates; no `/broadcasting/auth`; WS hits wrong app key or never opens Reverb | Shared Vite process inherits a **shell** `VITE_REVERB_APP_KEY` that overrides `.env.local`; or SPA origin is not on `CORS_ALLOWED_ORIGINS` | Before second-actor claim/status/archive: start a **private** Vite with explicit matching Reverb env (`env -u VITE_REVERB_APP_KEY VITE_REVERB_APP_KEY=<server-key> …`), confirm `import.meta.env` shows that key and CORS preflight for that origin returns `Access-Control-Allow-Origin`. Prefer the pre-allowlisted private port if the project already has one. Do not treat the shared Herd/SPA host as proof when its baked/process env diverges from server `REVERB_APP_KEY` |
+| list-account only on first paint, never after mutations | Echo never subscribed (wrong key / failed auth) | Fix key+CORS first; then assert WS to Reverb `app/<key>` and ≥1 list-account after the first second-actor mutation before vision-passing the UI step |
+
+
+## 36. Parallel workers expanding footprint onto shared env docs
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Parallel REQs declared disjoint footprints but both rewrite `packages/*/ .env.example` (or README); Stage B hits content conflict | Workers expanded footprint for docs that "belong" to every local-recipe REQ | Prefer **union resolve** on shared env/docs (keep both comment blocks + keys), never "ours" alone. Optionally claim env-doc REQs serially when both touch the same example file. Re-run related suite after merge |
+| Merge blocked by dirty same path on main checkout | Worker or local tool edited main tree mid-run | `git checkout -- <path>` only when the feature tip already carries the intended change; then merge. Re-assert integration base first |
 
