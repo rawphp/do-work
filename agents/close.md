@@ -53,13 +53,13 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 | Backend | Where the closure report lives |
 |---------|--------------------------------|
 | **markdown** | `{project}/.do-work/user-requests/UR-NNN/closure.md` (+ optional `closure-evidence/`) |
-| **linear** | Port op **`write_close_report`** — Initiative description **`## Closure`** + Initiative comment with the full report (`agents/tracker/linear.md`). Do **not** dual-write authoritative `closure.md` under `user-requests/`. Optional local evidence files for screenshots are fine; the report home is the Initiative. |
-| **sqlite** | Port op **`write_close_report`** → `bash {skill-root}/lib/dw-db.sh write-close {project} UR-NNN --body TEXT` (sets `closed_at`). Path-units via `list-reqs` + `layer=none`. **Do not** create `user-requests/…/closure.md` as the store. Evidence binaries under `.do-work/evidence/UR-NNN/closure-evidence/` only. |
+| **linear** | Port op **`write_close_report`** — do-work Issue (Project Milestone) description **`## Closure`** + milestone comment with the full report (`agents/tracker/linear.md`). Do **not** dual-write authoritative `closure.md` under `user-requests/`. Optional local evidence files for screenshots are fine; the report home is the Project Milestone. |
+| **sqlite** | Port op **`write_close_report`** → `bash {skill-root}/lib/dw-db.sh write-close {project} UR-NNN --body TEXT` (sets `closed_at`). Path-units via `list-reqs` + Entry/Terminal filter (Layer-agnostic). **Do not** create `user-requests/…/closure.md` as the store. Evidence binaries under `.do-work/evidence/UR-NNN/closure-evidence/` only. |
 
-**When effective backend is `linear`:** load the brief and path-unit Issues via port ops (`read_ur`, `list_reqs_for_ur` / done-equivalent Issues) rather than assuming local `input.md` / `archive/` are the store. Walk still runs against the **merged app** (local git). Persist only via **`write_close_report`**. Path-unit ids are **Linear issue identifiers** (e.g. `ENG-123`) — see linear.md **Close path-unit collection**.
+**When effective backend is `linear`:** load the brief and path-unit Linear issues (REQs) via port ops (`read_ur`, `list_reqs_for_ur` / done-equivalent issues) rather than assuming local `input.md` / `archive/` are the store. Walk still runs against the **merged app** (local git). Persist only via **`write_close_report`**. Path-unit ids are **Linear issue identifiers** (e.g. `ENG-123`) — see linear.md **Close path-unit collection**.
 
 **When effective backend is `sqlite` (1S):**
-- Brief / path-units: `get-ur` / `list-reqs --ur UR-NNN` via dw-db (filter `layer=none`)
+- Brief / path-units: `get-ur` / `list-reqs --ur UR-NNN` via dw-db; select path-units by non-empty Entry point + Terminal state (prefer `layer=none` when present; if none, fall back to any REQ with both path fields — field lesson §19)
 - Persist only via **`write-close`** — never dual-write `user-requests/UR-NNN/closure.md`
 - Evidence screenshots under `.do-work/evidence/UR-NNN/closure-evidence/` only
 - Hard-stop if dw-db fails
@@ -73,7 +73,7 @@ Keep these values in context: `test.suite_command` (for degraded `evidence-by-te
 | Backend | Brief source |
 |---------|--------------|
 | **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. If missing → report `"UR-NNN/input.md not found at {path}. Cannot close without a brief."` and stop. Do not write a partial `closure.md`. |
-| **linear** | Call port op **`read_ur`** for `UR-NNN` (Initiative description: `## Brief` and machine sections). If Initiative / Project missing → hard-stop with that error; do not invent a brief; do not fall back to local `input.md` as the store. |
+| **linear** | Call port op **`read_ur`** for `UR-NNN` (Project Milestone description: `## Brief` and machine sections). If milestone / product Project missing → hard-stop with that error; do not invent a brief; do not fall back to local `input.md` as the store. |
 | **sqlite** | `bash {skill-root}/lib/dw-db.sh get-ur {project} UR-NNN` (title/brief). Missing → hard-stop; do not invent a local `input.md`. |
 
 The brief is the user's own words — the contract the integrated app must satisfy. You read it for orientation only; the validated contract is each path-unit's declared entry point and terminal state (Step 2).
@@ -93,7 +93,8 @@ Do not read `**Closure proof:**`. Do not read non-path-unit items except to conf
 | Backend | How to collect path-units |
 |---------|---------------------------|
 | **markdown** | Scan `{project}/.do-work/archive/` for every `REQ-*.md` whose `**UR:**` field is `UR-NNN`. `req` = the `REQ-NNN` id. |
-| **linear** | Follow linear.md **Close path-unit collection**: resolve Project `do-work/{UR-id}`; **`list_reqs_for_ur`** (include done/archived-equivalent Issues); select path-units by Layer/Entry/Terminal fields. **`req` = Linear issue identifier** only — never invent parallel `REQ-NNN` ids. Do not scan local `archive/` as the store. |
+| **linear** | Follow linear.md **Close path-unit collection**: resolve shared product Project + do-work Issue milestone; **`list_reqs_for_ur`** (include done/archived-equivalent Linear issues); select path-units by non-empty Entry/Terminal (Layer-agnostic; prefer `Layer: none` when present). **`req` = Linear issue identifier** only — never invent parallel `REQ-NNN` ids. Do not scan local `archive/` as the store. |
+| **sqlite** | `list-reqs --ur UR-NNN` via dw-db; same Entry/Terminal selection as Step 2 definition. |
 
 **Empty case.** If zero path-units are found, skip Steps 3–4 and go straight to Step 5 with the empty-case schema (`path_units: 0`, `overall: no-path-units`).
 
@@ -144,7 +145,7 @@ A degraded verdict is a **first-class outcome**, not a failure — it is counted
 Build the closure document — YAML front matter plus one markdown verdict row per path-unit REQ (schema below). **Persist via the backend branch (REQ-296):**
 
 - **Markdown:** write `{project}/.do-work/user-requests/UR-NNN/closure.md` — the only work-item file you write under markdown.
-- **Linear:** call port op **`write_close_report`** (`agents/tracker/linear.md`) with the same full document for this Issue — Initiative `## Closure` + Initiative comment. Do not invent another home; do not dual-write authoritative local `closure.md`.
+- **Linear:** call port op **`write_close_report`** (`agents/tracker/linear.md`) with the same full document for this do-work Issue — Project Milestone `## Closure` + milestone comment. Do not invent another home; do not dual-write authoritative local `closure.md`.
 
 Place evidence artifacts (screenshots, captured command output) under `{project}/.do-work/user-requests/UR-NNN/closure-evidence/` when useful and reference them from `evidence_ref` (local evidence paths are allowed under both backends; they are not a second report store).
 
@@ -163,7 +164,7 @@ Place evidence artifacts (screenshots, captured command output) under `{project}
 
 **Verdict semantics:** `closed` = reached + observed matches terminal; `not-reached` = could not exercise the entry point at all; `terminal-mismatch` = reached but observed ≠ terminal; `degraded:*` = per Step 4.
 
-**Empty case.** A UR with zero path-units still produces a valid report with `path_units: 0`, an empty `verdict_summary: {}`, `overall: no-path-units`, and a one-line body stating that this Issue declared no reachable paths to close. Persist it via the same backend branch (local `closure.md` or **`write_close_report`**). It does **not** error.
+**Empty case.** An Issue with zero path-units still produces a valid report with `path_units: 0`, an empty `verdict_summary: {}`, `overall: no-path-units`, and a one-line body stating that this Issue declared no reachable paths to close. Persist it via the same backend branch (local `closure.md` or **`write_close_report`**). It does **not** error.
 
 **Schema:**
 
@@ -216,7 +217,7 @@ overall: no-path-units
 
 # Closure report — UR-NNN
 
-This UR declared no path-unit REQs, so there are no reachable paths to close. Nothing to walk; nothing to report.
+This Issue declared no path-unit REQs, so there are no reachable paths to close. Nothing to walk; nothing to report.
 ```
 
 ### 6. Report and surface gaps
@@ -234,7 +235,7 @@ Path-units walked: N
   degraded:human-confirmed:  N
 
 Overall: <closed | gaps | no-path-units>
-Report:  <markdown: user-requests/UR-NNN/closure.md | linear: Initiative ## Closure + comment via write_close_report>
+Report:  <markdown: user-requests/UR-NNN/closure.md | linear: Project Milestone ## Closure + comment via write_close_report>
 ```
 
 **Surface, never fix.** When `overall` is `gaps`, print each `not-reached` / `terminal-mismatch` / denied row (REQ id, entry point, observed state) and recommend the user capture follow-up work — e.g. intake a new brief or re-open via a new REQ. You do **not** edit source, re-run the loop, or reopen REQs. Remediation is an explicit, user-initiated act; integration failures are precisely the failures that need human judgment.
@@ -255,12 +256,12 @@ No commits. No work-item writes beyond the closure report home for the active ba
 - **Surface gaps, never auto-fix.** A `gaps` overall verdict reports the failing rows and recommends follow-up. Closure observes; it does not remediate.
 - **Evidence, not assertion.** Every verdict carries a concrete `evidence_ref` (command output, screenshot, test name, or human-confirm id). Do not invent evidence; do not record a verdict you did not observe.
 - **Respect security config.** Never run a probe that trips `security.blocked_commands` or touches `security.blocked_paths`; treat such a path-unit as not-automatable and route it through degraded mode.
-- **The empty case is success, not failure.** A UR with no path-units writes a valid `no-path-units` closure report (backend home) and exits cleanly.
-- **Linear homes are fixed (REQ-296 / REQ-297).** When `tracker.backend: linear`, collect path-units via Linear issue ids (`list_reqs_for_ur` + path-unit fields) and persist only via **`write_close_report`** (Initiative `## Closure` + comment). If Initiative write fails (permission/size) and the §10 Initiative-comment path also fails, hard-stop — do not invent ad-hoc Issue comments, alternate Docs, or local `closure.md` as the authoritative store.
+- **The empty case is success, not failure.** An Issue with no path-units writes a valid `no-path-units` closure report (backend home) and exits cleanly.
+- **Linear homes are fixed (REQ-296 / REQ-297).** When `tracker.backend: linear`, collect path-units via Linear issue ids (`list_reqs_for_ur` + path-unit fields) and persist only via **`write_close_report`** (Project Milestone `## Closure` + comment). If milestone write fails (permission/size) and the §10 milestone-comment path also fails, hard-stop — do not invent ad-hoc Linear issue comments, alternate Docs, or local `closure.md` as the authoritative store.
 
 ## Close field traps (continued)
 
-1. **no-path-units ≠ complete (§20).** Before treating `overall: no-path-units` as “UR is done”: list REQs across backlog + working + archive. Any non-archived REQ ⇒ not **tracker-complete**. Walk the brief on the merged app when asked to validate complete; report **product-complete** vs **tracker-complete** as two verdicts. Archived-only path scan can miss unarchived work.
+1. **no-path-units ≠ complete (§20).** Before treating `overall: no-path-units` as “Issue is done”: list REQs across backlog + working + archive. Any non-archived REQ ⇒ not **tracker-complete**. Walk the brief on the merged app when asked to validate complete; report **product-complete** vs **tracker-complete** as two verdicts. Archived-only path scan can miss unarchived work.
 2. **SPA hydrate before screenshot (§25).** Web walks must wait for SPA hydrate: Playwright `--wait-for-selector` on a real heading/testid plus `--wait-for-timeout`. Re-vision the PNG; blank dark `#app` shell ⇒ `not-reached`, not `closed`.
 3. **Shell / suite required (§26).** Close must have Shell (or parent-passed suite exit code + test names). Unread test source is not a passing suite.
 4. **Realtime second-actor (§36).** Before second-actor UI proof: private Vite with matching `VITE_REVERB_APP_KEY` / server **REVERB** key, **CORS** allows that origin (`CORS_ALLOWED_ORIGINS`), confirm WS to Reverb, and ≥1 list refresh after the first **second-actor** mutation.

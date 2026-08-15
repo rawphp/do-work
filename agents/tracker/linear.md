@@ -24,27 +24,36 @@ Do **not** load this file for ordinary work-item ops when backend is `markdown` 
 
 ## Hierarchy (authoritative)
 
+**Noun disambiguation (required when reading this file):**
+
+| Phrase | Means |
+|--------|--------|
+| **do-work Issue** / **UR-NNN** | Product brief entity = Linear **Project Milestone** (`<!-- do-work-ur -->`) |
+| **Linear issue** / **REQ** | Work item = native Linear **issue** id (e.g. `ENG-123`, `<!-- do-work-req -->`) |
+
+Never say bare "Issue's Issues". Prefer "do-work Issue's Linear issues (REQs)".
+
 ```
 Team (config)
-└── Project product_project   — one shared product Project per local product (not per Issue)
-    ├── Project Milestone (UR)   — §9.1 <!-- do-work-ur -->
-    └── Issue (REQ)              — attached to that Issue milestone
+└── Project product_project   — one shared product Project per local product (not per do-work Issue)
+    ├── Project Milestone (do-work Issue / UR-NNN)   — §9.1 <!-- do-work-ur -->
+    └── Linear issue (REQ)              — attached to that milestone
         └── Sub-issue (layer child)
 ```
 
 | Entity | Naming / config |
 |--------|-----------------|
 | Product Project | `tracker.linear.product_project` — **shared** name or UUID; **default empty**. Resolve via config chain (explicit `product_project` → `project.name` → git-root basename); `ensure_product_container` create-if-missing + **always persist UUID**. Never fall through to skill name `do-work` for empty config. Example for this skill repo only: name `do-work`. |
-| UR | **Project Milestone** on that project; name `ur_milestone_name_pattern` (default `{ur_id}: {title}`) |
+| do-work Issue (UR) | **Project Milestone** on that project; name `ur_milestone_name_pattern` (default `{ur_id}: {title}`) |
 | REQ | **Linear issue id only** (e.g. `ENG-123`) — no parallel `REQ-NNN` |
-| Issue scope | product Project + Issue Project Milestone membership |
+| REQ scope | product Project + do-work Issue (UR) Project Milestone membership |
 
 ### Hard rules (hierarchy)
 
 <!-- UR-002 path closed via children ORI-15..18: empty product_project → project.name → basename → ensure create+persist UUID; never invent skill name do-work -->
-1. **No Initiative-as-Issue** — MCP has no reliable Initiative create path; Issues are Project Milestones.
-2. **`product_project` is shared per local product** — do not create per-Issue Projects (including `do-work/{UR-id}` patterns) as the Issue container.
-3. **Atomic `create_ur`** — product Project ensure + milestone create; no partial UR; hard-stop on failure.
+1. **No Initiative as do-work Issue container** — MCP has no reliable Initiative create path; do-work Issues are Project Milestones.
+2. **`product_project` is shared per local product** — do not create per–do-work-Issue Projects (including `do-work/{UR-id}` patterns) as the do-work Issue container.
+3. **Atomic `create_ur`** — product Project ensure + milestone create; no partial do-work Issue; hard-stop on failure.
 4. **Rediscover, never invent** — every op begins with `search_tool`; hard-stop if tools missing.
 5. **No dual-write** — Linear is sole work-item store while `backend: linear`.
 
@@ -52,9 +61,9 @@ Team (config)
 
 | | **Milestone-as-Issue** | **Path-milestone mode (M1/M2)** |
 |--|---------------------|--------------------------------|
-| What | The UR *entity* | Optional delivery mode *inside* one UR |
-| Trigger | Every Linear Issue | Brief has `source: /saas-thesis handoff` **and** `### Milestones` with `#### M1`+ |
-| Store | Linear Project Milestone | Cursor `<!-- do-work-milestone -->` on that **same** Issue milestone description; Issues marked `M1`/`M2` |
+| What | The do-work Issue *entity* (UR-NNN) | Optional delivery mode *inside* one do-work Issue |
+| Trigger | Every do-work Issue (Project Milestone) | Brief has `source: /saas-thesis handoff` **and** `### Milestones` with `#### M1`+ |
+| Store | Linear Project Milestone | Cursor `<!-- do-work-milestone -->` on that **same** milestone description; Linear issues (REQs) marked `M1`/`M2` |
 | Ops | `create_ur` / `read_ur` / `list_urs` | `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` |
 | Detail | This section + [linear-ops.md](../../references/linear-ops.md) | [linear-path-milestones.md](../../references/linear-path-milestones.md) |
 
@@ -96,8 +105,8 @@ Read the pointed reference **when executing that op** (one hop only — no refer
 
 | Entity | Marker | Full template |
 |--------|--------|---------------|
-| Issue Project Milestone | `<!-- do-work-ur -->` | [linear-ops.md](../../references/linear-ops.md) §9.1 |
-| Issue (REQ) | `<!-- do-work-req -->` | [linear-ops.md](../../references/linear-ops.md) §9.2 |
+| do-work Issue Project Milestone (UR) | `<!-- do-work-ur -->` | [linear-ops.md](../../references/linear-ops.md) §9.1 |
+| Linear issue (REQ) | `<!-- do-work-req -->` | [linear-ops.md](../../references/linear-ops.md) §9.2 |
 
 On read/update: missing marker → **stop the op**; do not invent headers.
 
@@ -108,8 +117,8 @@ On read/update: missing marker → **stop the op**; do not invent headers.
 | Decisions | Team Doc `decisions_doc_title` | `append_decision` |
 | Calibration | Team Doc `calibration_doc_title` | Write/read calibration |
 | Run notes | Issue comment `<!-- do-work-run-note -->` | `append_run_note` |
-| Verify / close | Issue Project Milestone `## Verify` / `## Closure` + comment | `write_verify_report` / `write_close_report` |
-| Path-milestone cursor | Issue Project Milestone description `<!-- do-work-milestone -->` | milestone ops |
+| Verify / close | do-work Issue Project Milestone `## Verify` / `## Closure` + comment | `write_verify_report` / `write_close_report` |
+| Path-milestone cursor | do-work Issue Project Milestone description `<!-- do-work-milestone -->` | milestone ops |
 | Gate locks | **Local** `state/gate-owner.md` only | `write_gate_state` |
 
 Full sequences: [linear-ops.md](../../references/linear-ops.md).
@@ -141,7 +150,7 @@ When `tracker.backend` is **`linear`**, failure is a **hard stop**. **Never** si
 HARD STOP: Linear tracker backend is configured but Linear MCP is not usable.
 
 do-work will not fall back to markdown work-item storage while tracker.backend is "linear".
-No issues, Initiative-as-Issue entities, or local REQ/UR substitutes were invented.
+No Linear issues, Initiative-as-do-work-Issue entities, or local REQ/UR substitutes were invented.
 
 What failed: <MCP missing | unauthenticated | tools undiscoverable | team unresolved | status_map state missing | product_project unresolved | product_project empty-name | product_project multi-match>
 
@@ -199,7 +208,7 @@ use /do-work resume or unblock after MCP recovers (port: leave claimed).
 | `product_project` multi-match by name on team | Hard stop; require UUID in `tracker.linear.product_project` |
 | `product_project` unresolved / uncreatable | Hard stop |
 | Any `status_map` value missing on team workflow | Hard stop + rename / override instructions |
-| Milestone / issue create tools missing for `create_ur` / `create_req` | Hard stop; **no** Initiative-as-Issue substitute; **no** markdown dual-write |
+| Milestone / issue create tools missing for `create_ur` / `create_req` | Hard stop; **no** Initiative-as-do-work-Issue substitute; **no** markdown dual-write |
 | Relation tools missing after spike documents **missing** | Prefer body-only deps + one-time warning — still no markdown fallback |
 
 ### Claim / mid-flight (summary)
@@ -229,7 +238,7 @@ Full claim/archive sequences: [linear-ops.md](../../references/linear-ops.md).
 
 ## Cycle-check (read-side, best-effort) — REQ-021
 
-A **diagnostic** sequence that reads an Issue's Issues' native `blocks` relations client-side, builds the dependency graph, and reports any dependency cycles. This is the Linear analog of the sqlite `cycle-check` (REQ-017) / `deadlock-check` (REQ-019) commands — but **read-side and best-effort only**.
+A **diagnostic** sequence that reads a do-work Issue's Linear issues' (REQs') native `blocks` relations client-side, builds the dependency graph, and reports any dependency cycles. This is the Linear analog of the sqlite `cycle-check` (REQ-017) / `deadlock-check` (REQ-019) commands — but **read-side and best-effort only**.
 
 **Critical caveats — read before running:**
 
@@ -240,10 +249,10 @@ A **diagnostic** sequence that reads an Issue's Issues' native `blocks` relation
 
 ### Agent sequence
 
-1. **Scope the Issue** — resolve product Project + Issue Project Milestone; call **`list_reqs_for_ur`** ([linear-ops.md](../../references/linear-ops.md)) to enumerate the Issue's Issues (any status). Capture each Issue's Linear id.
-2. **Rediscover relation-read tools** — `search_tool` for Linear issue **relations** (queries such as `"linear issue relations"`, `"linear blocks"`, `"linear dependencies"`). Map hits to **observed** tool names + `input_schema` from search — never hard-code tool names. If zero relation-read tools are discoverable → emit a one-time warning and **fall back to each Issue's body `**Depends on:**` mirror** (display only; `blocks` relations are authoritative per **Deps authority** in [port.md](port.md)). Still no markdown store, no SQL.
-3. **Read `blocks` relations per Issue** — for each Issue, list its native `blocks` / "is blocked by" edges. Direction (matches `set_blocked_by` in [linear-ops.md](../../references/linear-ops.md)): a dependency **blocks** the current Issue — i.e. *this Issue is blocked by its dependencies*. Model each edge as a **depends-on** edge `current → dependency`.
-4. **Build the directed graph client-side** — nodes = the Issue's Issue ids; edges = depends-on edges from step 3. Only Issues that are dependencies of (or depended-on by) an Issue are in scope; do not pull the whole team graph.
+1. **Scope the do-work Issue** — resolve product Project + do-work Issue Project Milestone; call **`list_reqs_for_ur`** ([linear-ops.md](../../references/linear-ops.md)) to enumerate that milestone's Linear issues / REQs (any status). Capture each Linear issue id.
+2. **Rediscover relation-read tools** — `search_tool` for Linear issue **relations** (queries such as `"linear issue relations"`, `"linear blocks"`, `"linear dependencies"`). Map hits to **observed** tool names + `input_schema` from search — never hard-code tool names. If zero relation-read tools are discoverable → emit a one-time warning and **fall back to each Linear issue's body `**Depends on:**` mirror** (display only; `blocks` relations are authoritative per **Deps authority** in [port.md](port.md)). Still no markdown store, no SQL.
+3. **Read `blocks` relations per Linear issue** — for each REQ, list its native `blocks` / "is blocked by" edges. Direction (matches `set_blocked_by` in [linear-ops.md](../../references/linear-ops.md)): a dependency **blocks** the current Linear issue — i.e. *this REQ is blocked by its dependencies*. Model each edge as a **depends-on** edge `current → dependency`.
+4. **Build the directed graph client-side** — nodes = Linear issue ids for this do-work Issue; edges = depends-on edges from step 3. Only REQs that are dependencies of (or depended-on by) a listed REQ are in scope; do not pull the whole team graph.
 5. **Run cycle detection (DFS)** over the graph. On finding a back-edge, record the **cycle path** as an ordered list of Linear ids (e.g. `ENG-100 → ENG-101 → ENG-102 → ENG-100`).
 6. **Report** — emit `acyclic` when no cycle is found, or a `cycle-detected` block listing every discovered cycle path. When the check ran immediately after a `set_blocked_by` write, note that eventual consistency may hide a fresh edge and advise a re-read after settle.
 7. **Do not mutate.** This sequence writes nothing to Linear, the local store, or git. It only reads and reports.

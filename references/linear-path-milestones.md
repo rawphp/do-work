@@ -8,11 +8,11 @@ One hop from [`agents/tracker/linear.md`](../agents/tracker/linear.md). Load for
 |--|---------------------|--------------------------------|
 | Purpose | Hierarchy: the Issue itself | Delivery bridges *within* one UR |
 | Linear entity | **Project Milestone** named via `ur_milestone_name_pattern` | Not a separate Issue entity |
-| Cursor | n/a (the milestone *is* the Issue) | `<!-- do-work-milestone -->` block on the **Issue Project Milestone description** |
-| Issues | All REQs for the Issue attach to the Issue milestone | Additionally tagged `M1` / `**Milestone:** M1` for listing |
+| Cursor | n/a (the milestone *is* the do-work Issue) | `<!-- do-work-milestone -->` block on the **Issue Project Milestone description** |
+| Issues | All REQs for the do-work Issue attach to the do-work Issue milestone | Additionally tagged `M1` / `**Milestone:** M1` for listing |
 | Gate | n/a | Local `state/gate-owner.md` only |
 
-**Never** invent Initiative-as-Issue. **Never** put gate ownership in Linear.
+**Never** invent Initiative-as-do-work-Issue. **Never** put gate ownership in Linear.
 
 ---
 
@@ -29,7 +29,7 @@ Both required → **milestone mode**. Neither Linear labels nor Project cursor a
 
 ### Project description cursor block (marker format)
 
-Authoritative work-item cursor under `backend: linear`. Lives on the **Issue Project Milestone** description (Milestone-as-Issue entity on `product_project`), not a separate per-Issue Project and not local `active-milestone.md`.
+Authoritative work-item cursor under `backend: linear`. Lives on the **Issue Project Milestone** description (Milestone-as-Issue entity on `product_project`), not a separate per–do-work-Issue Project and not local `active-milestone.md`.
 
 ```markdown
 <!-- do-work-milestone -->
@@ -85,7 +85,7 @@ Path-unit parents and layer children for the same unit share the same milestone 
 | | |
 |---|---|
 | **Intent** | Read the active milestone cursor (if any). |
-| ****Home** | Issue Project Milestone description block `<!-- do-work-milestone -->` (path-milestone mode cursor — not the Issue entity itself). |
+| ****Home** | Issue Project Milestone description block `<!-- do-work-milestone -->` (path-milestone mode cursor — not the do-work Issue entity itself). |
 | **Preconditions** | None beyond readable Project; missing / empty block ⇒ not in milestone mode. |
 | **Returns** | `{ active: "M1" \| null, checklist: [...] }` — `active` null when marker missing, `**Active:**` empty/`none`/malformed, or Project unresolved. **Does not invent a milestone id.** |
 
@@ -117,7 +117,7 @@ Path-unit parents and layer children for the same unit share the same milestone 
 **Agent sequence:**
 
 1. ****Rediscover** Project Milestone get/update tools.
-2. **Resolve Issue Project Milestone** for the Issue.
+2. **Resolve do-work Issue Project Milestone** for the do-work Issue.
 3. **Read** current description + existing path-milestone cursor block (create block if capture is writing first cursor).
 4. **Apply caller intent:**
    - **Set / advance** to `M<n>`: set `**Active:** M<n>`; update checklist line for prior M to `deployed` (or caller-supplied status); set target line to `captured` / `running` / as requested.
@@ -139,7 +139,7 @@ Path-unit parents and layer children for the same unit share the same milestone 
 |---|---|
 | **Intent** | List REQs (Linear Issues) belonging to the active or named milestone. |
 | **Preconditions** | Milestone id known (`M<n>`) or active cursor set via `read_active_milestone`. |
-| ****Scope** | Issues on product Project attached to this Issue Project Milestone only. |
+| ****Scope** | Linear issues on product Project attached to this do-work Issue Project Milestone only. |
 
 **Agent sequence:**
 
@@ -314,7 +314,7 @@ Resume is **not** a separate port op name; it composes `set_req_status` + `heart
 
 Do **not** glob `.do-work/working/` or run `lib/synth-status.sh` as the work-item store. Instead:
 
-1. **Rediscover** list issues (scope: product Project + optional Issue Project Milestone, or all Issue milestones on the product Project). Prefer `list_reqs_for_ur` / list-by-project sequences already documented above.
+1. **Rediscover** list issues (scope: product Project + optional do-work Issue Project Milestone, or all do-work Issue milestones on the product Project). Prefer `list_reqs_for_ur` / list-by-project sequences already documented above.
 2. For each issue with workflow in `in_progress` or `stopped` (and optionally recent `released` for audit):
    - Run **Helper: read active claim** — parse latest claim-protocol comment (`agent_claim_marker` / `<!-- do-work-claim -->`) → show **claimer** (`agent_id`), **claimed_at**, **heartbeat**, **fresh/stale** vs effective `stale_max`, claim `status`.
 3. Surface **stale** active claims as warnings (parity with `lib/scan-stale.sh` / deadlock banner intent).

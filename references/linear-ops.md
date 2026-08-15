@@ -19,13 +19,13 @@ One hop from [`agents/tracker/linear.md`](../agents/tracker/linear.md). Load whe
 Team (config)
 └── Project product_project  — one shared product Project per local product (not per Issue)
     ├── Project Milestone (UR)  — §9.1 <!-- do-work-ur -->; brief, ideate, verify, close
-    └── Issue (REQ)             — on product Project, attached to Issue milestone
+    └── Linear issue (REQ)             — on product Project, attached to do-work Issue milestone
         └── Sub-issue (layer child)
 ```
 
 **Product Project naming:** `tracker.linear.product_project` defaults to **empty** (not skill name `do-work`). Resolve order is documented under `ensure_product_container` / `agents/config.md` Load Config step 8. Example for the do-work skill repo itself may still use name `do-work`.
 
-**No Initiative-as-Issue.** Path-milestone mode (M1/M2) is a *cursor + Issue markers* on the Issue milestone — see [linear-path-milestones.md](linear-path-milestones.md).
+**No Initiative-as-do-work-Issue.** Path-milestone mode (M1/M2) is a *cursor + Linear-issue markers* on the do-work Issue milestone — see [linear-path-milestones.md](linear-path-milestones.md).
 
 ---
 
@@ -37,12 +37,12 @@ Bodies are **markdown conventions** in Linear description fields — not custom 
 
 | Entity | Marker (first non-empty line of structured body) | Op consumers |
 |--------|--------------------------------------------------|--------------|
-| Issue Project Milestone | `<!-- do-work-ur -->` | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications`, verify/close writers |
-| Issue (REQ) | `<!-- do-work-req -->` | `create_req`, `update_req`, `read_req`, `set_files`, `set_blocked_by`, `claim_req` / `heartbeat_req` / `unblock_req` / `set_req_status`, archive later |
+| do-work Issue Project Milestone | `<!-- do-work-ur -->` | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications`, verify/close writers |
+| Linear issue (REQ) | `<!-- do-work-req -->` | `create_req`, `update_req`, `read_req`, `set_files`, `set_blocked_by`, `claim_req` / `heartbeat_req` / `unblock_req` / `set_req_status`, archive later |
 
 On **read/update**: if the marker is missing, treat as template parse failure → **stop the op**; do not invent headers or rewrite the body into template form without an explicit migrate path.
 
-### §9.1 Issue Project Milestone description template
+### §9.1 do-work Issue Project Milestone description template
 
 ```markdown
 <!-- do-work-ur -->
@@ -86,7 +86,7 @@ On **read/update**: if the marker is missing, treat as template parse failure �
 | `## Open gaps` / `## Capture summary` | Capture phase | Capture, verify |
 | `## Verify` / `## Closure` | `write_verify_report` / `write_close_report` (REQ-296) | Verify, close, go |
 
-### §9.2 Issue (REQ) description template
+### §9.2 Linear issue (REQ) description template
 
 ```markdown
 <!-- do-work-req -->
@@ -248,19 +248,19 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 5. **Optional labels** — when create/list label tools exist, pre-create common labels (`labels.layer_prefix`, `size_prefix`, `path_unit`) for the team. Label failure is non-fatal for container ensure (body headers remain source of truth); project ensure itself must already have succeeded.
 6. **Return** product Project **id (UUID)** + **name**. Cache for the session.
 
-**Does not:** create an Issue or REQ; create a per-Issue Linear Project; create Initiatives; write local Issue/REQ markdown as the store.
+**Does not:** create an Issue or REQ; create a per–do-work-Issue Linear Project; create Initiatives; write local Issue/REQ markdown as the store.
 
 ### `create_ur`
 
 | | |
 |---|---|
-| **Intent** | Record intake brief as a **Issue Project Milestone** on the shared **product Project**. Does **not** create REQs. **Not** Initiative-as-Issue. **Not** a new Linear Project per Issue. |
+| **Intent** | Record intake brief as a **do-work Issue Project Milestone** on the shared **product Project**. Does **not** create REQs. **Not** Initiative-as-do-work-Issue. **Not** a new Linear Project per do-work Issue. |
 | **Preconditions** | Preflight passed; `ensure_product_container` done; next `UR-NNN` slug allocatable. |
 | **Atomicity** | Product Project resolvable + Project Milestone create must succeed as one logical unit. **No partial UR.** |
 
 **Agent sequence:**
 
-1. **Ensure product Project** — call **`ensure_product_container`** first (resolve chain + list/create/bind + persist UUID). Do **not** restate a hard-coded product name here; do **not** create a per-Issue Project.
+1. **Ensure product Project** — call **`ensure_product_container`** first (resolve chain + list/create/bind + persist UUID). Do **not** restate a hard-coded product name here; do **not** create a per–do-work-Issue Project.
 2. **Allocate next `UR-NNN` slug**
    - `search_tool` for project milestones list tools (`"linear milestones"`, `"linear project milestones"`).
    - List milestones on the product Project; scan names / descriptions for `UR-*` / `**UR-id:** UR-*` / `<!-- do-work-ur -->`.
@@ -270,7 +270,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
    - Description: §9.1 template with verbatim brief; `**Product-project:**` + product project name; `**Product-project-id:**` from ensure; leave `**Milestone-id:**` empty until create returns it.
 4. **Create Project Milestone** on the product Project
    - `search_tool "linear milestone"` / create-milestone surface.
-   - If **no** milestone create tool is discovered → **hard-stop** (do **not** invent Initiative-as-Issue; do **not** create a per-Issue Project as a fake UR).
+   - If **no** milestone create tool is discovered → **hard-stop** (do **not** invent Initiative-as-do-work-Issue; do **not** create a per–do-work-Issue Project as a fake do-work Issue (UR)).
    - `use_tool` create with discovered schema (project id + name + description as required).
    - Record milestone id; patch `**Milestone-id:**` if update tools allow.
 5. **Return** Issue slug, product project id/name, milestone id/name. **Do not** write `.do-work/user-requests/UR-NNN/`. **Do not** create Linear Initiatives. **Do not** create a Linear Project per Issue.
@@ -295,13 +295,13 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | Create one backlog REQ (Issue) on the product Project, attached to the Issue Project Milestone. Optional path-unit parent + layer children as sub-issues. |
-| **Preconditions** | Issue Project Milestone exists on product Project (from `create_ur` or resolve); preflight passed. |
+| **Intent** | Create one backlog REQ (Linear issue) on the product Project, attached to the do-work Issue Project Milestone. Optional path-unit parent + layer children as sub-issues. |
+| **Preconditions** | do-work Issue Project Milestone exists on product Project (from `create_ur` or resolve); preflight passed. |
 | **Id rule** | Resulting id is the **Linear issue id only** (e.g. `ENG-123`). **Never** allocate `REQ-NNN`. |
 
 **Agent sequence:**
 
-1. Resolve **product Project id** + **Issue Project Milestone id** (`search_tool` + list/get). Missing either → hard-stop or fail create (UR incomplete).
+1. Resolve **product Project id** + **do-work Issue Project Milestone id** (`search_tool` + list/get). Missing either → hard-stop or fail create (UR incomplete).
 2. Resolve **backlog** workflow state id from `status_map.backlog` (default `"Todo"`) via discovered status tools.
 3. Build Issue **description** from §9.2 with capture fields (`**UR:**`, layer, files, depends-on Linear ids, size, priority, task, AC, verification, …). Titles short and actionable.
 4. **Path-unit parent** (if this REQ is a path-unit):
@@ -310,7 +310,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 5. **Standalone / leaf REQ:**
    - `search_tool "linear create issue"` (or `"linear issues"`).
    - If create-issue undiscoverable → **hard-stop** (no markdown dual-write).
-   - `use_tool` create: team, project=product Project, milestone=Issue Project Milestone, title, description, state=backlog map, optional assignee=`default_assignee_id`, labels, `parentId` when child.
+   - `use_tool` create: team, project=product Project, milestone=do-work Issue Project Milestone, title, description, state=backlog map, optional assignee=`default_assignee_id`, labels, `parentId` when child.
 6. **Deps at create (optional):** if dependency Linear ids are known, run the same dual-write as **`set_blocked_by`** (native `blocks` relations when tools exist **and** body `**Depends on:**` mirror). If relations missing → body-only + one-time warning (port rule).
 7. **Labels:** attach `Layer/{name}`, `Size/{S|M|L}`, and `path-unit` (parents only) per **Labels** table when label tools exist.
 8. **State:** create in `status_map.backlog` only (validated id from preflight) — never invent a state name.
@@ -336,16 +336,16 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | All REQs for an Issue, any status — Issues on product Project with that Issue Project Milestone. |
-| **Sequence** | 1) Resolve product Project + Issue Project Milestone. 2) `search_tool "linear list issues"`. 3) List Issues filtered by **product project** and **Issue milestone** (not global team backlog alone). 4) Return Linear ids + titles + states (+ parentId if present). |
+| **Intent** | All REQs for a do-work Issue, any status — Linear issues on product Project with that do-work Issue Project Milestone. |
+| **Sequence** | 1) Resolve product Project + do-work Issue Project Milestone. 2) `search_tool "linear list issues"`. 3) List Linear issues filtered by **product project** and **do-work Issue milestone** (not global team backlog alone). 4) Return Linear issue ids + titles + states (+ parentId if present). |
 | **Notes** | Issue Project Milestone membership is the scope. Do not scan local `.do-work/REQ-*`. |
-| **Failure** | Issue milestone missing → empty or error; MCP missing → hard-stop. |
+| **Failure** | do-work Issue milestone missing → empty or error; MCP missing → hard-stop. |
 
 ### `append_ideate`
 
 | | |
 |---|---|
-| **Intent** | Append or write ideate content onto an existing Issue Project Milestone — **without** overwriting `## Brief`. |
+| **Intent** | Append or write ideate content onto an existing do-work Issue Project Milestone — **without** overwriting `## Brief`. |
 | **Preconditions** | Preflight passed; UR exists (Project Milestone with §9.1 marker + `**UR-id:**`). |
 | **Does not** | Create REQs, Projects, or local `ideate.md` files. |
 
@@ -461,7 +461,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | Condition | Behavior |
 |-----------|----------|
-| Linear MCP tools undiscoverable at `create_ur` / `create_req` / append / `set_*` | Hard-stop + setup instructions; **no** Initiative-as-Issue, **no** Issue invent, **no** markdown dual-write |
+| Linear MCP tools undiscoverable at `create_ur` / `create_req` / append / `set_*` | Hard-stop + setup instructions; **no** Initiative-as-do-work-Issue, **no** work-item invent, **no** markdown dual-write |
 | `team_id` / `team_key` unresolved | Hard-stop; do not guess |
 | Product Project ok, milestone create fail | Hard-stop; no partial UR; operator recovery for orphan milestone if any |
 | Create-issue tools missing | Hard-stop; do not write `.do-work/REQ-*` |

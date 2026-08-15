@@ -9,7 +9,9 @@
 #
 # The trailing `closed=<yes|no|n/a>` field reports end-to-end Issue closure
 # (per docs/design/ur-closure.md), derived from the Issue's path-unit REQs
-# (REQs with `**Layer:** none`) and its `user-requests/UR-NNN/closure.md`:
+# and its `user-requests/UR-NNN/closure.md`.
+# A REQ is a path-unit when both `**Entry point:**` and `**Terminal state:**`
+# are non-empty after trim (Layer-agnostic; same rule as close/go/verify).
 #   yes  — closure.md exists with `overall: closed`
 #   no   — closure.md exists with a non-closed `overall` (e.g. gaps),
 #          OR no closure.md while the Issue has path-unit REQs
@@ -71,9 +73,15 @@ for dir in "$DOWORK" "$DOWORK/working" "$DOWORK/archive"; do
     fi
     id="$(req_id_from_path "$req")"
     derived="$(bash "$DERIVE" "$req" | awk '{ print $2 }')"
-    layer="$(extract_field "Layer" "$req")"
+    # Path-unit = non-empty Entry point + Terminal state (Layer-agnostic).
+    entry="$(extract_field "Entry point" "$req")"
+    terminal="$(extract_field "Terminal state" "$req")"
+    entry_trim="$(printf '%s' "$entry" | tr -d '[:space:]')"
+    terminal_trim="$(printf '%s' "$terminal" | tr -d '[:space:]')"
     pathunit=0
-    [ "$layer" = "none" ] && pathunit=1
+    if [ -n "$entry_trim" ] && [ -n "$terminal_trim" ]; then
+      pathunit=1
+    fi
     printf 'ROW %s %s %s %s\n' "$ur" "$id" "$derived" "$pathunit" >> "$TMP_ROWS"
   done
 done

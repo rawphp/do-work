@@ -23,7 +23,7 @@ This layers on the existing spine — verbatim-brief invariant, per-REQ `**Closu
 **Decision.** The closure agent is dispatched as a **fresh `Agent` subagent** (new context) that is handed exactly three things and nothing else:
 
 1. The verbatim brief: `{project}/.do-work/user-requests/UR-NNN/input.md`.
-2. The archived path-unit REQ files for that Issue (REQs whose `**Layer:**` is `none`), read from `{project}/.do-work/archive/`. The closure agent reads each path-unit's `**Entry point:**` and `**Terminal state:**` header fields — these are the contract it validates.
+2. The archived path-unit REQ files for that Issue (REQs with non-empty `**Entry point:**` and `**Terminal state:**` — Layer-agnostic; prefer `**Layer:** none` when present), read from `{project}/.do-work/archive/`. The closure agent reads each path-unit's `**Entry point:**` and `**Terminal state:**` header fields — these are the contract it validates.
 3. The project root and its config (`security`, `test.suite_command`, runtime hints), loaded via [config.md](../../agents/config.md).
 
 The closure agent is **denied** all pipeline context: no worker return reports, no verify/audit/review output, no run ledger, no orchestrator conversation. It must not read `**Closure proof:**` values — per-REQ proof is exactly the optimism it exists to re-check independently.
@@ -106,7 +106,7 @@ A degraded verdict is a **first-class outcome**, not a failure. It is surfaced i
 - `terminal-mismatch` — entry point reached but observed state ≠ declared terminal state (the integration drift case this whole feature exists to catch).
 - `degraded:*` — per Decision 3.
 
-**Empty case.** A UR with zero path-unit REQs writes a valid `closure.md` with `path_units: 0`, `overall: no-path-units`, and a one-line body explaining that this Issue declared no reachable paths to close (REQ-209 AC3). It does not error.
+**Empty case.** An Issue with zero path-unit REQs writes a valid `closure.md` with `path_units: 0`, `overall: no-path-units`, and a one-line body explaining that this Issue declared no reachable paths to close (REQ-209 AC3). It does not error.
 
 ### Worked example (`closure.md`)
 

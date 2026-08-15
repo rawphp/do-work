@@ -66,7 +66,7 @@ Read and follow [intake.md](intake.md) in full.
 Note the Issue number created (e.g. `UR-003`) — you will need it for the next steps. Under Linear, also keep the milestone id in context.
 
 **Number conflict guard:**
-- **Markdown:** Intake scans existing UR folders and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002).
+- **Markdown:** Intake scans existing Issue folders (`user-requests/UR-*`) and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002).
 - **Linear:** Issue slugs come from **`create_ur`** milestone scan; REQ ids are **Linear issue identifiers** allocated by Linear (no local `REQ-NNN`).
 
 ### 2. Run Ideate (default — skip with `--no-ideate`)

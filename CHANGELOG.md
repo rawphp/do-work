@@ -1,15 +1,14 @@
 # Changelog
 
-## Unreleased
-
-### Changed
-- Prose product noun: **Issue** replaces "User Request" / standalone "UR" language. Wire and slugs stay `UR-NNN` / `ur.*`; markdown path `user-requests/` unchanged. Linear: do-work Issue = Project Milestone; Linear Issue = REQ.
-
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
+
+### Changed
+- Prose product noun: **Issue** replaces "User Request" / standalone "UR" language. Wire and slugs stay `UR-NNN` / `ur.*`; markdown path `user-requests/` unchanged. **Linear disambiguation:** do-work Issue = Project Milestone (UR-NNN); Linear issue = REQ. Prefer "do-work Issue" / "Linear issue (REQ)" when both appear in one paragraph. **Consumer impact:** operator-facing copy and agent docs say Issue; scripts that grepped the phrase "User Request" should use Issue / `UR-NNN` instead. Slugs, ports, and MCP ids are unchanged.
+- Path-unit detection (close / go / `lib/coverage-rollup.sh` `closed=` column) is **Layer-agnostic**: a REQ is a path-unit when both `**Entry point:**` and `**Terminal state:**` are non-empty after trim. Prefer `**Layer:** none` when present, but layered REQs with path fields count when no `Layer: none` path-units exist. `Layer: none` alone (no path fields) is **not** a path-unit. **Consumer impact:** `closed=n/a|no|yes` from coverage-rollup/status can change for the same headers — Issues that only had bare `Layer: none` flip toward `n/a`; Issues whose layered REQs carry Entry/Terminal now participate in `closed=` (was stuck `n/a`).
 
 **MCP wire names (Grok-safe; `.` → `_`)**
 
