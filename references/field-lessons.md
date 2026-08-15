@@ -275,3 +275,39 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 | Parallel REQs declared disjoint footprints but both rewrite `packages/*/ .env.example` (or README); Stage B hits content conflict | Workers expanded footprint for docs that "belong" to every local-recipe REQ | Prefer **union resolve** on shared env/docs (keep both comment blocks + keys), never "ours" alone. Optionally claim env-doc REQs serially when both touch the same example file. Re-run related suite after merge |
 | Merge blocked by dirty same path on main checkout | Worker or local tool edited main tree mid-run | `git checkout -- <path>` only when the feature tip already carries the intended change; then merge. Re-assert integration base first |
 
+
+## 37. Final suite after a schema REQ — drop-table teardown vs migration `down()`
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| REQ-scoped tests pass and archive; the **final** suite fails in unrelated tests that `Schema::drop` a table, then RefreshDatabase rolls back a later index/`alter` migration | Worker only ran the REQ filter. `down()` assumes the table (and index) still exist. Another test dropped the table first | When a REQ adds or changes a **migration**, do not treat scoped tests as the wave gate. After merge, run the full suite (or at least files that drop that table). Make `down()` no-op if `Schema::hasTable` is false (or `dropIndexIfExists`) **before** archive of the schema REQ |
+| Final suite is the first failure | Orchestrator archived on REQ-filter green | Same: schema REQs require a full-suite (or teardown-adjacent) pass before archive |
+
+
+## 38. Close web walk: clear session between public and authed scenes
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Login (or other public) scene never reaches its testid after earlier authed scenes; wait times out | Same Playwright context keeps `sessionStorage` tokens; the SPA router redirects `/login` → dashboard | Before a public-route scene: logout / `sessionStorage.clear()` in the harness, or use a fresh browser context. Do not reuse leftover tokens across close scenes |
+
+
+## 38. Multi-Issue close args (`UR-001/005`)
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Operator runs `/do-work close UR-001/005` (slash or space list) | Expects multiple Issues closed in one turn | Parse as **multiple** Issue slugs (split on `/`, `,`, whitespace). For each open Issue: full close walk + one `write_close_report`. Already-closed Issues: report closed_at and skip rewrite unless operator asks re-close. Do not invent a nested path `UR-001/005` as a single id |
+
+
+## 38. do-work-io bulk create_req hits per-minute rate limit
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| Capture mid-UR fails with `rate_limited` / HTTP 429 on `req.create` after ~15–20 creates | Free/control profile enforces per_minute rate on capability bus | Pace creates (~1/s), retry 429 with exponential sleep (15s+), finish deps in a second pass after creates. Do not dual-write markdown REQs. Do not re-create already-allocated slugs — list_reqs_for_ur and resume remaining titles only |
+
+
+## 39. Missing config.yml + live do-work.io MCP → do not markdown-close
+
+| Symptom | Likely cause | Default action |
+|---------|--------------|----------------|
+| `/do-work close UR-NNN` closes a local `user-requests/archive/` ghost or invents `no-path-units` while the real Issue is open on do-work.io | Project has no `.do-work/config.yml` (or backend unset → markdown default) even though the host already has a working `dowork` MCP and a project slug matching the git basename | Before any markdown Issue/REQ read: if `search_tool` finds do-work.io tools, **hard-stop or re-resolve** — write/load `tracker.backend: do-work-io` + `tracker.dowork.project` (slug = basename or `project.list` match), then `ur_get` / `req_list` / `ur_write-close-report`. Never treat local archive as store truth while MCP project exists. |
+| Close finds wire `entry_point`/`terminal_state` null but body has `**Entry point:**` / `**Terminal state:**` | Capture stored path fields only in body | Parse body path headers as path-unit fallback; prefer `req.update` next capture to set wire fields |
