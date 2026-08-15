@@ -132,7 +132,7 @@ assert_eq "feat/something" "$(current_branch)" "$CURRENT_CASE still on feature"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 2: create new-work when on main, clean tree, UR arg given (ignored for name)
+# Case 2: create new-work when on main, clean tree, Issue arg given (ignored for name)
 # ----------------------------------------------------------------------
 CURRENT_CASE="create-new-work-scoped"
 CASES=$((CASES + 1))
@@ -148,7 +148,7 @@ assert_eq "new-work" "$RUN_STDOUT" "$CURRENT_CASE re-run stdout"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 3: create new-work when on main, clean, no UR arg
+# Case 3: create new-work when on main, clean, no Issue arg
 # ----------------------------------------------------------------------
 CURRENT_CASE="create-new-work-unscoped"
 CASES=$((CASES + 1))

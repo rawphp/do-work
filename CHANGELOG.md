@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Prose product noun: **Issue** replaces "User Request" / standalone "UR" language. Wire and slugs stay `UR-NNN` / `ur.*`; markdown path `user-requests/` unchanged. Linear: do-work Issue = Project Milestone; Linear Issue = REQ.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
@@ -18,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `/do-work status` (unscoped): archive rows in the situation-room table are capped to the **15 newest** REQ ids (lexicographic / zero-padded `REQ-NNN` order). Totals still count every archived REQ. When more exist, output includes `_… and N more archived_` and points operators at `status UR-NNN` or `.do-work/archive/`. **Consumer impact:** scripts that scrape unscoped status for a full archive inventory will miss older rows — scope with `UR-NNN` or read `archive/` directly.
 - Archive rows always render Status **`done`** (bucket location is authoritative; stale `**Status:**` headers in archive files are ignored in the table). **Consumer impact:** parsers that expected archive-row status to mirror the file header will now always see `done`.
 - Idle unscoped projects (backlog=0, working=0, archive>0) print a short “no live work” scan cue above the table; empty projects suggest `/do-work start "…"`.
-- `/do-work` help next steps: empty backlog no longer suggests `capture` for URs whose REQs already live in `archive/` (drained project); capture is only suggested for open URs with zero REQs anywhere.
+- `/do-work` help next steps: empty backlog no longer suggests `capture` for Issues whose REQs already live in `archive/` (drained project); capture is only suggested for open Issues with zero REQs anywhere.
 - Agent/docs copy for status and primary-loop commands updated (`agents/status.md`, `agents/help.md`, `docs/commands.md`, `docs/getting-started.md`, `SKILL.md`).
 
 **Hub-only skill install (UR-044 / REQ-278)**
@@ -145,7 +150,7 @@ Workers and orchestrators no longer use broad git-add sweeps. Every commit stage
 - `--grill` flag on start. Users choose Grill at the ideate gate after seeing surfaced gaps.
 
 **Compatibility**
-- Existing URs without YAML frontmatter are treated as legacy. Verify skips all new checks for them; they continue to work as before.
+- Existing Issues without YAML frontmatter are treated as legacy. Verify skips all new checks for them; they continue to work as before.
 - Existing REQs without a `**Layer:**` field are similarly exempt. No migration script.
 
 ## [1.0.0] - 2026-03-14
@@ -154,8 +159,8 @@ Workers and orchestrators no longer use broad git-add sweeps. Every commit stage
 
 - `/do-work start [brief]` — records brief, runs ideate, and decomposes into REQ files in one shot
 - `/do-work go [UR-NNN]` — verifies REQ coverage and auto-runs if confidence >= 90%
-- `/do-work intake [brief]` — records brief verbatim as next UR file
-- `/do-work capture [UR-NNN]` — decomposes a UR into discrete REQ task files
+- `/do-work intake [brief]` — records brief verbatim as next Issue file
+- `/do-work capture [UR-NNN]` — decomposes an Issue into discrete REQ task files
 - `/do-work ideate [UR-NNN]` — surfaces assumptions, risks, and connections before decomposition
 - `/do-work verify [UR-NNN]` — scores REQ coverage against the original brief (0-100%)
 - `/do-work run` — executes backlog with TDD loop, one REQ at a time, commit per REQ

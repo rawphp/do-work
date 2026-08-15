@@ -31,7 +31,7 @@ not this file. No product names/ticket ids as substance.
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
-| Path-unit worker has nothing to implement; need branch evidence for merge | Layer children already on integration base | Do **not** re-implement. Re-run path verification (tests + ui re-vision + docs). If `.do-work/` is gitignored, write a local path-closure note under the UR dir for humans, and land an **empty commit** (`--allow-empty`) on `req/<id>` so the orchestrator has a merge tip. Reuse prior `ui-evidence` PNG only after **re-vision-assert**; copy under the path-unit step name when useful |
+| Path-unit worker has nothing to implement; need branch evidence for merge | Layer children already on integration base | Do **not** re-implement. Re-run path verification (tests + ui re-vision + docs). If `.do-work/` is gitignored, write a local path-closure note under the Issue dir for humans, and land an **empty commit** (`--allow-empty`) on `req/<id>` so the orchestrator has a merge tip. Reuse prior `ui-evidence` PNG only after **re-vision-assert**; copy under the path-unit step name when useful |
 | Worktree base wrong | Checkout HEAD ≠ named integration base | Create worktree from the **integration base named in the dispatch**, not from a dirty/other feature branch on the main checkout |
 
 ## 5. Stage B: assert integration base before every merge
@@ -62,14 +62,14 @@ not this file. No product names/ticket ids as substance.
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
-| `tracker.backend: linear` but UR only exists under `.do-work/user-requests/` with `REQ-*.md` backlog; Linear milestone/issues missing | Capture ran markdown store (or dual-wrote) while config already says linear | **Hard-stop** — do not treat markdown REQs as live. Offer: (1) create Linear UR milestone + issues from the markdown capture then go, or (2) set `tracker.backend: markdown` for this run. Never silent-fallback while backend is linear |
+| `tracker.backend: linear` but Issue only exists under `.do-work/user-requests/` with `REQ-*.md` backlog; Linear milestone/issues missing | Capture ran markdown store (or dual-wrote) while config already says linear | **Hard-stop** — do not treat markdown REQs as live. Offer: (1) create Linear Issue milestone + issues from the markdown capture then go, or (2) set `tracker.backend: markdown` for this run. Never silent-fallback while backend is linear |
 
 
 ## 9. Go / verify UR existence must follow active backend
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
-| `go` hard-stops "UR not found at user-requests/…" while sqlite/linear has the UR | Phase agent still uses markdown-only path probe for "UR exists" | After Load Config + backend resolve: **markdown** → `user-requests/UR-NNN/input.md`; **sqlite** → `get-ur`; **linear** → `read_ur`. Never require local `user-requests/` when backend is not markdown |
+| `go` hard-stops "UR not found at user-requests/…" while sqlite/linear has the Issue | Phase agent still uses markdown-only path probe for "UR exists" | After Load Config + backend resolve: **markdown** → `user-requests/UR-NNN/input.md`; **sqlite** → `get-ur`; **linear** → `read_ur`. Never require local `user-requests/` when backend is not markdown |
 | Verify/score runs against empty/wrong backlog | Same: globbed `REQ-*.md` while live store is DB/Linear | List REQs only via port (`list_reqs_for_ur` / `list-reqs`) |
 
 ## 10. SQLite archive gate: body ACs + closure_proof column
@@ -96,7 +96,7 @@ not this file. No product names/ticket ids as substance.
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
-| A capture-created REQ's `--deps` points at the **wrong** REQ (a different UR's REQ) — the dependent later claims a satisfied/unrelated dep instead of its real predecessor | `create-req` allocates slugs globally (max+1 across the whole DB / REQ tree); a multi-REQ capture that passes `--deps "REQ-NNN"` with a **guessed** slug has it accepted (that slug already exists for another REQ) and silently wired to the wrong target | Create the dependency-target REQ **first**, read its actual slug from `create-req` stdout, then pass that real slug as `--deps` on the dependent REQ. Or create all REQs first and wire deps after via `set-blocked-by`. **Never** pass a not-yet-allocated slug to `--deps`; always re-verify with `dw-db check-deps REQ-NNN` after |
+| A capture-created REQ's `--deps` points at the **wrong** REQ (a different Issue's REQ) — the dependent later claims a satisfied/unrelated dep instead of its real predecessor | `create-req` allocates slugs globally (max+1 across the whole DB / REQ tree); a multi-REQ capture that passes `--deps "REQ-NNN"` with a **guessed** slug has it accepted (that slug already exists for another REQ) and silently wired to the wrong target | Create the dependency-target REQ **first**, read its actual slug from `create-req` stdout, then pass that real slug as `--deps` on the dependent REQ. Or create all REQs first and wire deps after via `set-blocked-by`. **Never** pass a not-yet-allocated slug to `--deps`; always re-verify with `dw-db check-deps REQ-NNN` after |
 
 
 ## 14. Worker worktree base: branch off the named integration branch, not HEAD
@@ -140,13 +140,13 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
-| A UR captured with every REQ assigned a `Layer:` (backend/frontend) — none `Layer: none` — yet the endpoint REQs carry real `**Entry point:**`/`**Terminal state:**` pairs; `go` Step 4b fires the closure offer and/or the close agent then finds **zero path-units** and writes an empty `no-path-units` report, skipping the endpoint walk the operator expected | `verify.md` Step 4f treats "Entry point / Terminal state present" as the path-unit signal (Layer-agnostic), but `close.md` Step 2 and `go.md` Step 4b define a path-unit as `**Layer:** none` AND both path fields present. The two definitions disagree, so a UR captured with layered path-field REQs looks walkable to verify but yields nothing to close | When collecting path-units for close on a UR with no `Layer: none` REQs, fall back to the verify signal: every archived REQ with non-empty `**Entry point:**` + `**Terminal state:**`, ignoring `**Layer:**`. (Skill-side fix: align close.md Step 2 / go.md Step 4b with verify's Layer-agnostic detection, or have capture emit `Layer: none` path-unit parents when a REQ's entry point spans the layer model.) |
+| A UR captured with every REQ assigned a `Layer:` (backend/frontend) — none `Layer: none` — yet the endpoint REQs carry real `**Entry point:**`/`**Terminal state:**` pairs; `go` Step 4b fires the closure offer and/or the close agent then finds **zero path-units** and writes an empty `no-path-units` report, skipping the endpoint walk the operator expected | `verify.md` Step 4f treats "Entry point / Terminal state present" as the path-unit signal (Layer-agnostic), but `close.md` Step 2 and `go.md` Step 4b define a path-unit as `**Layer:** none` AND both path fields present. The two definitions disagree, so an Issue captured with layered path-field REQs looks walkable to verify but yields nothing to close | When collecting path-units for close on an Issue with no `Layer: none` REQs, fall back to the verify signal: every archived REQ with non-empty `**Entry point:**` + `**Terminal state:**`, ignoring `**Layer:**`. (Skill-side fix: align close.md Step 2 / go.md Step 4b with verify's Layer-agnostic detection, or have capture emit `Layer: none` path-unit parents when a REQ's entry point spans the layer model.) |
 
 ## 20. "Validate complete" ≠ empty close report
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
-| Operator asks to validate a UR is complete; close writes `overall: no-path-units` while the product already ships (or while REQs sit in backlog with ACs still `[ ]`) | `close.md` only scans **archived** path-units (`Layer: none` + entry/terminal). A shipped UR whose REQs were never archived, or were captured as layered children without path fields, looks like "nothing to close" | Before treating `no-path-units` as a completeness yes: `list_reqs_for_ur` across backlog + working + archive. If any REQ is not archived, the UR is **not** tracker-complete. Walk the brief on the merged app anyway (web/api/cli as the brief implies) and report product-complete vs tracker-complete as two verdicts |
+| Operator asks to validate an Issue is complete; close writes `overall: no-path-units` while the product already ships (or while REQs sit in backlog with ACs still `[ ]`) | `close.md` only scans **archived** path-units (`Layer: none` + entry/terminal). A shipped UR whose REQs were never archived, or were captured as layered children without path fields, looks like "nothing to close" | Before treating `no-path-units` as a completeness yes: `list_reqs_for_ur` across backlog + working + archive. If any REQ is not archived, the Issue is **not** tracker-complete. Walk the brief on the merged app anyway (web/api/cli as the brief implies) and report product-complete vs tracker-complete as two verdicts |
 
 ## 21. Prefer the project's existing `.do-work/` layout over a legacy skill clone
 
@@ -170,7 +170,7 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 |---------|--------------|----------------|
 | Worker is `done` with tests green, then `check-policy.sh` exits 1: `blocked_path: …/.env.example matches .env.*` | Default `security.blocked_paths` includes `.env` and `.env.*`. The glob is unanchored-suffix: `.env.example` is a public template, not a secret file | Do **not** merge/archive. Treat as `policy-blocked`. Before the next run that must document an env var, narrow `security.blocked_paths` so `.env.*` does not match `.env.example` (keep `.env`, add explicit secret siblings like `.env.local` / `.env.production`). Then `/do-work resume` the stopped REQ — the feature branch can stay. Never bypass the policy gate silently |
 
-## 24. Linear UR slug lookup is zero-padded; evidence checker needs the project root
+## 24. Linear Issue slug lookup is zero-padded; evidence checker needs the project root
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
@@ -237,7 +237,7 @@ Related to §1 (symlinked vendor) but distinct: the symlink **works for running 
 
 | Symptom | Likely cause | Default action |
 |---------|--------------|----------------|
-| Intake brief invents wrong layout (e.g. dark 3-col when mockups are light Linear) | Agent summarized from placeholders without vision-reading attached images | **Before** writing inventory into the UR brief: open each attached image (session `images/` or message assets) and describe only what is visible |
+| Intake brief invents wrong layout (e.g. dark 3-col when mockups are light Linear) | Agent summarized from placeholders without vision-reading attached images | **Before** writing inventory into the Issue brief: open each attached image (session `images/` or message assets) and describe only what is visible |
 | Workers cannot open mockup paths under `/Users/…/.grok/sessions/…` later | Session media is ephemeral | During start/capture, **copy** mockups into `{project}/.do-work/evidence/UR-NNN/mockups/` and cite those paths in REQ Context / Assets |
 
 ## 33. Vue private harness: use `RouterView` component, not `h('router-view')`

@@ -27,7 +27,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -35,7 +35,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear` to `markdown`. If backend is `linear`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
 
@@ -160,7 +160,7 @@ Re-use the orchestrator dispatch path from [run.md](run.md). Do not duplicate th
 1. Classify `subagent_type` using the **REQ Classification** section of [run.md](run.md).
 2. Select `model` using the **Model Selection** section of [run.md](run.md). Note: a stopped-then-resumed REQ matches signal #1 in the model table (`previous status: stopped attempt recorded`) and therefore escalates to `opus` by default.
 3. Identify prior-REQ archived paths for the same UR using the same lookup described in [run.md](run.md) Step 2.
-4. Dispatch via the `Agent` tool, passing the same inline-prompt shape used in [run.md](run.md) Step 2 — the three inputs (REQ path, UR path, prior-REQ paths) plus the full [run-worker.md](run-worker.md) instructions verbatim.
+4. Dispatch via the `Agent` tool, passing the same inline-prompt shape used in [run.md](run.md) Step 2 — the three inputs (REQ path, Issue path, prior-REQ paths) plus the full [run-worker.md](run-worker.md) instructions verbatim.
 
 Announce before dispatch:
 

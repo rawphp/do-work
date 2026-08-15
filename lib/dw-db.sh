@@ -204,7 +204,7 @@ cmd_create_req() {
 
   local ur_id
   ur_id="$(ur_id_for_slug "$db" "$ur")"
-  [ -n "$ur_id" ] || die "create-req: unknown UR slug: $ur"
+  [ -n "$ur_id" ] || die "create-req: unknown Issue slug: $ur"
 
   local parent_sql="NULL"
   if [ -n "$parent" ]; then
@@ -363,7 +363,7 @@ cmd_list_reqs() {
   if [ -n "$ur" ]; then
     local uid
     uid="$(ur_id_for_slug "$db" "$ur")"
-    [ -n "$uid" ] || die "list-reqs: unknown UR slug: $ur"
+    [ -n "$uid" ] || die "list-reqs: unknown Issue slug: $ur"
     sqlite3 -separator $'\t' "$db" "
 SELECT r.slug, r.title, r.status, u.slug
 FROM reqs r JOIN urs u ON u.id=r.ur_id
@@ -560,7 +560,7 @@ _sbb_tx() {
     die "set-blocked-by: transaction failed${err:+ ($err)}"
   fi
 
-  # Reuse REQ-017's cycle detector over the staged graph (no UR filter — a
+  # Reuse REQ-017's cycle detector over the staged graph (no Issue filter — a
   # write may not create ANY cycle).
   SBB_CYCLE="$(cycle_core "" <"$graph_file")"
   local cyc_rc=$?
@@ -942,13 +942,13 @@ ORDER BY CAST(substr(d.slug, instr(d.slug,'-')+1) AS INTEGER) ASC;"
 # Hypothetical edges (set-blocked-by "would this create a cycle?" probe)
 # are extra EDGE lines appended to the same stream — never persisted.
 # A UR argument is a REPORT FILTER only: the subgraph is always the whole
-# deps table, so cycles routed through another UR's REQs are still detected;
-# a cycle is reported only when at least one node in it belongs to that UR.
+# deps table, so cycles routed through another Issue's REQs are still detected;
+# a cycle is reported only when at least one node in it belongs to that Issue.
 # ----------------------------------------------------------------------
 
 # graph_from_db <db> — print NODE/EDGE lines for every req + every dep edge.
 # Uses a non-whitespace column separator (field lesson: tab collapses empty
-# fields under IFS reads; slugs/URs are non-empty here, but stay bulletproof).
+# fields under IFS reads; slugs/Issues are non-empty here, but stay bulletproof).
 graph_from_db() {
   local db="$1"
   local sep=$'\x1e'
@@ -979,7 +979,7 @@ cycle_core() {
     node_list[node_n++] = id
     if (!(id in adj_count)) { adj[id] = ""; adj_count[id] = 0 }
   } else {
-    # Keep the UR if a later NODE line provides one.
+    # Keep the Issue if a later NODE line provides one.
     if (ur != "") node_ur[id] = ur
   }
   next
@@ -1037,7 +1037,7 @@ END {
             for (k = 0; k < path_len; k++) {
               if (path_order[k] == child) { cycle_start = k; break }
             }
-            # Decide whether to REPORT this cycle under the UR filter.
+            # Decide whether to REPORT this cycle under the Issue filter.
             report = 1
             if (filter != "") {
               report = 0
@@ -1389,7 +1389,7 @@ COMMIT;
 SQL
 }
 
-# Active milestone for a UR id (empty if none).
+# Active milestone for an Issue id (empty if none).
 ur_active_milestone() {
   local db="$1"
   local ur_id="$2"
@@ -1467,7 +1467,7 @@ cmd_list_claimable() {
   if [ -n "$ur" ]; then
     local uid
     uid="$(ur_id_for_slug "$db" "$ur")"
-    [ -n "$uid" ] || die "list-claimable: unknown UR slug: $ur"
+    [ -n "$uid" ] || die "list-claimable: unknown Issue slug: $ur"
     where="$where AND r.ur_id = $uid"
   fi
 
@@ -1487,7 +1487,7 @@ ORDER BY
   while IFS=$'\x1e' read -r slug rid ur_id files path_m; do
     [ -n "$slug" ] || continue
 
-    # Milestone filter (per-UR cursor)
+    # Milestone filter (per-Issue cursor)
     local active_m
     active_m="$(ur_active_milestone "$db" "$ur_id")"
     if [ -n "$active_m" ]; then
@@ -1589,7 +1589,7 @@ cmd_append_ideate() {
   local db ur_id now brief_before brief_after
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "append-ideate: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "append-ideate: unknown Issue slug: $slug"
   brief_before="$(sqlite3 "$db" "SELECT brief FROM urs WHERE id=$ur_id;")"
   now="$(iso_now)"
   _artifact_write "$db" "$ur_id" "ideate" "append" "$_BODY" "$now"
@@ -1607,7 +1607,7 @@ cmd_append_clarifications() {
   local db ur_id now
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "append-clarifications: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "append-clarifications: unknown Issue slug: $slug"
   now="$(iso_now)"
   _artifact_write "$db" "$ur_id" "clarifications" "append" "$_BODY" "$now"
 }
@@ -1622,7 +1622,7 @@ cmd_write_verify() {
   local db ur_id now
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "write-verify: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "write-verify: unknown Issue slug: $slug"
   now="$(iso_now)"
   _artifact_write "$db" "$ur_id" "verify" "replace" "$_BODY" "$now"
 }
@@ -1638,7 +1638,7 @@ cmd_write_close() {
   local db ur_id now body_q now_q
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "write-close: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "write-close: unknown Issue slug: $slug"
   now="$(iso_now)"
   body_q="$(sql_quote "$_BODY")"
   now_q="$(sql_quote "$now")"
@@ -1667,7 +1667,7 @@ cmd_write_open_gaps() {
   local db ur_id now
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "write-open-gaps: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "write-open-gaps: unknown Issue slug: $slug"
   now="$(iso_now)"
   _artifact_write "$db" "$ur_id" "open_gaps" "replace" "$_BODY" "$now"
 }
@@ -1681,7 +1681,7 @@ cmd_write_capture_summary() {
   local db ur_id now
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "write-capture-summary: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "write-capture-summary: unknown Issue slug: $slug"
   now="$(iso_now)"
   _artifact_write "$db" "$ur_id" "capture_summary" "replace" "$_BODY" "$now"
 }
@@ -1741,7 +1741,7 @@ cmd_set_active_milestone() {
   local db ur_id active_sql checklist_sql
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "set-active-milestone: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "set-active-milestone: unknown Issue slug: $slug"
   if [ -z "$active" ]; then
     active_sql="NULL"
   else
@@ -1769,12 +1769,12 @@ cmd_get_active_milestone() {
   local db ur_id
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "get-active-milestone: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "get-active-milestone: unknown Issue slug: $slug"
   ur_active_milestone "$db" "$ur_id"
 }
 
 # --- list-milestone-reqs <root> <UR-NNN> [--milestone M1] ---
-# Defaults to that UR's active milestone; empty active → empty list.
+# Defaults to that Issue's active milestone; empty active → empty list.
 cmd_list_milestone_reqs() {
   local root="${1:-}" slug="${2:-}"; shift 2 2>/dev/null || true
   [ -n "$root" ] && [ -n "$slug" ] || die "list-milestone-reqs: usage: list-milestone-reqs <root> <UR-NNN> [--milestone M1]"
@@ -1789,7 +1789,7 @@ cmd_list_milestone_reqs() {
   local db ur_id
   db="$(open_db "$root")"
   ur_id="$(ur_id_for_slug "$db" "$slug")"
-  [ -n "$ur_id" ] || die "list-milestone-reqs: unknown UR slug: $slug"
+  [ -n "$ur_id" ] || die "list-milestone-reqs: unknown Issue slug: $slug"
   if [ -z "$milestone" ]; then
     milestone="$(ur_active_milestone "$db" "$ur_id")"
   fi
@@ -2122,7 +2122,7 @@ SELECT slug, title, class, created_at, COALESCE(closed_at,'')
 FROM urs
 ORDER BY CAST(substr(slug, instr(slug,'-')+1) AS INTEGER) ASC;")"
   if [ -z "${ur_lines:-}" ]; then
-    ur_rows_html='<tr><td colspan="7" class="empty">No user requests yet.</td></tr>'
+    ur_rows_html='<tr><td colspan="7" class="empty">No issues yet.</td></tr>'
   else
     while IFS="$sep" read -r u_slug u_title u_class u_created u_closed; do
       [ -n "${u_slug:-}" ] || continue
@@ -2263,7 +2263,7 @@ HEAD3
     printf '%s\n' "$stale_banner"
     cat <<'MID'
 <section>
-  <h2>User requests</h2>
+  <h2>Issues</h2>
   <table>
     <thead><tr><th>UR</th><th>Title</th><th>Class</th><th>REQs</th><th>Backlog</th><th>In progress</th><th>Done</th></tr></thead>
     <tbody>

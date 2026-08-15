@@ -18,7 +18,7 @@
 
 | Domain | Where it lives |
 |--------|----------------|
-| Work items (URs, REQs, claims, decisions, verify/close) | Active **tracker backend** only: `markdown` \| `linear` \| `sqlite` |
+| Work items (Issues, REQs, claims, decisions, verify/close) | Active **tracker backend** only: `markdown` \| `linear` \| `sqlite` |
 | Runtime (worktrees, branches, merges, `state/*` locks, config) | **Always local** to the project |
 
 **Primary loop:** `/do-work start` (intake → ideate → capture) then `/do-work go` (verify → audit → run → optional close/log).
@@ -104,7 +104,7 @@ Greenfield rule: switching to sqlite does **not** import markdown history. First
 | `review.md` | Post-build gate before archive |
 | `status.md` | Situation room (claims, heartbeats, coverage) |
 | `board.md` | SQLite HTML board regeneration |
-| `close.md` | UR-level path-unit closure vs brief |
+| `close.md` | Issue-level path-unit closure vs brief |
 | `unblock.md` / `resume.md` | Recovery: backlog return / re-dispatch |
 | `upgrade.md` | Conformance fixes + optional migrate |
 | `log.md` | Build-in-public draft posts |
@@ -118,7 +118,7 @@ Greenfield rule: switching to sqlite does **not** import markdown history. First
 |------|------|
 | `port.md` | Shared op catalog, claim/deps/footprint rules, hard-stop matrix |
 | `markdown.md` | Default: `.do-work/` files + `lib/*.sh` |
-| `linear.md` | Linear Issues + UR Project Milestones + claim comments |
+| `linear.md` | Linear Issues + Issue Project Milestones + claim comments |
 | `sqlite.md` | `lib/dw-db.sh` + `work.db` sequences |
 
 ### 1.5 Key `lib/*.sh` (determinism surface)
@@ -186,7 +186,7 @@ flowchart LR
 |------|--------|------|
 | **Orchestrator** | `start`, `go`, `run` | Sequencing, claim pick, merge/archive, user gates |
 | **Worker** | `run-worker` | Single REQ: TDD, verification steps, one commit tip |
-| **Quality gates** | `verify`, `audit`, `review`, `close` | Coverage, criteria sharpness, post-build, UR closure |
+| **Quality gates** | `verify`, `audit`, `review`, `close` | Coverage, criteria sharpness, post-build, Issue closure |
 | **Recovery** | `status`, `unblock`, `resume` | Visibility and unstick without dual-write |
 
 ### 2.3 Artifact flow (conceptual)
@@ -231,7 +231,7 @@ Unset / empty backend → **markdown** (no Linear/`sqlite3` required).
 
 | Concern | markdown | linear | sqlite |
 |---------|----------|--------|--------|
-| **UR home** | `user-requests/UR-NNN/input.md` | Project Milestone on shared product Project | `urs` + artifacts in `work.db` |
+| **Issue home** | `user-requests/UR-NNN/input.md` | Project Milestone on shared product Project | `urs` + artifacts in `work.db` |
 | **REQ home** | `.do-work/REQ-*.md` | Issues (Linear ids) | `reqs` rows (`REQ-NNN` slugs) |
 | **Claim** | FS stamp + `working/` | Workflow state + claim comment | `claims` table |
 | **Deps authority** | REQ header | Native `blocks` relations (body mirror) | `deps` table |
@@ -249,7 +249,7 @@ Unset / empty backend → **markdown** (no Linear/`sqlite3` required).
 
 ### 3.4 Product containers
 
-- **Linear:** one shared **product Project** (`product_project` resolve chain → UUID bind); each UR is a **Project Milestone** (not Initiative — MCP has no Initiative create).
+- **Linear:** one shared **product Project** (`product_project` resolve chain → UUID bind); each Issue is a **Project Milestone** (not Initiative — MCP has no Initiative create).
 - **SQLite:** DB ensure creates schema; no product Project abstraction beyond the project root.
 - **Markdown:** directories under `.do-work/`.
 

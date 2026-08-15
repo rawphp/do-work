@@ -67,9 +67,9 @@ case "$html" in
   *) fail "expected HTML-escaped script title entities" ;;
 esac
 
-# UR/REQ tables present
+# Issue/REQ tables present
 case "$html" in
-  *"$ur"*|*"User Requests"*|*"UR"*) : ;;
+  *"$ur"*|*"Issues"*|*"UR"*) : ;;
   *) fail "expected UR content in board" ;;
 esac
 case "$html" in

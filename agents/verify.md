@@ -6,7 +6,7 @@ You are the Verify agent in the Do Work system. Your job is to compare the backl
 
 ## When Invoked
 
-You will be given a project do-work path and a UR reference, e.g.:
+You will be given a project do-work path and an Issue reference, e.g.:
 
 ```
 {project}/.do-work/   ←  backlog to verify
@@ -23,7 +23,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -31,7 +31,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
@@ -58,7 +58,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | **linear** | Port op **`write_verify_report`** — Initiative description **`## Verify`** + Initiative comment with the full report (`agents/tracker/linear.md`). Fixed home; do not invent alternate sections or local files as the store. Description size spill → section pointer + Initiative comment only (§10). If description **and** Initiative comment both fail → hard-stop; never invent Issue comments or alternate Docs. |
 | **do-work-io** | Port op **`write_verify_report`** (`ur.write-verify-report` in `agents/tracker/do-work-io.md`). Do not invent a local `user-requests/` path as the store. If MCP fails → hard-stop. |
 
-After producing the report in Step 5c, when backend is **linear** or **do-work-io**, call **`write_verify_report`** with the full report body for this UR. Still print the report to the console for the operator. Scoring arithmetic remains `lib/score-coverage.sh` (local).
+After producing the report in Step 5c, when backend is **linear** or **do-work-io**, call **`write_verify_report`** with the full report body for this Issue. Still print the report to the console for the operator. Scoring arithmetic remains `lib/score-coverage.sh` (local).
 
 ### 1. Read the brief
 
@@ -73,11 +73,11 @@ After producing the report in Step 5c, when backend is **linear** or **do-work-i
 
 **Markdown path (default):** Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present.
 
-**Legacy UR detection.** Read the first 10 lines of `input.md`. If they do not begin with a `---` line followed by a YAML frontmatter block ending in `---`, this UR predates the gap-aware capture refactor. Mark it as legacy. Verify will:
+**Legacy UR detection.** Read the first 10 lines of `input.md`. If they do not begin with a `---` line followed by a YAML frontmatter block ending in `---`, this Issue predates the gap-aware capture refactor. Mark it as legacy. Verify will:
 - Run all pre-existing checks (coverage scoring, ideate observation tracking, vague-criteria scan).
-- **Skip** the new layer-coverage check, integration-block check, and partial-confidence check (Steps 4b-4d below). Legacy URs continue to behave exactly as they did before this refactor.
+- **Skip** the new layer-coverage check, integration-block check, and partial-confidence check (Steps 4b-4d below). Legacy Issues continue to behave exactly as they did before this refactor.
 
-**Frontmatter parse for non-legacy URs.** For URs that begin with a `---` block, parse the YAML frontmatter and extract:
+**Frontmatter parse for non-legacy Issues.** For Issues that begin with a `---` block, parse the YAML frontmatter and extract:
 
 - `classification` (one of: bug-fix, feature, other-as-feature, other-as-bug-fix)
 - `layers_in_scope` (list of layer names, possibly empty)
@@ -85,7 +85,7 @@ After producing the report in Step 5c, when backend is **linear** or **do-work-i
 - `reqs` (list of `{ id, layer, integration_confidence }` records)
 - `acknowledged_partials` (list of REQ ids)
 
-If any of these fields is missing from a non-legacy UR's frontmatter, treat it as if the field is empty (e.g. `layer_decisions: {}`, `reqs: []`, `acknowledged_partials: []`, `open_gaps: []`). This keeps verify lenient against partial state.
+If any of these fields is missing from a non-legacy Issue's frontmatter, treat it as if the field is empty (e.g. `layer_decisions: {}`, `reqs: []`, `acknowledged_partials: []`, `open_gaps: []`). This keeps verify lenient against partial state.
 
 Hold all parsed values in context for Steps 4b, 4c, 4d below.
 
@@ -106,11 +106,11 @@ If `{project}/.do-work/user-requests/UR-NNN/ideate.md` exists:
 
 **Score impact:** Count the unaddressed ideate flags. They feed the score as the `--ideate-flags` category (-5 each, capped at -20 total). The arithmetic authority is `lib/score-coverage.sh`, invoked in Step 5 — do not compute the deduction by hand here. This is advisory — unaddressed flags do not block the pipeline.
 
-If `ideate.md` does not exist for this UR, skip this step silently.
+If `ideate.md` does not exist for this Issue, skip this step silently.
 
 ## Milestone mode adjustment
 
-If `{project}/.do-work/state/active-milestone.md` exists, you are scoring coverage of the **active milestone only**, not the whole UR.
+If `{project}/.do-work/state/active-milestone.md` exists, you are scoring coverage of the **active milestone only**, not the whole Issue.
 
 - Read the active milestone identifier (e.g. `M1`).
 - Locate the `#### M<n>` section in `UR-NNN/input.md`.
@@ -118,7 +118,7 @@ If `{project}/.do-work/state/active-milestone.md` exists, you are scoring covera
 - Score REQ coverage against this milestone scope only. Do not flag missing REQs for future milestones — those are not in scope yet.
 - The verification report must explicitly state: "Verifying coverage for milestone M<n> only. Coverage of future milestones is not in scope."
 
-If `active-milestone.md` does NOT exist, behave exactly as the existing verify flow (score against the whole UR).
+If `active-milestone.md` does NOT exist, behave exactly as the existing verify flow (score against the whole Issue).
 
 ### 3. Analyse coverage
 
@@ -143,13 +143,13 @@ Also check for:
 ### 4b. Layer-coverage check
 
 This check is skipped for:
-- Legacy URs (no frontmatter — flagged in Step 1).
-- URs with empty `layers_in_scope` (bug-fix briefs, or `--no-layers` invocations).
+- Legacy Issues (no frontmatter — flagged in Step 1).
+- Issues with empty `layers_in_scope` (bug-fix briefs, or `--no-layers` invocations).
 
-For all other URs:
+For all other Issues:
 
 1. For each layer in `layers_in_scope` (from frontmatter):
-   - Scan all REQs in this UR (by `**UR:** UR-NNN`) for any with `**Layer:** <layer>`.
+   - Scan all REQs in this Issue (by `**UR:** UR-NNN`) for any with `**Layer:** <layer>`.
    - If at least one REQ matches, the layer is covered.
    - If no REQ matches, check `layer_decisions[<layer>]`. If it equals `no`, the gap is acknowledged — not flagged.
    - Otherwise, this is a layer-coverage gap.
@@ -161,10 +161,10 @@ For all other URs:
 ### 4c. Integration block check
 
 This check is skipped for:
-- Legacy URs.
-- URs whose `classification` is `bug-fix` or `other-as-bug-fix`.
+- Legacy Issues.
+- Issues whose `classification` is `bug-fix` or `other-as-bug-fix`.
 
-For all other URs (`feature` or `other-as-feature`), iterate through `reqs:` in the frontmatter:
+For all other Issues (`feature` or `other-as-feature`), iterate through `reqs:` in the frontmatter:
 
 1. Skip any REQ with `layer: none` — those don't require an Integration block.
 
@@ -179,9 +179,9 @@ For all other URs (`feature` or `other-as-feature`), iterate through `reqs:` in 
 
 ### 4d. Partial-confidence check
 
-This check is skipped for legacy URs and for `bug-fix` / `other-as-bug-fix` classifications.
+This check is skipped for legacy Issues and for `bug-fix` / `other-as-bug-fix` classifications.
 
-For all other URs, iterate through `reqs:` in the frontmatter:
+For all other Issues, iterate through `reqs:` in the frontmatter:
 
 1. For each REQ where `integration_confidence == partial`:
    - If the REQ id appears in `acknowledged_partials`, treat as resolved — no flag.
@@ -197,7 +197,7 @@ For all other URs, iterate through `reqs:` in the frontmatter:
 
 ### 4e. Dangling-dep check
 
-For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog ∪ working/ ∪ archive/) for a `**Depends on:**` line.
+For every UR (legacy and non-legacy), scan each REQ in the Issue's REQ set (backlog ∪ working/ ∪ archive/) for a `**Depends on:**` line.
 
 1. Parse each `**Depends on:**` value as a comma-separated list of REQ ids (e.g. `REQ-144, REQ-150`). Trim whitespace; ignore `none` / empty.
 
@@ -209,13 +209,13 @@ For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog
 
 5. **Auto-fix integration.** With `--auto-fix`, for each dangling dep present an `AskUserQuestion` with two options:
    - **"Remove reference"** — strip the unresolved id from the source REQ's `**Depends on:**` line (delete the line entirely if it becomes empty).
-   - **"Note as expected (cross-UR dep)"** — leave the reference in place; record the pair in the verify report as acknowledged, no score deduction on next run within the same invocation.
+   - **"Note as expected (cross-Issue dep)"** — leave the reference in place; record the pair in the verify report as acknowledged, no score deduction on next run within the same invocation.
 
    Apply the chosen action per dep before re-scoring.
 
 ### 4f. Path-unit closure precondition
 
-For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog ∪ working/ ∪ archive/) for the path-unit header fields:
+For every UR (legacy and non-legacy), scan each REQ in the Issue's REQ set (backlog ∪ working/ ∪ archive/) for the path-unit header fields:
 
 - `**Entry point:**`
 - `**Terminal state:**`
@@ -235,7 +235,7 @@ A REQ is a **path-unit candidate** when either field is present. A path-unit is 
 
 ### 4g. Non-executable verification step scan
 
-For every UR (legacy and non-legacy), scan each REQ in the UR's REQ set (backlog ∪ working/ ∪ archive/) for verification steps in `## Verification Steps` that violate the worker-executability rule.
+For every UR (legacy and non-legacy), scan each REQ in the Issue's REQ set (backlog ∪ working/ ∪ archive/) for verification steps in `## Verification Steps` that violate the worker-executability rule.
 
 **Indicator categories (single source of truth: `agents/capture.md` `### Writing effective Verification Steps` — do not maintain a separate copy; cite and apply the same four categories):**
 
@@ -281,7 +281,7 @@ From Steps 2b–4g you have already counted each category. Your job is to produc
 | dangling deps | Step 4e | `--dangling-deps` |
 | path-unit closure gaps | Step 4f | `--path-unit-gaps` |
 
-Non-executable step hits (Step 4g) are reported as named Issues on individual REQs (in the Issues section of the report); they do not have a dedicated `score-coverage.sh` flag — their effect on confidence flows through the Issues count. Skipped checks contribute zero — omit the flag (it defaults to 0). For legacy/bug-fix URs, the layer/integration/partial-confidence categories are skipped, so leave those flags off.
+Non-executable step hits (Step 4g) are reported as named Issues on individual REQs (in the Issues section of the report); they do not have a dedicated `score-coverage.sh` flag — their effect on confidence flows through the Issues count. Skipped checks contribute zero — omit the flag (it defaults to 0). For legacy/bug-fix Issues, the layer/integration/partial-confidence categories are skipped, so leave those flags off.
 
 #### 5b. Invoke the scorer (arithmetic)
 

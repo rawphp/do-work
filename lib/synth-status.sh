@@ -257,7 +257,7 @@ render_row() {
   ur="$F_UR"
   [ -z "$ur" ] && ur="—"
 
-  # If a UR filter is set, only emit rows for matching UR. Use plain equality
+  # If an Issue filter is set, only emit rows for matching UR. Use plain equality
   # rather than substring so e.g. UR-1 doesn't match UR-10.
   if [ -n "$UR_FILTER" ] && [ "$ur" != "$UR_FILTER" ]; then
     return 0
@@ -408,7 +408,7 @@ else
   if [ "$ARCHIVE_N" -gt 0 ]; then
     # Unscoped: cap archive rows (newest REQ ids last in glob → take tail).
     # Scoped (UR-NNN): list every matching archive row — the filter already
-    # narrows the set and operators asked for that UR deliberately.
+    # narrows the set and operators asked for that Issue deliberately.
     if [ -n "$UR_FILTER" ]; then
       for f in "${ARCHIVE_FILES[@]}"; do
         render_row "$f" "archive"

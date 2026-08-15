@@ -35,7 +35,7 @@ fields; everything else in the file is ignored.
 | Field | Source line in writer | Used for |
 |---|---|---|
 | `req` | `req: $REQ_ID` | Join key back to the REQ file (shape, Files, ACs). |
-| `ur` | `ur: ${UR_ID}` | Group runs by UR for per-UR aggregates. |
+| `ur` | `ur: ${UR_ID}` | Group runs by UR for per-Issue aggregates. |
 | `model` | `model: "$MODEL"` | Escalation analysis (`sonnet` vs `opus`). |
 | `result` | `result: "$RESULT"` | Stop-reason classification (`done`, `verification-failing`, `blocked`, `ambiguous-criteria`, …). |
 | `review_outcome` | `review_outcome: "$REVIEW"` | Pair with `result` to separate "done but review-flagged" from clean done. |

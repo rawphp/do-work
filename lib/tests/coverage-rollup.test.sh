@@ -137,7 +137,7 @@ run_script
 assert_contains "UR-001 intended=3 proven=1 unproven=2" "$OUT" "$CURRENT_CASE counts"
 assert_not_contains "pending=" "$OUT" "$CURRENT_CASE no pending field"
 assert_contains "unproven_ids=REQ-002,REQ-003" "$OUT" "$CURRENT_CASE ids"
-# Additive: a UR with no path-unit REQs and no closure.md reports closed=n/a,
+# Additive: an Issue with no path-unit REQs and no closure.md reports closed=n/a,
 # and the existing fields are unchanged.
 assert_contains "closed=n/a" "$OUT" "$CURRENT_CASE closure column"
 teardown_fixture
@@ -151,7 +151,7 @@ run_script "UR-002"
 assert_contains "UR-002 intended=2 proven=2 unproven=0" "$OUT" "$CURRENT_CASE counts"
 teardown_fixture
 
-# --- Closure column (REQ-213): end-to-end closure state per UR ---
+# --- Closure column (REQ-213): end-to-end closure state per Issue ---
 
 # closed=yes: path-unit REQ present, closure.md exists with overall: closed.
 CURRENT_CASE="closure-yes"
@@ -184,7 +184,7 @@ run_script "UR-030"
 assert_contains "closed=no" "$OUT" "$CURRENT_CASE closure"
 teardown_fixture
 
-# closed=n/a: UR has no path-unit REQs at all.
+# closed=n/a: Issue has no path-unit REQs at all.
 CURRENT_CASE="closure-na"
 CASES=$((CASES + 1))
 setup_fixture

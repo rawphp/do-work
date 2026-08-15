@@ -92,20 +92,20 @@ AGENT_ID="$(hostname).$$"
 After skill-root is resolved and **before** any claim, worker dispatch, or worktree provision, ensure the orchestrator checkout is not on a protected default branch:
 
 ```bash
-# When this run is scoped to a UR (`/do-work run UR-NNN` or go-delegated run for UR-NNN):
+# When this run is scoped to an Issue (`/do-work run UR-NNN` or go-delegated run for UR-NNN):
 bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
-# When unscoped (`/do-work run` with no UR):
+# When unscoped (`/do-work run` with no Issue):
 # bash {skill-root}/lib/ensure-integration-base.sh
 ```
 
 | Outcome | Action |
 |---------|--------|
-| **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (detached HEAD, invalid UR slug, checkout/merge failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. Dirty trees on a protected default are allowed — uncommitted changes carry onto `new-work`. |
+| **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (detached HEAD, invalid Issue slug, checkout/merge failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. Dirty trees on a protected default are allowed — uncommitted changes carry onto `new-work`. |
 | **Exit 0** | Script prints the final branch name on stdout. Record it as the run's **integration base**. Subsequent worker W1 reads this branch via `git rev-parse --abbrev-ref HEAD` (or `git branch --show-current`) on the orchestrator checkout at worktree create — workers do not call ensure themselves. |
 
 **Hard rules (do not invent branch switches):**
 
-1. **Only `ensure-integration-base.sh` may create or checkout `new-work` on the orchestrator checkout.** Leave-default always targets `new-work` (UR arg ignored for naming). If `new-work` exists, the script checkouts it and **merges** the protected tip just left; dirty trees carry. Agents must not run `git checkout` / `git switch` / `git checkout -b` to force an integration base.
+1. **Only `ensure-integration-base.sh` may create or checkout `new-work` on the orchestrator checkout.** Leave-default always targets `new-work` (Issue arg ignored for naming). If `new-work` exists, the script checkouts it and **merges** the protected tip just left; dirty trees carry. Agents must not run `git checkout` / `git switch` / `git checkout -b` to force an integration base.
 2. **Skip is binding.** If the orchestrator was already on a non-protected branch (any feature branch, existing `new-work`, etc.), the script prints that branch and **does not switch**. Stay there for the whole run — do **not** hop to `new-work` because the run is UR-scoped or because another agent used a different base.
 3. After exit 0, `git branch --show-current` must equal the printed name. If not, hard-stop; do not "repair" with another checkout.
 4. Worker worktrees on `req/*` are isolated; they never retarget the orchestrator's branch.
@@ -377,7 +377,7 @@ Resolve whether milestone mode is active via the tracker backend (REQ-298 Linear
 
 **Linear backend (REQ-298 path; REQ-299 ops):**
 
-1. Call port op **`read_active_milestone`** (`agents/tracker/linear.md`) for the scoped UR Project (`do-work/{UR-id}` when `/do-work run UR-NNN`, else each active Project the run scopes). Cursor lives on Project description `<!-- do-work-milestone -->` — **not** local `active-milestone.md`. When the Project description has **no milestone marker**, the op returns `active: null` and **does not invent a milestone id**.
+1. Call port op **`read_active_milestone`** (`agents/tracker/linear.md`) for the scoped Issue Project (`do-work/{UR-id}` when `/do-work run UR-NNN`, else each active Project the run scopes). Cursor lives on Project description `<!-- do-work-milestone -->` — **not** local `active-milestone.md`. When the Project description has **no milestone marker**, the op returns `active: null` and **does not invent a milestone id**.
 2. **`active` null (non-milestone mode / empty marker):** skip this step; proceed with unconstrained `list_claimable_reqs`.
 3. **`active` set (e.g. `M1`):** constrain claim pool to that milestone — pass milestone scope into **`list_claimable_reqs`** and/or intersect with **`list_milestone_reqs`** for `M<active>` (status backlog / claimable). Issue markers: label `M<n>` and/or body `**Milestone:** M<n>` (see linear.md).
 4. **No fallback to other milestones.** If the constrained list is empty, fall through to **Step 1.0a**. Deploy gate (Step 7b) + **`set_active_milestone`** are the only advances of the cursor.
@@ -543,7 +543,7 @@ Identify the **prior-REQ archived paths** for the same UR — these provide the 
 3. For each archived REQ, read its `**UR:**` field and keep only those matching the current UR
 4. Pass the resulting absolute paths to the worker
 
-Dispatch via the `Agent` tool. Pass the worker **five named inputs** — REQ path, UR path, prior-REQ paths, the project context-pack path (from Pre-flight Step 2b), and the resolved skill-root (from Pre-flight Step 2a) — plus the run-worker.md instructions inline. Substitute the concrete `$SKILL_ROOT` value for `{skill-root}` in the instructions you paste so the worker's `{skill-root}/lib/...` calls resolve to a real path:
+Dispatch via the `Agent` tool. Pass the worker **five named inputs** — REQ path, Issue path, prior-REQ paths, the project context-pack path (from Pre-flight Step 2b), and the resolved skill-root (from Pre-flight Step 2a) — plus the run-worker.md instructions inline. Substitute the concrete `$SKILL_ROOT` value for `{skill-root}` in the instructions you paste so the worker's `{skill-root}/lib/...` calls resolve to a real path:
 
 ```
 Agent(
@@ -551,12 +551,12 @@ Agent(
   subagent_type: <classified type>,
   model: <selected model>,
   prompt: """
-You are the Run Worker. Follow the instructions below exactly. Prefer the inputs given; bounded exploration of files your implementation genuinely touches is allowed (see your When Invoked rule). Do not load other REQs or URs.
+You are the Run Worker. Follow the instructions below exactly. Prefer the inputs given; bounded exploration of files your implementation genuinely touches is allowed (see your When Invoked rule). Do not load other REQs or Issues.
 
 <inputs>
 REQ:         {absolute path to working/REQ-NNN-slug.md}
 UR:          {absolute path to user-requests/UR-NNN/input.md}
-Prior REQs from this UR (may be empty):
+Prior REQs from this Issue (may be empty):
   - {absolute path}
   - {absolute path}
 Context pack: {absolute path to .do-work/state/context-pack.md}
@@ -874,11 +874,11 @@ git push -u origin req/REQ-NNN
 **4-pr.2 Determine the PR target by granularity.** Read `config.delivery.pr.granularity` (default `req`):
 
 - **`req`** (default) — open the PR immediately, from `req/REQ-NNN` into the base branch. Continue to 4-pr.3.
-- **`ur`** — do NOT open a per-REQ PR. Instead accumulate this REQ onto the UR's shared integration branch:
+- **`ur`** — do NOT open a per-REQ PR. Instead accumulate this REQ onto the Issue's shared integration branch:
   1. Integration branch for `granularity: ur` is always `new-work` (same leave-default name as `ensure-integration-base`).
   2. If `new-work` does not yet exist on the remote, create it from the base branch and push it.
   3. Merge `req/REQ-NNN` into `new-work` (`git merge --no-ff`, applying the same conflict/retry policy as 4a) and push `new-work`.
-  4. Archive this REQ now (4-pr.4) recording the `new-work` branch, but **defer PR creation**: the single PR opens at UR drain. After the last REQ for this UR archives and the UR's backlog is empty (see `## When the Backlog is Empty` drain check), open one PR from `new-work` into the base branch using the same title/body shape as 4-pr.3 (title/body keyed to the UR rather than a single REQ; the body links the UR and lists each integrated REQ). Record that PR's URL on the UR. Then continue past 4-pr.5 to Step 7.
+  4. Archive this REQ now (4-pr.4) recording the `new-work` branch, but **defer PR creation**: the single PR opens at UR drain. After the last REQ for this Issue archives and the Issue's backlog is empty (see `## When the Backlog is Empty` drain check), open one PR from `new-work` into the base branch using the same title/body shape as 4-pr.3 (title/body keyed to the Issue rather than a single REQ; the body links the Issue and lists each integrated REQ). Record that PR's URL on the Issue. Then continue past 4-pr.5 to Step 7.
 
 **4-pr.3 Open the PR (`req` granularity, or the single UR-drain PR).**
 
@@ -902,7 +902,7 @@ Output: <primary output path>
 
 Capture the PR URL printed by `gh pr create`.
 
-**4-pr.4 Archive the REQ.** Apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, consolidate `deferred_checks:` or an existing `## Manual checks (advisory)` section into advisory bullets — including the `**Suite:** not-run` header write from 4b step 5a when a consolidated item carries `category: suite-not-run` —, **archive-integrity gate (4b step 5b — `bash {skill-root}/lib/check-archive-integrity.sh` on the rewritten file; non-zero ⇒ stop with `**Reason:** archive-integrity`, do not archive)**, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the UR-drain PR opens.
+**4-pr.4 Archive the REQ.** Apply the **same** archive logic as 4b (path-unit closure guard, non-empty closure-proof requirement, strip ownership stamp, set `**Status:** done`, write `**Closure proof:**`, append `## Outputs`, consolidate `deferred_checks:` or an existing `## Manual checks (advisory)` section into advisory bullets — including the `**Suite:** not-run` header write from 4b step 5a when a consolidated item carries `category: suite-not-run` —, **archive-integrity gate (4b step 5b — `bash {skill-root}/lib/check-archive-integrity.sh` on the rewritten file; non-zero ⇒ stop with `**Reason:** archive-integrity`, do not archive)**, `mv` to `archive/`) — with one addition: append the PR URL to `## Outputs` as a bullet, e.g. `- PR — <pr-url>`. For `ur` granularity where the PR opens later, record the integration branch in `## Outputs` now and append the PR URL bullet when the Issue-drain PR opens.
 
 **4-pr.5 Tear down the worktree — but keep the branch.** Remove the worktree; do **not** delete the branch (the PR owns it):
 
@@ -1028,7 +1028,7 @@ Then (both backends):
 - Delete `{project}/.do-work/state/gate-owner.md` (local release — both backends).
 - **Markdown:** Delete `{project}/.do-work/state/active-milestone.md`. **This deletion wakes idle siblings** into the empty-backlog path (see Step 1.0a).
 - **Linear:** **`set_active_milestone`** clear (`active` null). **This cursor clear wakes idle siblings** polling `read_active_milestone`.
-- Print: "Run `/do-work capture UR-NNN` to add new REQs for the gap, or edit the UR's milestone definition. Idle siblings will exit when the active milestone cursor is cleared."
+- Print: "Run `/do-work capture UR-NNN` to add new REQs for the gap, or edit the Issue's milestone definition. Idle siblings will exit when the active milestone cursor is cleared."
 - Exit.
 
 #### State file: `gate-owner.md` (local — both backends)
@@ -1125,3 +1125,14 @@ When the worker returns `status: stopped`, `reason: ambiguous-criteria`:
 
 ---
 
+
+## Field traps (orchestrator — from field-lessons)
+
+Apply in pre-flight, dispatch, Stage B, and recovery:
+
+- **Before every Stage B merge:** `git branch --show-current` == recorded integration base (§5).
+- **Orphan worktree after no YAML report:** force-remove worktree + branch when no feat commit; re-dispatch fresh (§11).
+- **Background workers:** independent verify of commit/tests; prefer foreground when YAML is required (§15).
+- **After teardown, before final suite:** `composer dump-autoload` / rebuild if symlinked deps were regenerated (§16).
+- **Submodule merges:** fetch object from worktree submodule into main clone before teardown (§31).
+- **Pass `integration_base: <name>` into every worker dispatch** so W1 does not rely on drifted HEAD (§14).

@@ -106,7 +106,7 @@ case "$out_scoped" in
   *) fail "scoped output should mention $ur: $out_scoped" ;;
 esac
 
-# Unrelated UR scope yields no our REQs (or empty)
+# Unrelated Issue scope yields no our REQs (or empty)
 ur2="$(bash "$DW" create-ur "$TMP" --title "Other" --brief "other")" \
   || fail "create-ur2"
 out_other="$(bash "$DW" status-synth "$TMP" "$ur2" 2>&1)" || fail "other scope failed"

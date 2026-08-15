@@ -2,7 +2,7 @@
 
 Deep dive for multi-tracker configuration. Hard-stop and dual-write rules are summarized in `SKILL.md` (always loaded). Canonical contracts: [agents/tracker/port.md](../agents/tracker/port.md), [agents/config.md](../agents/config.md). Runtime sequences: [agents/tracker/markdown.md](../agents/tracker/markdown.md), [agents/tracker/linear.md](../agents/tracker/linear.md), [agents/tracker/sqlite.md](../agents/tracker/sqlite.md), [agents/tracker/do-work-io.md](../agents/tracker/do-work-io.md).
 
-Work items (URs, REQs, decisions, verify/close reports, run notes) are stored through a **tracker port**. Config key `tracker.backend` selects the implementation:
+Work items (Issues, REQs, decisions, verify/close reports, run notes) are stored through a **tracker port**. Config key `tracker.backend` selects the implementation:
 
 | `tracker.backend` | Behavior |
 |-------------------|----------|
@@ -31,8 +31,8 @@ Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 / **7b** 
 |----------|------------------|
 | Team | `team_id` and/or `team_key` — **hard-fail** if neither resolves |
 | MCP | Linear MCP tools must be discoverable — **hard-fail** with skill setup instructions if not |
-| Hierarchy | **UR = Project Milestone** on shared product Project per local product; REQs = Issues with that milestone. Not Initiatives (MCP has no Initiative create tools). |
-| `product_project` | Shared Linear Project (**name or UUID**) for all URs on this local product — **default empty** (not skill name `do-work`). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Example for this skill repo only: name `do-work`. |
+| Hierarchy | **Issue (slug UR-NNN) = Project Milestone** on shared product Project per local product; REQs = Linear Issues on that milestone. Not Initiatives (MCP has no Initiative create tools). |
+| `product_project` | Shared Linear Project (**name or UUID**) for all Issues on this local product — **default empty** (not skill name `do-work`). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Example for this skill repo only: name `do-work`. |
 | `ur_milestone_name_pattern` | Default `{ur_id}: {title}` |
 | `status_map` | `backlog→Todo`, `in_progress→In Progress`, `stopped→Canceled`, `done→Done` — **hard-fail** if a mapped state is missing on the team (rename team state or override the map key) |
 | Labels | `Layer/`, `path-unit`, `Size/` prefixes |
@@ -60,9 +60,9 @@ Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 / **7b** 
 | `tracker.dowork.project` | `""` | Project **slug**. **Hard-fail** if empty; do not guess |
 | `tracker.dowork.mcp_profile` | `dowork.control` | MCP path suffix: `dowork.read` / `dowork.control` / `dowork.admin` |
 
-**do-work-io rules:** remote MCP is the sole work-item store; never fall through to markdown, Linear, or sqlite. `status_map` is identity (`backlog` / `in_progress` / `stopped` / `done`) and **REQ-only**; URs have no status — closed-ness is `closed_at`. `/do-work upgrade migrate` **refuses** under `do-work-io`.
+**do-work-io rules:** remote MCP is the sole work-item store; never fall through to markdown, Linear, or sqlite. `status_map` is identity (`backlog` / `in_progress` / `stopped` / `done`) and **REQ-only**; Issues have no status — closed-ness is `closed_at`. `/do-work upgrade migrate` **refuses** under `do-work-io`.
 
-**No dual-write.** With `tracker.backend: linear`, `sqlite`, **or** `do-work-io`, that backend is the **only** work-item store. Agents must not mirror URs/REQs into another store as a second source of truth, and must not fall back when the active backend fails (hard-stop instead). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them.
+**No dual-write.** With `tracker.backend: linear`, `sqlite`, **or** `do-work-io`, that backend is the **only** work-item store. Agents must not mirror Issues/REQs into another store as a second source of truth, and must not fall back when the active backend fails (hard-stop instead). After idle markdown→Linear migration (`/do-work upgrade migrate`), historical `.do-work/user-requests/` and `archive/` trees remain on disk as **read-only history** — work-item ops ignore them.
 
 **Linear commit / branch convention** (when `backend: linear`):
 

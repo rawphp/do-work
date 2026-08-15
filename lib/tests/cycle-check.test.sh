@@ -143,7 +143,7 @@ assert_contains "REQ-010" "$CHK_STDOUT" "$CURRENT_CASE stdout contains REQ-010"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 5: UR-scoped invocation ignores deps outside that UR
+# Case 5: UR-scoped invocation ignores deps outside that Issue
 # ----------------------------------------------------------------------
 CURRENT_CASE="ur-scoped-cross-ur-edge-ignored"
 CASES=$((CASES + 1))
@@ -159,7 +159,7 @@ assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 6: UR-scoped invocation detects cycle within the UR
+# Case 6: UR-scoped invocation detects cycle within the Issue
 # ----------------------------------------------------------------------
 CURRENT_CASE="ur-scoped-cycle-within-ur"
 CASES=$((CASES + 1))

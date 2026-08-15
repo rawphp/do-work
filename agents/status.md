@@ -23,7 +23,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -31,7 +31,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`sqlite`** but `agents/tracker/sqlite.md` is missing / `sqlite3` unusable / `dw-db` fails → **hard-stop**. Never fall through to markdown paths or glob `working/REQ`.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown paths, Linear, or sqlite, or glob `working/REQ`.
@@ -44,7 +44,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 | **`markdown`** (default) | Steps **1–2** below (`{skill-root}/lib/synth-status.sh`, `derive-status`, `coverage-rollup`, `deadlock-check`) |
 | **`linear`** | Step **1L** — Linear claimers / heartbeats via port ops in `agents/tracker/linear.md` (**Status reporting**). Do **not** glob `.do-work/working/` or treat local REQ files as the live store. |
 | **`sqlite`** | Step **1S** — `bash {skill-root}/lib/dw-db.sh status-synth {project} [UR-NNN]`; stale via `dw-db scan-stale`; **never** glob `working/` or `REQ-*.md` as the live store. |
-| **`do-work-io`** | Step **1D** — `ur.list` + `req.list` per UR via `agents/tracker/do-work-io.md`; stale = `active_claim.heartbeat_at` older than `parallel.stale_threshold_seconds`. **Never** glob `working/` or call `synth-status.sh`. |
+| **`do-work-io`** | Step **1D** — `ur.list` + `req.list` per Issue via `agents/tracker/do-work-io.md`; stale = `active_claim.heartbeat_at` older than `parallel.stale_threshold_seconds`. **Never** glob `working/` or call `synth-status.sh`. |
 
 ### 1. Render situation (markdown backend)
 
@@ -76,7 +76,7 @@ Then render the intended-vs-proven Coverage section:
 bash {skill-root}/lib/coverage-rollup.sh [UR-NNN]
 ```
 
-Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the UR has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the UR has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the UR declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `$SKILL_ROOT/lib/coverage-rollup.sh` is missing, report `"$SKILL_ROOT/lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
+Print stdout under a `Coverage` heading. Each line shows `intended=<n> proven=<n> unproven=<n>`, any `unproven_ids`, and a trailing `closed=<yes|no|n/a>` end-to-end closure field. `closed` reports whether the Issue has been validated end-to-end by `/do-work close` (per docs/design/ur-closure.md), distinct from per-REQ proof: `yes` = `UR-NNN/closure.md` exists with `overall: closed`; `no` = closure.md reports gaps, or the Issue has path-unit REQs but no closure.md yet (run `/do-work close UR-NNN`); `n/a` = the Issue declares no path-unit REQs to walk. `proven` still means per-REQ closure proof; `closed` means the merged whole was walked. Also compute and print a project total by summing the rows. If there are no REQs yet, show `Coverage: no REQs captured yet.` If `$SKILL_ROOT/lib/coverage-rollup.sh` is missing, report `"$SKILL_ROOT/lib/coverage-rollup.sh not found — skipping coverage rollup."` and continue.
 
 ### 1L. Render situation (Linear backend)
 
@@ -109,7 +109,7 @@ Print stdout verbatim. This **folds** synth + derive + coverage + closed:
 - **Proven** section: `proven` / `unproven` from `status=done` + non-empty `closure_proof` + `suite != not-run`
 - **Coverage** section: `intended` / `proven` / `unproven` / `unproven_ids` / `closed=<yes|no|n/a>`
   - `closed=yes` when `urs.closed_at` is set or a `ur_artifacts.kind=close` row exists
-  - `closed=n/a` when the UR has no path-unit REQs (`layer=none`); else `no` until close
+  - `closed=n/a` when the Issue has no path-unit REQs (`layer=none`); else `no` until close
 
 3. **Stale banner** — optionally:
 
@@ -129,7 +129,7 @@ If `status-synth` fails → hard-stop with stderr. Stop after printing (skip mar
 *Only when effective `tracker.backend` is `do-work-io`. Hard-stop if MCP/PAT/project unusable — never fall back to markdown globs.*
 
 1. `project.ensure` / `project.get` for `tracker.dowork.project` (slug).
-2. `ur.list` then `req.list` per UR (optional UR scope).
+2. `ur.list` then `req.list` per Issue (optional Issue scope).
 3. Table: slug, title, status, `active_claim.agent_id`, `heartbeat_at`, fresh/stale vs `parallel.stale_threshold_seconds`.
 4. Proven: `status=done` + non-empty `closure_proof`. Closed: `closed_at` set.
 5. Do not run `synth-status.sh` / glob `REQ-*.md`.

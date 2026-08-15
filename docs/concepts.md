@@ -12,7 +12,7 @@ do-work turns a natural-language brief into small, traceable tasks and runs them
 Your brief
     │
     ▼
-  UR-NNN          user request (verbatim input + side artifacts)
+  UR-NNN          issue (verbatim input + side artifacts)
     │
     ▼
   REQ-NNN-…       backlog tasks (one file each)
@@ -33,11 +33,11 @@ Your brief
 
 Granular commands (`intake`, `capture`, `verify`, `run`, …) are the same building blocks; `start` and `go` chain them with defaults and human gates.
 
-**File-based state.** Everything lives under the project’s `.do-work/` (config, URs, backlog REQs, `working/`, `archive/`, `runs/`, `state/`). There is no separate do-work server. `git` history is the audit trail.
+**File-based state.** Everything lives under the project’s `.do-work/` (config, Issues, backlog REQs, `working/`, `archive/`, `runs/`, `state/`). There is no separate do-work server. `git` history is the audit trail.
 
 ## Key terms
 
-### UR (user request)
+### UR (issue)
 
 - Folder: `.do-work/user-requests/UR-NNN/`
 - Core file: `input.md` — your brief **verbatim** (do-work does not “improve” the wording on intake)

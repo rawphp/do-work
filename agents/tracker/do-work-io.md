@@ -37,7 +37,7 @@ Do **not** load this file when backend is `markdown`, `linear`, or `sqlite`.
 1. **No dual-write** — do not treat `REQ-*.md` / `user-requests/` / Linear / `work.db` as live truth.
 2. **Slugs at the agent surface** — pass `project` (slug from `tracker.dowork.project`) plus `ur` / `req` slugs. ULIDs are accepted by the server but agents should use slugs.
 3. **REQ status underscore** — `in_progress` (never store `in-progress`).
-4. **URs have no status** — closure is `closed_at` from `write_close_report`.
+4. **Issues have no status** — closure is `closed_at` from `write_close_report`.
 5. **`archived` is not a status** — `req.archive` is a separate gate (`done` + `closure_proof` + all AC checked).
 6. **`agent_id` is advisory** — any of the owning user's tokens may heartbeat/unblock.
 7. **Rediscover tools** — `search_tool` the published underscore wire name first, then the dotted capability id; `use_tool` / MCP `tools/call` with the **observed** qualified name. Never hard-code a host-specific `dowork__…` / `server__tool` string.
@@ -70,7 +70,7 @@ Published MCP **wire name** is the Grok-safe form of the capability id (`.` → 
 
 ## Hard-stop template
 
-When `tracker.backend` is **`do-work-io`**, an unusable MCP mount, PAT, project slug, or backend doc is a **hard stop**. **Never** silent-fallback to markdown, Linear, or sqlite. **Never** invent local UR/REQ files as a substitute store.
+When `tracker.backend` is **`do-work-io`**, an unusable MCP mount, PAT, project slug, or backend doc is a **hard stop**. **Never** silent-fallback to markdown, Linear, or sqlite. **Never** invent local Issue/REQ files as a substitute store.
 
 ### Operator-facing message (use as template)
 
@@ -79,7 +79,7 @@ HARD STOP: do-work-io tracker backend is configured but MCP/PAT/project is not u
 
 do-work will not fall back to markdown, Linear, or sqlite work-item storage
 while tracker.backend is "do-work-io".
-No local REQ/UR files, Linear issues, or work.db rows were invented.
+No local REQ/Issue files, Linear issues, or work.db rows were invented.
 
 What failed: <MCP missing | unauthenticated | tools undiscoverable | PAT unset |
               base_url missing | project slug missing | project not found |
@@ -307,7 +307,7 @@ Each sequence starts with rediscovery (`search_tool` **wire name** then dotted c
 
 #### `list_milestone_reqs`
 
-**Refuse (v1.1).** Same. Use `list_reqs_for_ur` (`req.list`) when you need the UR’s REQs.
+**Refuse (v1.1).** Same. Use `list_reqs_for_ur` (`req.list`) when you need the Issue’s REQs.
 
 #### `write_gate_state`
 

@@ -22,12 +22,12 @@ It is **file-based by default**: every artifact (brief, decomposed task, claim s
 
 ## Multi-tracker (work-item backends)
 
-Work items (URs, REQs, decisions, verify/close reports, run notes) go through a **tracker port**. Config key `tracker.backend` selects the store:
+Work items (Issues, REQs, decisions, verify/close reports, run notes) go through a **tracker port**. Config key `tracker.backend` selects the store:
 
 | `tracker.backend` | Work-item store |
 |-------------------|-----------------|
 | **unset / empty / `markdown`** | Default: local `.do-work/` + `lib/*.sh` |
-| **`linear`** | Linear only (product Project / **UR milestones** / Issues) — **no dual-write** |
+| **`linear`** | Linear only (product Project / **Issue milestones** / Issues) — **no dual-write** |
 | **`sqlite`** | Local `.do-work/work.db` only via `lib/dw-db.sh` — **no dual-write**; greenfield empty DB on switch |
 | **`do-work-io`** | do-work.io only (remote MCP; slugs `UR-NNN` / `REQ-NNN`; identity `status_map`) — **no dual-write**; web UI is the board |
 
@@ -43,7 +43,7 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 
 ### No dual-write and hard-stop
 
-- With `backend: linear`, `backend: sqlite`, or `backend: do-work-io`, that store is the sole work-item source of truth. Agents do not keep a parallel markdown UR/REQ store.
+- With `backend: linear`, `backend: sqlite`, or `backend: do-work-io`, that store is the sole work-item source of truth. Agents do not keep a parallel markdown Issue/REQ store.
 - If Linear is unusable (MCP missing/unauthenticated, team unresolved, missing `status_map` state) **or** `agents/tracker/linear.md` is missing, agents **hard-stop** with setup instructions. They never silently fall back to markdown.
 - If sqlite is unusable (`sqlite3` missing, corrupt DB / bad `user_version`, missing `agents/tracker/sqlite.md`), agents **hard-stop** the same way — **never** fall back to markdown or Linear.
 - If do-work.io is unusable (`do-work-io.md` missing, empty/invalid `base_url`, missing PAT in `token_env`, empty project slug, or MCP tools undiscoverable), agents **hard-stop** — **never** fall back to markdown, Linear, or sqlite.
@@ -53,7 +53,7 @@ Work items (URs, REQs, decisions, verify/close reports, run notes) go through a 
 
 ```
 .do-work/work.db   (sole work-item store; gitignored)
-├── urs            (UR briefs / status / artifacts)
+├── urs            (Issue briefs / status / artifacts)
 ├── reqs           (REQ rows + parent UR + status)
 ├── claims         (active claim / heartbeat rows)
 └── …              (decisions, milestones, artifacts — see schema)
@@ -75,7 +75,7 @@ do-work.io project (tracker.dowork.project slug)
 └── artifacts / decisions / run_notes
 ```
 
-- **Slugs** at the agent surface: `UR-NNN` / `REQ-NNN`. Identity `status_map` (`backlog` / `in_progress` / `stopped` / `done`) is **REQ-only**; UR closure is `closed_at`.
+- **Slugs** at the agent surface: `UR-NNN` / `REQ-NNN`. Identity `status_map` (`backlog` / `in_progress` / `stopped` / `done`) is **REQ-only**; Issue closure is `closed_at`.
 - **MCP:** `{tracker.dowork.base_url}/mcp/{tracker.dowork.mcp_profile}` (default profile `dowork.control`) with `Authorization: Bearer ${tracker.dowork.token_env}` (default env `DOWORK_IO_PAT`). Mint the PAT in the web UI; **do not paste it into chat**.
 - **Board:** `/do-work board` is sqlite-only. The do-work.io web dashboard is the live board.
 - **Milestone cursor** (`read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`) is **not served** in v1.1 — treat as not in milestone mode. `write_gate_state` stays local.
@@ -87,7 +87,7 @@ do-work.io project (tracker.dowork.project slug)
 ```
 Team (config team_id / team_key)
 └── Product Project (tracker.linear.product_project — one shared Project per local product)
-    ├── Project Milestone (UR brief / ideate / verify / close)
+    ├── Project Milestone (Issue brief / ideate / verify / close)
     │   └── Issue (REQ / path-unit) ± sub-issues (layer children)
     └── Project Milestone (next UR)
         └── Issue …
@@ -95,9 +95,9 @@ Team (config team_id / team_key)
 
 **`product_project` resolve (default empty):** explicit `tracker.linear.product_project` (name|UUID) if set; else `project.name`; else git-root directory basename. Then `ensure_product_container` create-if-missing and **always persists** the Project UUID back to config. Empty config never falls through to the skill name `do-work` — that name is only an example when this skill's own repo is the local product.
 
-**Why milestones, not Initiatives:** official Linear MCP exposes Project Milestone create/list/get, but not Initiative create/list. do-work therefore homes each UR on a **Project Milestone**.
+**Why milestones, not Initiatives:** official Linear MCP exposes Project Milestone create/list/get, but not Initiative create/list. do-work therefore homes each Issue on a **Project Milestone**.
 
-REQs use **Linear issue ids** only (e.g. `ENG-123`). `UR-NNN` remains the UR-milestone slug.
+REQs use **Linear issue ids** only (e.g. `ENG-123`). `UR-NNN` remains the Issue-milestone slug.
 
 ### Commit convention (Linear)
 
@@ -161,7 +161,7 @@ Creates per-project state under `{project}/.do-work/`:
 ```
 .do-work/
 ├── config.yml          # project configuration
-├── user-requests/      # one folder per UR
+├── user-requests/      # one folder per Issue
 ├── working/            # REQs currently claimed by a worker
 ├── archive/            # completed REQs
 ├── logs/               # build-in-public log drafts
@@ -182,7 +182,7 @@ The brief is written **verbatim** as `user-requests/UR-NNN/input.md`. No interpr
 
 **Why verbatim:** The brief is the source of truth that `verify` later scores against. If `intake` "improves" the brief, downstream coverage scoring measures the rewrite, not the user's intent. Faithfully recording the original input is non-negotiable.
 
-**Why a folder per UR (not a single file):** The UR accretes artifacts as it moves through the pipeline — `input.md`, `ideate.md`, optional `assets/`, frontmatter that tracks `layers_in_scope` etc. A folder keeps related artifacts colocated.
+**Why a folder per Issue (not a single file):** The UR accretes artifacts as it moves through the pipeline — `input.md`, `ideate.md`, optional `assets/`, frontmatter that tracks `layers_in_scope` etc. A folder keeps related artifacts colocated.
 
 ---
 
@@ -298,7 +298,7 @@ Before any claim, worker dispatch, or worktree provision, go and run call `lib/e
 
 `/do-work start` does **not** call this helper and does not switch branches — only go/run enforce the guard.
 
-The same `new-work` name is shared with `delivery.pr.granularity: ur` (one PR per UR). Merge mode reuses that branch for accumulation; using `new-work` does **not** require `delivery.mode: pr`.
+The same `new-work` name is shared with `delivery.pr.granularity: ur` (one PR per Issue). Merge mode reuses that branch for accumulation; using `new-work` does **not** require `delivery.mode: pr`.
 
 **Why leave the default:** Landing REQ merges on `main`/`master` while agents run makes it easy to ship half-finished work or fight over the shared default. An integration base keeps the default clean until the operator promotes deliberately.
 
@@ -417,16 +417,16 @@ If a worker's commit collides on shared files, it waits with exponential backoff
 
 ## Milestone Mode
 
-When a UR contains the marker `source: /saas-thesis handoff` plus a `### Milestones` heading with `#### M1` (or higher) subheadings, do-work enters **milestone mode**:
+When an Issue contains the marker `source: /saas-thesis handoff` plus a `### Milestones` heading with `#### M1` (or higher) subheadings, do-work enters **milestone mode**:
 
-- Capture decomposes one milestone at a time, not the whole UR
+- Capture decomposes one milestone at a time, not the whole Issue
 - REQ files are prefixed: `REQ-M1-001-slug.md`, `REQ-M2-001-slug.md`, ...
 - Run halts at the end of each milestone's REQs and prompts for a **deploy gate** — non-delegable human confirmation
 - State files in `.do-work/state/`:
   - `active-milestone.md` — current milestone identifier
   - `milestones.md` — checklist of all milestones with status
 
-**Why implicit (triggered by UR shape, not a flag):** The `/saas-thesis` skill produces UR files with the correct shape automatically. Forcing users to remember `--milestone-mode` on `go` would split a single user intent across two commands. The marker in the UR carries the intent.
+**Why implicit (triggered by Issue shape, not a flag):** The `/saas-thesis` skill produces Issue files with the correct shape automatically. Forcing users to remember `--milestone-mode` on `go` would split a single user intent across two commands. The marker in the Issue carries the intent.
 
 **Why deploy gates are non-delegable:** Deploying a milestone is a real-world action with real-world consequences (payment processor enabled, customer-facing copy live, etc.). The skill never assumes consent for an irreversible external action.
 

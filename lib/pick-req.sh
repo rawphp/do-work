@@ -2,7 +2,7 @@
 # pick-req.sh — central deterministic REQ picker for the do-work coordination layer.
 #
 # Usage: pick-req.sh <scope> <agent-id>
-#   <scope>     "any" or a UR id ("UR-NNN") to restrict candidates to one UR.
+#   <scope>     "any" or an Issue id ("UR-NNN") to restrict candidates to one UR.
 #   <agent-id>  Caller's agent id (reserved for future logging; not currently used
 #               for filtering — the same agent may legitimately re-pick its own
 #               released REQs).
@@ -18,7 +18,7 @@
 #      state/active-milestone.md exists — only REQ-M<active>-*.md considered).
 #   2. Sort by Priority descending, then numeric REQ id ascending.
 #   3. For each candidate, in order:
-#        a. scope filter: skip if <scope> is a UR id and **UR:** mismatches.
+#        a. scope filter: skip if <scope> is an Issue id and **UR:** mismatches.
 #        b. dep filter: skip if any **Depends on:** id is absent from archive/.
 #        c. overlap filter: skip if any **Files:** entry intersects the file set
 #           held by any working/ slot (globs expanded against the working tree,

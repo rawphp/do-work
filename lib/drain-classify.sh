@@ -9,7 +9,7 @@
 # pick-req.sh's rejection log:
 #   dep:<id>      — REQ <id> rejected because a dependency is unsatisfied
 #   overlap:<id>  — REQ <id> rejected because of a sibling overlap claim
-#   scope:<id>    — REQ <id> rejected because it falls outside the active UR scope
+#   scope:<id>    — REQ <id> rejected because it falls outside the active Issue scope
 #
 # Emits exactly one label on stdout, with precedence:
 #   overlap-blocked > deps-blocked > scope-blocked > truly-empty

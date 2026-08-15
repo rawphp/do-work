@@ -27,7 +27,7 @@ Read and follow the **Load Config** section of [config.md](config.md). Keep the 
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -35,7 +35,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
@@ -58,7 +58,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 ### 0b. Validate UR exists
 
-Before delegating to any sub-agent, confirm the UR exists on the **active backend**:
+Before delegating to any sub-agent, confirm the Issue exists on the **active backend**:
 
 | Backend | How to confirm |
 |---------|----------------|
@@ -74,7 +74,7 @@ If it does not exist, report: "UR-NNN not found" (name the backend; markdown may
 After Load Config resolves `{skill-root}` / `$SKILL_ROOT` (step 8) and **before** any verify, run, or worker dispatch, leave protected default branches **only**:
 
 ```bash
-# When go is scoped to a UR, pass the slug. Unscoped go (no UR-NNN): omit the arg.
+# When go is scoped to an Issue, pass the slug. Unscoped go (no UR-NNN): omit the arg.
 bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
 # unscoped: bash {skill-root}/lib/ensure-integration-base.sh
 ```
@@ -150,7 +150,7 @@ When run completes without a stopper, archive and ledger writes are owned by [ru
 
 After run drains without a stopper:
 
-1. Check whether the UR has any archived path-unit REQs — scan `{project}/.do-work/archive/` for REQs whose `**UR:**` is `UR-NNN` and whose `**Layer:**` is `none` with non-empty `**Entry point:**` and `**Terminal state:**`.
+1. Check whether the Issue has any archived path-unit REQs — scan archive (or port list) for REQs whose `**UR:**` is `UR-NNN` with non-empty `**Entry point:**` and `**Terminal state:**` (**Layer-agnostic** fallback when no `Layer: none` exists — field lesson §19). Prefer `Layer: none` when present.
 2. If ≥1 path-unit REQ is found **and** `{project}/.do-work/user-requests/UR-NNN/closure.md` does not yet exist:
    - Use `AskUserQuestion` with the prompt: "Run `close` for UR-NNN to validate the integrated result against your brief? This walks every path-unit's entry point in the merged app and writes a closure report." with options **"Yes — run close now"** and **"No — skip closure"**.
    - If the user chooses "Yes": read [close.md](close.md) in full and follow it exactly, passing `{project}/.do-work/`, `UR-NNN`, and the current branch. Record the close outcome (`overall` field from the closure report) for inclusion in the Step 6 completion report.
@@ -203,7 +203,7 @@ If `config.next_steps.enabled` is `true`:
 
 **Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
-1. **"Start new work"** — Run intake for a new UR
+1. **"Start new work"** — Run intake for a new Issue
 2. **"Review archive"** — List completed REQs and outputs
 3. **"Skip"** — End the interaction
 
@@ -220,3 +220,10 @@ If `config.next_steps.enabled` is `false` or missing: output `Next step: /do-wor
 - Never skip Verify — it must run before any execution starts
 - The `--force` flag overrides the threshold but still runs verify (so you see the report)
 - If the run agent hits a stopper, respect it — do not retry or override
+
+
+## Field traps (from field-lessons)
+
+- **Linear + markdown-only REQs (§8):** if `tracker.backend: linear` but the Issue only exists as local `user-requests/` + `REQ-*.md` with no Linear milestone/issues → **hard-stop**. Offer migrate-to-Linear or set `tracker.backend: markdown`. Never silent-fallback.
+- **UR exists via backend (§9):** after Load Config, prove UR via markdown path / sqlite `get-ur` / linear `read_ur` — never require local `user-requests/` when backend is not markdown.
+- **Close offer path-units (§19):** use Layer-agnostic Entry/Terminal detection when collecting path-units for the close offer.
