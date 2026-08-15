@@ -146,7 +146,7 @@ teardown_fixture() {
   fi
 }
 
-# Run synth-status.sh with optional UR arg inside $TMP.
+# Run synth-status.sh with optional Issue arg inside $TMP.
 run_synth() {
   local arg="${1:-}"
   local err_file="$TMP/.stderr.$$"
@@ -328,7 +328,7 @@ assert_not_contains "| REQ-900 | UR-900 | in-progress |" "$STDOUT" "$CURRENT_CAS
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 10: scoped status still lists all archive rows for that UR.
+# Case 10: scoped status still lists all archive rows for that Issue.
 # ----------------------------------------------------------------------
 CURRENT_CASE="archive-cap-scoped"
 CASES=$((CASES + 1))

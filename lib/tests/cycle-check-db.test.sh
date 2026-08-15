@@ -9,9 +9,9 @@
 #   - transitive A→B→C→A → exit 1, full path.
 #   - self-loop A→A → exit 1, prints "A → A".
 #   - empty deps → exit 0.
-#   - cross-UR cycle (UR-X ↔ UR-Y) → exit 1 (whole graph).
+#   - cross-Issue cycle (UR-X ↔ UR-Y) → exit 1 (whole graph).
 #   - UR report-filter: cycle-check <root> UR-X reports only cycles involving
-#     UR-X, yet STILL detects cross-UR cycles; does NOT report unrelated URs.
+#     UR-X, yet STILL detects cross-Issue cycles; does NOT report unrelated Issues.
 #   - hypothetical-edge (--add): "would adding edge(s) X create a cycle?" without
 #     persisting → yes on would-be-cycle, no on safe edge; DB unchanged after.
 #
@@ -66,7 +66,7 @@ teardown_fixture() {
 }
 
 # Create UR + REQs. Each REQ var passed by name is assigned its real slug.
-# Usage: mkroot; mkur "Title" "Brief"   → echoes UR slug
+# Usage: mkroot; mkur "Title" "Brief"   → echoes Issue slug
 mkroot() {
   bash "$DWDB" ensure "$TMP" >/dev/null
 }
@@ -201,7 +201,7 @@ assert_eq "" "$CHK_STDOUT" "$CURRENT_CASE stdout empty"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 7: cross-UR cycle (UR-X REQ A ↔ UR-Y REQ B) → exit 1 (whole graph)
+# Case 7: cross-Issue cycle (UR-X REQ A ↔ UR-Y REQ B) → exit 1 (whole graph)
 # ----------------------------------------------------------------------
 CURRENT_CASE="cross-ur-cycle-whole-graph"
 CASES=$((CASES + 1))
@@ -220,7 +220,7 @@ assert_contains "$B" "$CHK_STDOUT" "$CURRENT_CASE has $B"
 teardown_fixture
 
 # ----------------------------------------------------------------------
-# Case 8: UR report-filter detects cross-UR cycle when filtered to either UR;
+# Case 8: UR report-filter detects cross-Issue cycle when filtered to either UR;
 #         an unrelated UR sees nothing.
 # ----------------------------------------------------------------------
 CURRENT_CASE="ur-filter-cross-ur-detected"

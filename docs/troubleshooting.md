@@ -64,7 +64,7 @@ Or clone `rawphp/do-work` directly into the hub (see [Getting started](getting-s
    ```yaml
    layers: [frontend, backend]
    ```
-2. Or skip for this UR:
+2. Or skip for this Issue:
    ```text
    /do-work start "…" --no-layers
    /do-work capture UR-NNN --no-layers
@@ -309,7 +309,7 @@ Do **not** guess a team. Agents hard-stop until one resolves. Full schema: `agen
 
 ### Want Linear but still on markdown history
 
-**Cause:** Project has local URs/REQs; you want cutover.
+**Cause:** Project has local Issues/REQs; you want cutover.
 
 **Fix:** Idle only (`working/` empty, no active claims):
 
@@ -327,9 +327,9 @@ Use dry-run first when offered. After cutover: no dual-write; historical markdow
 
 ### Intake hard-stops looking for Initiatives
 
-**Cause:** Older skill text required Initiative + per-UR Project. Current hierarchy uses **Project Milestones** for URs (Linear MCP has milestone CRUD, not Initiative create).
+**Cause:** Older skill text required Initiative + per-Issue Project. Current hierarchy uses **Project Milestones** for Issues (Linear MCP has milestone CRUD, not Initiative create).
 
-**Fix:** Use skill version with Milestone-as-UR (`agents/tracker/linear.md` § Hierarchy). Ensure the shared product Project resolves: set `tracker.linear.product_project` (name|UUID) **or** leave it empty so resolve uses `project.name` → git-root basename, then `ensure_product_container` create-if-missing + persists UUID. Do **not** expect a universal default Project named `do-work` (that name is only an example for this skill repo). Confirm milestone tools appear in `search_tool "linear milestone"`.
+**Fix:** Use skill version with Milestone-as-Issue (`agents/tracker/linear.md` § Hierarchy). Ensure the shared product Project resolves: set `tracker.linear.product_project` (name|UUID) **or** leave it empty so resolve uses `project.name` → git-root basename, then `ensure_product_container` create-if-missing + persists UUID. Do **not** expect a universal default Project named `do-work` (that name is only an example for this skill repo). Confirm milestone tools appear in `search_tool "linear milestone"`.
 
 ---
 
@@ -339,7 +339,7 @@ Optional local work-item store when `tracker.backend: sqlite` in `.do-work/confi
 
 ### Switch to sqlite (greenfield)
 
-**Cause:** You want a single local DB for URs/REQs instead of markdown files or Linear.
+**Cause:** You want a single local DB for Issues/REQs instead of markdown files or Linear.
 
 **Fix — opt in:**
 
@@ -354,7 +354,7 @@ tracker:
 
 Rules that matter:
 
-- **Greenfield only** — first ensure creates an **empty** `.do-work/work.db`. Prior markdown URs/REQs and Linear history are **not** imported in v1.
+- **Greenfield only** — first ensure creates an **empty** `.do-work/work.db`. Prior markdown Issues/REQs and Linear history are **not** imported in v1.
 - **No dual-write** — with `backend: sqlite`, `.do-work/work.db` is the sole work-item store. Do not treat `REQ-*.md` / `user-requests/` as live truth.
 - **`work.db` is gitignored** — `/do-work upgrade` ensures `.gitignore` has `.do-work/work.db`, `.do-work/work.db-*`, and board output paths.
 - **No markdown→Linear migrate under sqlite** — `/do-work upgrade migrate` **refuses** when `tracker.backend` is `sqlite` (`migrate-linear: refused-sqlite-backend`). There is no sqlite→Linear path either.
@@ -433,7 +433,7 @@ Optional remote work-item store when `tracker.backend: do-work-io` in `.do-work/
 
 ### Switch to do-work.io
 
-**Cause:** You want URs/REQs to live only on do-work.io (remote MCP), not in local markdown, Linear, or sqlite.
+**Cause:** You want Issues/REQs to live only on do-work.io (remote MCP), not in local markdown, Linear, or sqlite.
 
 **Fix — opt in:**
 

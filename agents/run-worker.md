@@ -26,7 +26,7 @@ The orchestrator dispatches you with these named inputs:
 4. **Context pack path** — absolute path to `.do-work/state/context-pack.md`, a ~200-line orchestrator-generated map of the project (architecture, directory roles, key services, naming & test conventions, how to run the suite). Read it in Step 2.
 5. **Skill root** — the absolute `$SKILL_ROOT` the orchestrator resolved once in **Load Config step 8** (`agents/config.md`: walk-up from loaded instruction file with `lib/` + (`SKILL.md` or `agents/`) markers, or inherit of a valid pre-set `$SKILL_ROOT`; hard-stop if unknown) and substituted into these instructions. It is the skill install root (the directory containing `lib/` and skill markers). Wherever these instructions write `{skill-root}/lib/...`, that means this passed-in value — substitute it. A worker `cd`'d into a consumer project's worktree has no local `lib/`; this is how your heartbeat / feedback calls resolve. Do **not** invent a second resolve recipe (no env/hub/CWD fallback). If the orchestrator omitted Skill root or left `{skill-root}` unsubstituted and you cannot determine the path, hard-stop per Load Config step 8 (inherit only when the value still satisfies markers; otherwise walk-up from the loaded instruction file).
 
-**Context discipline (bounded exploration, not starvation).** Prefer the context pack and the files the REQ and prior REQs cite — they are your primary context. When the implementation genuinely touches a file (a helper you must call, a convention you must match, a test pattern you must follow), you MAY read it to do the work correctly — bounded exploration of files your change actually touches is allowed. You MUST NOT load other REQs or other URs, and you MUST NOT wander into unrelated parts of the repo for general reading. Bounded exploration serves the change in front of you; it is not a license to re-survey the whole project (that is what the context pack is for).
+**Context discipline (bounded exploration, not starvation).** Prefer the context pack and the files the REQ and prior REQs cite — they are your primary context. When the implementation genuinely touches a file (a helper you must call, a convention you must match, a test pattern you must follow), you MAY read it to do the work correctly — bounded exploration of files your change actually touches is allowed. You MUST NOT load other REQs or other Issues, and you MUST NOT wander into unrelated parts of the repo for general reading. Bounded exploration serves the change in front of you; it is not a license to re-survey the whole project (that is what the context pack is for).
 
 ---
 
@@ -51,12 +51,18 @@ Execute these steps in order before proceeding to the normal `## Steps`. **This 
 
 ### W1. Record the base branch
 
+**Prefer the named integration base from the orchestrator dispatch** (the branch `ensure-integration-base` printed — usually `new-work`). Do **not** invent a different base.
+
+If the dispatch message includes `integration_base: <name>`, use that string as `<base-branch>` and create the worktree **off that named branch**, not off whatever `HEAD` happens to be in a drifted main checkout.
+
+Fallback only when the orchestrator omitted the name:
+
 ```bash
 git rev-parse --abbrev-ref HEAD
 # equivalent: git branch --show-current
 ```
 
-Record the output as `<base-branch>`. This is the orchestrator checkout's **current branch after** `ensure-integration-base` has already run in go/run pre-flight — not necessarily `main`/`master`. Workers **do not** call `ensure-integration-base` themselves; they inherit the post-ensure base by reading `HEAD` at worktree create. All subsequent merge and teardown steps (orchestrator Step 4, both `delivery.mode: merge` and `pr`) reference this same value.
+Record the output as `<base-branch>`. Workers **do not** call `ensure-integration-base` themselves. Field lesson §14: when HEAD can drift between ensure and worktree create, **branch off the named integration branch** (`git worktree add … -b req/<id> <named-base>`), not off HEAD. Never `git checkout`/`switch` in the main checkout.
 
 ### W2. Create the worktree + feature branch
 
@@ -131,7 +137,7 @@ Load config and resolve work-item storage before reading/updating REQs:
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` (including `heartbeat_req` → `lib/heartbeat.sh`) — use those ops; do not re-implement store details here.
@@ -197,7 +203,7 @@ Stamp here now (after reading the REQ), then continue.
 
 Read the **context pack** (`.do-work/state/context-pack.md`, input 4) first — it is your fastest path to the project's architecture, directory roles, key services, naming & test conventions, and the suite command. Use it to orient before you touch code so your implementation matches existing patterns and reaches for the right helpers and test idioms. If the pack path is missing or the file is absent (older orchestrator), skip it and rely on the REQ, prior REQs, and bounded exploration.
 
-Read the UR `input.md` once for orientation.
+Read the Issue `input.md` once for orientation.
 
 For each prior-REQ archived path you were given, read it and extract:
 - Task title (from the `# REQ-NNN:` heading)
@@ -218,7 +224,7 @@ If the prior-REQ list is empty, skip this substep.
 | **markdown** | Read `{project}/.do-work/decisions.md` if it exists |
 | **linear** | **Read decisions** helper in `agents/tracker/linear.md` — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing → empty. Do **not** use local `decisions.md` as the store |
 
-Grammar is identical either backend (SKILL.md § Decisions Memory): `YYYY-MM-DD | UR/REQ ref | decision | rationale` (Linear issue ids may appear in the ref slot). If your REQ's task or acceptance criteria require you to act against a recorded decision line (e.g. the REQ asks you to add client-side validation but a decision line reads `... | validation lives server-side | ...`), do not silently override it — return `status: stopped` with `reason: scope-creep` (if the REQ pushes new behaviour past a standing boundary) or `reason: ambiguous-criteria` (if the REQ and the decision are in direct conflict and you cannot tell which governs), naming the specific decision line verbatim in your report details so the orchestrator can route it for human resolution. If the store is absent (no decision recorded yet), this substep is silently a no-op — never create the store just to read it.
+Grammar is identical either backend (SKILL.md § Decisions Memory): `YYYY-MM-DD | Issue/REQ ref | decision | rationale` (Linear issue ids may appear in the ref slot). If your REQ's task or acceptance criteria require you to act against a recorded decision line (e.g. the REQ asks you to add client-side validation but a decision line reads `... | validation lives server-side | ...`), do not silently override it — return `status: stopped` with `reason: scope-creep` (if the REQ pushes new behaviour past a standing boundary) or `reason: ambiguous-criteria` (if the REQ and the decision are in direct conflict and you cannot tell which governs), naming the specific decision line verbatim in your report details so the orchestrator can route it for human resolution. If the store is absent (no decision recorded yet), this substep is silently a no-op — never create the store just to read it.
 
 ### 3. Execute TDD — red first
 
@@ -614,3 +620,21 @@ Field rules:
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.
 - **Worktree teardown belongs to the orchestrator.** Workers MUST NOT run `git worktree remove` or `git branch -d`. After you return `status: done`, the orchestrator merges the feature branch, archives the REQ, and tears down the worktree. Running teardown from the worker double-deletes the worktree and can corrupt the orchestrator's post-merge steps.
 - **Never invent stopper reasons.** The canonical source for the stop-reason vocabulary is `lib/stop-reasons.sh` (established in REQ-007); the worker's reasons are exactly its `--worker` subset, and the inline list below MUST stay in sync with `bash lib/stop-reasons.sh --worker`. The `reason` field in a stopped/failed report MUST be one of the documented enum values: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`. Do not improvise values outside this list (for example `awaiting-human-verification` is not a valid reason — if the worker hits an inherently non-executable verification step, use `status: deferred` in the checkpoint log and add the step to `deferred_checks:` so the orchestrator can route it into advisory archive data, then continue toward `status: done`). Inventing reasons outside the enum breaks downstream tooling (status, resume, unblock commands) that pattern-matches on these values.
+
+
+## Field traps (from field-lessons)
+
+Read `{skill-root}/references/field-lessons.md` at worker start when present. Act on these without waiting to rediscover them:
+
+1. **Laravel real vendor (§1).** If Pest fails with `A facade root has not been set` after `linked: vendor`, remove the worktree vendor symlink and run real `composer install` in the worktree app/package that owns `composer.json`. Do not rely on a vendor symlink for Laravel + Pest.
+2. **Named integration base (§14).** Create worktrees off the **named** integration branch from dispatch, not off drifted HEAD.
+3. **Worktree CWD only (§28).** After W2/W3.5, every read/edit/test uses the **worktree absolute path**. Main checkout is out of bounds (may hold dirty WIP).
+4. **No regenerator on symlinked deps (§16).** Do not run `composer dump-autoload`, `npm rebuild`, or similar regenerators against a **symlinked** `vendor`/`node_modules` — they rewrite shared artifacts to worktree-relative paths and break the main checkout after teardown. Prefer real provision / `worktree.setup_command: "composer install --no-interaction"`.
+5. **iOS DerivedData (§7).** Every `xcodebuild test` in this worker uses a per-REQ `-derivedDataPath` (e.g. `/tmp/dd-<sanitized-req-id>`). Never share default DerivedData across concurrent workers.
+6. **Pest WARN cosmetic (§17).** `Tests: N warning, M passed` with missing `.env` via phpdotenv is **green** when exit code is 0 and failed=0. Do not return `verification-failing` for warning-only.
+7. **Private Vite UI evidence (§22).** Screenshot worktree frontend from a **private** Vite started in `{worktree}/<app-package>` on an **unused-port** (not shared 5173 / `*.project.test`). No HTML positional arg to `vite`. Confirm HTTP 200 before screenshot. Long-lived process — not killed by short tool timeouts.
+8. **Vue harness RouterView (§33).** Use `import { RouterView } from 'vue-router'` and `h(RouterView)` — never `h('router-view')` (unknown native element, empty body).
+9. **Block-style YAML report (§18).** Return Report `acceptance:` map must be **block style** (not flow-style `{status: passed, evidence: [...]}`) so `check-acceptance-evidence.sh` sees evidence.
+10. **Path-unit empty commit (§4).** When children already shipped and this path-unit has nothing to implement: re-run path verification + re-vision UI; land `git commit --allow-empty` on `req/<id>` so merge has a tip. Do not re-implement children.
+11. **UI evidence dual home (§30).** Write PNGs under `.do-work/evidence/UR-NNN/ui-evidence/` **and** copy (or dual-write) to `.do-work/user-requests/UR-NNN/ui-evidence/` so the checker path resolves on non-markdown backends.
+12. **Pest red datasets (§28).** In red phase, use string literals in `->with([...])` datasets until model constants exist (avoid `DatasetMissing`).

@@ -79,7 +79,7 @@ What this does:
 Useful flags:
 
 - `--no-ideate` — skip creative review and the ideate gate
-- `--no-layers` — skip layer-coverage checks for this UR (recorded for audit)
+- `--no-layers` — skip layer-coverage checks for this Issue (recorded for audit)
 
 If capture stops because layers are undeclared, either set layers in config or pass `--no-layers` (see [Troubleshooting](troubleshooting.md)).
 
@@ -106,7 +106,7 @@ Full key list: [`agents/config.md`](../agents/config.md).
 
 ### Optional: Linear as work-item store
 
-By default, work items live under `.do-work/` (`tracker.backend` unset or `markdown`). You can point do-work at **Linear** instead so URs/REQs live only in Linear (no dual-write).
+By default, work items live under `.do-work/` (`tracker.backend` unset or `markdown`). You can point do-work at **Linear** instead so Issues/REQs live only in Linear (no dual-write).
 
 Minimal config:
 
@@ -130,7 +130,7 @@ tracker:
 **Rules that matter day one:**
 
 - **Markdown is the default** — skip this section entirely if you only want local files.
-- **No dual-write** — Linear mode does not keep a second markdown store of URs/REQs.
+- **No dual-write** — Linear mode does not keep a second markdown store of Issues/REQs.
 - **Hard-stop** — if Linear MCP is down or misconfigured, agents stop with setup instructions; they do not fall back to markdown.
 - **Human assignee** — you stay assignee on Issues; agents claim via comments. **Do not clear agent claim comments in Linear while a run is live** (see troubleshooting).
 - **Migrate existing markdown projects** only when idle: `/do-work upgrade migrate` (dry-run first). See [How it works → Multi-tracker](HOW-IT-WORKS.md#multi-tracker-work-item-backends).
@@ -179,7 +179,7 @@ tracker:
 
 ### 5. Execute with go
 
-Use the UR number from the start report (example `UR-001`):
+Use the Issue number from the start report (example `UR-001`):
 
 ```text
 /do-work go UR-001
@@ -196,7 +196,7 @@ Flags:
 
 - `--force` — run even when confidence is below threshold (verify still runs so you see the report)
 - `--auto-fix` — create missing REQs once, re-score, then run only if still ≥ threshold
-- `--no-layers` — skip layer-coverage checks for this UR (threaded into verify/capture when auto-fix runs)
+- `--no-layers` — skip layer-coverage checks for this Issue (threaded into verify/capture when auto-fix runs)
 
 ### 6. Check status while work runs
 

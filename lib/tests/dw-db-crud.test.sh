@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dw-db-crud.test.sh — UR/REQ create, get, list, update, set-status, set-files, set-blocked-by.
+# dw-db-crud.test.sh — Issue/REQ create, get, list, update, set-status, set-files, set-blocked-by.
 set -u
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 LIB_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
@@ -130,14 +130,14 @@ if bash "$DW" create-req "$TMP" --ur "UR-00000" --title "bad" 2>/dev/null; then
   fail "create-req invalid UR should fail"
 fi
 
-# cross-UR deps allowed
+# cross-Issue deps allowed
 ur2="$(bash "$DW" create-ur "$TMP" --title "Other" --brief "o")" || fail "create-ur 2"
 req_other="$(bash "$DW" create-req "$TMP" --ur "$ur2" --title "Other req")" || fail "create-req other"
-bash "$DW" set-blocked-by "$TMP" "$req" "$req_other" || fail "cross-UR set-blocked-by failed"
+bash "$DW" set-blocked-by "$TMP" "$req" "$req_other" || fail "cross-Issue set-blocked-by failed"
 cross="$(sqlite3 "$db" "SELECT COUNT(*) FROM deps d
   JOIN reqs a ON a.id=d.req_id JOIN reqs b ON b.id=d.depends_on_req_id
   WHERE a.slug='$req' AND b.slug='$req_other';")"
-[ "$cross" = "1" ] || fail "cross-UR dep not stored"
+[ "$cross" = "1" ] || fail "cross-Issue dep not stored"
 
 # get missing → non-zero
 if bash "$DW" get-req "$TMP" "REQ-00000" 2>/dev/null; then

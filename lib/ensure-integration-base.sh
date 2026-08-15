@@ -89,12 +89,12 @@ if [ -n "$UR_ARG" ]; then
   case "$UR_ARG" in
     UR-[0-9]*)
       if ! printf '%s' "$UR_ARG" | grep -Eq '^UR-[0-9]+$'; then
-        echo "ensure-integration-base.sh: invalid UR slug '$UR_ARG' (expected UR-NNN)" >&2
+        echo "ensure-integration-base.sh: invalid Issue slug '$UR_ARG' (expected UR-NNN)" >&2
         exit 1
       fi
       ;;
     *)
-      echo "ensure-integration-base.sh: invalid UR slug '$UR_ARG' (expected UR-NNN)" >&2
+      echo "ensure-integration-base.sh: invalid Issue slug '$UR_ARG' (expected UR-NNN)" >&2
       exit 1
       ;;
   esac

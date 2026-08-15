@@ -10,9 +10,9 @@
 
 ## Problem
 
-Proof in do-work is per-REQ, pre-merge, and produced in isolation. A worker proves its own REQ inside a worktree and writes `**Closure proof:**` (a checkpoint-log + commit reference); `lib/derive-status.sh` then marks that REQ `proven`, and `lib/coverage-rollup.sh` rolls per-UR `intended/proven/unproven`. Nothing validates the **integrated** result: that after every REQ merges to base, each path-unit's entry point still reaches its declared terminal state in the merged app. Cross-REQ integration drift is checked at capture time (footprint/deps) but never at delivery time. The final suite runs tests only — it cannot observe a route rendering, an endpoint responding, or a CLI command exiting cleanly.
+Proof in do-work is per-REQ, pre-merge, and produced in isolation. A worker proves its own REQ inside a worktree and writes `**Closure proof:**` (a checkpoint-log + commit reference); `lib/derive-status.sh` then marks that REQ `proven`, and `lib/coverage-rollup.sh` rolls per-Issue `intended/proven/unproven`. Nothing validates the **integrated** result: that after every REQ merges to base, each path-unit's entry point still reaches its declared terminal state in the merged app. Cross-REQ integration drift is checked at capture time (footprint/deps) but never at delivery time. The final suite runs tests only — it cannot observe a route rendering, an endpoint responding, or a CLI command exiting cleanly.
 
-This design specifies a **UR closure agent**: a fresh subagent that, after a run drains, re-reads the verbatim brief cold and walks every path-unit's entry point in the merged app, producing `{project}/.do-work/user-requests/UR-NNN/closure.md` — a per-path-unit verdict validating end-to-end reachability. It does not fix gaps; it surfaces them.
+This design specifies a **Issue closure agent**: a fresh subagent that, after a run drains, re-reads the verbatim brief cold and walks every path-unit's entry point in the merged app, producing `{project}/.do-work/user-requests/UR-NNN/closure.md` — a per-path-unit verdict validating end-to-end reachability. It does not fix gaps; it surfaces them.
 
 This layers on the existing spine — verbatim-brief invariant, per-REQ `**Closure proof:**`, the deterministic tested bash lib, evidence-not-assertion archiving. It adds an end-to-end proof tier above per-REQ proof; it replaces nothing.
 
@@ -23,7 +23,7 @@ This layers on the existing spine — verbatim-brief invariant, per-REQ `**Closu
 **Decision.** The closure agent is dispatched as a **fresh `Agent` subagent** (new context) that is handed exactly three things and nothing else:
 
 1. The verbatim brief: `{project}/.do-work/user-requests/UR-NNN/input.md`.
-2. The archived path-unit REQ files for that UR (REQs whose `**Layer:**` is `none`), read from `{project}/.do-work/archive/`. The closure agent reads each path-unit's `**Entry point:**` and `**Terminal state:**` header fields — these are the contract it validates.
+2. The archived path-unit REQ files for that Issue (REQs with non-empty `**Entry point:**` and `**Terminal state:**` — Layer-agnostic; prefer `**Layer:** none` when present), read from `{project}/.do-work/archive/`. The closure agent reads each path-unit's `**Entry point:**` and `**Terminal state:**` header fields — these are the contract it validates.
 3. The project root and its config (`security`, `test.suite_command`, runtime hints), loaded via [config.md](../../agents/config.md).
 
 The closure agent is **denied** all pipeline context: no worker return reports, no verify/audit/review output, no run ledger, no orchestrator conversation. It must not read `**Closure proof:**` values — per-REQ proof is exactly the optimism it exists to re-check independently.
@@ -79,7 +79,7 @@ A degraded verdict is a **first-class outcome**, not a failure. It is surfaced i
 
 | Field | Type | Meaning |
 |---|---|---|
-| `ur` | `UR-NNN` | the UR being closed |
+| `ur` | `UR-NNN` | the Issue being closed |
 | `closed_at` | ISO-8601 timestamp | when the walk completed |
 | `branch` | string | the merged branch walked (e.g. `main`) |
 | `path_units` | int | count of path-unit REQs found |
@@ -106,7 +106,7 @@ A degraded verdict is a **first-class outcome**, not a failure. It is surfaced i
 - `terminal-mismatch` — entry point reached but observed state ≠ declared terminal state (the integration drift case this whole feature exists to catch).
 - `degraded:*` — per Decision 3.
 
-**Empty case.** A UR with zero path-unit REQs writes a valid `closure.md` with `path_units: 0`, `overall: no-path-units`, and a one-line body explaining that this UR declared no reachable paths to close (REQ-209 AC3). It does not error.
+**Empty case.** An Issue with zero path-unit REQs writes a valid `closure.md` with `path_units: 0`, `overall: no-path-units`, and a one-line body explaining that this Issue declared no reachable paths to close (REQ-209 AC3). It does not error.
 
 ### Worked example (`closure.md`)
 
@@ -156,7 +156,7 @@ overall: gaps
 **Decision.**
 
 - **Standalone:** `/do-work close UR-NNN` routes through a new SKILL.md subcommand section (REQ-212), mirroring the `status` block: detect `{project}`, resolve `UR-NNN`, confirm `{project}/.do-work/user-requests/UR-NNN/input.md` exists (else report and stop), read `agents/close.md` in full, follow it exactly. The closure agent itself is `agents/close.md` (REQ-211).
-- **Offered by go after a clean run:** go's post-run flow (`agents/go.md` Step 4 archive area / Step 6 report) gains a closure offer. After run drains without a stopper, go reports completion and — when closure is applicable (the UR has ≥1 path-unit REQ now archived) — offers to run `close` for that UR. The offer is **workflow-relevant, not cosmetic**: per R9, it must not be gated behind `next_steps.enabled`; it is gated only on delegate-vs-standalone (go is top-level, so it presents the offer). If the user declines, go reports the UR as run-complete-but-not-closed.
+- **Offered by go after a clean run:** go's post-run flow (`agents/go.md` Step 4 archive area / Step 6 report) gains a closure offer. After run drains without a stopper, go reports completion and — when closure is applicable (the Issue has ≥1 path-unit REQ now archived) — offers to run `close` for that Issue. The offer is **workflow-relevant, not cosmetic**: per R9, it must not be gated behind `next_steps.enabled`; it is gated only on delegate-vs-standalone (go is top-level, so it presents the offer). If the user declines, go reports the Issue as run-complete-but-not-closed.
 - **Failure behaviour:** closure gaps (`not-reached`, `terminal-mismatch`) are **surfaced, not auto-fixed**. The closure agent never edits source, never re-runs the loop, never reopens REQs. A `gaps` overall verdict prints the failing rows and recommends the user capture follow-up work (e.g. intake a new brief or re-open via a new REQ). This matches the system's non-delegable-gate discipline: closure observes and reports; remediation is an explicit, user-initiated act.
 
 **Rationale.** Two entry points cover both the autonomous path (go offers it as the natural last step of delivery) and the deliberate path (a user closing an older UR by hand). Gating the go offer on `next_steps.enabled` would hide the system's most important delivery signal behind a default-off cosmetic flag — exactly the Gap G mistake R9 corrects. Auto-fixing on gaps would re-introduce the self-correcting optimism this agent exists to break; surfacing keeps the human in the loop for integration failures, which are precisely the failures most likely to need judgment.
@@ -168,8 +168,8 @@ overall: gaps
 **Decision.** Closure operates **above** the existing per-REQ proof tier; it does not write or alter `**Closure proof:**`.
 
 - `**Closure proof:**` stays exactly as today: written by run.md Step 4 from the worker's `closure_proof` YAML value (a checkpoint-log + commit reference), and read by `lib/derive-status.sh` to derive per-REQ `proven`/`unproven`. The closure agent does not touch it.
-- The UR-level closure verdict lives only in `UR-NNN/closure.md`. Per-path-unit `evidence_ref` values in that file are the closure analogue of `**Closure proof:**` — they reference observed end-to-end evidence (command output, screenshot, test name, human-confirm id) rather than a per-REQ checkpoint log.
-- **Coverage distinction (REQ-213):** `lib/coverage-rollup.sh` gains an end-to-end tier. Today it prints `intended=N proven=N unproven=N` per UR by aggregating `derive-status.sh`. REQ-213 extends it: when `UR-NNN/closure.md` exists, the rollup reads `overall` and the `verdict_summary` and appends a closure column, e.g. `closed=1 gaps=1` or `closure=none` when no `closure.md` exists yet. This lets `status` (which already prints the rollup under its `Coverage` heading) distinguish "proven per-REQ" from "proven end-to-end" without changing the existing per-REQ math — the new field is additive, preserving the existing line format and the lib's test contract (`lib/tests/coverage-rollup.test.sh`).
+- The Issue-level closure verdict lives only in `UR-NNN/closure.md`. Per-path-unit `evidence_ref` values in that file are the closure analogue of `**Closure proof:**` — they reference observed end-to-end evidence (command output, screenshot, test name, human-confirm id) rather than a per-REQ checkpoint log.
+- **Coverage distinction (REQ-213):** `lib/coverage-rollup.sh` gains an end-to-end tier. Today it prints `intended=N proven=N unproven=N` per Issue by aggregating `derive-status.sh`. REQ-213 extends it: when `UR-NNN/closure.md` exists, the rollup reads `overall` and the `verdict_summary` and appends a closure column, e.g. `closed=1 gaps=1` or `closure=none` when no `closure.md` exists yet. This lets `status` (which already prints the rollup under its `Coverage` heading) distinguish "proven per-REQ" from "proven end-to-end" without changing the existing per-REQ math — the new field is additive, preserving the existing line format and the lib's test contract (`lib/tests/coverage-rollup.test.sh`).
 
 **Rationale.** Two proof tiers answer two different questions: `**Closure proof:**` answers "was this REQ correctly built and committed?"; closure answers "does the merged whole do what the user asked?". Keeping them separate preserves the meaning of every existing field and the determinism of the lib scripts, while making the end-to-end signal visible in the one place users already look (`status` Coverage). Folding closure into `**Closure proof:**` would conflate per-REQ correctness with integration reachability and silently change what `proven` means across the whole system.
 

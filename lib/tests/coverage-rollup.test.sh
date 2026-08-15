@@ -54,6 +54,8 @@ write_req() {
   local status="$4"
   local proof="$5"
   local layer="${6:-agents}"
+  local entry="${7:-}"
+  local terminal="${8:-}"
   cat > "$path" <<EOF
 # $id: Test
 
@@ -62,6 +64,8 @@ write_req() {
 **Created:** 2026-06-09
 **Layer:** $layer
 **Closure proof:** $proof
+**Entry point:** $entry
+**Terminal state:** $terminal
 **Files:** agents/run.md
 **Depends on:**
 EOF
@@ -137,7 +141,7 @@ run_script
 assert_contains "UR-001 intended=3 proven=1 unproven=2" "$OUT" "$CURRENT_CASE counts"
 assert_not_contains "pending=" "$OUT" "$CURRENT_CASE no pending field"
 assert_contains "unproven_ids=REQ-002,REQ-003" "$OUT" "$CURRENT_CASE ids"
-# Additive: a UR with no path-unit REQs and no closure.md reports closed=n/a,
+# Additive: an Issue with no path-unit REQs and no closure.md reports closed=n/a,
 # and the existing fields are unchanged.
 assert_contains "closed=n/a" "$OUT" "$CURRENT_CASE closure column"
 teardown_fixture
@@ -151,13 +155,13 @@ run_script "UR-002"
 assert_contains "UR-002 intended=2 proven=2 unproven=0" "$OUT" "$CURRENT_CASE counts"
 teardown_fixture
 
-# --- Closure column (REQ-213): end-to-end closure state per UR ---
+# --- Closure column (REQ-213): end-to-end closure state per Issue ---
 
 # closed=yes: path-unit REQ present, closure.md exists with overall: closed.
 CURRENT_CASE="closure-yes"
 CASES=$((CASES + 1))
 setup_fixture
-write_req "$TMP/.do-work/archive/REQ-010-pu.md" "REQ-010" "UR-010" "done" "checkpoint:RUN-010 commit:abc" "none"
+write_req "$TMP/.do-work/archive/REQ-010-pu.md" "REQ-010" "UR-010" "done" "checkpoint:RUN-010 commit:abc" "none" "/app" "badge visible"
 write_req "$TMP/.do-work/archive/REQ-011-impl.md" "REQ-011" "UR-010" "done" "checkpoint:RUN-011 commit:def" "agents"
 write_closure "UR-010" "closed" 1 0
 run_script "UR-010"
@@ -169,7 +173,7 @@ teardown_fixture
 CURRENT_CASE="closure-no-gaps"
 CASES=$((CASES + 1))
 setup_fixture
-write_req "$TMP/.do-work/archive/REQ-020-pu.md" "REQ-020" "UR-020" "done" "checkpoint:RUN-020 commit:abc" "none"
+write_req "$TMP/.do-work/archive/REQ-020-pu.md" "REQ-020" "UR-020" "done" "checkpoint:RUN-020 commit:abc" "none" "/app" "done"
 write_closure "UR-020" "gaps" 0 1
 run_script "UR-020"
 assert_contains "closed=no" "$OUT" "$CURRENT_CASE closure"
@@ -179,18 +183,37 @@ teardown_fixture
 CURRENT_CASE="closure-no-absent"
 CASES=$((CASES + 1))
 setup_fixture
-write_req "$TMP/.do-work/archive/REQ-030-pu.md" "REQ-030" "UR-030" "done" "checkpoint:RUN-030 commit:abc" "none"
+write_req "$TMP/.do-work/archive/REQ-030-pu.md" "REQ-030" "UR-030" "done" "checkpoint:RUN-030 commit:abc" "none" "/app" "done"
 run_script "UR-030"
 assert_contains "closed=no" "$OUT" "$CURRENT_CASE closure"
 teardown_fixture
 
-# closed=n/a: UR has no path-unit REQs at all.
+# closed=n/a: Issue has no path-unit REQs at all.
 CURRENT_CASE="closure-na"
 CASES=$((CASES + 1))
 setup_fixture
 write_req "$TMP/.do-work/archive/REQ-040-a.md" "REQ-040" "UR-040" "done" "checkpoint:RUN-040 commit:abc" "agents"
 run_script "UR-040"
 assert_contains "closed=n/a" "$OUT" "$CURRENT_CASE closure"
+teardown_fixture
+
+# closed=no (absent) with Layer-agnostic path-unit: layered REQ still counts when
+# Entry point + Terminal state are set (close/go field lesson §19).
+CURRENT_CASE="closure-layered-pathunit"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-041-pu.md" "REQ-041" "UR-041" "done" "checkpoint:RUN-041 commit:abc" "frontend" "/ui" "list renders"
+run_script "UR-041"
+assert_contains "closed=no" "$OUT" "$CURRENT_CASE layered path-unit counts"
+teardown_fixture
+
+# Layer: none alone without Entry/Terminal is NOT a path-unit.
+CURRENT_CASE="closure-layer-none-without-path-fields"
+CASES=$((CASES + 1))
+setup_fixture
+write_req "$TMP/.do-work/archive/REQ-042-none.md" "REQ-042" "UR-042" "done" "checkpoint:RUN-042 commit:abc" "none"
+run_script "UR-042"
+assert_contains "closed=n/a" "$OUT" "$CURRENT_CASE layer none alone not path-unit"
 teardown_fixture
 
 # --- Legacy pending-validation data (UR-039): no derived pending bucket ---

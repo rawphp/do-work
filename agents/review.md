@@ -15,7 +15,7 @@ You will be given exactly these named inputs (shape depends on tracker backend):
 **Markdown backend:**
 
 1. The work-item id: **markdown** — working REQ path `{project}/.do-work/working/REQ-NNN-slug.md`; **linear** — Linear issue id; **sqlite (1S)** — REQ **slug** only (no `working/` path)
-2. The matching UR path
+2. The matching Issue path
 3. The worker report YAML
 4. The implementation diff or commit reference
 5. The policy-check output (`lib/check-policy.sh` result and exit code)
@@ -23,7 +23,7 @@ You will be given exactly these named inputs (shape depends on tracker backend):
 **Linear backend (`tracker.backend: linear` — REQ-295):**
 
 1. The **Linear issue id** (e.g. `ENG-123`) — load body via port op **`read_req`** (not a `.do-work/working/` path as source of truth)
-2. The matching UR / Project context (UR slug / Initiative id when known)
+2. The matching UR / Project context (Issue slug / Initiative id when known)
 3. The worker report YAML
 4. The implementation diff or commit reference (feature branch may be `req/ENG-123`)
 5. The policy-check output (`lib/check-policy.sh` result and exit code)
@@ -34,7 +34,7 @@ When the orchestrator runs in **adversarial mode**, you may be one of three revi
 
 ## Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops:
 
 1. Load config (`agents/config.md`) and resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -42,7 +42,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.

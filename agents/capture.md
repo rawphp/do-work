@@ -22,8 +22,8 @@ You will be given an Issue reference (slug `UR-NNN`):
 | Backend | Invocation |
 |---------|------------|
 | **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/` |
-| **linear** | UR slug (e.g. `UR-001`) and/or UR Project Milestone id — **no** local folder required |
-| **do-work-io** | UR slug (e.g. `UR-001`) — **no** local folder required |
+| **linear** | Issue slug (e.g. `UR-001`) and/or Issue Project Milestone id — **no** local folder required |
+| **do-work-io** | Issue slug (e.g. `UR-001`) — **no** local folder required |
 
 ---
 
@@ -35,7 +35,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -43,7 +43,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
@@ -52,10 +52,10 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 
 | Concern | Markdown | Linear | sqlite (1S) | do-work-io (1D) |
 |---------|----------|--------|-------------|-----------------|
-| Brief / ideate / clarifications | `input.md`, optional `ideate.md` | **`read_ur`** (UR Project Milestone §9.1: Brief, Ideate, Clarifications) | **`get-ur`** + artifact kinds via dw-db | **`read_ur`** (`ur.get`) via `agents/tracker/do-work-io.md` |
-| Create REQs | Write `{project}/.do-work/REQ-NNN-*.md` | Port op **`create_req`** only — Issues on **product Project** + **UR milestone**; Linear issue ids only (e.g. `ENG-123`). **No** local `REQ-*.md` as store. | `bash {skill-root}/lib/dw-db.sh create-req {project} --ur UR-NNN …` — **No** local `REQ-*.md` | Port op **`create_req`** (`req.create`) — slugs `REQ-NNN`. **No** local `REQ-*.md` as store |
-| List REQs for this UR | Glob backlog/working/archive | Port op **`list_reqs_for_ur`** (product Project + UR milestone filter) — same op verify uses later | `dw-db list-reqs --ur UR-NNN` | Port op **`list_reqs_for_ur`** (`req.list`) |
-| Capture summary / status | `input.md` body + frontmatter | Update UR milestone description sections/status fields (never overwrite `## Brief` verbatim intake); no local `input.md` dual-write | `write-capture-summary` via dw-db; never dual-write `input.md` | Artifact / UR update via `do-work-io.md` only; never dual-write `input.md` |
+| Brief / ideate / clarifications | `input.md`, optional `ideate.md` | **`read_ur`** (Issue Project Milestone §9.1: Brief, Ideate, Clarifications) | **`get-ur`** + artifact kinds via dw-db | **`read_ur`** (`ur.get`) via `agents/tracker/do-work-io.md` |
+| Create REQs | Write `{project}/.do-work/REQ-NNN-*.md` | Port op **`create_req`** only — Issues on **product Project** + **Issue milestone**; Linear issue ids only (e.g. `ENG-123`). **No** local `REQ-*.md` as store. | `bash {skill-root}/lib/dw-db.sh create-req {project} --ur UR-NNN …` — **No** local `REQ-*.md` | Port op **`create_req`** (`req.create`) — slugs `REQ-NNN`. **No** local `REQ-*.md` as store |
+| List REQs for this Issue | Glob backlog/working/archive | Port op **`list_reqs_for_ur`** (product Project + Issue milestone filter) — same op verify uses later | `dw-db list-reqs --ur UR-NNN` | Port op **`list_reqs_for_ur`** (`req.list`) |
+| Capture summary / status | `input.md` body + frontmatter | Update Issue milestone description sections/status fields (never overwrite `## Brief` verbatim intake); no local `input.md` dual-write | `write-capture-summary` via dw-db; never dual-write `input.md` | Artifact / UR update via `do-work-io.md` only; never dual-write `input.md` |
 | Hard-stop | n/a | MCP / create-issue tools missing → hard-stop; never write local backlog REQs as substitute | dw-db/sqlite unusable → hard-stop; never write local backlog REQs | MCP/PAT/project unusable → hard-stop; never write local backlog REQs |
 
 **When effective backend is `linear`:** use **`create_req`** exclusively for REQ persistence; after create, optionally **`list_reqs_for_ur`** to verify Issues landed. Do **not** dual-write under `.do-work/REQ-*` or `user-requests/`.
@@ -71,7 +71,7 @@ Standing decisions and capture calibration are **work-item memory**, not runtime
 | Concern | Markdown (`markdown.md`) | Linear (`linear.md`) | sqlite (1S) | do-work-io (1D) |
 |---------|--------------------------|----------------------|-------------|-----------------|
 | Read decisions | `{project}/.do-work/decisions.md` if present | **Read decisions** helper — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty | decisions table via dw-db / port (not local `decisions.md` as store) | Port ops in `do-work-io.md` (`decision.append` / list) — not local `decisions.md` as store |
-| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing). Same grammar: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale` | `bash {skill-root}/lib/dw-db.sh append-decision {project} "…"` | Port op **`append_decision`** (`decision.append`) |
+| Append decision | Append one line to `.do-work/decisions.md` (create if absent) | **`append_decision`** — append-only line on that Team Doc (create-if-missing). Same grammar: `YYYY-MM-DD \| Issue/REQ ref \| decision \| rationale` | `bash {skill-root}/lib/dw-db.sh append-decision {project} "…"` | Port op **`append_decision`** (`decision.append`) |
 | Read calibration | `{project}/.do-work/state/calibration.md` if present | **Read calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`); missing → continue without | `dw-db read-calibration` — not `state/calibration.md` as store | Continue without a remote calibration Doc (not a do-work.io work-item op) |
 
 **When effective backend is `linear`:** do **not** read or write local `.do-work/decisions.md` or `state/calibration.md` as the store. Use the sequences in `agents/tracker/linear.md` only. **When `markdown`:** keep the file paths in the steps below.
@@ -105,7 +105,7 @@ Keep guidance bullets in context as advisory calibration — they inform how you
 - **Markdown:** Read `{project}/.do-work/decisions.md` if it exists.
 - **Linear:** Load via linear.md **Read decisions** (Team Doc `decisions_doc_title` / default `do-work/decisions`).
 
-Each line records a standing decision (`YYYY-MM-DD | UR/REQ ref | decision | rationale`). Hold these in context while decomposing: they are prior calls that should shape how you split and scope REQs so this UR does not contradict them (e.g. a recorded "validation lives server-side" decision tells you which layer a validation REQ belongs to). If the store is empty/absent (no decision has been recorded yet), continue without it — never create it just to read it.
+Each line records a standing decision (`YYYY-MM-DD | Issue/REQ ref | decision | rationale`). Hold these in context while decomposing: they are prior calls that should shape how you split and scope REQs so this Issue does not contradict them (e.g. a recorded "validation lives server-side" decision tells you which layer a validation REQ belongs to). If the store is empty/absent (no decision has been recorded yet), continue without it — never create it just to read it.
 
 ### 1b. Detect milestone mode
 
@@ -203,7 +203,7 @@ Decision table:
 |---|---|---|---|
 | `bug-fix` | any | any | Proceed. `layers_in_scope: []` will be recorded in UR frontmatter; no layer-coverage prompt fires. |
 | `feature` | non-empty | not passed | Proceed. `layers_in_scope` = the configured `layers:` list. |
-| `feature` | non-empty | passed | Proceed. `layers_in_scope: []` recorded in UR frontmatter (deliberate user opt-out for this UR only); no layer-coverage prompt fires. |
+| `feature` | non-empty | passed | Proceed. `layers_in_scope: []` recorded in UR frontmatter (deliberate user opt-out for this Issue only); no layer-coverage prompt fires. |
 | `feature` | empty or missing | not passed | **Halt.** Output the error below. Do not write any REQs. |
 | `feature` | empty or missing | passed | Proceed. `layers_in_scope: []` recorded in UR frontmatter. |
 | `other` (effective `feature`) | empty or missing | not passed | **Halt** as above. |
@@ -218,19 +218,19 @@ This is a feature-class brief, and gap-aware capture requires either:
       layers: [frontend, backend]
       and re-run capture, OR
   (2) pass --no-layers on the start or go invocation to skip
-      layer-coverage checks for this UR only.
+      layer-coverage checks for this Issue only.
 
 Layer-coverage checks prevent features from silently shipping with
-the frontend or wiring missed. Disable them per-UR with --no-layers
+the frontend or wiring missed. Disable them per-Issue with --no-layers
 when they don't apply (e.g. internal CLI scripts).
 ```
 
-Hold `layers_in_scope` (the per-UR list) in context for downstream steps.
+Hold `layers_in_scope` (the per-Issue list) in context for downstream steps.
 
-If `--no-layers` produced a deliberate per-UR opt-out (a `feature` brief proceeding with `layers_in_scope: []`), append one standing decision line (SKILL.md § Decisions Memory format):
+If `--no-layers` produced a deliberate per-Issue opt-out (a `feature` brief proceeding with `layers_in_scope: []`), append one standing decision line (SKILL.md § Decisions Memory format):
 
 ```
-YYYY-MM-DD | UR-NNN | layer-coverage checks skipped for this UR | --no-layers opt-out
+YYYY-MM-DD | UR-NNN | layer-coverage checks skipped for this Issue | --no-layers opt-out
 ```
 
 - **Markdown:** append to `{project}/.do-work/decisions.md` (create if absent).
@@ -346,10 +346,10 @@ If you discover a requirement that was missed, add a REQ for it before proceedin
 | Backend | How to create each REQ |
 |---------|------------------------|
 | **markdown** | Write a file to the backlog root: `{project}/.do-work/REQ-NNN-short-slug.md` |
-| **linear** | Call port op **`create_req`** (`agents/tracker/linear.md`) for each planned task — Issue on **product Project**, **milestone** = parent UR Project Milestone, body §9.2, labels as available. Resulting id is the **Linear issue id only** (e.g. `ENG-123`). Path-unit parents first, then children with `parentId`. **Do not** write local `.do-work/REQ-*.md` as the store. After all creates (or on verify), **`list_reqs_for_ur`** may be used to confirm Issues for this UR. |
-| **do-work-io** | Call port op **`create_req`** (`agents/tracker/do-work-io.md` → `req.create`) for each planned task. Resulting id is the **REQ slug** (`REQ-NNN`). Path-unit parents first, then children. **Do not** write local `.do-work/REQ-*.md` as the store. After all creates, **`list_reqs_for_ur`** (`req.list`) may confirm REQs for this UR. |
+| **linear** | Call port op **`create_req`** (`agents/tracker/linear.md`) for each planned task — Issue on **product Project**, **milestone** = parent Issue Project Milestone, body §9.2, labels as available. Resulting id is the **Linear issue id only** (e.g. `ENG-123`). Path-unit parents first, then children with `parentId`. **Do not** write local `.do-work/REQ-*.md` as the store. After all creates (or on verify), **`list_reqs_for_ur`** may be used to confirm Issues for this Issue. |
+| **do-work-io** | Call port op **`create_req`** (`agents/tracker/do-work-io.md` → `req.create`) for each planned task. Resulting id is the **REQ slug** (`REQ-NNN`). Path-unit parents first, then children. **Do not** write local `.do-work/REQ-*.md` as the store. After all creates, **`list_reqs_for_ur`** (`req.list`) may confirm REQs for this Issue. |
 
-Decomposition content (Task / Context / AC / Verification / Integration fields) is the same for both backends; only the store differs. Under Linear, `**UR:**` / `**Parent:**` / `**Depends on:**` use Linear issue ids and the UR slug; never invent parallel `REQ-NNN` allocation.
+Decomposition content (Task / Context / AC / Verification / Integration fields) is the same for both backends; only the store differs. Under Linear, `**UR:**` / `**Parent:**` / `**Depends on:**` use Linear issue ids and the Issue slug; never invent parallel `REQ-NNN` allocation.
 
 **Every REQ must carry a `**Layer:**` field.** Set it from the R-number's tag (Step 3b). If multiple R-numbers map to the same REQ, they must all share the same tag — otherwise split the REQ. Bug-fix briefs (classification from Step 2b) write `**Layer:** none` on every REQ.
 
@@ -532,7 +532,7 @@ For each uncovered layer, present this prompt via `AskUserQuestion`:
 Project declares layer "{layer}", but no REQ covers it.
 Brief: "{one-sentence summary of input.md's first paragraph}"
 
-Is "{layer}" needed for this UR?
+Is "{layer}" needed for this Issue?
 ```
 
 Options:
@@ -544,7 +544,7 @@ Options:
 
 **No path:** record the decision in working state. The actual frontmatter write happens later in Step 6b. For now, hold `layer_decisions[<layer>] = no` in context.
 
-Also append the decision to the cross-UR decisions memory (this is a judgment-point choice that shapes the decomposition — the layer is being deliberately left out of this UR). One line:
+Also append the decision to the cross-Issue decisions memory (this is a judgment-point choice that shapes the decomposition — the layer is being deliberately left out of this Issue). One line:
 
 ```
 YYYY-MM-DD | UR-NNN | layer "<layer>" out of scope | user answered "No" at layer-coverage prompt
@@ -631,7 +631,7 @@ After all REQ files are written (Steps 4, 4b, 4c, 4d complete), validate that th
 | `sqlite` | `bash {skill-root}/lib/dw-db.sh cycle-check {project} UR-NNN` |
 | `do-work-io` | Server `req.set-blocked-by` rejects cycles. Read-side: `req.list` + each REQ’s `depends_on` slugs; DFS in working memory. **Do not** run markdown `cycle-check.sh` (vacuous — no `REQ-*.md`). |
 
-Replace `UR-NNN` with the actual UR identifier and `{project}` with the project root. The markdown script scans all REQs matching that UR across backlog, working, and archive (`.do-work/REQ-*.md`), builds the dep graph, and runs DFS cycle detection. The sqlite command (`dw-db cycle-check`, REQ-017) reads the `deps` table directly — **under sqlite the markdown script globs `.do-work/REQ-*.md` and finds nothing, exiting 0 vacuously**, so the `dw-db` form is required for the gate to actually fire.
+Replace `UR-NNN` with the actual UR identifier and `{project}` with the project root. The markdown script scans all REQs matching that Issue across backlog, working, and archive (`.do-work/REQ-*.md`), builds the dep graph, and runs DFS cycle detection. The sqlite command (`dw-db cycle-check`, REQ-017) reads the `deps` table directly — **under sqlite the markdown script globs `.do-work/REQ-*.md` and finds nothing, exiting 0 vacuously**, so the `dw-db` form is required for the gate to actually fire.
 
 **On exit 0 (no cycle):** Continue to Step 5.
 
@@ -661,7 +661,7 @@ The file-feedback call is best-effort — if `feedback.enabled` is false or `gh`
 
 This pass runs only for `feature`-class briefs and only on REQs whose `**Layer:**` is not `none`. Bug-fix briefs and `none`-layer REQs skip it.
 
-**Scope contract.** If invoked with a specific REQ id as scope (e.g. by `verify --auto-fix` for a single Integration block gap), this pass runs against only that REQ. If invoked without a scope (the normal capture flow), iterate every qualifying REQ in the UR. Steps 6 and 6b must run after this pass regardless of scope so the summary block and frontmatter stay in sync.
+**Scope contract.** If invoked with a specific REQ id as scope (e.g. by `verify --auto-fix` for a single Integration block gap), this pass runs against only that REQ. If invoked without a scope (the normal capture flow), iterate every qualifying REQ in the Issue. Steps 6 and 6b must run after this pass regardless of scope so the summary block and frontmatter stay in sync.
 
 For each qualifying REQ in scope, fill the `## Integration` block by answering three sub-questions, citing concrete file paths or symbols.
 
@@ -709,7 +709,7 @@ For each qualifying REQ in scope, fill the `## Integration` block by answering t
 
 **Backend branch:**
 - **Markdown:** Prepend (or replace, on re-run — see Step 7 idempotency rules) a summary block to `input.md`'s body, immediately after the YAML frontmatter close (`---`) and before the `## Request` heading.
-- **Linear:** Write the same summary content onto the **UR Project Milestone** description (e.g. under `## Capture summary` or fenced `<!-- capture-summary-start -->` … `<!-- capture-summary-end -->`) via rediscovered milestone update tools — same surface as `append_ideate`. **Never** overwrite `## Brief`. **Never** dual-write local `input.md`. REQ rows use **Linear issue ids**.
+- **Linear:** Write the same summary content onto the **Issue Project Milestone** description (e.g. under `## Capture summary` or fenced `<!-- capture-summary-start -->` … `<!-- capture-summary-end -->`) via rediscovered milestone update tools — same surface as `append_ideate`. **Never** overwrite `## Brief`. **Never** dual-write local `input.md`. REQ rows use **Linear issue ids**.
 
 **Markdown path (detail):** Prepend (or replace, on re-run — see Step 7 idempotency rules) a summary block to `input.md`'s body, immediately after the YAML frontmatter close (`---`) and before the `## Request` heading.
 
@@ -757,7 +757,7 @@ On re-run: if both fence comments are present, replace everything from `<!-- cap
 
 **Markdown:** Update `input.md`'s YAML frontmatter (the block between the first two `---` lines) to record capture's decisions.
 
-**Linear:** Record the same fields as machine-readable state on the **UR Project Milestone** description (status → captured, classification, layers_in_scope, layer_decisions, reqs with Linear issue ids, acknowledged_partials). Prefer structured YAML or §9.1-compatible headers that `read_ur` can re-parse — never overwrite `## Brief`. Rebuild `reqs` via **`list_reqs_for_ur`** when re-running. Do not write local `input.md`.
+**Linear:** Record the same fields as machine-readable state on the **Issue Project Milestone** description (status → captured, classification, layers_in_scope, layer_decisions, reqs with Linear issue ids, acknowledged_partials). Prefer structured YAML or §9.1-compatible headers that `read_ur` can re-parse — never overwrite `## Brief`. Rebuild `reqs` via **`list_reqs_for_ur`** when re-running. Do not write local `input.md`.
 
 **Markdown frontmatter shape** must end up looking like:
 
@@ -778,25 +778,25 @@ acknowledged_partials: []       # REQ ids the user has reviewed and waved throug
 
 **Field rules:**
 
-- `status` flips from `intake` to `captured`. (If a future re-capture revisits a UR with `status: captured`, leave it as `captured`.)
+- `status` flips from `intake` to `captured`. (If a future re-capture revisits an Issue with `status: captured`, leave it as `captured`.)
 - `classification` is from Step 2b.
-- `layers_in_scope` is the per-UR snapshot from Step 2c. May be empty for bug-fix briefs or `--no-layers` invocations.
+- `layers_in_scope` is the per-Issue snapshot from Step 2c. May be empty for bug-fix briefs or `--no-layers` invocations.
 - `layer_decisions` only contains entries for layers the user explicitly opted out of in Step 4c. Layers with REQs covering them do not appear here.
-- `reqs` is a list of every REQ in this UR (matched by `**UR:** UR-NNN` in the REQ files, including REQs in working/ or archive/ that belong to this UR).
+- `reqs` is a list of every REQ in this Issue (matched by `**UR:** UR-NNN` in the REQ files, including REQs in working/ or archive/ that belong to this Issue).
 - `acknowledged_partials` is preserved from the existing frontmatter on re-run; never reset by capture.
 - `open_gaps` is preserved from the existing frontmatter (ideate writes it, capture leaves it alone). If absent, it's not added by capture.
 
-**Idempotency on re-run** (capture invoked on a UR that already has `status: captured`):
+**Idempotency on re-run** (capture invoked on an Issue that already has `status: captured`):
 
 - `classification` — preserved from existing frontmatter; not re-derived.
 - `layers_in_scope` — re-derived from current config and Step 2c logic; the new value overwrites the old. (This means edits to `layers:` propagate when capture re-runs.)
 - `layer_decisions` — preserved entries are kept; new "no" answers in this run merge in. Capture does not re-prompt for layers where `layer_decisions[<layer>] == no`.
-- `reqs` — rebuilt from scratch by scanning REQ files in backlog/working/archive matching this UR. New REQs from this run are included; deleted REQ entries are dropped.
+- `reqs` — rebuilt from scratch by scanning REQ files in backlog/working/archive matching this Issue. New REQs from this run are included; deleted REQ entries are dropped.
 - `acknowledged_partials` — preserved verbatim. Never modified by capture.
 
 A re-run that produces no new REQs and no new layer decisions is otherwise a no-op except for refreshing the summary block timestamp (Step 6).
 
-**Side effect of re-deriving `layers_in_scope`:** adding new layers to `.do-work/config.yml` months later will trigger layer-coverage prompts on any UR that gets re-captured under the new config — even URs that pre-date the new layer. This is by design (current config is treated as authoritative), but worth knowing before broadening the layer list. The user resolves these by recording `layer_decisions: { newlayer: no }` for old URs that don't need the new layer.
+**Side effect of re-deriving `layers_in_scope`:** adding new layers to `.do-work/config.yml` months later will trigger layer-coverage prompts on any Issue that gets re-captured under the new config — even Issues that pre-date the new layer. This is by design (current config is treated as authoritative), but worth knowing before broadening the layer list. The user resolves these by recording `layer_decisions: { newlayer: no }` for old Issues that don't need the new layer.
 
 ### 7. Commit the backlog
 
@@ -819,7 +819,7 @@ git commit -m "chore(UR-NNN): capture decomposition + state"
 
 Replace `UR-NNN` with the actual UR identifier. The commit includes new REQ files, the updated `input.md` (frontmatter + summary block), and any newly written `## Integration` blocks within REQs.
 
-**Linear:** Skip git commits for work-item storage (Issues + UR milestone already live in Linear). Optional local commits only if capture also changed non-work-item project files — do **not** invent dual-write REQ markdown just to commit. Prefer **`list_reqs_for_ur`** after creates as the verify-green step before reporting.
+**Linear:** Skip git commits for work-item storage (Issues + Issue milestone already live in Linear). Optional local commits only if capture also changed non-work-item project files — do **not** invent dual-write REQ markdown just to commit. Prefer **`list_reqs_for_ur`** after creates as the verify-green step before reporting.
 
 ### 8. Report and prompt
 
@@ -850,7 +850,7 @@ Classification: <classification>
 Layers in scope: <list, or "(none)">
 Layer decisions: <"<layer>: no" entries, or "(none — all covered)">
 Product project: <name or id>
-UR milestone: <name or id>
+Issue milestone: <name or id>
 
 REQs written (Linear issue ids):
   ENG-123 — Short title — layer: <layer> — integration: <confidence>
@@ -859,7 +859,7 @@ REQs written (Linear issue ids):
 Total: N issues (list_reqs_for_ur)
 ```
 
-The user reads this to confirm capture's decisions match the brief. Detail-level review: markdown `## Capture summary` in `input.md`; linear same section on the UR milestone / **`read_ur`**.
+The user reads this to confirm capture's decisions match the brief. Detail-level review: markdown `## Capture summary` in `input.md`; linear same section on the Issue milestone / **`read_ur`**.
 
 **Then, immediately after the report**, check whether to present next-step options:
 
@@ -871,7 +871,7 @@ If `config.next_steps.enabled` is `true` **and** this agent is running standalon
 2. **"Run Go"** — Skip to verify + run in one shot
 3. **"Skip"** — End the interaction
 
-If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output `Next step: /do-work go UR-NNN to verify coverage and run.` (substitute the real UR number) and stop.
+If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside start: output `Next step: /do-work go UR-NNN to verify coverage and run.` (substitute the real Issue number) and stop.
 
 ---
 
@@ -891,3 +891,11 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 - Slugs: lowercase, kebab-case, max 5 words, derived from the task title (markdown filenames; Linear titles remain short/actionable)
 - Hard-stop if backend is `linear` and Linear MCP is unusable — never silent markdown fallback
 - Hard-stop if backend is `do-work-io` and MCP/PAT/project is unusable — never silent markdown fallback
+
+
+## Field traps (from field-lessons)
+
+1. **Never guess a not-yet-allocated REQ slug for `--deps` (§13).** Create the dependency-target REQ first; read the real slug from `create-req` stdout; pass that as `--deps`. Or create all REQs then `set-blocked-by`. Re-check with `check-deps`. Guessed slugs can silently wire to another Issue's REQ.
+2. **cycle-check under sqlite is vacuous (§12).** `cycle-check.sh` globs `REQ-*.md` and exits 0 with no edges under sqlite. Under sqlite, verify the `deps` table (DFS) or a `dw-db cycle-check` op — do not treat script exit 0 alone as proof.
+3. **do-work-io REQ body (§26b).** Before go/run: every REQ must have a full markdown **body** (`## Task` / Context / Integration / Verification Steps), not AC-only shells. Path-units need `entry_point` + `terminal_state`. Use `req.update` when create omitted body.
+4. **Mockups durable (§32).** Vision-read attached mockups before inventing layout. Copy session images into `{project}/.do-work/evidence/UR-NNN/mockups/` and cite those paths in REQ Context.

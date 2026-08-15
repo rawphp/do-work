@@ -24,7 +24,7 @@ Do **not** load this file for ordinary work-item ops when backend is `markdown` 
 
 ```
 {project}/.do-work/
-├── work.db              — sole work-item store (URs, REQs, claims, artifacts, …)
+├── work.db              — sole work-item store (Issues, REQs, claims, artifacts, …)
 ├── evidence/UR-NNN/     — binary / UI / closure evidence only (not tickets)
 │   ├── ui-evidence/
 │   └── closure-evidence/
@@ -42,7 +42,7 @@ Do **not** load this file for ordinary work-item ops when backend is `markdown` 
 | Ideate / clarifications / verify / close | `ur_artifacts` (`kind`) |
 | Decisions | `decisions` table (append-only lines) |
 | Calibration | single-row `calibration` (id=1) |
-| Milestone cursor | `milestone_state` **per UR** (`ur_id` UNIQUE) |
+| Milestone cursor | `milestone_state` **per Issue** (`ur_id` UNIQUE) |
 | Run notes | `run_notes` rows on REQ |
 | Gate locks | **local** `.do-work/state/gate-owner.md` only — **not DB** |
 
@@ -101,13 +101,13 @@ Do not fall back to markdown or Linear. Fix sqlite3 / work.db / skill install, t
 | `set_files` | `bash {skill-root}/lib/dw-db.sh set-files {root} REQ-NNN "path1 path2"` |
 | `archive_req` | `bash {skill-root}/lib/dw-db.sh archive-req {root} REQ-NNN` (runs integrity gate first) |
 | `unblock_req` | `bash {skill-root}/lib/dw-db.sh unblock {root} REQ-NNN` |
-| `append_decision` | `bash {skill-root}/lib/dw-db.sh append-decision {root} "YYYY-MM-DD \| UR/REQ ref \| decision \| rationale"` — **append-only** |
+| `append_decision` | `bash {skill-root}/lib/dw-db.sh append-decision {root} "YYYY-MM-DD \| Issue/REQ ref \| decision \| rationale"` — **append-only** |
 | `write_verify_report` | `bash {skill-root}/lib/dw-db.sh write-verify {root} UR-NNN --body TEXT` — **replace** `ur_artifacts.kind=verify` |
 | `write_close_report` | `bash {skill-root}/lib/dw-db.sh write-close {root} UR-NNN --body TEXT` — **replace** close artifact + set `urs.closed_at` |
 | `append_run_note` | `bash {skill-root}/lib/dw-db.sh append-run-note {root} REQ-NNN --payload TEXT` |
-| `read_active_milestone` | `bash {skill-root}/lib/dw-db.sh get-active-milestone {root} UR-NNN` (empty = not in milestone mode for that UR) |
+| `read_active_milestone` | `bash {skill-root}/lib/dw-db.sh get-active-milestone {root} UR-NNN` (empty = not in milestone mode for that Issue) |
 | `set_active_milestone` | `bash {skill-root}/lib/dw-db.sh set-active-milestone {root} UR-NNN M1` or `… UR-NNN ""` to clear; optional `--checklist JSON` |
-| `list_milestone_reqs` | `bash {skill-root}/lib/dw-db.sh list-milestone-reqs {root} UR-NNN [--milestone M1]` (default = that UR’s active) |
+| `list_milestone_reqs` | `bash {skill-root}/lib/dw-db.sh list-milestone-reqs {root} UR-NNN [--milestone M1]` (default = that Issue’s active) |
 | `write_gate_state` | **Local only:** write/delete `{root}/.do-work/state/gate-owner.md` (and final-suite locks under `state/*`). **Never** write gate ownership into `work.db`. |
 | `migrate_markdown_to_linear` | **Refuse under sqlite.** Effective backend is already `sqlite` — do not run markdown→Linear cutover; do not invent markdown→sqlite migrate. Report refuse and leave config + DB unchanged. |
 
@@ -198,7 +198,7 @@ Do not write `.do-work/state/calibration.md` as the store while backend is sqlit
 Same one-line grammar as SKILL.md § Decisions Memory:
 
 ```text
-YYYY-MM-DD | UR/REQ ref | decision | rationale
+YYYY-MM-DD | Issue/REQ ref | decision | rationale
 ```
 
 Append-only via `append-decision`. Supersede by appending a new line.

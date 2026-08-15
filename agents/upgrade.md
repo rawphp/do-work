@@ -68,7 +68,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -76,7 +76,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
@@ -565,7 +565,7 @@ Follow `agents/tracker/linear.md` → **`migrate_markdown_to_linear`**:
 
 | Mode | Behavior |
 |------|----------|
-| **dry-run** | Inventory markdown URs/REQs + decisions/calibration; **list planned** Initiatives / Projects / Issues / Docs / config flip **without writing**; **zero** Linear writes; **zero** config changes. Record `migrate-linear: dry-run-reported`. |
+| **dry-run** | Inventory markdown Issues/REQs + decisions/calibration; **list planned** Initiatives / Projects / Issues / Docs / config flip **without writing**; **zero** Linear writes; **zero** config changes. Record `migrate-linear: dry-run-reported`. |
 | **apply** | Only after destructive confirm. Team Docs → Initiatives/Projects/Issues (map status, relations, parents, AC checkboxes) → set `tracker.backend: linear` + team ids in `.do-work/config.yml` → leave `user-requests/`, backlog `REQ-*.md`, and `archive/` on disk as **read-only historical** (do not delete). **Post-cutover work-item ops ignore historical markdown trees** (Linear-only store). Record `migrate-linear: converged`. |
 
 On mid-migration MCP failure: **hard-stop** per linear.md failure matrix — config

@@ -17,32 +17,32 @@ One hop from [`agents/tracker/linear.md`](../agents/tracker/linear.md). Load whe
 
 ```
 Team (config)
-└── Project product_project  — one shared product Project per local product (not per UR)
+└── Project product_project  — one shared product Project per local product (not per Issue)
     ├── Project Milestone (UR)  — §9.1 <!-- do-work-ur -->; brief, ideate, verify, close
-    └── Issue (REQ)             — on product Project, attached to UR milestone
+    └── Linear issue (REQ)             — on product Project, attached to do-work Issue milestone
         └── Sub-issue (layer child)
 ```
 
 **Product Project naming:** `tracker.linear.product_project` defaults to **empty** (not skill name `do-work`). Resolve order is documented under `ensure_product_container` / `agents/config.md` Load Config step 8. Example for the do-work skill repo itself may still use name `do-work`.
 
-**No Initiative-as-UR.** Path-milestone mode (M1/M2) is a *cursor + Issue markers* on the UR milestone — see [linear-path-milestones.md](linear-path-milestones.md).
+**No Initiative-as-do-work-Issue.** Path-milestone mode (M1/M2) is a *cursor + Linear-issue markers* on the do-work Issue milestone — see [linear-path-milestones.md](linear-path-milestones.md).
 
 ---
 
 ## Templates (design §9)
 
-Bodies are **markdown conventions** in Linear description fields — not custom Linear fields. Prefer description appends; fall back to UR Project Milestone/Issue **comments** if description size limits require it (record a one-line pointer in the section when spilling).
+Bodies are **markdown conventions** in Linear description fields — not custom Linear fields. Prefer description appends; fall back to Issue Project Milestone/Issue **comments** if description size limits require it (record a one-line pointer in the section when spilling).
 
 **Machine markers (required):**
 
 | Entity | Marker (first non-empty line of structured body) | Op consumers |
 |--------|--------------------------------------------------|--------------|
-| UR Project Milestone | `<!-- do-work-ur -->` | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications`, verify/close writers |
-| Issue (REQ) | `<!-- do-work-req -->` | `create_req`, `update_req`, `read_req`, `set_files`, `set_blocked_by`, `claim_req` / `heartbeat_req` / `unblock_req` / `set_req_status`, archive later |
+| do-work Issue Project Milestone | `<!-- do-work-ur -->` | `create_ur`, `read_ur`, `list_urs`, `append_ideate`, `append_clarifications`, verify/close writers |
+| Linear issue (REQ) | `<!-- do-work-req -->` | `create_req`, `update_req`, `read_req`, `set_files`, `set_blocked_by`, `claim_req` / `heartbeat_req` / `unblock_req` / `set_req_status`, archive later |
 
 On **read/update**: if the marker is missing, treat as template parse failure → **stop the op**; do not invent headers or rewrite the body into template form without an explicit migrate path.
 
-### §9.1 UR Project Milestone description template
+### §9.1 do-work Issue Project Milestone description template
 
 ```markdown
 <!-- do-work-ur -->
@@ -86,7 +86,7 @@ On **read/update**: if the marker is missing, treat as template parse failure �
 | `## Open gaps` / `## Capture summary` | Capture phase | Capture, verify |
 | `## Verify` / `## Closure` | `write_verify_report` / `write_close_report` (REQ-296) | Verify, close, go |
 
-### §9.2 Issue (REQ) description template
+### §9.2 Linear issue (REQ) description template
 
 ```markdown
 <!-- do-work-req -->
@@ -125,7 +125,7 @@ On **read/update**: if the marker is missing, treat as template parse failure �
 | Field / section | Write rules | Readers |
 |-----------------|-------------|---------|
 | `<!-- do-work-req -->` | Required at create; never strip | All REQ ops |
-| `**UR:**` | Owning UR slug | `list_reqs_for_ur` cross-check; display |
+| `**UR:**` | Owning Issue slug | `list_reqs_for_ur` cross-check; display |
 | `**Layer:**` | Layer name or `none`; also label `Layer/{name}` when labels available | Capture, footprint |
 | `**Parent:**` | Parent **Linear issue id** or `none`; children also set native `parentId` | Path-units |
 | `**Entry point:**` / `**Terminal state:**` | Path-unit **parents only**; leave empty on leaves | Capture path-units |
@@ -188,7 +188,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 ---
 
-## UR/REQ CRUD sequences
+## Issue/REQ CRUD sequences
 
 **Shared agent protocol for every step below:**
 
@@ -205,10 +205,10 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | Entity | Id form |
 |--------|---------|
-| UR slug | Sequential `UR-NNN` (UR Project Milestone metadata only) |
+| Issue slug | Sequential `UR-NNN` (Issue Project Milestone metadata only) |
 | REQ | **Linear issue identifier only** (e.g. `ENG-123`) — never allocate `REQ-NNN` under Linear backend |
-| Product Project | `tracker.linear.product_project` — shared for all URs on this local product; **name or UUID**; empty default; resolve chain + ensure persist UUID (never invent skill name `do-work`) |
-| UR milestone name | `tracker.linear.ur_milestone_name_pattern` (default `{ur_id}: {title}`) |
+| Product Project | `tracker.linear.product_project` — shared for all Issues on this local product; **name or UUID**; empty default; resolve chain + ensure persist UUID (never invent skill name `do-work`) |
+| Issue milestone name | `tracker.linear.ur_milestone_name_pattern` (default `{ur_id}: {title}`) |
 
 
 ### Preflight (before first CRUD op in a session)
@@ -223,7 +223,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | Team resolvable; ensure the shared **product Project** for this local product (not per UR); optional labels ready. Create/bind when missing; **always persist** Project UUID to `tracker.linear.product_project`. |
+| **Intent** | Team resolvable; ensure the shared **product Project** for this local product (not per Issue); optional labels ready. Create/bind when missing; **always persist** Project UUID to `tracker.linear.product_project`. |
 | **Preconditions** | Preflight steps 2–4 done (MCP tools, team resolved, `status_map` validated). Config loaded (`agents/config.md`). |
 | **Failure** | Hard-stop on empty-name, multi-match, tool missing, create/get failure. **Never** create markdown `.do-work/` as substitute product container. **Never** invent Initiatives as UR containers. **Never** fall through to skill name `do-work` for empty `product_project`. |
 
@@ -248,19 +248,19 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 5. **Optional labels** — when create/list label tools exist, pre-create common labels (`labels.layer_prefix`, `size_prefix`, `path_unit`) for the team. Label failure is non-fatal for container ensure (body headers remain source of truth); project ensure itself must already have succeeded.
 6. **Return** product Project **id (UUID)** + **name**. Cache for the session.
 
-**Does not:** create a UR or REQ; create a per-UR Linear Project; create Initiatives; write local UR/REQ markdown as the store.
+**Does not:** create an Issue or REQ; create a per–do-work-Issue Linear Project; create Initiatives; write local Issue/REQ markdown as the store.
 
 ### `create_ur`
 
 | | |
 |---|---|
-| **Intent** | Record intake brief as a **UR Project Milestone** on the shared **product Project**. Does **not** create REQs. **Not** Initiative-as-UR. **Not** a new Linear Project per UR. |
+| **Intent** | Record intake brief as a **do-work Issue Project Milestone** on the shared **product Project**. Does **not** create REQs. **Not** Initiative-as-do-work-Issue. **Not** a new Linear Project per do-work Issue. |
 | **Preconditions** | Preflight passed; `ensure_product_container` done; next `UR-NNN` slug allocatable. |
 | **Atomicity** | Product Project resolvable + Project Milestone create must succeed as one logical unit. **No partial UR.** |
 
 **Agent sequence:**
 
-1. **Ensure product Project** — call **`ensure_product_container`** first (resolve chain + list/create/bind + persist UUID). Do **not** restate a hard-coded product name here; do **not** create a per-UR Project.
+1. **Ensure product Project** — call **`ensure_product_container`** first (resolve chain + list/create/bind + persist UUID). Do **not** restate a hard-coded product name here; do **not** create a per–do-work-Issue Project.
 2. **Allocate next `UR-NNN` slug**
    - `search_tool` for project milestones list tools (`"linear milestones"`, `"linear project milestones"`).
    - List milestones on the product Project; scan names / descriptions for `UR-*` / `**UR-id:** UR-*` / `<!-- do-work-ur -->`.
@@ -270,10 +270,10 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
    - Description: §9.1 template with verbatim brief; `**Product-project:**` + product project name; `**Product-project-id:**` from ensure; leave `**Milestone-id:**` empty until create returns it.
 4. **Create Project Milestone** on the product Project
    - `search_tool "linear milestone"` / create-milestone surface.
-   - If **no** milestone create tool is discovered → **hard-stop** (do **not** invent Initiative-as-UR; do **not** create a per-UR Project as a fake UR).
+   - If **no** milestone create tool is discovered → **hard-stop** (do **not** invent Initiative-as-do-work-Issue; do **not** create a per–do-work-Issue Project as a fake do-work Issue (UR)).
    - `use_tool` create with discovered schema (project id + name + description as required).
    - Record milestone id; patch `**Milestone-id:**` if update tools allow.
-5. **Return** UR slug, product project id/name, milestone id/name. **Do not** write `.do-work/user-requests/UR-NNN/`. **Do not** create Linear Initiatives. **Do not** create a Linear Project per UR.
+5. **Return** Issue slug, product project id/name, milestone id/name. **Do not** write `.do-work/user-requests/UR-NNN/`. **Do not** create Linear Initiatives. **Do not** create a Linear Project per Issue.
 
 ### `read_ur`
 
@@ -287,7 +287,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | Enumerate URs (ids + titles) for prompts/status. |
+| **Intent** | Enumerate Issues (ids + titles) for prompts/status. |
 | **Sequence** | `search_tool` → list Project Milestones on product Project; keep those with `<!-- do-work-ur -->` / `**UR-id:**` / matching `ur_milestone_name_pattern`. Return `UR-NNN` + title; use `read_ur` for full body. |
 | **Failure** | MCP missing → hard-stop. |
 
@@ -295,13 +295,13 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | Create one backlog REQ (Issue) on the product Project, attached to the UR Project Milestone. Optional path-unit parent + layer children as sub-issues. |
-| **Preconditions** | UR Project Milestone exists on product Project (from `create_ur` or resolve); preflight passed. |
+| **Intent** | Create one backlog REQ (Linear issue) on the product Project, attached to the do-work Issue Project Milestone. Optional path-unit parent + layer children as sub-issues. |
+| **Preconditions** | do-work Issue Project Milestone exists on product Project (from `create_ur` or resolve); preflight passed. |
 | **Id rule** | Resulting id is the **Linear issue id only** (e.g. `ENG-123`). **Never** allocate `REQ-NNN`. |
 
 **Agent sequence:**
 
-1. Resolve **product Project id** + **UR Project Milestone id** (`search_tool` + list/get). Missing either → hard-stop or fail create (UR incomplete).
+1. Resolve **product Project id** + **do-work Issue Project Milestone id** (`search_tool` + list/get). Missing either → hard-stop or fail create (UR incomplete).
 2. Resolve **backlog** workflow state id from `status_map.backlog` (default `"Todo"`) via discovered status tools.
 3. Build Issue **description** from §9.2 with capture fields (`**UR:**`, layer, files, depends-on Linear ids, size, priority, task, AC, verification, …). Titles short and actionable.
 4. **Path-unit parent** (if this REQ is a path-unit):
@@ -310,7 +310,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 5. **Standalone / leaf REQ:**
    - `search_tool "linear create issue"` (or `"linear issues"`).
    - If create-issue undiscoverable → **hard-stop** (no markdown dual-write).
-   - `use_tool` create: team, project=product Project, milestone=UR Project Milestone, title, description, state=backlog map, optional assignee=`default_assignee_id`, labels, `parentId` when child.
+   - `use_tool` create: team, project=product Project, milestone=do-work Issue Project Milestone, title, description, state=backlog map, optional assignee=`default_assignee_id`, labels, `parentId` when child.
 6. **Deps at create (optional):** if dependency Linear ids are known, run the same dual-write as **`set_blocked_by`** (native `blocks` relations when tools exist **and** body `**Depends on:**` mirror). If relations missing → body-only + one-time warning (port rule).
 7. **Labels:** attach `Layer/{name}`, `Size/{S|M|L}`, and `path-unit` (parents only) per **Labels** table when label tools exist.
 8. **State:** create in `status_map.backlog` only (validated id from preflight) — never invent a state name.
@@ -336,16 +336,16 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | All REQs for a UR, any status — Issues on product Project with that UR Project Milestone. |
-| **Sequence** | 1) Resolve product Project + UR Project Milestone. 2) `search_tool "linear list issues"`. 3) List Issues filtered by **product project** and **UR milestone** (not global team backlog alone). 4) Return Linear ids + titles + states (+ parentId if present). |
-| **Notes** | UR Project Milestone membership is the scope. Do not scan local `.do-work/REQ-*`. |
-| **Failure** | UR milestone missing → empty or error; MCP missing → hard-stop. |
+| **Intent** | All REQs for a do-work Issue, any status — Linear issues on product Project with that do-work Issue Project Milestone. |
+| **Sequence** | 1) Resolve product Project + do-work Issue Project Milestone. 2) `search_tool "linear list issues"`. 3) List Linear issues filtered by **product project** and **do-work Issue milestone** (not global team backlog alone). 4) Return Linear issue ids + titles + states (+ parentId if present). |
+| **Notes** | Issue Project Milestone membership is the scope. Do not scan local `.do-work/REQ-*`. |
+| **Failure** | do-work Issue milestone missing → empty or error; MCP missing → hard-stop. |
 
 ### `append_ideate`
 
 | | |
 |---|---|
-| **Intent** | Append or write ideate content onto an existing UR Project Milestone — **without** overwriting `## Brief`. |
+| **Intent** | Append or write ideate content onto an existing do-work Issue Project Milestone — **without** overwriting `## Brief`. |
 | **Preconditions** | Preflight passed; UR exists (Project Milestone with §9.1 marker + `**UR-id:**`). |
 | **Does not** | Create REQs, Projects, or local `ideate.md` files. |
 
@@ -360,7 +360,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
    - If missing → insert `## Ideate` after `## Clarifications` (or after `## Brief` if clarifications absent), preserving order of other §9.1 sections.
 5. **Never** modify `## Brief` verbatim intake.
 6. **Write** — `use_tool` update milestone description with the merged markdown. If description hits size limits → post overflow as Initiative comment titled/tagged for ideate and leave a one-line pointer under `## Ideate`.
-7. ****Return** UR slug + milestone id + product project id. No `.do-work/user-requests/` write.
+7. ****Return** Issue slug + milestone id + product project id. No `.do-work/user-requests/` write.
 
 | Failure | Behavior |
 |---------|----------|
@@ -372,14 +372,14 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | | |
 |---|---|
-| **Intent** | Append question-phase Q&A onto the UR under `## Clarifications`. Does **not** create REQs. |
+| **Intent** | Append question-phase Q&A onto the Issue under `## Clarifications`. Does **not** create REQs. |
 | **Preconditions** | Preflight passed; UR exists. |
 | **Does not** | Overwrite `## Brief`; replace prior Q&A wholesale (append only). |
 
 **Agent sequence:**
 
 1. **Rediscover** — `search_tool` for milestone get/update (same surface as `append_ideate`).
-2. ****Resolve + read** UR Project Milestone; require `<!-- do-work-ur -->`.
+2. ****Resolve + read** Issue Project Milestone; require `<!-- do-work-ur -->`.
 3. **Locate `## Clarifications`**:
    - Append each Q&A as:
 
@@ -390,7 +390,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
    - Keep prior entries. If section missing, insert after `## Brief` before `## Ideate`.
 4. **Write** updated description via discovered update tool (comment spill same as ideate if needed).
-5. ****Return** UR slug + milestone id.
+5. ****Return** Issue slug + milestone id.
 
 | Failure | Behavior |
 |---------|----------|
@@ -461,7 +461,7 @@ When label tools are discoverable (create/list/attach), agents **must** keep lab
 
 | Condition | Behavior |
 |-----------|----------|
-| Linear MCP tools undiscoverable at `create_ur` / `create_req` / append / `set_*` | Hard-stop + setup instructions; **no** Initiative-as-UR, **no** Issue invent, **no** markdown dual-write |
+| Linear MCP tools undiscoverable at `create_ur` / `create_req` / append / `set_*` | Hard-stop + setup instructions; **no** Initiative-as-do-work-Issue, **no** work-item invent, **no** markdown dual-write |
 | `team_id` / `team_key` unresolved | Hard-stop; do not guess |
 | Product Project ok, milestone create fail | Hard-stop; no partial UR; operator recovery for orphan milestone if any |
 | Create-issue tools missing | Hard-stop; do not write `.do-work/REQ-*` |
@@ -481,23 +481,23 @@ Agents **must not invent** homes. Use only the rows below (plus local gate locks
 
 | Artifact | Linear home | Format | Writers / readers | Port op / sequence |
 |----------|-------------|--------|-------------------|--------------------|
-| Decisions | Team Doc title = `tracker.linear.decisions_doc_title` (default **`do-work/decisions`**) | One line per decision: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale` | capture write; capture / ideate / question / worker read | **`append_decision`**; **Read decisions** helper |
+| Decisions | Team Doc title = `tracker.linear.decisions_doc_title` (default **`do-work/decisions`**) | One line per decision: `YYYY-MM-DD \| Issue/REQ ref \| decision \| rationale` | capture write; capture / ideate / question / worker read | **`append_decision`**; **Read decisions** helper |
 | Calibration | Team Doc title = `tracker.linear.calibration_doc_title` (default **`do-work/calibration`**) | Full calibration body (same shape as markdown `state/calibration.md`) | retro write (full replace); capture read | **Write / read calibration Doc** |
 | Run / cost notes | Comment on Issue after attempt; optional Project update for run rollup | YAML fenced block + `<!-- do-work-run-note -->` | run | **`append_run_note`** (REQ-294) |
-| Verify report | UR Project Milestone description `## Verify` + milestone comment | Full report markdown | verify, go | **`write_verify_report`** |
-| Close report | UR Project Milestone description `## Closure` + milestone comment | Per path-unit results (closure schema) | close | **`write_close_report`** |
-| Path-milestone cursor (M1/M2) | UR Project Milestone description `<!-- do-work-milestone -->` | active M + checklist | capture, run | **`read_active_milestone`** / **`set_active_milestone`** / **`list_milestone_reqs`** (REQ-298 path; **REQ-299** ops) |
+| Verify report | Issue Project Milestone description `## Verify` + milestone comment | Full report markdown | verify, go | **`write_verify_report`** |
+| Close report | Issue Project Milestone description `## Closure` + milestone comment | Per path-unit results (closure schema) | close | **`write_close_report`** |
+| Path-milestone cursor (M1/M2) | Issue Project Milestone description `<!-- do-work-milestone -->` | active M + checklist | capture, run | **`read_active_milestone`** / **`set_active_milestone`** / **`list_milestone_reqs`** (REQ-298 path; **REQ-299** ops) |
 | Gate locks | **Local** `{project}/.do-work/state/gate-owner.md`, `final-suite-*.md` | unchanged | run | **`write_gate_state`** (local only; REQ-299 concurrent serialize) |
 
 **Create-if-missing (Team Docs):** on first write, if no Doc with the configured title exists for the configured team, create it (title exact match to config), then write. Readers: if missing, treat as empty (no decisions / no calibration) — never invent content.
 
-**Hard-stop (REQ-296 / REQ-297):** if Docs tools (for decisions/calibration) or UR Project Milestone update/comment tools (for verify/close) are undiscoverable after `search_tool`, **or** Team Doc create/update fails (permission, size, MCP error), **or** milestone description append/update fails **and** the §10 milestone-comment path also fails — hard-stop that op with Linear setup / permission instructions. Do **not**:
+**Hard-stop (REQ-296 / REQ-297):** if Docs tools (for decisions/calibration) or Issue Project Milestone update/comment tools (for verify/close) are undiscoverable after `search_tool`, **or** Team Doc create/update fails (permission, size, MCP error), **or** milestone description append/update fails **and** the §10 milestone-comment path also fails — hard-stop that op with Linear setup / permission instructions. Do **not**:
 
 - fall back to local `.do-work/decisions.md` / `state/calibration.md` / `closure.md` as the work-item store
 - invent alternate Doc titles outside `decisions_doc_title` / `calibration_doc_title`
 - invent ad-hoc Issue comments (or Project updates) as a substitute home for decisions, calibration, verify, or close reports
 
-§10-allowed UR Project Milestone comment for the full verify/close body (with a section pointer) remains valid when description size alone fails.
+§10-allowed Issue Project Milestone comment for the full verify/close body (with a section pointer) remains valid when description size alone fails.
 
 ---
 
@@ -605,7 +605,7 @@ If comment tools are undiscoverable → **hard-stop** (claim protocol cannot run
 | | |
 |---|---|
 | **Intent** | Return REQs that are backlog, deps-satisfied, footprint-free, and unclaimed (or stale-eligible) — in pick order. **Does not claim.** |
-| **Preconditions** | Preflight passed; Product Project + optional UR milestone scope known (optional `UR-NNN` / milestone id). |
+| **Preconditions** | Preflight passed; Product Project + optional Issue milestone scope known (optional `UR-NNN` / milestone id). |
 | **Authoritative deps** | Native **`blocks` relations** (port). Body `**Depends on:**` is mirror only. |
 | **Ids** | Linear issue ids only. |
 | **v1 lib** | Implemented as agent/MCP steps only — **not** `lib/pick-req.sh` (markdown). No Linear-aware bash required. |
@@ -620,13 +620,13 @@ Sort candidates **before** filtering, then walk in order and return the first su
 | 2 | `created_at` | ascending (older first) | Linear issue create timestamp |
 | 3 | Linear identifier | ascending lexicographic (`ENG-12` before `ENG-100` only if string sort; prefer natural numeric suffix when practical) | e.g. `ENG-123` |
 
-Milestone / scope filters (when caller passes them) apply **before** the walk: only issues on the scoped UR Project Milestone / path-milestone marker are candidates.
+Milestone / scope filters (when caller passes them) apply **before** the walk: only issues on the scoped Issue Project Milestone / path-milestone marker are candidates.
 
 **Skip reasons (emit one line per rejected candidate — drain-classify parity):**
 
 | Reason token | When | Run-loop mapping (`drain-classify` intent) |
 |--------------|------|---------------------------------------------|
-| `scope:<id>` | Caller scope (UR Project / milestone) excludes the issue | `scope-blocked` |
+| `scope:<id>` | Caller scope (Issue Project / milestone) excludes the issue | `scope-blocked` |
 | `claim:<id>` | Active **fresh** foreign claim holds the issue (not reclaimable) | not claimable; re-pick later |
 | `dep:<id>` | Authoritative **blocks** (or body fallback) has at least one undones dependency | `deps-blocked` |
 | `overlap:<id>` | Footprint path set intersects an in-flight claim’s `**Files:**` | `overlap-blocked` |
@@ -648,7 +648,7 @@ When the ordered walk yields **zero** claimable issues, the orchestrator classif
 **Agent sequence:**
 
 1. **Rediscover** — `search_tool` for: list issues by project; get issue; list relations; list comments; list workflow states (already validated at load).
-2. **Enumerate candidates** — issues on product Project (filtered by UR milestone when scoped) whose workflow state maps to **`status_map.backlog`**. Exclude `done` / `in_progress` / `stopped` unless a stale active claim is being recovered under explicit reclaim policy (default pick: **backlog + unclaimed only**). Apply scope filter; emit `scope:<id>` for excluded-by-scope backlog issues when useful for classify.
+2. **Enumerate candidates** — issues on product Project (filtered by Issue milestone when scoped) whose workflow state maps to **`status_map.backlog`**. Exclude `done` / `in_progress` / `stopped` unless a stale active claim is being recovered under explicit reclaim policy (default pick: **backlog + unclaimed only**). Apply scope filter; emit `scope:<id>` for excluded-by-scope backlog issues when useful for classify.
 3. **Sort** candidates by the pick-order ladder above.
 4. **For each candidate** in sorted order:
    - **Claim check** — run **Helper: read active claim**. Skip with `claim:<id>` if active claim is **fresh** (another agent holds it). If active claim is **stale**, treat as reclaimable (eligible) unless caller policy forbids takeover.
@@ -851,7 +851,7 @@ Failed review or failed acceptance-evidence **never** transitions to `status_map
 
    Adjust fields to what the orchestrator collected; `result` may be `done`, `stopped:<reason>`, or `failed`. Marker line `<!-- do-work-run-note -->` is stable for readers/retro.
 3. **Post comment** on the Issue via discovered create-comment tool.
-4. **Optional Project update** — if project-update tools exist and the caller wants a run rollup, post a short summary on product Project or UR milestone (non-authoritative) (non-authoritative convenience; Issue comment remains the home per design §10).
+4. **Optional Project update** — if project-update tools exist and the caller wants a run rollup, post a short summary on product Project or Issue milestone (non-authoritative) (non-authoritative convenience; Issue comment remains the home per design §10).
 5. **Return** comment id / success.
 
 | Failure | Behavior |
@@ -867,7 +867,7 @@ When `ledger.enabled: true`, the orchestrator **may also** append `{project}/.do
 |-------|------------------------------|
 | **Issue comment via `append_run_note`** | **Authoritative** run/cost note |
 | **Local `RUN-NNN.yml`** | **Telemetry only** — offline sum/budget/retro convenience |
-| **Local UR/REQ markdown** | **Not** a work-item store; do not dual-write REQs |
+| **Local Issue/REQ markdown** | **Not** a work-item store; do not dual-write REQs |
 
 Rules:
 
@@ -881,7 +881,7 @@ Rules:
 Readers (primarily **`agents/retro.md`**, optionally budget/status) collect authoritative Linear run history when `backend: linear`:
 
 1. **Rediscover** issue list/get + comment list tools (`search_tool`).
-2. **Scope** — Issues under the product Project for the configured team (or a single UR milestone when scoped). Prefer Issues that have been attempted (in_progress / stopped / done), not pure backlog with zero comments.
+2. **Scope** — Issues under the product Project for the configured team (or a single Issue milestone when scoped). Prefer Issues that have been attempted (in_progress / stopped / done), not pure backlog with zero comments.
 3. **List comments** per Issue; keep bodies whose first marker line is `<!-- do-work-run-note -->` (same marker as `append_run_note`).
 4. **Parse** the YAML fenced block (fields: `req`, `agent`, `model`, `result`, timestamps, cost, commit, …). Treat parse failures as skip-with-warning (do not invent stats).
 5. **Prefer** these notes for retro interpretation when present. If comment tools fail or zero notes found → fall back to local `{project}/.do-work/runs/RUN-NNN.yml` telemetry (if any). Never dual-write a fabricated local ledger from partial Linear data.
@@ -901,13 +901,13 @@ Readers (primarily **`agents/retro.md`**, optionally budget/status) collect auth
 **Line format** — **identical** one-line grammar to markdown `.do-work/decisions.md` / SKILL.md § Decisions Memory (four pipe-separated fields; no paragraphs):
 
 ```
-YYYY-MM-DD | UR/REQ ref | decision | rationale
+YYYY-MM-DD | Issue/REQ ref | decision | rationale
 ```
 
 | Field | Rule |
 |-------|------|
 | `YYYY-MM-DD` | UTC date the decision was recorded |
-| `UR/REQ ref` | UR slug (`UR-035`) and/or Linear issue id (`ENG-123`) — same slot as markdown `REQ-NNN` |
+| `Issue/REQ ref` | Issue slug (`UR-035`) and/or Linear issue id (`ENG-123`) — same slot as markdown `REQ-NNN` |
 | `decision` | Standing choice, stated as a constraint |
 | `rationale` | One phrase explaining why |
 
@@ -982,17 +982,17 @@ Calibration is **not** a separate port op name in `port.md`; representation unde
 
 | | |
 |---|---|
-| **Intent** | Persist verify-phase coverage report for a UR. |
-| **Preconditions** | UR Project Milestone exists (`read_ur` / product Project + milestone); verify agent has produced the report body. |
-| **Home** | UR Project Milestone description section **`## Verify`** + **milestone comment** with the full report. **Not** a local file under `user-requests/` as source of truth. |
+| **Intent** | Persist verify-phase coverage report for an Issue. |
+| **Preconditions** | Issue Project Milestone exists (`read_ur` / product Project + milestone); verify agent has produced the report body. |
+| **Home** | Issue Project Milestone description section **`## Verify`** + **milestone comment** with the full report. **Not** a local file under `user-requests/` as source of truth. |
 | **Does not** | Create REQs; change claim state; invent alternate section names. |
 
 **Agent sequence:**
 
 1. **Rediscover** — tools to get/update Project Milestone description and create comments. Queries such as `"linear milestone"`, `"linear update milestone"`, `"linear create comment"`.
-2. **Resolve UR** — load UR Project Milestone for `UR-NNN` (`read_ur`). Confirm `<!-- do-work-ur -->` body.
+2. **Resolve UR** — load Issue Project Milestone for `UR-NNN` (`read_ur`). Confirm `<!-- do-work-ur -->` body.
 3. **Build report** — full markdown verify report (confidence score, coverage, gaps, issues, summary — same console shape as `agents/verify.md` Step 5c).
-4. **Update `## Verify` section** — replace or insert content under `## Verify` in the UR Project Milestone description (prefer description append/replace of that section only; do not overwrite `## Brief`). Include at least: confidence score, recommendation, and a short summary. If the full report exceeds size limits, put a one-line pointer in `## Verify` (e.g. `Full report: see Initiative comment <timestamp>`) and put the **full** body in the comment.
+4. **Update `## Verify` section** — replace or insert content under `## Verify` in the Issue Project Milestone description (prefer description append/replace of that section only; do not overwrite `## Brief`). Include at least: confidence score, recommendation, and a short summary. If the full report exceeds size limits, put a one-line pointer in `## Verify` (e.g. `Full report: see Initiative comment <timestamp>`) and put the **full** body in the comment.
 5. **Post milestone comment** — full report body, optionally prefixed with `<!-- do-work-verify-report -->` for stable readers.
 6. **Return** Initiative id + comment id / success. Do **not** write a durable local verify path as the work-item store.
 
@@ -1011,19 +1011,19 @@ Calibration is **not** a separate port op name in `port.md`; representation unde
 
 | | |
 |---|---|
-| **Intent** | Persist close-phase path-unit closure report for a UR. |
-| **Preconditions** | UR Project Milestone exists; close agent has produced the closure document (YAML front matter + per path-unit rows). |
-| **Home** | UR Project Milestone description section **`## Closure`** + **milestone comment** with the full closure report. **Not** `{project}/.do-work/user-requests/UR-NNN/closure.md` as source of truth under Linear. |
+| **Intent** | Persist close-phase path-unit closure report for an Issue. |
+| **Preconditions** | Issue Project Milestone exists; close agent has produced the closure document (YAML front matter + per path-unit rows). |
+| **Home** | Issue Project Milestone description section **`## Closure`** + **milestone comment** with the full closure report. **Not** `{project}/.do-work/user-requests/UR-NNN/closure.md` as source of truth under Linear. |
 | **Does not** | Edit REQs/source; reopen Issues; put gate locks in Linear. |
 
 **Agent sequence:**
 
 1. **Rediscover** milestone get/update + comment create tools.
-2. **Resolve UR** — UR Project Milestone for `UR-NNN` via `read_ur`.
+2. **Resolve UR** — Issue Project Milestone for `UR-NNN` via `read_ur`.
 3. **Build report** — same schema as `agents/close.md` Step 5 (`ur`, `closed_at`, `branch`, `path_units`, `verdict_summary`, `overall`, plus per-path-unit rows). Empty path-unit case still writes a valid `overall: no-path-units` report.
 4. **Update `## Closure` section** — replace/insert under `## Closure` only. Short summary in description is fine; full YAML+rows may live in the comment if size-constrained (pointer line in section required when spilling).
 5. **Post milestone comment** — full closure markdown, optionally prefixed with `<!-- do-work-close-report -->`.
-6. **Evidence artifacts** — screenshots / command captures remain **local** under a UR-scoped path only if the operator needs files on disk (optional); `evidence_ref` may point at local paths or inline snippets. Local evidence files are **not** a second work-item store for the report itself.
+6. **Evidence artifacts** — screenshots / command captures remain **local** under an Issue-scoped path only if the operator needs files on disk (optional); `evidence_ref` may point at local paths or inline snippets. Local evidence files are **not** a second work-item store for the report itself.
 7. ****Return** milestone id + success. Do **not** dual-write authoritative `closure.md` under `user-requests/` when `backend: linear`.
 
 | Failure | Behavior |
@@ -1035,16 +1035,16 @@ Calibration is **not** a separate port op name in `port.md`; representation unde
 
 #### Close path-unit collection (Linear — REQ-297)
 
-When `agents/close.md` walks a UR under `backend: linear`, path-units come from Linear Issues — not from local `archive/REQ-*.md`:
+When `agents/close.md` walks an Issue under `backend: linear`, path-units come from Linear Issues — not from local `archive/REQ-*.md`:
 
-1. Resolve product Project + UR milestone and call **`list_reqs_for_ur`** (all Issues in that Project; include done/archived-equivalent).
+1. Resolve product Project + Issue milestone and call **`list_reqs_for_ur`** (all Issues in that Project; include done/archived-equivalent).
 2. For each Issue body, treat as a **path-unit** when `**Layer:**` is `none` **and** both `**Entry point:**` and `**Terminal state:**` are present and non-empty after trim.
 3. Extract: `req` = **Linear issue identifier** (e.g. `ENG-123`); `entry_point` / `terminal_state` = verbatim header values.
 4. Do **not** read `**Closure proof:**` (same cold-dispatch rule as markdown).
 5. Walk still runs against the **merged local app** (git). Persist results only via **`write_close_report`**.
 6. Closure row `req:` fields and report headings use Linear ids (`## ENG-123 — closed`), never parallel `REQ-NNN` allocation.
 
-Brief load under Linear: **`read_ur`** (UR Project Milestone description `## Brief` / machine sections) — do not require local `user-requests/UR-NNN/input.md` as the store.
+Brief load under Linear: **`read_ur`** (Issue Project Milestone description `## Brief` / machine sections) — do not require local `user-requests/UR-NNN/input.md` as the store.
 
 ---
 

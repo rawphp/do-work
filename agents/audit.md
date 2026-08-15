@@ -35,7 +35,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -43,7 +43,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
@@ -69,11 +69,11 @@ Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full — including th
 
 Read `{project}/.do-work/user-requests/UR-NNN/ideate.md` if it exists. Note Challenger risks and Connector overlaps for reference during interrogation.
 
-### 2. Read all REQ files for this UR
+### 2. Read all REQ files for this Issue
 
 Scan the backlog root (`{project}/.do-work/`) for `REQ-NNN-*.md` files.
 
-For each REQ file, read its `**UR:**` field. **Only audit REQs whose UR field matches the target UR** (e.g. `UR-018`). Skip REQs belonging to other URs.
+For each REQ file, read its `**UR:**` field. **Only audit REQs whose UR field matches the target UR** (e.g. `UR-018`). Skip REQs belonging to other Issues.
 
 Do not audit REQs in `working/` (already in-flight) or `archive/` (already completed).
 
@@ -297,3 +297,8 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 - If you cannot confidently determine the right fix, flag instead of guessing
 - Acknowledge that capture already runs a vague-qualifier scan (Step 4b) — focus on what slipped through, not redundant scanning
 - Do not block the pipeline. You are a sharpening pass.
+
+
+## Field traps (from field-lessons)
+
+- **do-work-io body before go (§26b):** if `req.get` returns ACs/files but empty/missing **body**, `req.update` with full `## Task` / Context / Integration / Verification Steps before claim/dispatch.

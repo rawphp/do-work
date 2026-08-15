@@ -24,7 +24,7 @@
 
 set -u
 
-SCOPE="${1:-}"   # empty = all URs; otherwise e.g. "UR-030"
+SCOPE="${1:-}"   # empty = all Issues; otherwise e.g. "UR-030"
 DOWORK=".do-work"
 
 # --------------------------------------------------------------------------

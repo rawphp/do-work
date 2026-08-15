@@ -45,7 +45,7 @@ Do **not** load `agents/tracker/linear.md` on this path.
 
 | Artifact | Location |
 |----------|----------|
-| UR brief | `.do-work/user-requests/UR-NNN/input.md` |
+| Issue brief | `.do-work/user-requests/UR-NNN/input.md` |
 | Ideate | `.do-work/user-requests/UR-NNN/ideate.md` |
 | Clarifications | `## Clarifications` section inside `input.md` |
 | REQ backlog | `.do-work/REQ-NNN-*.md` (or `REQ-M<n>-NNN-*.md` in milestone mode) |
@@ -133,7 +133,7 @@ Every op name from `port.md` appears below with **script path and/or file glob**
 
 | | |
 |---|---|
-| **Intent** | Enumerate URs. |
+| **Intent** | Enumerate Issues. |
 | **Implementation** | Glob directories under `.do-work/user-requests/UR-*/` (exclude non-UR siblings such as `archive/` if present). |
 | **lib/*.sh** | **None** |
 | **File globs** | `.do-work/user-requests/UR-*/` |
@@ -160,7 +160,7 @@ Every op name from `port.md` appears below with **script path and/or file glob**
 
 | | |
 |---|---|
-| **Intent** | Create one backlog REQ for a UR. |
+| **Intent** | Create one backlog REQ for an Issue. |
 | **Implementation** | `agents/capture.md` writes `.do-work/REQ-NNN-slug.md` (or `REQ-M<n>-NNN-slug.md`) with template headers, `**Status:** backlog`, footprint/deps as known. |
 | **lib/*.sh** | **None** for create; later eligibility uses pick/deps/footprint. |
 | **File globs** | `.do-work/REQ-*.md` |
@@ -187,7 +187,7 @@ Every op name from `port.md` appears below with **script path and/or file glob**
 
 | | |
 |---|---|
-| **Intent** | All REQs for a UR, any status. |
+| **Intent** | All REQs for an Issue, any status. |
 | **Implementation** | Glob REQ files; filter on header `**UR:** UR-NNN`. |
 | **lib/*.sh** | **None** — no `lib/list-reqs-for-ur.sh`. |
 | **File globs** | `.do-work/REQ-*.md`, `working/REQ-*.md`, `archive/REQ-*.md` |
@@ -275,7 +275,7 @@ Every op name from `port.md` appears below with **script path and/or file glob**
 | | |
 |---|---|
 | **Intent** | Append standing decision line. |
-| **Implementation** | Append one line to `.do-work/decisions.md` (create if absent when writer is capture/etc.). Format: `YYYY-MM-DD \| UR/REQ ref \| decision \| rationale`. |
+| **Implementation** | Append one line to `.do-work/decisions.md` (create if absent when writer is capture/etc.). Format: `YYYY-MM-DD \| Issue/REQ ref \| decision \| rationale`. |
 | **lib/*.sh** | **None** |
 | **File paths** | `.do-work/decisions.md` |
 
@@ -283,7 +283,7 @@ Every op name from `port.md` appears below with **script path and/or file glob**
 
 | | |
 |---|---|
-| **Intent** | Persist verify-phase coverage report for a UR. |
+| **Intent** | Persist verify-phase coverage report for an Issue. |
 | **Implementation** | `agents/verify.md` produces the coverage report (console-primary). Scoring arithmetic: **`lib/score-coverage.sh`**. |
 | **lib/*.sh** | **`lib/score-coverage.sh`** (exists). **No** `lib/write-verify-report.sh`. |
 | **File paths** | **Gap:** no single durable path equivalent to `closure.md`; report is agent console output unless the operator asks to save it. Do not invent a path. |
@@ -292,7 +292,7 @@ Every op name from `port.md` appears below with **script path and/or file glob**
 
 | | |
 |---|---|
-| **Intent** | Persist close-phase report for a UR. |
+| **Intent** | Persist close-phase report for an Issue. |
 | **Implementation** | `agents/close.md` writes `.do-work/user-requests/UR-NNN/closure.md` (+ optional `closure-evidence/`). |
 | **lib/*.sh** | **None** |
 | **File paths** | `user-requests/UR-NNN/closure.md` |

@@ -1,6 +1,6 @@
 # Subcommand instructions
 
-Deep step-by-step stubs for each `/do-work` subcommand. `SKILL.md` keeps the Quick Reference table and agent-file index; load this file when executing a subcommand that needs the full stub (especially `install` bootstrap template). After project-root detection and conformance (see `SKILL.md`), prefer reading the phase agent file and following it exactly. Store I/O must follow the tracker port after Load Config — paths below describe the **markdown** default; under `tracker.backend: linear`, use port ops from [agents/tracker/linear.md](../agents/tracker/linear.md) instead of listing local UR/REQ trees as live truth.
+Deep step-by-step stubs for each `/do-work` subcommand. `SKILL.md` keeps the Quick Reference table and agent-file index; load this file when executing a subcommand that needs the full stub (especially `install` bootstrap template). After project-root detection and conformance (see `SKILL.md`), prefer reading the phase agent file and following it exactly. Store I/O must follow the tracker port after Load Config — paths below describe the **markdown** default; under `tracker.backend: linear`, use port ops from [agents/tracker/linear.md](../agents/tracker/linear.md) instead of listing local Issue/REQ trees as live truth.
 
 ## Subcommand Instructions
 
@@ -132,7 +132,7 @@ Record a brief and decompose it into REQ files in one shot. Ideate runs by defau
 Verify REQ coverage and conditionally execute the backlog.
 
 1. Detect `{project}`.
-2. Determine the UR:
+2. Determine the Issue:
    - If `UR-NNN` was provided, use it.
    - If not, list `{project}/.do-work/user-requests/` and ask which UR to verify against.
 3. Note whether `--force` or `--auto-fix` are present in the arguments.
@@ -143,7 +143,7 @@ Verify REQ coverage and conditionally execute the backlog.
 
 ### intake [brief]
 
-Record a natural-language brief as the next UR file. Never skip to planning or implementation.
+Record a natural-language brief as the next Issue file. Never skip to planning or implementation.
 
 1. Detect `{project}`.
 2. Check if `{project}/.do-work/` exists. If not, run install automatically first, then continue.
@@ -157,10 +157,10 @@ Record a natural-language brief as the next UR file. Never skip to planning or i
 
 ### capture [UR-NNN]
 
-Decompose a UR brief into discrete REQ files in the backlog.
+Decompose an Issue brief into discrete REQ files in the backlog.
 
 1. Detect `{project}`.
-2. Determine the UR:
+2. Determine the Issue:
    - If `UR-NNN` was provided, use it.
    - If not, list `{project}/.do-work/user-requests/` and ask which UR to capture.
 3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
@@ -174,7 +174,7 @@ Decompose a UR brief into discrete REQ files in the backlog.
 Surface assumptions, risks, and connections in a brief before decomposition.
 
 1. Detect `{project}`.
-2. Determine the UR:
+2. Determine the Issue:
    - If `UR-NNN` was provided, use it.
    - If not, list `{project}/.do-work/user-requests/` and ask which UR to review.
 3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
@@ -188,7 +188,7 @@ Surface assumptions, risks, and connections in a brief before decomposition.
 Grill the user about their brief — extract assumptions, gaps, and constraints through one-at-a-time questioning.
 
 1. Detect `{project}`.
-2. Determine the UR:
+2. Determine the Issue:
    - If `UR-NNN` was provided, use it.
    - If not, list `{project}/.do-work/user-requests/` and ask which UR to question.
 3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
@@ -202,7 +202,7 @@ Grill the user about their brief — extract assumptions, gaps, and constraints 
 Interrogate REQ quality for a given UR — auto-fix soft spots and report changes.
 
 1. Detect `{project}`.
-2. Determine the UR:
+2. Determine the Issue:
    - If `UR-NNN` was provided, use it.
    - If not, list `{project}/.do-work/user-requests/` and ask which UR to audit.
 3. Confirm `{project}/.do-work/user-requests/{UR-NNN}/input.md` exists. If not, report error and stop.
@@ -216,7 +216,7 @@ Interrogate REQ quality for a given UR — auto-fix soft spots and report change
 Score REQ coverage against the original brief. List gaps and issues.
 
 1. Detect `{project}`.
-2. Determine the UR:
+2. Determine the Issue:
    - If `UR-NNN` was provided, use it.
    - If not, list `{project}/.do-work/user-requests/` and ask which UR to verify against.
 3. Note whether `--auto-fix` is present in the arguments.
@@ -227,7 +227,7 @@ Score REQ coverage against the original brief. List gaps and issues.
 
 ### run [UR-NNN] [--parallel N] [--budget <amount>]
 
-Execute the backlog autonomously — until empty or a stopper is hit. The optional `UR-NNN` argument scopes execution to that UR's REQs only, ignoring all other backlog entries. The orchestrator dispatches a fresh worker subagent per REQ (see [agents/run-worker.md](../agents/run-worker.md)) and reads its structured return report.
+Execute the backlog autonomously — until empty or a stopper is hit. The optional `UR-NNN` argument scopes execution to that Issue's REQs only, ignoring all other backlog entries. The orchestrator dispatches a fresh worker subagent per REQ (see [agents/run-worker.md](../agents/run-worker.md)) and reads its structured return report.
 
 By default the orchestrator runs **serially** — one REQ at a time. The optional `--parallel N` flag enables **single-session parallel mode**: one orchestrator dispatches up to `N` concurrent workers from a single terminal, then serializes their integration through a merge queue. See [Parallel Execution](concepts.md#parallel-execution) (single-session parallel mode).
 
@@ -243,15 +243,15 @@ By default the orchestrator runs **serially** — one REQ at a time. The optiona
 - Under `--parallel N`, the same gate rides the merge queue: once the budget is reached the orchestrator stops refilling the window and lets live workers drain, then emits the budget-stop report.
 
 1. Detect `{project}`.
-2. Determine UR scope:
-   - If `UR-NNN` was provided, record it — the run agent will filter the backlog to that UR.
+2. Determine Issue scope:
+   - If `UR-NNN` was provided, record it — the run agent will filter the backlog to that Issue.
    - If not provided, the full backlog is in scope.
 3. Resolve the parallel window width: `--parallel N` if given, else `parallel.max_workers` (default 1), clamped to 10. `N == 1` runs serial; `N > 1` runs `agents/run.md`'s `## Parallel Run Mode`. Resolve the effective budget: `--budget <amount>` if given, else `cost.budget` (empty = unlimited).
 4. Pre-flight checks:
    - Working/ files are classified by agents/run.md's pre-flight (mine/sibling/stale buckets); stale slots are surfaced only when the backlog has no claimable REQ — do not prompt merely because working/ is non-empty.
    - If no `REQ-NNN-*.md` files exist in `{project}/.do-work/` (backlog root) within scope, report "Backlog is empty." and stop.
 5. Read [agents/run.md](../agents/run.md) in full.
-6. Follow the run agent instructions exactly, passing through the UR scope, the resolved parallel window width, and the effective budget.
+6. Follow the run agent instructions exactly, passing through the Issue scope, the resolved parallel window width, and the effective budget.
 
 ---
 
@@ -260,8 +260,8 @@ By default the orchestrator runs **serially** — one REQ at a time. The optiona
 Render a read-only live situation room: all in-flight REQs, their claimers, heartbeat ages, any deadlock warnings, and a Coverage section showing intended/proven/unproven REQs.
 
 1. Detect `{project}`.
-2. Determine UR scope:
-   - If `UR-NNN` was provided, pass it through to scope the report to that UR's REQs.
+2. Determine Issue scope:
+   - If `UR-NNN` was provided, pass it through to scope the report to that Issue's REQs.
    - If not provided, all in-flight REQs are reported.
 3. Confirm `{project}/.do-work/` exists. If not, report "do-work not installed." and stop.
 4. Read [agents/status.md](../agents/status.md) in full.
@@ -286,13 +286,13 @@ Regenerate a **static HTML** snapshot of the sqlite work-item store (human brows
 
 ### close UR-NNN
 
-Validate the integrated result of a UR against its verbatim brief — walking every path-unit's entry point to its terminal state in the merged app — and write a per-path-unit closure report.
+Validate the integrated result of an Issue against its verbatim brief — walking every path-unit's entry point to its terminal state in the merged app — and write a per-path-unit closure report.
 
 1. Detect `{project}`.
-2. Confirm `UR-NNN` was provided. If not, report "close requires a UR id (e.g. /do-work close UR-042)." and stop.
-3. Confirm `{project}/.do-work/user-requests/UR-NNN/input.md` exists. If not, report "UR-NNN not found at {project}/.do-work/user-requests/UR-NNN/. Check the UR number and try again." and stop.
+2. Confirm `UR-NNN` was provided. If not, report "close requires an Issue id (e.g. /do-work close UR-042)." and stop.
+3. Confirm `{project}/.do-work/user-requests/UR-NNN/input.md` exists. If not, report "UR-NNN not found at {project}/.do-work/user-requests/UR-NNN/. Check the Issue number and try again." and stop.
 4. Read [agents/close.md](../agents/close.md) in full.
-5. Follow the close agent instructions exactly. The close agent is dispatched as a fresh subagent — pass only the project do-work path, the UR reference, and the merged branch.
+5. Follow the close agent instructions exactly. The close agent is dispatched as a fresh subagent — pass only the project do-work path, the Issue reference, and the merged branch.
 
 ---
 

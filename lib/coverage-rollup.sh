@@ -4,16 +4,18 @@
 # Usage:
 #   coverage-rollup.sh [UR-NNN]
 #
-# Prints one line per UR:
+# Prints one line per Issue:
 #   UR-001 intended=3 proven=1 unproven=2 unproven_ids=REQ-002,REQ-003 closed=n/a
 #
-# The trailing `closed=<yes|no|n/a>` field reports end-to-end UR closure
-# (per docs/design/ur-closure.md), derived from the UR's path-unit REQs
-# (REQs with `**Layer:** none`) and its `user-requests/UR-NNN/closure.md`:
+# The trailing `closed=<yes|no|n/a>` field reports end-to-end Issue closure
+# (per docs/design/ur-closure.md), derived from the Issue's path-unit REQs
+# and its `user-requests/UR-NNN/closure.md`.
+# A REQ is a path-unit when both `**Entry point:**` and `**Terminal state:**`
+# are non-empty after trim (Layer-agnostic; same rule as close/go/verify).
 #   yes  — closure.md exists with `overall: closed`
 #   no   — closure.md exists with a non-closed `overall` (e.g. gaps),
-#          OR no closure.md while the UR has path-unit REQs
-#   n/a  — the UR has no path-unit REQs
+#          OR no closure.md while the Issue has path-unit REQs
+#   n/a  — the Issue has no path-unit REQs
 # This field is additive; the existing intended/proven/unproven math is unchanged.
 
 set -u
@@ -47,7 +49,7 @@ req_id_from_path() {
   }'
 }
 
-# Reads the `overall:` value from a UR's closure.md front matter.
+# Reads the `overall:` value from an Issue's closure.md front matter.
 # Prints the value (e.g. "closed", "gaps", "no-path-units") or nothing if absent.
 closure_overall() {
   local ur="$1"
@@ -71,9 +73,15 @@ for dir in "$DOWORK" "$DOWORK/working" "$DOWORK/archive"; do
     fi
     id="$(req_id_from_path "$req")"
     derived="$(bash "$DERIVE" "$req" | awk '{ print $2 }')"
-    layer="$(extract_field "Layer" "$req")"
+    # Path-unit = non-empty Entry point + Terminal state (Layer-agnostic).
+    entry="$(extract_field "Entry point" "$req")"
+    terminal="$(extract_field "Terminal state" "$req")"
+    entry_trim="$(printf '%s' "$entry" | tr -d '[:space:]')"
+    terminal_trim="$(printf '%s' "$terminal" | tr -d '[:space:]')"
     pathunit=0
-    [ "$layer" = "none" ] && pathunit=1
+    if [ -n "$entry_trim" ] && [ -n "$terminal_trim" ]; then
+      pathunit=1
+    fi
     printf 'ROW %s %s %s %s\n' "$ur" "$id" "$derived" "$pathunit" >> "$TMP_ROWS"
   done
 done
@@ -82,7 +90,7 @@ if [ ! -s "$TMP_ROWS" ]; then
   exit 0
 fi
 
-# Resolve end-to-end closure state per UR and append CLOSURE prelude lines.
+# Resolve end-to-end closure state per Issue and append CLOSURE prelude lines.
 # Done before awk so the file-reading stays in bash (portable, no awk getline).
 for ur in $(awk '$1=="ROW" { print $2 }' "$TMP_ROWS" | sort -u); do
   overall="$(closure_overall "$ur")"

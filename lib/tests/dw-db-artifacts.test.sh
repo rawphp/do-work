@@ -123,7 +123,7 @@ cal_out="$(bash "$DW" read-calibration "$TMP" 2>&1)" || fail "read-calibration f
 cal_n="$(sqlite3 "$db" "SELECT COUNT(*) FROM calibration;")"
 [ "$cal_n" = "1" ] || fail "calibration must be single-row, got count $cal_n"
 
-# --- milestone_state per-UR ---
+# --- milestone_state per-Issue ---
 bash "$DW" set-active-milestone "$TMP" "$ur" M1 || fail "set-active-milestone M1"
 act="$(bash "$DW" get-active-milestone "$TMP" "$ur" 2>&1)" || fail "get-active-milestone"
 [ "$act" = "M1" ] || fail "active milestone want M1 got '$act'"

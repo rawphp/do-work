@@ -8,12 +8,12 @@ You sharpen the brief by asking what the user already knows but didn't say. You 
 
 ## When Invoked
 
-You will be given a UR reference:
+You will be given an Issue reference:
 
 | Backend | Invocation |
 |---------|------------|
 | **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/` |
-| **linear** | UR slug (e.g. `UR-001`) and/or UR Project Milestone id — no local folder required |
+| **linear** | Issue slug (e.g. `UR-001`) and/or Issue Project Milestone id — no local folder required |
 
 You may also be invoked from the ideate gate when the user selects "Grill me", or run standalone via the `/do-work question` subcommand.
 
@@ -27,7 +27,7 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 ### 0a. Tracker load path
 
-Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
+Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goes **only** through named tracker port ops after config is loaded:
 
 1. Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 2. Read `agents/tracker/port.md` (shared op catalog + rules).
@@ -35,7 +35,7 @@ Work-item storage (URs, REQs, decisions, verify/close reports, run notes) goes *
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
-- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute UR/REQ markdown as the store.
+- **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
 - Markdown backend: ops map — **invoke** coordination scripts as `bash {skill-root}/lib/...` after Load Config step 8 resolves `$SKILL_ROOT`; **catalog identity** remains `lib/*.sh` in `markdown.md` — use those ops; do not re-implement store details here.
@@ -97,8 +97,8 @@ Build a prioritized list of ambiguities, ordered by impact on the downstream dec
 Before asking the user anything, attempt to resolve each ambiguity from existing artifacts. Check:
 
 - The project codebase (source files, configs, existing tests)
-- Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear / sqlite / do-work-io:** Issue clarifications via port `read_ur` / `list_urs` (never invent a dual store)
-- Prior REQs — **markdown:** `.do-work/archive/REQ-*.md`; **linear:** Issues via port `list_reqs_for_ur` / `read_req` (Linear issue ids); **sqlite / do-work-io:** `list_reqs_for_ur` / `read_req` by `REQ-NNN` slug
+- Prior UR clarifications — **markdown:** `user-requests/UR-*/input.md` `## Clarifications`; **linear:** Issue Project Milestone clarifications via port `read_ur` / `list_urs`; **sqlite / do-work-io:** Issue clarifications via port `read_ur` / `list_urs` (never invent a dual store)
+- Prior REQs — **markdown:** `.do-work/archive/REQ-*.md`; **linear:** Linear issues via port `list_reqs_for_ur` / `read_req` (Linear issue ids); **sqlite / do-work-io:** `list_reqs_for_ur` / `read_req` by `REQ-NNN` slug
 - **Decisions memory (REQ-297):** **markdown** — `.do-work/decisions.md` if present; **linear** — **Read decisions** helper (`agents/tracker/linear.md`, Team Doc `decisions_doc_title` / default `do-work/decisions`). Same one-line grammar either backend. Do not read local `decisions.md` when backend is linear. When backend is **sqlite** or **do-work-io**, read decisions via port / `decision` list ops (not local `decisions.md`); clarifications only via `append_clarifications`.
 
 For each ambiguity, classify the resolution into one of three buckets:
@@ -186,7 +186,7 @@ If the user chose "Correct some" for specific inferences, record the corrected v
 | Backend | How |
 |---------|-----|
 | **markdown** | Append a `## Clarifications` section to `{project}/.do-work/user-requests/UR-NNN/input.md`. If the section already exists, append new Q&A below existing entries. Never overwrite prior clarifications. Never modify the original brief text above the section. |
-| **linear** | Call port op **`append_clarifications`** (`agents/tracker/linear.md`) with each Q&A pair. Appends under `## Clarifications` on the **UR Project Milestone**; creates the section if missing; never overwrites `## Brief` or prior Q&A. **Do not** write local `input.md`. If MCP fails → hard-stop. |
+| **linear** | Call port op **`append_clarifications`** (`agents/tracker/linear.md`) with each Q&A pair. Appends under `## Clarifications` on the **Issue Project Milestone**; creates the section if missing; never overwrites `## Brief` or prior Q&A. **Do not** write local `input.md`. If MCP fails → hard-stop. |
 | **sqlite** | Call port op **`append_clarifications`** via dw-db. **Do not** write local `input.md`. |
 | **do-work-io** | Call port op **`append_clarifications`** (`agents/tracker/do-work-io.md`). **Do not** write local `input.md`. If MCP fails → hard-stop. |
 

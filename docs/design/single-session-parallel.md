@@ -27,7 +27,7 @@ Workers are embarrassingly parallel: each runs TDD red→green in its own worktr
 
 **Decision: hand-rolled fan-out via N concurrent `Agent`-tool dispatches from the orchestrator, reaped as each returns.** Reject delegating the fan-out to the harness's Workflow tool (pipeline/parallel primitives).
 
-The orchestrator issues up to N `Agent` calls in one turn (the harness runs concurrent tool calls in a single turn in parallel), each carrying the same worker contract already defined in `run.md` Step 2 (REQ path, UR path, prior-REQ paths, `run-worker.md` inline). As each dispatch returns its YAML report, the orchestrator enqueues it for serialized integration (decision 3) and, if backlog remains, claims and dispatches a refill (decision 2).
+The orchestrator issues up to N `Agent` calls in one turn (the harness runs concurrent tool calls in a single turn in parallel), each carrying the same worker contract already defined in `run.md` Step 2 (REQ path, Issue path, prior-REQ paths, `run-worker.md` inline). As each dispatch returns its YAML report, the orchestrator enqueues it for serialized integration (decision 3) and, if backlog remains, claims and dispatches a refill (decision 2).
 
 **Trade-off evaluation** (three concrete criteria, per acceptance criterion):
 

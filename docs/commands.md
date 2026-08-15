@@ -43,7 +43,7 @@ Invoke with no subcommand for help plus suggested next steps:
 | Flag | Effect |
 |------|--------|
 | `--no-ideate` | Skip ideate and its Grill/Continue/Stop gate |
-| `--no-layers` | Skip layer-coverage checks for this UR; records `layers_in_scope: []` |
+| `--no-layers` | Skip layer-coverage checks for this Issue; records `layers_in_scope: []` |
 
 **Notes:**
 
@@ -60,7 +60,7 @@ Invoke with no subcommand for help plus suggested next steps:
 
 ### `/do-work go [UR-NNN]`
 
-**Job:** Verify coverage for a UR, then audit and run when the confidence gate passes.
+**Job:** Verify coverage for an Issue, then audit and run when the confidence gate passes.
 
 **Pipeline:** verify → (if gate passes) audit → run → optional close offer → optional log.
 
@@ -104,7 +104,7 @@ Use after upgrading the skill install when help or startup mentions pending migr
 
 Records the brief **verbatim** as the next `UR-NNN/input.md`. No decomposition.
 
-Use when you want the UR on disk before ideate/capture, or to script the pipeline yourself.
+Use when you want the Issue on disk before ideate/capture, or to script the pipeline yourself.
 
 ### `/do-work ideate [UR-NNN]`
 
@@ -150,7 +150,7 @@ Use standalone to sharpen REQs without starting the run loop.
 
 ### `/do-work run [UR-NNN]`
 
-Executes the backlog: claim REQ → worker TDD loop → evidence validation → policy checks → post-build review → archive/ledger. Optional `UR-NNN` limits work to that UR’s REQs.
+Executes the backlog: claim REQ → worker TDD loop → evidence validation → policy checks → post-build review → archive/ledger. Optional `UR-NNN` limits work to that Issue’s REQs.
 
 Does **not** run the verify confidence gate (unlike `go`).
 
@@ -185,9 +185,9 @@ Requires a REQ id (example: `/do-work resume REQ-042`).
 
 ### `/do-work close UR-NNN`
 
-Validates the integrated result of a UR against the verbatim brief: walks path-unit entry points to terminal states and writes a closure report under the UR folder.
+Validates the integrated result of an Issue against the verbatim brief: walks path-unit entry points to terminal states and writes a closure report under the Issue folder.
 
-Requires a UR id. `go` may offer close after a clean drain when path-unit REQs exist and no `closure.md` yet. Closure gaps do not block the log step.
+Requires an Issue id. `go` may offer close after a clean drain when path-unit REQs exist and no `closure.md` yet. Closure gaps do not block the log step.
 
 ---
 
@@ -215,25 +215,25 @@ Same surface as README / SKILL quick reference:
 |---------|--------------|
 | `/do-work start [brief]` | Brief + REQs; ideate on by default |
 | `/do-work start [brief] --no-ideate` | Skip creative review |
-| `/do-work start [brief] --no-layers` | Skip layer checks for this UR |
+| `/do-work start [brief] --no-layers` | Skip layer checks for this Issue |
 | `/do-work go [UR-NNN]` | Verify; auto-run if ≥ threshold |
 | `/do-work go [UR-NNN] --force` | Verify + run regardless of score |
 | `/do-work go [UR-NNN] --auto-fix` | Verify, fix gaps once, run if ≥ threshold |
 | `/do-work go [UR-NNN] --no-layers` | Verify + run; skip layer checks |
 | `/do-work install` | Create `.do-work/` |
 | `/do-work upgrade` | Conformance fixes for `.do-work/` |
-| `/do-work intake [brief]` | Verbatim UR only |
+| `/do-work intake [brief]` | Verbatim Issue only |
 | `/do-work capture [UR-NNN]` | UR → REQ files |
 | `/do-work question [UR-NNN]` | Interactive grilling |
 | `/do-work audit [UR-NNN]` | REQ quality pass |
 | `/do-work ideate [UR-NNN]` | Assumptions and risks |
 | `/do-work verify [UR-NNN]` | Coverage score + gaps |
 | `/do-work verify [UR-NNN] --auto-fix` | Verify + create missing REQs |
-| `/do-work run [UR-NNN]` | Execute backlog (optional UR scope) |
+| `/do-work run [UR-NNN]` | Execute backlog (optional Issue scope) |
 | `/do-work run --parallel N` | Single-session parallel workers |
 | `/do-work run --budget <amount>` | Spend cap for the run |
 | `/do-work status [UR-NNN]` | Situation room |
-| `/do-work close UR-NNN` | Integrated UR closure report |
+| `/do-work close UR-NNN` | Integrated Issue closure report |
 | `/do-work unblock REQ-NNN` | Stuck REQ → backlog |
 | `/do-work resume REQ-NNN` | Re-dispatch stopped REQ |
 | `/do-work retro` | Ledger → calibration report |

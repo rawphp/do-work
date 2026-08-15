@@ -153,16 +153,16 @@ Migration is additive. Legacy REQs without `**Entry point:**`, `**Terminal state
 
 ## Decisions Memory
 
-`.do-work/decisions.md` is an append-only, cross-UR record of standing decisions (ADR-lite). It gives capture, ideate, and workers a shared institutional memory so a call made in one UR ("validation lives server-side") is not re-litigated or contradicted in the next.
+`.do-work/decisions.md` is an append-only, cross-Issue record of standing decisions (ADR-lite). It gives capture, ideate, and workers a shared institutional memory so a call made in one UR ("validation lives server-side") is not re-litigated or contradicted in the next.
 
 **Format** — one line per decision, no paragraphs (this is a memory, not documentation; anything needing prose belongs in a design doc):
 
 ```
-YYYY-MM-DD | UR/REQ ref | decision | rationale
+YYYY-MM-DD | Issue/REQ ref | decision | rationale
 ```
 
 - `YYYY-MM-DD` — the date the decision was recorded.
-- `UR/REQ ref` — the UR or REQ the decision was made under (e.g. `UR-035` or `REQ-224`).
+- `Issue/REQ ref` — the Issue or REQ the decision was made under (e.g. `UR-035` or `REQ-224`).
 - `decision` — the standing choice, stated as a constraint.
 - `rationale` — one phrase explaining why.
 

@@ -31,7 +31,7 @@ Canonical contract: `agents/tracker/port.md` + Load Config steps 6–7 / **7b** 
 |----------|------------------|
 | Team | `team_id` and/or `team_key` — **hard-fail** if neither resolves |
 | MCP | Linear MCP tools must be discoverable — **hard-fail** with skill setup instructions if not |
-| Hierarchy | **do-work Issue (`UR-NNN`) = Project Milestone** on shared product Project; **REQs = Linear Issues** with that milestone. Not Initiatives (MCP has no Initiative create tools). Product noun Issue ≠ Linear Issue. |
+| Hierarchy | **do-work Issue (`UR-NNN`) = Project Milestone** on shared product Project; **REQs = Linear issues** with that milestone. Not Initiatives (MCP has no Initiative create tools). Product noun Issue ≠ Linear issue (REQ). Prefer "do-work Issue" / "Linear issue (REQ)" when both appear. |
 | `product_project` | Shared Linear Project (**name or UUID**) for all do-work Issues on this local product — **default empty** (not skill name `do-work`). Resolve: explicit `product_project` → `project.name` → git-root basename; `ensure_product_container` create-if-missing + **always persist UUID**. Example for this skill repo only: name `do-work`. |
 | `ur_milestone_name_pattern` | Default `{ur_id}: {title}` |
 | `status_map` | `backlog→Todo`, `in_progress→In Progress`, `stopped→Canceled`, `done→Done` — **hard-fail** if a mapped state is missing on the team (rename team state or override the map key) |

@@ -1,7 +1,7 @@
 # Tracker port (shared contract)
 
 Shared work-item operation catalog and load path for do-work multi-tracker backends.
-Phase agents that touch URs/REQs (or other work-item artifacts) resolve storage **only** through this port and the active backend file — never by inventing raw store paths or tools outside the backend doc.
+Phase agents that touch Issues/REQs (or other work-item artifacts) resolve storage **only** through this port and the active backend file — never by inventing raw store paths or tools outside the backend doc.
 
 This file freezes **op names**, **preconditions**, and **backend-independent semantic rules** (claim, deps, footprint, hard-stop, mid-flight failure). Backend files implement each op; they must not invent alternate op names or weaken these rules.
 
@@ -76,7 +76,7 @@ From the storage inventory: **work-item** data is what the active tracker backen
 | Milestone cursor content | `read_active_milestone`, `set_active_milestone`, `list_milestone_reqs` |
 | Product container | `ensure_product_container` |
 
-In Linear mode these live only in Linear (Initiatives, Projects, Linear Issues for REQs, Docs, comments) — **no dual-write** to Issue/REQ markdown as source of truth. Product noun **Issue** (do-work) ≠ Linear Issue (REQ).
+In Linear mode these live only in Linear (Projects, Project Milestones for do-work Issues, Linear issues for REQs, Docs, comments) — **no dual-write** to Issue/REQ markdown as source of truth. Product noun **Issue** (do-work) ≠ Linear issue (REQ).
 
 ### Stay local (not port work-item storage)
 
@@ -118,7 +118,7 @@ Claim **semantics** are port rules; claim **representation** is backend-specific
 | Required `status_map` workflow state missing on the team | **Hard stop** with rename / map-fix instructions |
 | MCP dies mid-op before a safe commit point | **Hard stop** — see **Mid-flight failure (leave claimed)** |
 
-Agents must not switch to `markdown` or `sqlite` ops “to keep going”, write UR/REQ files under `.do-work/` as a substitute store while backend is `linear`, or invent partial local mirrors of Linear work items.
+Agents must not switch to `markdown` or `sqlite` ops “to keep going”, write Issue/REQ files under `.do-work/` as a substitute store while backend is `linear`, or invent partial local mirrors of Linear work items.
 
 ### SQLite detail (when `backend: sqlite`)
 
@@ -141,7 +141,7 @@ Agents must not glob `.do-work/REQ-*` / `user-requests/` as live truth while bac
 | `token_env` empty or unset in the process environment | **Hard stop**; do not paste the PAT into chat |
 | Mid-flight after successful claim | leave claimed (active claim row on the server) |
 
-Agents must not switch to `markdown`, `linear`, or `sqlite` ops “to keep going”, write UR/REQ files under `.do-work/` as a substitute store while backend is `do-work-io`, or invent partial local mirrors of remote work items.
+Agents must not switch to `markdown`, `linear`, or `sqlite` ops “to keep going”, write Issue/REQ files under `.do-work/` as a substitute store while backend is `do-work-io`, or invent partial local mirrors of remote work items.
 
 ### Markdown detail (when `backend: markdown`, including unset/empty)
 
@@ -238,13 +238,13 @@ Names freeze intent. Exact field shapes and store sequences live in each backend
 | `ensure_product_container` | Product/team container ready (markdown: dirs; Linear: shared product Project create/bind + persist UUID) |
 | `create_ur` | Record intake brief |
 | `read_ur` | Load brief (+ ideate if present) |
-| `list_urs` | Enumerate URs for prompts/status |
+| `list_urs` | Enumerate Issues for prompts/status |
 | `append_ideate` | Write ideate onto UR |
 | `append_clarifications` | Question-phase Q&A |
 | `create_req` | Create one REQ in backlog |
 | `update_req` | Edit REQ body/fields |
 | `read_req` | Load full REQ |
-| `list_reqs_for_ur` | All REQs for a UR (any status) |
+| `list_reqs_for_ur` | All REQs for an Issue (any status) |
 | `list_claimable_reqs` | Backlog, deps ok, footprint ok, unclaimed — pick order |
 | `claim_req` | Optimistic claim + in-progress |
 | `heartbeat_req` | Refresh liveness |
@@ -254,8 +254,8 @@ Names freeze intent. Exact field shapes and store sequences live in each backend
 | `archive_req` | Done + closure proof / outputs |
 | `unblock_req` | Return to backlog, clear claim |
 | `append_decision` | Standing decisions memory |
-| `write_verify_report` | Verify output for a UR |
-| `write_close_report` | Close output for a UR |
+| `write_verify_report` | Verify output for an Issue |
+| `write_close_report` | Close output for an Issue |
 | `append_run_note` | Ledger-ish / cost note for a REQ or run |
 | `read_active_milestone` | Milestone cursor |
 | `set_active_milestone` | Advance / set milestone |
@@ -343,9 +343,9 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 
 | | |
 |---|---|
-| **Intent** | List all REQs for a UR in any status. |
+| **Intent** | List all REQs for an Issue in any status. |
 | **Preconditions** | UR exists (or UR id known). |
-| **Notes** | Scope is the UR’s project/container; not global product backlog unless caller expands. |
+| **Notes** | Scope is the Issue’s project/container; not global product backlog unless caller expands. |
 
 #### `list_claimable_reqs`
 
@@ -479,7 +479,7 @@ Each op lists **intent**, **preconditions**, and **notes**. Inputs/outputs are c
 
 | | |
 |---|---|
-| **Intent** | One-shot, idle-only cutover from the markdown work-item store to Linear (design §12). Creates Initiatives / Projects / Issues for existing URs and REQs (backlog + archive), Team Docs for decisions/calibration, then flips `tracker.backend` to `linear`. After cutover, local UR/REQ trees are **read-only historical** — not dual-write. |
+| **Intent** | One-shot, idle-only cutover from the markdown work-item store to Linear (design §12). Creates Initiatives / Projects / Issues for existing Issues and REQs (backlog + archive), Team Docs for decisions/calibration, then flips `tracker.backend` to `linear`. After cutover, local Issue/REQ trees are **read-only historical** — not dual-write. |
 | **Preconditions** | Effective backend is still **`markdown`** (cutover target is Linear). **`working/` empty.** No active claims. Operator confirms (or explicit dry-run). Linear team resolvable and MCP usable **before** any write. Surfaced via `/do-work upgrade migrate` (or upgrade migrate step) — see `agents/upgrade.md` + `agents/tracker/linear.md`. |
 | **Notes** | **Not a normal lifecycle op.** Sequences and dry-run live in `linear.md`. **Refuse entirely** if effective backend is already **`sqlite`**, **`linear`**, or **`do-work-io`** — leave config + store unchanged (no partial cutover; there is no markdown→sqlite migrate in v1). **Refuse entirely** if `working/` non-empty or active claims exist — leave config + markdown trees unchanged (no partial cutover). **Hard-stop** if Linear MCP is unusable mid-migration — leave markdown trees + config backend unchanged (no partial cutover). Supports **dry-run** (report planned creates; zero Linear writes; config untouched). |
 

@@ -1,5 +1,10 @@
 # Run Agent
 
+
+## Field lessons (load first)
+
+Before pre-flight or claim: read `{skill-root}/references/field-lessons.md` when present (**before acting**). Apply the traps below; do not re-learn them mid-merge.
+
 You are the Run agent in the Do Work system. Your job is to execute the backlog autonomously — one REQ at a time — until empty. Each completed REQ is committed to git with a structured message.
 
 ---
@@ -124,7 +129,7 @@ Full stamp lifecycle: [run-loop.md](../references/run-loop.md) § Agent Identity
    ```bash
    bash {skill-root}/lib/ensure-integration-base.sh [UR-NNN]
    ```
-   Pass the UR slug when this run is scoped (`/do-work run UR-NNN`); omit the arg when unscoped (UR arg does not change the leave-default branch name). Non-zero exit → hard-stop the run (surface stderr); do **not** claim or dispatch workers. Success → record printed branch as integration base (same base for `delivery.mode` merge and pr). **If already on a non-default branch, the script skips (prints current branch) — do not invent a further `git checkout` to `new-work`.** Only the script may switch the orchestrator checkout. Leave-default target is always `new-work` (create-if-missing; existing → checkout + merge protected tip; dirty carry). Full sequence + hard rules: [run-loop.md](../references/run-loop.md) § Pre-flight Check §2a.1.
+   Pass the Issue slug when this run is scoped (`/do-work run UR-NNN`); omit the arg when unscoped (Issue arg does not change the leave-default branch name). Non-zero exit → hard-stop the run (surface stderr); do **not** claim or dispatch workers. Success → record printed branch as integration base (same base for `delivery.mode` merge and pr). **If already on a non-default branch, the script skips (prints current branch) — do not invent a further `git checkout` to `new-work`.** Only the script may switch the orchestrator checkout. Leave-default target is always `new-work` (create-if-missing; existing → checkout + merge protected tip; dirty carry). Full sequence + hard rules: [run-loop.md](../references/run-loop.md) § Pre-flight Check §2a.1.
 4. Scan/classify working slots (markdown) or in-flight Linear claims — mine / sibling / stale buckets.
 5. Resume any `mine` slot.
 6. Try backlog (primary); else evaluate working set; else empty-backlog path.
@@ -207,3 +212,15 @@ Full enum handling + feedback path: [run-loop.md](../references/run-loop.md) § 
 - [agents/run-worker.md](run-worker.md) — Worker contract
 - [agents/tracker/linear.md](tracker/linear.md) — Linear backend index (when `tracker.backend: linear`)
 - [agents/tracker/do-work-io.md](tracker/do-work-io.md) — do-work.io backend index (when `tracker.backend: do-work-io`)
+
+
+## Field traps (from field-lessons)
+
+1. **Assert integration base before every Stage B merge (§5).** Immediately before each `git merge` / PR base use: `git branch --show-current` must equal the **recorded** ensure-integration-base tip. If mismatch: checkout the recorded base only when safe, or merge via a worktree that holds the base — never merge “wherever HEAD is.”
+2. **Worker hard-death / orphan worktree (§11).** If a worker vanishes with **no YAML report** (usage limit, crash) and leaves `.worktrees/req-*` + `req/*` with **no** `feat(...)` commit: `git worktree remove … --force` then `git branch -D req/…`. Refresh heartbeat (keep claim); re-dispatch a **fresh** worker off the **named** integration base. Do not salvage uncommitted partial work.
+3. **Background dispatch reports (§15).** Named background worker/review may return only `idle_notification` without YAML. Do **not** block on self-reported YAML. Treat commit + tests as ground truth (scope, re-run suite, policy). If you need the report inline, dispatch **foreground** (`run_in_background: false` / equivalent).
+4. **Regenerator after teardown (§16).** After the last worker worktree is torn down and **before** the final suite, if any worker used symlinked vendor/node_modules, re-run `composer dump-autoload` / `npm rebuild` in the **main checkout** so artifacts are main-path again.
+5. **Submodule pointer merge (§31).** After merging a submodule SHA change: fetch the object from the worktree submodule into the main submodule clone, then checkout that SHA — before tearing down the worktree. Clear `git submodule status` `+` before archive/final suite.
+6. **Union shared registration files (§35).** After serial Stage B merges that touch ServiceProvider `CAPABILITY_CLASSES`, routes hubs, or shared registries: **union** entries from each feature tip — never “keep ours” alone. Re-run full suite on the integration base.
+7. **Shared env/docs footprint (§36).** Parallel workers rewriting the same `.env.example` / README: **union resolve** (keep both comment blocks + keys), never ours-only. Prefer serializing env-doc REQs when both claim the same example file.
+8. **Policy `.env.example` (§23).** If `check-policy.sh` blocks on `.env.example` matching `.env.*`, treat as `policy-blocked` — narrow `security.blocked_paths` (keep `.env`, drop unanchored `.env.*` or exclude `.env.example`) then resume. Never silent-bypass the policy gate.

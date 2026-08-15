@@ -96,11 +96,11 @@ Flags:
 |---------|-------------|
 | `/do-work start [brief]` | Records brief + decomposes into REQs. Includes ideate by default. |
 | `/do-work start [brief] --no-ideate` | Same, but skips the creative review. |
-| `/do-work start [brief] --no-layers` | Same as start, but skips layer-coverage checks (records `layers_in_scope: []` for this UR). |
+| `/do-work start [brief] --no-layers` | Same as start, but skips layer-coverage checks (records `layers_in_scope: []` for this Issue). |
 | `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
 | `/do-work go [UR-NNN] --force` | Verifies + runs regardless of score. |
 | `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs. |
-| `/do-work go [UR-NNN] --no-layers` | Verifies + runs, but skips layer-coverage checks for this UR. |
+| `/do-work go [UR-NNN] --no-layers` | Verifies + runs, but skips layer-coverage checks for this Issue. |
 | `/do-work install` | Creates `.do-work/` folder structure in current project. |
 | `/do-work upgrade` | Brings `.do-work/` state into conformance with the current skill. |
 | `/do-work intake [brief]` | Records brief verbatim as next Issue (slug `UR-NNN`). |
@@ -114,7 +114,7 @@ Flags:
 | `/do-work run --parallel N` | Single-session parallel mode: dispatches up to N concurrent workers from one terminal. |
 | `/do-work run --budget <amount>` | Caps estimated model spend for the run; stops at the next REQ boundary when reached. |
 | `/do-work status [UR-NNN]` | Live situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup. |
-| `/do-work close UR-NNN` | Validates the integrated result of a UR against its verbatim brief; writes a closure report. |
+| `/do-work close UR-NNN` | Validates the integrated result of an Issue against its verbatim brief; writes a closure report. |
 | `/do-work unblock REQ-NNN` | Forces a stuck REQ out of `working/` back to the backlog. |
 | `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ. |
 | `/do-work retro` | Mines the run ledger into a learning report + capture calibration guidance. |
@@ -134,9 +134,9 @@ Flags:
 
 `start` = intake + ideate (with gate) + capture. `go` = verify + audit + run.
 
-**Integration base.** `/do-work go` and `/do-work run` never merge worker branches into `main`, `master`, or the remote HEAD short name. Pre-flight calls `lib/ensure-integration-base.sh`: if the orchestrator is already off a protected default, that branch is the base; if on a protected default, leave-default always uses the fixed branch `new-work` (scoped and unscoped; create-if-missing). When `new-work` already exists, the script checkouts it and **merges** the protected tip just left (so it is updated from main). Dirty trees on a protected default **carry** onto `new-work` (no dirt-only hard-stop). `/do-work start` does **not** call this helper and never switches branches. The same `new-work` name is used when `delivery.pr.granularity: ur` accumulates a UR PR — merge mode reuses that name without requiring `delivery.mode: pr`.
+**Integration base.** `/do-work go` and `/do-work run` never merge worker branches into `main`, `master`, or the remote HEAD short name. Pre-flight calls `lib/ensure-integration-base.sh`: if the orchestrator is already off a protected default, that branch is the base; if on a protected default, leave-default always uses the fixed branch `new-work` (scoped and unscoped; create-if-missing). When `new-work` already exists, the script checkouts it and **merges** the protected tip just left (so it is updated from main). Dirty trees on a protected default **carry** onto `new-work` (no dirt-only hard-stop). `/do-work start` does **not** call this helper and never switches branches. The same `new-work` name is used when `delivery.pr.granularity: ur` accumulates an Issue PR — merge mode reuses that name without requiring `delivery.mode: pr`.
 
-**Delivery mode.** How a passing REQ is delivered at the integration step is configurable via `delivery.mode` in `.do-work/config.yml`. The default `merge` mode merges each REQ's `req/REQ-NNN` branch into the **integration base** (not `main`/`master` — see above) locally, archives, tears down the worktree, and deletes the branch. Set `delivery.mode: pr` for team repos with CI and human review: instead of merging, the orchestrator pushes the branch and opens a GitHub PR via `gh`, records the PR URL in the archived REQ's `## Outputs` and the run ledger, and leaves the branch alive (the PR owns it). `delivery.pr.granularity: req` (default) opens one PR per REQ; `ur` accumulates every REQ of a UR onto the shared `new-work` branch and opens a single PR when that UR's backlog drains. PR mode requires a configured git remote and the `gh` CLI — if either is missing the run stops with a `missing-creds` stopper and the REQ stays in `working/`; it never silently falls back to merging. The closure-proof model is unchanged in both modes — evidence still gates archive; the PR is only the delivery vehicle.
+**Delivery mode.** How a passing REQ is delivered at the integration step is configurable via `delivery.mode` in `.do-work/config.yml`. The default `merge` mode merges each REQ's `req/REQ-NNN` branch into the **integration base** (not `main`/`master` — see above) locally, archives, tears down the worktree, and deletes the branch. Set `delivery.mode: pr` for team repos with CI and human review: instead of merging, the orchestrator pushes the branch and opens a GitHub PR via `gh`, records the PR URL in the archived REQ's `## Outputs` and the run ledger, and leaves the branch alive (the PR owns it). `delivery.pr.granularity: req` (default) opens one PR per REQ; `ur` accumulates every REQ of an Issue onto the shared `new-work` branch and opens a single PR when that Issue's backlog drains. PR mode requires a configured git remote and the `gh` CLI — if either is missing the run stops with a `missing-creds` stopper and the REQ stays in `working/`; it never silently falls back to merging. The closure-proof model is unchanged in both modes — evidence still gates archive; the PR is only the delivery vehicle.
 
 Normal completion is proof-backed. Capture may mark generated criteria as `agent-drafted`, but that provenance does not block execution. If a REQ exists in the backlog, it should run unless dependencies, footprint, policy, tests, verification, review, or genuinely ambiguous criteria stop it. Workers return checkpointed evidence and per-criterion acceptance evidence; the orchestrator validates that evidence, runs policy checks for blocked paths or commands, invokes post-build review, writes `**Closure proof:**`, derives `proven` / `unproven`, and records `.do-work/runs/RUN-NNN.yml` when the ledger is enabled. A worker report is only an input to completion, not the archive/proof decision.
 
@@ -163,7 +163,7 @@ do-work/
 │   ├── run-worker.md     ← worker: TDD-and-commits a single REQ
 │   ├── review.md         ← post-build scope, evidence, policy, and regression review
 │   ├── status.md         ← read-only situation room
-│   ├── close.md          ← validates a UR's integrated result against its brief
+│   ├── close.md          ← validates an Issue's integrated result against its brief
 │   ├── unblock.md        ← forces a stuck REQ back to the backlog
 │   ├── resume.md         ← re-dispatches a worker for a stopped REQ
 │   ├── retro.md          ← mines the run ledger into learning reports
@@ -265,7 +265,7 @@ Feature briefs frequently produce REQs that miss the frontend, miss the wiring, 
 
 Capture inspects the codebase to draft the answers, verifies cited files actually exist before claiming high confidence, and asks you when it can't tell. Verify enforces the block on every new-surface REQ.
 
-**Skip per-UR with `--no-layers`** when the checks don't apply (e.g. internal one-shot scripts). The choice is recorded in UR state, so it's auditable.
+**Skip per-Issue with `--no-layers`** when the checks don't apply (e.g. internal one-shot scripts). The choice is recorded in UR state, so it's auditable.
 
 ---
 

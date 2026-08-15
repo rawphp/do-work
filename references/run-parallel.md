@@ -16,7 +16,7 @@ Pre-flight (`## Pre-flight Check`) runs exactly as in serial mode — branch/dir
 
 ### P1. Fan-out mechanism — concurrent `Agent` dispatches (design §1)
 
-Fan out via **N concurrent `Agent`-tool dispatches in one turn** — the same worker-dispatch surface serial mode uses at `## The Loop` Step 2. The harness runs concurrent tool calls in a single turn in parallel. Do **not** delegate fan-out to a Workflow/scheduler primitive: the `Agent` tool is the only dispatch surface guaranteed wherever serial mode works, it keeps the announce/return checkpoints that logging, the ledger (Step 3b), and stopper-surfacing all hang off, and it keeps resume granularity at one REQ. Each dispatch carries the identical five-input worker contract from Step 2 (REQ path, UR path, prior-REQ paths, context-pack path, resolved `$SKILL_ROOT`, plus `run-worker.md` inline). Announce each at claim time exactly as Step 1's announce line.
+Fan out via **N concurrent `Agent`-tool dispatches in one turn** — the same worker-dispatch surface serial mode uses at `## The Loop` Step 2. The harness runs concurrent tool calls in a single turn in parallel. Do **not** delegate fan-out to a Workflow/scheduler primitive: the `Agent` tool is the only dispatch surface guaranteed wherever serial mode works, it keeps the announce/return checkpoints that logging, the ledger (Step 3b), and stopper-surfacing all hang off, and it keeps resume granularity at one REQ. Each dispatch carries the identical five-input worker contract from Step 2 (REQ path, Issue path, prior-REQ paths, context-pack path, resolved `$SKILL_ROOT`, plus `run-worker.md` inline). Announce each at claim time exactly as Step 1's announce line.
 
 ### P2. Window fill — claim-as-slot-frees (design §2)
 
@@ -226,7 +226,7 @@ If `config.next_steps.enabled` is `true` **and** this agent is running standalon
 
 **Use the `AskUserQuestion` tool** (do NOT just print the options as text) with these options:
 
-1. **"Start new work"** — Run intake for a new UR
+1. **"Start new work"** — Run intake for a new Issue
 2. **"Review outputs"** — List archived REQs and their output paths
 3. **"Skip"** — End the interaction
 
@@ -234,3 +234,10 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 ---
 
+
+## Field traps (parallel — from field-lessons)
+
+- **Stage B base assert (§5):** before each serial merge in the queue, re-check `git branch --show-current` against the recorded integration base.
+- **Union registries (§35):** when feature tips both edit `CAPABILITY_CLASSES` / route groups / provider lists, Stage B conflict resolution must **union** both sides — never “ours” alone — then re-run the suite.
+- **Shared env docs (§36):** same-file `.env.example` / README conflicts → union resolve; optionally serialize those REQs.
+- **iOS:** each concurrent worker must use a unique `-derivedDataPath` (§7).
