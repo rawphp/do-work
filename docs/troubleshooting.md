@@ -34,7 +34,7 @@ Symptom-first fixes for install, `start` / `go` gates, capture, and stuck runs.
 
 ### Install cloned a different GitHub org than expected
 
-**Cause:** `install.sh` defaults `DO_WORK_REPO_URL` to `https://github.com/agent-native/do-work.git` unless overridden.
+**Cause:** `DO_WORK_REPO_URL` was set (env or prior install) to a fork or old remote. Default is `https://github.com/rawphp/do-work.git`.
 
 **Fix:** Set the URL explicitly:
 

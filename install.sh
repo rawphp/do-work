@@ -4,7 +4,7 @@ set -euo pipefail
 # Install do-work into the active skills hub (~/.agents/skills).
 # Default: git clone/update. Use --from-cwd / --source for a live symlink.
 
-REPO_URL="${DO_WORK_REPO_URL:-https://github.com/agent-native/do-work.git}"
+REPO_URL="${DO_WORK_REPO_URL:-https://github.com/rawphp/do-work.git}"
 HUB="${AGENTS_SKILLS_HUB:-$HOME/.agents/skills}"
 SKILL_DIR="$HUB/do-work"
 BACKUP_DIR="$HUB/.backups"

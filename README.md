@@ -42,20 +42,20 @@ Installs into the shared skills hub (`~/.agents/skills/do-work` by default). All
 ### One-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agent-native/do-work/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash
 ```
 
 Optional live symlink from a checkout (dev):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agent-native/do-work/main/install.sh | bash -s -- --from-cwd
+curl -fsSL https://raw.githubusercontent.com/rawphp/do-work/main/install.sh | bash -s -- --from-cwd
 # or: bash install.sh --source /path/to/do-work
 ```
 
 ### Or clone manually
 
 ```bash
-git clone https://github.com/agent-native/do-work.git ~/.agents/skills/do-work
+git clone https://github.com/rawphp/do-work.git ~/.agents/skills/do-work
 ```
 
 Override the hub directory with `AGENTS_SKILLS_HUB` (same as `install.sh`). Wire any agent harness to load skills from that hub.

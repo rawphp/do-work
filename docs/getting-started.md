@@ -37,12 +37,10 @@ bash install.sh
 
 `install.sh` clones or updates into `$AGENTS_SKILLS_HUB/do-work` (default `~/.agents/skills/do-work`).
 
-If you use the script’s default remote without a local checkout, note the current default in `install.sh`:
+`install.sh` defaults `DO_WORK_REPO_URL` to `https://github.com/rawphp/do-work.git`. Override only for a fork:
 
 ```bash
-# Default REPO_URL inside install.sh (override if needed):
-# DO_WORK_REPO_URL defaults to https://github.com/agent-native/do-work.git
-DO_WORK_REPO_URL=https://github.com/rawphp/do-work.git bash install.sh
+DO_WORK_REPO_URL=https://github.com/your-org/do-work.git bash install.sh
 ```
 
 **Option C — live symlink from a checkout (development):**
