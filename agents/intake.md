@@ -249,4 +249,4 @@ Next steps:
 
 ## Field traps (from field-lessons)
 
-- **Mockups / vision (§32):** before writing inventory into the Issue brief, open each attached image (session `images/` or message assets) and describe only what is visible. Copy durable files to `{project}/.do-work/evidence/UR-NNN/mockups/`.
+- **Mockups / vision:** before writing inventory into the Issue brief, open each attached image (session `images/` or message assets) and describe only what is visible. Copy durable files to `{project}/.do-work/evidence/UR-NNN/mockups/`.

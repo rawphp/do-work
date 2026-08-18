@@ -183,6 +183,7 @@ In all cases, never leave partial state without reporting it. If an Issue was cr
 
 ## Field traps (from field-lessons)
 
-- **Prefer existing `.do-work/` (§21):** if `{project}/.do-work/config.yml` exists, use champion layout — do not create a sibling legacy `do-work/` tree.
-- **Linear vs markdown capture (§8):** when config says `linear`, capture must create Linear Issue/REQs — do not leave markdown-only backlog.
-- **Mockups (§32):** if the brief includes images, vision-read them and copy into `.do-work/evidence/UR-NNN/mockups/` before decomposition.
+- **Prefer existing `.do-work/`:** if `{project}/.do-work/config.yml` exists, use champion layout — do not create a sibling legacy `do-work/` tree.
+- **Backend matches capture store:** when config says `linear` / `sqlite` / `do-work-io`, capture must create on that backend — do not leave markdown-only backlog.
+- **Mockups:** if the brief includes images, vision-read them and copy into `.do-work/evidence/UR-NNN/mockups/` before decomposition.
+- **do-work-io install:** MCP tools answering is enough to set `tracker.backend: do-work-io` + `base_url`/`project`/`token_env`/`mcp_profile` and `project.ensure`. Do not paste the PAT into chat or config. Process env may lack `${token_env}` while host MCP still works — report PAT unset for non-MCP shells; do not hard-stop install solely for that when MCP already answers.

@@ -301,4 +301,4 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 ## Field traps (from field-lessons)
 
-- **do-work-io body before go (§26b):** if `req.get` returns ACs/files but empty/missing **body**, `req.update` with full `## Task` / Context / Integration / Verification Steps before claim/dispatch.
+- **REQ body before go:** if `req.get` / `read_req` returns ACs/files but empty/missing **body**, `req.update` / `update_req` with full `## Task` / Context / Integration / Verification Steps before claim/dispatch.

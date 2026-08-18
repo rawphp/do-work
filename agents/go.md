@@ -224,6 +224,7 @@ If `config.next_steps.enabled` is `false` or missing: output `Next step: /do-wor
 
 ## Field traps (from field-lessons)
 
-- **Linear + markdown-only REQs (§8):** if `tracker.backend: linear` but the Issue only exists as local `user-requests/` + `REQ-*.md` with no Linear milestone/issues → **hard-stop**. Offer migrate-to-Linear or set `tracker.backend: markdown`. Never silent-fallback.
-- **UR exists via backend (§9):** after Load Config, prove UR via markdown path / sqlite `get-ur` / linear `read_ur` — never require local `user-requests/` when backend is not markdown.
-- **Close offer path-units (§19):** use Layer-agnostic Entry/Terminal detection when collecting path-units for the close offer.
+- **Configured remote + markdown-only REQs:** if `tracker.backend` is `linear` / `do-work-io` / `sqlite` but the Issue only exists as local `user-requests/` + `REQ-*.md` with no remote/DB rows → **hard-stop**. Offer migrate/create on the configured backend or set `tracker.backend: markdown`. Never silent-fallback.
+- **UR exists via backend:** after Load Config, prove UR via markdown path / sqlite `get-ur` / linear or do-work-io `read_ur` — never require local `user-requests/` when backend is not markdown.
+- **Close offer path-units:** use Layer-agnostic Entry/Terminal detection when collecting path-units for the close offer.
+- **Multi-Issue close args:** when offering or chaining close, slash/comma/space lists are multiple Issue slugs (see close agent).

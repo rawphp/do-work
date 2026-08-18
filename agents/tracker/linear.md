@@ -280,4 +280,6 @@ A **diagnostic** sequence that reads a do-work Issue's Linear issues' (REQs') na
 
 ## Field traps (from field-lessons)
 
-- **Issue slug zero-padding (§24):** accept both `UR-30` and `UR-030` when resolving milestones; list product-Project milestones and match prefix/`**UR-id:**` rather than hard-stopping on the first exact-name miss.
+- **Issue slug zero-padding:** accept both `UR-30` and `UR-030` when resolving milestones; list product-Project milestones and match prefix/`**UR-id:**` rather than hard-stopping on the first exact-name miss.
+- **Heartbeat patch-in-place:** when a claim comment id is known, `save_comment` (or update-comment) with that id + refreshed `heartbeat` only — do not post a second active claim comment unless update tools are missing (see `heartbeat_req` above).
+- **Evidence checker project root:** write Linear body snapshots under `{project}/.do-work/state/` (or another in-project path) before `check-acceptance-evidence.sh` so `resolve_project_root` finds the app — not under `/tmp` alone.

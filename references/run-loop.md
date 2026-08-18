@@ -1130,9 +1130,10 @@ When the worker returns `status: stopped`, `reason: ambiguous-criteria`:
 
 Apply in pre-flight, dispatch, Stage B, and recovery:
 
-- **Before every Stage B merge:** `git branch --show-current` == recorded integration base (§5).
-- **Orphan worktree after no YAML report:** force-remove worktree + branch when no feat commit; re-dispatch fresh (§11).
-- **Background workers:** independent verify of commit/tests; prefer foreground when YAML is required (§15).
-- **After teardown, before final suite:** `composer dump-autoload` / rebuild if symlinked deps were regenerated (§16).
-- **Submodule merges:** fetch object from worktree submodule into main clone before teardown (§31).
-- **Pass `integration_base: <name>` into every worker dispatch** so W1 does not rely on drifted HEAD (§14).
+- **Before every Stage B merge:** `git branch --show-current` == recorded integration base.
+- **Orphan worktree after no YAML report:** force-remove worktree + branch when no feat commit; re-dispatch fresh.
+- **Background workers:** independent verify of commit/tests; prefer foreground when YAML is required.
+- **After teardown, before final suite:** regenerator in main checkout if symlinked deps were regenerated.
+- **Submodule merges:** fetch object from worktree submodule into main clone before teardown.
+- **Pass `integration_base: <name>` into every worker dispatch** so W1 does not rely on drifted HEAD.
+- **Schema REQs:** full suite on integration base before archive when migrations changed.

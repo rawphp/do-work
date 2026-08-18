@@ -237,7 +237,7 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 
 ## Field traps (parallel — from field-lessons)
 
-- **Stage B base assert (§5):** before each serial merge in the queue, re-check `git branch --show-current` against the recorded integration base.
-- **Union registries (§35):** when feature tips both edit `CAPABILITY_CLASSES` / route groups / provider lists, Stage B conflict resolution must **union** both sides — never “ours” alone — then re-run the suite.
-- **Shared env docs (§36):** same-file `.env.example` / README conflicts → union resolve; optionally serialize those REQs.
-- **iOS:** each concurrent worker must use a unique `-derivedDataPath` (§7).
+- **Stage B base assert:** before each serial merge in the queue, re-check `git branch --show-current` against the recorded integration base.
+- **Union registries:** when feature tips both edit shared registries (providers, route tables, plugin/capability lists), Stage B conflict resolution must **union** both sides — never “ours” alone — then re-run the suite.
+- **Shared env docs:** same-file `.env.example` / README conflicts → union resolve; optionally serialize those REQs.
+- **Native iOS:** each concurrent worker must use a unique `-derivedDataPath`.

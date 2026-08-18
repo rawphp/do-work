@@ -373,6 +373,15 @@ Server `req.set-blocked-by` rejects cycles. For a read-side diagnostic, `req.lis
 
 ---
 
+## Field traps
+
+- **Wire fields first:** treat `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` as present on `req.get` / `req.list`. Use wire values; snapshot under `{project}/.do-work/state/` only if keys are truly absent on an old server.
+- **Path fields in body:** if wire `entry_point`/`terminal_state` are null but body has `**Entry point:**` / `**Terminal state:**`, parse body as path-unit fallback; prefer `req.update` next capture to set wire fields.
+- **Bulk create 429:** pace `req.create` (~1/s), exponential backoff on `rate_limited`, resume remaining titles via `req.list` — never dual-write markdown.
+- **Capture summary:** never `ur.update` a new brief; append via `ur.append-clarifications` (or capture-summary fence).
+
+---
+
 ## Related
 
 - `agents/tracker/port.md` — shared op catalog + hard-stop / leave-claimed

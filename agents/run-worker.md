@@ -626,15 +626,16 @@ Field rules:
 
 Read `{skill-root}/references/field-lessons.md` at worker start when present. Act on these without waiting to rediscover them:
 
-1. **Laravel real vendor (§1).** If Pest fails with `A facade root has not been set` after `linked: vendor`, remove the worktree vendor symlink and run real `composer install` in the worktree app/package that owns `composer.json`. Do not rely on a vendor symlink for Laravel + Pest.
-2. **Named integration base (§14).** Create worktrees off the **named** integration branch from dispatch, not off drifted HEAD.
-3. **Worktree CWD only (§28).** After W2/W3.5, every read/edit/test uses the **worktree absolute path**. Main checkout is out of bounds (may hold dirty WIP).
-4. **No regenerator on symlinked deps (§16).** Do not run `composer dump-autoload`, `npm rebuild`, or similar regenerators against a **symlinked** `vendor`/`node_modules` — they rewrite shared artifacts to worktree-relative paths and break the main checkout after teardown. Prefer real provision / `worktree.setup_command: "composer install --no-interaction"`.
-5. **iOS DerivedData (§7).** Every `xcodebuild test` in this worker uses a per-REQ `-derivedDataPath` (e.g. `/tmp/dd-<sanitized-req-id>`). Never share default DerivedData across concurrent workers.
-6. **Pest WARN cosmetic (§17).** `Tests: N warning, M passed` with missing `.env` via phpdotenv is **green** when exit code is 0 and failed=0. Do not return `verification-failing` for warning-only.
-7. **Private Vite UI evidence (§22).** Screenshot worktree frontend from a **private** Vite started in `{worktree}/<app-package>` on an **unused-port** (not shared 5173 / `*.project.test`). No HTML positional arg to `vite`. Confirm HTTP 200 before screenshot. Long-lived process — not killed by short tool timeouts.
-8. **Vue harness RouterView (§33).** Use `import { RouterView } from 'vue-router'` and `h(RouterView)` — never `h('router-view')` (unknown native element, empty body).
-9. **Block-style YAML report (§18).** Return Report `acceptance:` map must be **block style** (not flow-style `{status: passed, evidence: [...]}`) so `check-acceptance-evidence.sh` sees evidence.
-10. **Path-unit empty commit (§4).** When children already shipped and this path-unit has nothing to implement: re-run path verification + re-vision UI; land `git commit --allow-empty` on `req/<id>` so merge has a tip. Do not re-implement children.
-11. **UI evidence dual home (§30).** Write PNGs under `.do-work/evidence/UR-NNN/ui-evidence/` **and** copy (or dual-write) to `.do-work/user-requests/UR-NNN/ui-evidence/` so the checker path resolves on non-markdown backends.
-12. **Pest red datasets (§28).** In red phase, use string literals in `->with([...])` datasets until model constants exist (avoid `DatasetMissing`).
+1. **Framework app real vendor.** If the app boots only when `vendor/` is a real tree (e.g. Pest/`php artisan test` fails after `linked: vendor` with facade/bootstrap path errors), remove the worktree vendor symlink and run real `composer install` in the package that owns `composer.json`. Prefer `worktree.setup_command` over symlinking framework vendor.
+2. **Named integration base.** Create worktrees off the **named** integration branch from dispatch, not off drifted HEAD.
+3. **Worktree CWD only.** After W2/W3.5, every read/edit/test uses the **worktree absolute path**. Main checkout is out of bounds (may hold dirty WIP).
+4. **No regenerator on symlinked deps.** Do not run `composer dump-autoload`, `npm rebuild`, or similar regenerators against a **symlinked** `vendor`/`node_modules` — they rewrite shared artifacts to worktree-relative paths and break the main checkout after teardown.
+5. **Native iOS parallel builds.** Every `xcodebuild test` in this worker uses a per-REQ `-derivedDataPath` (e.g. `/tmp/dd-<sanitized-req-id>`). Never share default DerivedData across concurrent workers. Prefer project `make`/auto device pick over hard-coded Simulator names when the host Sim list varies.
+6. **Test runner: exit code is truth.** `N warning, M passed` with exit 0 and failed=0 is **green** (e.g. missing gitignored `.env` noise). Do not return `verification-failing` for warning-only.
+7. **Private UI evidence server.** Screenshot worktree frontend from a **private** dev server started in `{worktree}/<app-package>` on an **unused port** (not the shared project host). No HTML positional arg that steals Vite root. Confirm HTTP 200 before screenshot. Long-lived process — not killed by short tool timeouts.
+8. **Block-style YAML report.** Return Report `acceptance:` map must be **block style** (not flow-style `{status: passed, evidence: [...]}`) so `check-acceptance-evidence.sh` sees evidence.
+9. **Path-unit empty commit.** When children already shipped and this path-unit has nothing to implement: re-run path verification + re-vision UI; land `git commit --allow-empty` on `req/<id>` so merge has a tip. Do not re-implement children.
+10. **UI evidence dual home.** Write PNGs under `.do-work/evidence/UR-NNN/ui-evidence/` **and** copy (or dual-write) to `.do-work/user-requests/UR-NNN/ui-evidence/` so the checker path resolves on non-markdown backends.
+11. **Red-phase datasets.** In red phase, datasets must not reference symbols that do not exist yet (use string literals until constants land).
+12. **Playwright host tooling.** Homebrew `playwright` may be a **Python** CLI, not a Node module. Prefer `playwright screenshot` or `python3` + `playwright.sync_api` for click/type; do not assume `require('playwright')`.
+13. **Nested monorepo deps.** If provision linked only depth ≤1 and package tests cannot resolve deps, set `worktree.link_paths` (or symlink the nested package’s `node_modules`/`vendor` from the main checkout) before verification.

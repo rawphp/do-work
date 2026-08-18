@@ -59,7 +59,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 **When effective backend is `linear`:** load the brief and path-unit Linear issues (REQs) via port ops (`read_ur`, `list_reqs_for_ur` / done-equivalent issues) rather than assuming local `input.md` / `archive/` are the store. Walk still runs against the **merged app** (local git). Persist only via **`write_close_report`**. Path-unit ids are **Linear issue identifiers** (e.g. `ENG-123`) — see linear.md **Close path-unit collection**.
 
 **When effective backend is `sqlite` (1S):**
-- Brief / path-units: `get-ur` / `list-reqs --ur UR-NNN` via dw-db; select path-units by non-empty Entry point + Terminal state (prefer `layer=none` when present; if none, fall back to any REQ with both path fields — field lesson §19)
+- Brief / path-units: `get-ur` / `list-reqs --ur UR-NNN` via dw-db; select path-units by non-empty Entry point + Terminal state (prefer `layer=none` when present; if none, fall back to any REQ with both path fields — Layer-agnostic)
 - Persist only via **`write-close`** — never dual-write `user-requests/UR-NNN/closure.md`
 - Evidence screenshots under `.do-work/evidence/UR-NNN/closure-evidence/` only
 - Hard-stop if dw-db fails
@@ -272,7 +272,9 @@ No commits. No work-item writes beyond the closure report home for the active ba
 
 ## Close field traps (continued)
 
-1. **no-path-units ≠ complete (§20).** Before treating `overall: no-path-units` as “Issue is done”: list REQs across backlog + working + archive. Any non-archived REQ ⇒ not **tracker-complete**. Walk the brief on the merged app when asked to validate complete; report **product-complete** vs **tracker-complete** as two verdicts. Archived-only path scan can miss unarchived work.
-2. **SPA hydrate before screenshot (§25).** Web walks must wait for SPA hydrate: Playwright `--wait-for-selector` on a real heading/testid plus `--wait-for-timeout`. Re-vision the PNG; blank dark `#app` shell ⇒ `not-reached`, not `closed`.
-3. **Shell / suite required (§26).** Close must have Shell (or parent-passed suite exit code + test names). Unread test source is not a passing suite.
-4. **Realtime second-actor (§36).** Before second-actor UI proof: private Vite with matching `VITE_REVERB_APP_KEY` / server **REVERB** key, **CORS** allows that origin (`CORS_ALLOWED_ORIGINS`), confirm WS to Reverb, and ≥1 list refresh after the first **second-actor** mutation.
+1. **no-path-units ≠ complete.** Before treating `overall: no-path-units` as “Issue is done”: list REQs across backlog + working + archive. Any non-archived REQ ⇒ not **tracker-complete**. Walk the brief on the merged app when asked to validate complete; report **product-complete** vs **tracker-complete** as two verdicts. Archived-only path scan can miss unarchived work.
+2. **SPA hydrate before screenshot.** Web walks must wait for SPA hydrate: Playwright `--wait-for-selector` on a real heading/testid plus `--wait-for-timeout`. Re-vision the PNG; blank dark shell ⇒ `not-reached`, not `closed`.
+3. **Shell / suite required.** Close must have Shell (or parent-passed suite exit code + test names). Unread test source is not a passing suite.
+4. **Clear session between public and authed scenes.** Before a public-route scene after authed ones: logout / clear session storage, or use a fresh browser context — leftover tokens can redirect away from login/public entry points.
+5. **Multi-Issue close args.** `/do-work close UR-001/005` (or comma/space lists) means **multiple** Issue slugs — full close walk + one report each. Do not invent a nested path id. Already-closed: report `closed_at` and skip rewrite unless re-close was requested.
+6. **Missing config + live remote MCP.** If `.do-work/config.yml` is missing/unset (markdown default) but `search_tool` already finds do-work.io (or Linear) tools for this product, **hard-stop or re-resolve** backend + project before any local archive/ghost close. Never treat local `user-requests/` as store truth while a live remote project exists.

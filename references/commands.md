@@ -289,8 +289,8 @@ Regenerate a **static HTML** snapshot of the sqlite work-item store (human brows
 Validate the integrated result of an Issue against its verbatim brief — walking every path-unit's entry point to its terminal state in the merged app — and write a per-path-unit closure report.
 
 1. Detect `{project}`.
-2. Confirm `UR-NNN` was provided. If not, report "close requires an Issue id (e.g. /do-work close UR-042)." and stop.
-3. Confirm `{project}/.do-work/user-requests/UR-NNN/input.md` exists. If not, report "UR-NNN not found at {project}/.do-work/user-requests/UR-NNN/. Check the Issue number and try again." and stop.
+2. Confirm at least one Issue id was provided. Accept multiple ids: slash (`UR-001/005`), comma, or whitespace lists — run close once per open Issue. If none, report "close requires an Issue id (e.g. /do-work close UR-042)." and stop.
+3. **Existence follows active backend** (Load Config first): markdown → `user-requests/UR-NNN/input.md`; sqlite → `get-ur`; linear / do-work-io → `read_ur`. Never require local `user-requests/` when backend is not markdown. If config is missing/markdown-default but live do-work.io/Linear MCP already has this product, re-resolve backend before treating local trees as truth.
 4. Read [agents/close.md](../agents/close.md) in full.
 5. Follow the close agent instructions exactly. The close agent is dispatched as a fresh subagent — pass only the project do-work path, the Issue reference, and the merged branch.
 

@@ -263,3 +263,8 @@ bash {skill-root}/lib/dw-db.sh archive-req {root} REQ-001
 ```
 
 Gate state: edit `{root}/.do-work/state/gate-owner.md` only — never `dw-db` for gate ownership.
+
+## Field traps
+
+- **Archive gate:** before `archive-req`, set `closure_proof` via `update-req --closure-proof "…"` and flip body AC boxes `- [ ]` → `- [x]`. `archive-req` itself sets status `done`.
+- **Empty columns in multi-column CLI:** `dw-db` already uses `0x1e` record separators so bash `read` does not collapse empty fields — keep that pattern in any new multi-column sqlite filters.
