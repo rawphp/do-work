@@ -10,9 +10,9 @@ You operate in a fresh subagent session. You have no memory of prior REQs, prior
 
 The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
 
-| # | Step | Decision |
-|---|------|----------|
-| J2 | Step 8 (Footprint Verification) — footprint miss classification | Distinguish a legitimate adjacent file (test fixture, related helper, forgotten doc update) from genuine scope creep. If the extra staged path is clearly related to this REQ's stated task, continue-and-correct (update `**Files:**`, emit feedback). If it represents a new module or unrelated refactor outside the REQ's stated scope, return `status: stopped`, `reason: scope-creep`. |
+| #   | Step                                                            | Decision                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J2  | Step 8 (Footprint Verification) — footprint miss classification | Distinguish a legitimate adjacent file (test fixture, related helper, forgotten doc update) from genuine scope creep. If the extra staged path is clearly related to this REQ's stated task, continue-and-correct (update `**Files:**`, emit feedback). If it represents a new module or unrelated refactor outside the REQ's stated scope, return `status: stopped`, `reason: scope-creep`. |
 
 ---
 
@@ -68,10 +68,10 @@ Record the output as `<base-branch>`. Workers **do not** call `ensure-integratio
 
 Resolve names from the tracker backend (load path Step 0). **Linear issue ids are sanitized for git refs** (see `agents/tracker/linear.md` Branch sanitize / design §6.5).
 
-| Backend | Feature branch | Worktree directory |
-|---------|----------------|--------------------|
-| **markdown** | `req/REQ-NNN` (e.g. `req/REQ-117`) | `{project}/.worktrees/req-NNN` (e.g. `req-117`) |
-| **linear** | `req/<sanitized-linear-id>` (e.g. `req/ENG-123`) | `{project}/.worktrees/req-<sanitized-lower>` (e.g. `req-eng-123`, hard default) |
+| Backend      | Feature branch                                   | Worktree directory                                                              |
+| ------------ | ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| **markdown** | `req/REQ-NNN` (e.g. `req/REQ-117`)               | `{project}/.worktrees/req-NNN` (e.g. `req-117`)                                 |
+| **linear**   | `req/<sanitized-linear-id>` (e.g. `req/ENG-123`) | `{project}/.worktrees/req-<sanitized-lower>` (e.g. `req-eng-123`, hard default) |
 
 **Sanitize algorithm (Linear — REQ-295):** start from the Linear issue id (e.g. `ENG-123`); keep only `[A-Za-z0-9._-]`; map every other character to `-`; collapse consecutive `-`/`.`; strip leading/trailing `-`/`.`; if empty → hard-stop (do not invent a name). Branch = `req/<sanitized-id>` (preserve identifier case). Worktree dir **hard-defaults to lowercase** sanitized form (`req-eng-123`) for FS consistency — do not keep mixed-case worktree dirs.
 
@@ -137,6 +137,7 @@ Load config and resolve work-item storage before reading/updating REQs:
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -166,6 +167,7 @@ Load config and resolve work-item storage before reading/updating REQs:
 ### 1. Read the REQ
 
 Read the REQ file in full. Understand:
+
 - The Task
 - The Context
 - The Acceptance Criteria
@@ -206,11 +208,13 @@ Read the **context pack** (`.do-work/state/context-pack.md`, input 4) first — 
 Read the Issue `input.md` once for orientation.
 
 For each prior-REQ archived path you were given, read it and extract:
+
 - Task title (from the `# REQ-NNN:` heading)
 - Files created or modified (from the `## Outputs` section)
 - A one-line summary of what was built
 
 Keep this in mind during implementation so you do not:
+
 - Overwrite files a prior REQ created
 - Re-implement logic a prior REQ already built
 - Contradict decisions made in a prior REQ
@@ -219,10 +223,10 @@ If the prior-REQ list is empty, skip this substep.
 
 **Read the decisions memory (backend branch — REQ-297).** Standing decisions are **constraints** on your implementation, not advisory context — do not contradict one.
 
-| Backend | How to load |
-|---------|-------------|
-| **markdown** | Read `{project}/.do-work/decisions.md` if it exists |
-| **linear** | **Read decisions** helper in `agents/tracker/linear.md` — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing → empty. Do **not** use local `decisions.md` as the store |
+| Backend      | How to load                                                                                                                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown** | Read `{project}/.do-work/decisions.md` if it exists                                                                                                                                                      |
+| **linear**   | **Read decisions** helper in `agents/tracker/linear.md` — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing → empty. Do **not** use local `decisions.md` as the store |
 
 Grammar is identical either backend (SKILL.md § Decisions Memory): `YYYY-MM-DD | Issue/REQ ref | decision | rationale` (Linear issue ids may appear in the ref slot). If your REQ's task or acceptance criteria require you to act against a recorded decision line (e.g. the REQ asks you to add client-side validation but a decision line reads `... | validation lives server-side | ...`), do not silently override it — return `status: stopped` with `reason: scope-creep` (if the REQ pushes new behaviour past a standing boundary) or `reason: ambiguous-criteria` (if the REQ and the decision are in direct conflict and you cannot tell which governs), naming the specific decision line verbatim in your report details so the orchestrator can route it for human resolution. If the store is absent (no decision recorded yet), this substep is silently a no-op — never create the store just to read it.
 
@@ -243,9 +247,9 @@ Before writing any implementation code:
 
 1. Build a checklist of the form:
 
-   | # | Check | Command | Expected (FAIL) | Expected (PASS) |
-   |---|-------|---------|-----------------|-----------------|
-   | 1 | File exists at {path} | `test -f {path} && echo PASS \|\| echo FAIL` | FAIL | PASS |
+   | #   | Check                 | Command                                      | Expected (FAIL) | Expected (PASS) |
+   | --- | --------------------- | -------------------------------------------- | --------------- | --------------- |
+   | 1   | File exists at {path} | `test -f {path} && echo PASS \|\| echo FAIL` | FAIL            | PASS            |
 
 2. Run every check command. ALL must return the FAIL condition. If any check already passes, the red-green discipline is broken — investigate before proceeding.
 
@@ -278,12 +282,12 @@ Check whether the implementation broke existing tests:
 1. Run `git diff --name-only` to list files modified by this REQ
 2. For each changed file, look for related test files using common naming conventions:
 
-   | Source file pattern | Test file candidates |
-   |---|---|
-   | `src/Foo.php` | `tests/FooTest.php`, `tests/Unit/FooTest.php`, `tests/Feature/FooTest.php` |
-   | `app/Models/Foo.php` | `tests/Unit/Models/FooTest.php` |
-   | `src/foo.ts` | `src/foo.test.ts`, `__tests__/foo.test.ts` |
-   | `src/components/Foo.vue` | `src/components/Foo.test.ts` |
+   | Source file pattern      | Test file candidates                                                       |
+   | ------------------------ | -------------------------------------------------------------------------- |
+   | `src/Foo.php`            | `tests/FooTest.php`, `tests/Unit/FooTest.php`, `tests/Feature/FooTest.php` |
+   | `app/Models/Foo.php`     | `tests/Unit/Models/FooTest.php`                                            |
+   | `src/foo.ts`             | `src/foo.test.ts`, `__tests__/foo.test.ts`                                 |
+   | `src/components/Foo.vue` | `src/components/Foo.test.ts`                                               |
 
 3. Exclude test files already run in step 3c
 4. If related tests are found, run them. If any fail, fix the implementation and re-run until green.
@@ -300,12 +304,12 @@ Review each acceptance criterion in the REQ. Mark each `- [x]` as you verify it.
 
 Read `## Verification Steps` from the REQ. Execute each step in order:
 
-| Type | How to execute |
-|------|---------------|
-| `test` | Bash: run the command, check exit code 0 / matching output |
-| `build` | Bash: run the build command, check exit code 0 and no errors |
+| Type      | How to execute                                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `test`    | Bash: run the command, check exit code 0 / matching output                                                               |
+| `build`   | Bash: run the build command, check exit code 0 and no errors                                                             |
 | `runtime` | Ensure the dev server is running (start in background if not, wait healthy), run the command, compare output to expected |
-| `ui` | **Playwright screenshot + vision assert (mandatory visual check).** See **UI screenshot contract** below. |
+| `ui`      | **Playwright screenshot + vision assert (mandatory visual check).** See **UI screenshot contract** below.                |
 
 Record the result of each step in an ordered checkpoint log. Each checkpoint entry must include `step`, `total`, `type`, command/action, expected result, pass/fail status, and a short actual-output summary. If the step crosses a boundary, include the handoff name (for example `input -> persistence`, `API -> render`, or `command -> file`).
 
@@ -338,7 +342,7 @@ If Playwright (or a usable browser binary) cannot run in this worktree, a `ui` s
 
 **Heartbeat checkpoint:** after each verification step, stamp the heartbeat — `{skill-root}/lib/heartbeat.sh "$REQ_PATH"` — so a long verification sequence never lets the slot drift stale.
 
-**Deferred checkpoint status.** Some verification steps are *inherently* non-executable in a worktree — not because the implementation is wrong, but because running them is structurally impossible regardless of retries:
+**Deferred checkpoint status.** Some verification steps are _inherently_ non-executable in a worktree — not because the implementation is wrong, but because running them is structurally impossible regardless of retries:
 
 - **`human`** — the step explicitly requires human judgment or confirmation ("Confirm the badge looks correct", "Ask the user to approve").
 - **`device`** — the step requires a physical device or external hardware not available in the worktree (mobile device, IoT sensor, etc.).
@@ -354,12 +358,14 @@ When you encounter a genuinely non-executable step (`human`, `device`, or `envir
 4. Continue to Step 7 and return `status: done`. The code merges, the REQ archives as done, and the un-run suite becomes explicit advisory follow-up outside the blocking closure path — but the `**Suite:** not-run` marker makes `lib/derive-status.sh` derive the REQ `unproven` until the suite actually runs. The documented stopper-reason enum is unchanged; no new stopper is introduced.
 
 **Critical distinction — deferred vs. failing:**
-- A step that is *executable* but currently failing (test red, endpoint 500s, build broken) is **not** eligible for deferral. It follows the normal retry path and, after 3 retries, returns `verification-failing`.
-- Deferral is only for steps that *no retry could ever make executable* in this worktree. If you are unsure, attempt the step at least once before classifying it as deferred.
+
+- A step that is _executable_ but currently failing (test red, endpoint 500s, build broken) is **not** eligible for deferral. It follows the normal retry path and, after 3 retries, returns `verification-failing`.
+- Deferral is only for steps that _no retry could ever make executable_ in this worktree. If you are unsure, attempt the step at least once before classifying it as deferred.
 
 **If all non-deferred steps pass:** proceed to step 7 (even if some steps were deferred — deferred steps do not block progress).
 
 **If any non-deferred step fails:**
+
 1. Note which step failed, expected vs actual, and the last good checkpoint before the failure.
 2. Increment a retry counter
 3. If retry count < 3: go back to step 3b (implement) with the failure as context — fix the root cause, not the test
@@ -424,12 +430,13 @@ This DOES NOT block the commit. Footprint declarations evolve with reality, and 
 
 The categories that should appear in your commit:
 
-| Category | What to stage | Path pattern |
-|---|---|---|
-| Implementation files | Source files this REQ changed | Anywhere in the repo, listed explicitly |
+| Category                        | What to stage                                                                   | Path pattern                              |
+| ------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------- |
+| Implementation files            | Source files this REQ changed                                                   | Anywhere in the repo, listed explicitly   |
 | UR-owned artifacts (if touched) | Files this REQ created under its UR directory (e.g. ideate.md, captured assets) | `.do-work/user-requests/UR-NNN/REQ-NNN-*` |
 
 Forbidden to stage:
+
 - Any `.do-work/working/REQ-*.md` — that's orchestrator state; orchestrator commits the working→archive move on the main checkout after merge.
 - Any `.do-work/archive/REQ-*.md` — same, orchestrator-owned.
 - `.do-work/state/*` — orchestrator-owned.
@@ -457,10 +464,10 @@ Output: path/to/primary/output"
 
 **Commit message by tracker backend (REQ-294 / design §6.5):**
 
-| Backend | Subject | Footer |
-|---------|---------|--------|
-| **markdown** | `feat(REQ-NNN): short title` | `REQ:` working path; `UR:` input path; `Output:` primary path |
-| **linear** | `feat(ENG-123): short title` (Linear issue id) | `Issue: ENG-123`; `UR: UR-NNN` when known; `Output:` primary path — **no** `.do-work/archive/REQ-…` path required |
+| Backend      | Subject                                        | Footer                                                                                                            |
+| ------------ | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **markdown** | `feat(REQ-NNN): short title`                   | `REQ:` working path; `UR:` input path; `Output:` primary path                                                     |
+| **linear**   | `feat(ENG-123): short title` (Linear issue id) | `Issue: ENG-123`; `UR: UR-NNN` when known; `Output:` primary path — **no** `.do-work/archive/REQ-…` path required |
 
 **Branch naming (REQ-295):** under Linear, the worktree branch **is** `req/<sanitized-linear-id>` (W2). Feature-branch isolation is unchanged. Never use `req/REQ-NNN` naming when the active backend is `linear`.
 
@@ -513,10 +520,10 @@ The worker must **never** edit a file that contains conflict markers (`<<<<<<<`,
 
 ### Exit conditions
 
-| Outcome | Action |
-|---|---|
-| Success on attempt N (1 ≤ N ≤ 5) | Capture the commit hash; proceed to the existing Step 8 epilogue; record `retry_count: N-1` in the Return Report (0 means first attempt succeeded) |
-| Failure after attempt 5 | Emit feedback (best-effort, non-blocking — see below), then return `status: stopped`, `reason: concurrent-conflict`, `retry_count: 5`, with `details` listing the branch, last git stderr, and conflicting paths |
+| Outcome                          | Action                                                                                                                                                                                                           |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Success on attempt N (1 ≤ N ≤ 5) | Capture the commit hash; proceed to the existing Step 8 epilogue; record `retry_count: N-1` in the Return Report (0 means first attempt succeeded)                                                               |
+| Failure after attempt 5          | Emit feedback (best-effort, non-blocking — see below), then return `status: stopped`, `reason: concurrent-conflict`, `retry_count: 5`, with `details` listing the branch, last git stderr, and conflicting paths |
 
 ### Feedback on 5-retry exhaustion
 
@@ -537,7 +544,7 @@ bash {skill-root}/lib/file-feedback.sh concurrent-conflict \
   || true
 ```
 
-> **JUDGMENT:** Title and body should signal *which REQ* and *that 5 retries were used* without naming the conflicting paths verbatim (the fingerprint already captures them via hash). The body's one sentence is for the human triaging the inbox — they want "is this a real coordination hotspot or a one-off race?" Trend signal beats incident detail.
+> **JUDGMENT:** Title and body should signal _which REQ_ and _that 5 retries were used_ without naming the conflicting paths verbatim (the fingerprint already captures them via hash). The body's one sentence is for the human triaging the inbox — they want "is this a real coordination hotspot or a one-off race?" Trend signal beats incident detail.
 
 ---
 
@@ -547,51 +554,53 @@ When you exit, your final message must be a fenced YAML block matching this sche
 
 ```yaml
 req: REQ-NNN
-status: done            # or "stopped" or "failed"
-commit: abcdef1         # short hash, only when status: done
-reason: ""              # required when status is "stopped" or "failed"
-                        # one of: tests-failing, verification-failing,
-                        #         missing-creds, ambiguous-criteria,
-                        #         scope-creep, dependency-missing,
-                        #         unknown-error, concurrent-conflict
-details: ""             # free-text context for the orchestrator/user
-isolation: worktree     # unconditional — same-branch mode is retired
-closure_proof: ""       # non-empty only when status: done; references checkpoint_log and commit
-last_good_step: 0       # highest verification checkpoint that passed before failure; total count when all pass
-failed_step: 0          # failing checkpoint number; 0 when status: done
+status: done # or "stopped" or "failed"
+commit: abcdef1 # short hash, only when status: done
+reason:
+  '' # required when status is "stopped" or "failed"
+  # one of: tests-failing, verification-failing,
+  #         missing-creds, ambiguous-criteria,
+  #         scope-creep, dependency-missing,
+  #         unknown-error, concurrent-conflict
+details: '' # free-text context for the orchestrator/user
+isolation: worktree # unconditional — same-branch mode is retired
+closure_proof: '' # non-empty only when status: done; references checkpoint_log and commit
+last_good_step: 0 # highest verification checkpoint that passed before failure; total count when all pass
+failed_step: 0 # failing checkpoint number; 0 when status: done
 checkpoint_log:
-  status: passed        # or "failed"
+  status: passed # or "failed"
   checkpoints:
     - step: 1
       total: 1
       type: test
-      command: ""
-      expected: ""
-      actual: ""
-      status: passed    # or "deferred" for inherently non-executable steps
-      handoff: ""
-deferred_checks: []  # list of deferred verification steps; empty list when nothing deferred
-                     # each entry: { step: "<step text>", category: human|device|environment|suite-not-run, reason: "<why>" }
-                     # human/device/environment are advisory only and never affect proven-ness.
-                     # suite-not-run is reserved for the W3.5-unprovisionable path (Step 6) and is the
-                     # only category that makes the orchestrator stamp `**Suite:** not-run` on archive.
-                     # example: [{ step: "Confirm badge renders on user's phone", category: device,
-                     #              reason: "Requires physical iOS device not available in worktree" }]
+      command: ''
+      expected: ''
+      actual: ''
+      status: passed # or "deferred" for inherently non-executable steps
+      handoff: ''
+deferred_checks: [] # list of deferred verification steps; empty list when nothing deferred
+  # each entry: { step: "<step text>", category: human|device|environment|suite-not-run, reason: "<why>" }
+  # human/device/environment are advisory only and never affect proven-ness.
+  # suite-not-run is reserved for the W3.5-unprovisionable path (Step 6) and is the
+  # only category that makes the orchestrator stamp `**Suite:** not-run` on archive.
+  # example: [{ step: "Confirm badge renders on user's phone", category: device,
+  #              reason: "Requires physical iOS device not available in worktree" }]
 acceptance:
   AC1:
     status: passed
     evidence:
-      - type: test       # one of test, command, file, runtime_check, ui
-        ref: ""          # for type: ui, ref MUST be the ui-evidence PNG path (file must exist)
+      - type: test # one of test, command, file, runtime_check, ui
+        ref: '' # for type: ui, ref MUST be the ui-evidence PNG path (file must exist)
 milestone_complete: false
-milestone: ""           # active milestone id when milestone_complete is true
-retry_count: 0          # integer — number of conflict retries consumed (0 = no retries)
+milestone: '' # active milestone id when milestone_complete is true
+retry_count: 0 # integer — number of conflict retries consumed (0 = no retries)
 outputs:
   - path: path/to/file
     description: one line
 ```
 
 Field rules:
+
 - `status: done` → `commit` must be set; `reason` empty
 - `status: done` → `closure_proof` must be non-empty and reference the checkpoint log plus completing commit (for example `checkpoint_log:passed commit:abcdef1`)
 - `status: done` requires every acceptance criterion to carry `status: passed` with evidence — acceptance criteria can never be deferred. A REQ whose only AC is human-judgment-based has genuinely ambiguous criteria and must return `reason: ambiguous-criteria`, not defer the AC.
@@ -620,7 +629,6 @@ Field rules:
 - **Stop on ambiguity.** If acceptance criteria are genuinely ambiguous, return `status: stopped` with `reason: ambiguous-criteria`. Do not guess.
 - **Worktree teardown belongs to the orchestrator.** Workers MUST NOT run `git worktree remove` or `git branch -d`. After you return `status: done`, the orchestrator merges the feature branch, archives the REQ, and tears down the worktree. Running teardown from the worker double-deletes the worktree and can corrupt the orchestrator's post-merge steps.
 - **Never invent stopper reasons.** The canonical source for the stop-reason vocabulary is `lib/stop-reasons.sh` (established in REQ-007); the worker's reasons are exactly its `--worker` subset, and the inline list below MUST stay in sync with `bash {skill-root}/lib/stop-reasons.sh --worker`. The `reason` field in a stopped/failed report MUST be one of the documented enum values: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`. Do not improvise values outside this list (for example `awaiting-human-verification` is not a valid reason — if the worker hits an inherently non-executable verification step, use `status: deferred` in the checkpoint log and add the step to `deferred_checks:` so the orchestrator can route it into advisory archive data, then continue toward `status: done`). Inventing reasons outside the enum breaks downstream tooling (status, resume, unblock commands) that pattern-matches on these values.
-
 
 ## Field traps (from field-lessons)
 

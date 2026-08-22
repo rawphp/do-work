@@ -26,9 +26,9 @@ Your brief
 
 **Two-command surface**
 
-| Command | Role |
-|---------|------|
-| `/do-work start …` | Define work: intake → ideate (default) → capture |
+| Command              | Role                                                         |
+| -------------------- | ------------------------------------------------------------ |
+| `/do-work start …`   | Define work: intake → ideate (default) → capture             |
 | `/do-work go UR-NNN` | Execute work: verify → audit → run (then optional close/log) |
 
 Granular commands (`intake`, `capture`, `verify`, `run`, …) are the same building blocks; `start` and `go` chain them with defaults and human gates.
@@ -79,9 +79,9 @@ On `start` (unless `--no-ideate`), ideate ends with:
 
 Default threshold: **`verify.threshold: 90`** in `.do-work/config.yml`.
 
-| Outcome | Behaviour |
-|---------|-----------|
-| Score ≥ threshold | Proceed to audit + run |
+| Outcome           | Behaviour                                                     |
+| ----------------- | ------------------------------------------------------------- |
+| Score ≥ threshold | Proceed to audit + run                                        |
 | Score < threshold | Halt; show gaps (unless `--force` or successful `--auto-fix`) |
 
 ### Layers

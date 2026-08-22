@@ -23,48 +23,48 @@ Work-item storage is pluggable (`tracker.backend`: **markdown** default, **linea
 
 Most days you only need these:
 
-| Command | What it does |
-|---------|-------------|
-| `/do-work start [brief]` | Record a brief and build the REQ backlog (ideate on by default; auto-installs). |
-| `/do-work go [UR-NNN]` | Verify coverage, then audit + run when confidence ≥ threshold (default 90%). Issue slug is still `UR-NNN`. |
-| `/do-work status [UR-NNN]` | Live situation room: in-flight, backlog, recent done, coverage. |
-| `/do-work board` | Regenerate static HTML board from work.db (sqlite only). |
-| `/do-work` | Help + suggested next steps for this project. |
+| Command                    | What it does                                                                                               |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `/do-work start [brief]`   | Record a brief and build the REQ backlog (ideate on by default; auto-installs).                            |
+| `/do-work go [UR-NNN]`     | Verify coverage, then audit + run when confidence ≥ threshold (default 90%). Issue slug is still `UR-NNN`. |
+| `/do-work status [UR-NNN]` | Live situation room: in-flight, backlog, recent done, coverage.                                            |
+| `/do-work board`           | Regenerate static HTML board from work.db (sqlite only).                                                   |
+| `/do-work`                 | Help + suggested next steps for this project.                                                              |
 
 Flags for start/go (`--no-ideate`, `--force`, `--auto-fix`, …) are in the full table below.
 
 ## Quick Reference
 
-| Command | What it does |
-|---------|-------------|
-| `/do-work start [brief]` | Records brief + decomposes into REQs in one shot. Includes ideate by default. Auto-installs if needed. |
-| `/do-work start [brief] --no-ideate` | Same as start, but skips the creativity review before decomposition. |
-| `/do-work start [brief] --no-layers` | Same as start, but skips layer-coverage checks for this Issue (records `layers_in_scope: []`). |
-| `/do-work go [UR-NNN]` | Verifies coverage, auto-runs if >= 90% confidence. |
-| `/do-work go [UR-NNN] --force` | Verifies + runs regardless of confidence score. |
-| `/do-work go [UR-NNN] --auto-fix` | Verifies, auto-fixes gaps, then runs if >= 90%. |
-| `/do-work go [UR-NNN] --no-layers` | Verify + run, skipping layer-coverage checks for this Issue. |
-| `/do-work install` | Creates `.do-work/` structure in current project. |
-| `/do-work upgrade` | Brings the project's .do-work/ state into conformance with the current skill — runs the manifest's detectors and applies fixes (interactive confirmation on destructive rows). Idempotent. |
-| `/do-work intake [brief]` | Records brief verbatim as next Issue (slug `UR-NNN`). |
-| `/do-work capture [UR-NNN]` | Decomposes an Issue brief into REQ files in the backlog. |
-| `/do-work question [UR-NNN]` | Grills you about your brief — extracts assumptions, gaps, constraints. |
-| `/do-work audit [UR-NNN]` | Interrogates REQ quality — auto-fixes soft spots, reports changes. |
-| `/do-work ideate [UR-NNN]` | Surfaces assumptions, risks, and connections in a brief. |
-| `/do-work verify [UR-NNN]` | Scores REQ coverage against brief (0-100%), lists gaps. |
-| `/do-work verify [UR-NNN] --auto-fix` | Verify + auto-create missing REQs. |
-| `/do-work run [UR-NNN]` | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional `UR-NNN` scopes the run to that Issue's REQs only. |
-| `/do-work run [UR-NNN] --parallel N` | Single-session parallel mode: one terminal dispatches up to N concurrent workers (default 1 = serial, capped at 10), serializing merge/archive through a queue. Defaults from `parallel.max_workers`. |
+| Command                                   | What it does                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/do-work start [brief]`                  | Records brief + decomposes into REQs in one shot. Includes ideate by default. Auto-installs if needed.                                                                                                                                                                                        |
+| `/do-work start [brief] --no-ideate`      | Same as start, but skips the creativity review before decomposition.                                                                                                                                                                                                                          |
+| `/do-work start [brief] --no-layers`      | Same as start, but skips layer-coverage checks for this Issue (records `layers_in_scope: []`).                                                                                                                                                                                                |
+| `/do-work go [UR-NNN]`                    | Verifies coverage, auto-runs if >= 90% confidence.                                                                                                                                                                                                                                            |
+| `/do-work go [UR-NNN] --force`            | Verifies + runs regardless of confidence score.                                                                                                                                                                                                                                               |
+| `/do-work go [UR-NNN] --auto-fix`         | Verifies, auto-fixes gaps, then runs if >= 90%.                                                                                                                                                                                                                                               |
+| `/do-work go [UR-NNN] --no-layers`        | Verify + run, skipping layer-coverage checks for this Issue.                                                                                                                                                                                                                                  |
+| `/do-work install`                        | Creates `.do-work/` structure in current project.                                                                                                                                                                                                                                             |
+| `/do-work upgrade`                        | Brings the project's .do-work/ state into conformance with the current skill — runs the manifest's detectors and applies fixes (interactive confirmation on destructive rows). Idempotent.                                                                                                    |
+| `/do-work intake [brief]`                 | Records brief verbatim as next Issue (slug `UR-NNN`).                                                                                                                                                                                                                                         |
+| `/do-work capture [UR-NNN]`               | Decomposes an Issue brief into REQ files in the backlog.                                                                                                                                                                                                                                      |
+| `/do-work question [UR-NNN]`              | Grills you about your brief — extracts assumptions, gaps, constraints.                                                                                                                                                                                                                        |
+| `/do-work audit [UR-NNN]`                 | Interrogates REQ quality — auto-fixes soft spots, reports changes.                                                                                                                                                                                                                            |
+| `/do-work ideate [UR-NNN]`                | Surfaces assumptions, risks, and connections in a brief.                                                                                                                                                                                                                                      |
+| `/do-work verify [UR-NNN]`                | Scores REQ coverage against brief (0-100%), lists gaps.                                                                                                                                                                                                                                       |
+| `/do-work verify [UR-NNN] --auto-fix`     | Verify + auto-create missing REQs.                                                                                                                                                                                                                                                            |
+| `/do-work run [UR-NNN]`                   | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional `UR-NNN` scopes the run to that Issue's REQs only.                                                                                                                                          |
+| `/do-work run [UR-NNN] --parallel N`      | Single-session parallel mode: one terminal dispatches up to N concurrent workers (default 1 = serial, capped at 10), serializing merge/archive through a queue. Defaults from `parallel.max_workers`.                                                                                         |
 | `/do-work run [UR-NNN] --budget <amount>` | Caps cumulative estimated model spend for the run; overrides `cost.budget` for this invocation. When estimated spend reaches the budget, the loop finishes the in-flight REQ's integration then stops at the next REQ boundary with a budget-stop report. Empty budget = unlimited (default). |
-| `/do-work review` | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md. |
-| `/do-work status [UR-NNN]` | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report. |
-| `/do-work board` | Regenerate static HTML board from work.db (sqlite only). |
-| `/do-work close UR-NNN` | Validates the integrated result of an Issue against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report. |
-| `/do-work retro` | Mines the run ledger and feedback fingerprints to produce a human report and regenerate `.do-work/state/calibration.md` — advisory capture guidance derived from historical patterns. |
-| `/do-work unblock REQ-NNN` | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status. |
-| `/do-work resume REQ-NNN` | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat. |
-| `/do-work log` | Generates build-in-public draft posts for configured platforms. |
-| `/do-work` | Show this help. |
+| `/do-work review`                         | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md.                                                                                                                                           |
+| `/do-work status [UR-NNN]`                | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report.                                                                                                                                                           |
+| `/do-work board`                          | Regenerate static HTML board from work.db (sqlite only).                                                                                                                                                                                                                                      |
+| `/do-work close UR-NNN`                   | Validates the integrated result of an Issue against its verbatim brief — walks every path-unit's entry point to its terminal state in the merged app and writes a closure report.                                                                                                             |
+| `/do-work retro`                          | Mines the run ledger and feedback fingerprints to produce a human report and regenerate `.do-work/state/calibration.md` — advisory capture guidance derived from historical patterns.                                                                                                         |
+| `/do-work unblock REQ-NNN`                | Forces a stuck REQ out of working/ back to the backlog — strips claim stamp, resets status.                                                                                                                                                                                                   |
+| `/do-work resume REQ-NNN`                 | Re-dispatches a fresh worker for a stopped REQ — preserves claim, refreshes heartbeat.                                                                                                                                                                                                        |
+| `/do-work log`                            | Generates build-in-public draft posts for configured platforms.                                                                                                                                                                                                                               |
+| `/do-work`                                | Show this help.                                                                                                                                                                                                                                                                               |
 
 Deep per-subcommand stubs (install bootstrap template, flag wiring, pre-flight notes): [references/commands.md](references/commands.md).
 
@@ -109,24 +109,24 @@ Run ledger: when `ledger.enabled: true`, `/do-work run` writes append-only `.do-
 
 Full multi-backend deep dive: [references/tracker.md](references/tracker.md).
 
-| `tracker.backend` | Behavior |
-|-------------------|----------|
-| **unset / empty / missing** | Treat as **`markdown`** — no hard-stop, no Linear/`sqlite3` required |
-| **`markdown`** | Default: local `.do-work/` files + `lib/*.sh` |
-| **`linear`** | Linear is the sole work-item store |
-| **`sqlite`** | `.do-work/work.db` is the sole work-item store (`lib/dw-db.sh`) |
-| **`do-work-io`** | do-work.io is the sole work-item store (remote MCP; hard-stop if MCP/PAT/project unusable) |
+| `tracker.backend`           | Behavior                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| **unset / empty / missing** | Treat as **`markdown`** — no hard-stop, no Linear/`sqlite3` required                       |
+| **`markdown`**              | Default: local `.do-work/` files + `lib/*.sh`                                              |
+| **`linear`**                | Linear is the sole work-item store                                                         |
+| **`sqlite`**                | `.do-work/work.db` is the sole work-item store (`lib/dw-db.sh`)                            |
+| **`do-work-io`**            | do-work.io is the sole work-item store (remote MCP; hard-stop if MCP/PAT/project unusable) |
 
 **Load path** (every phase that touches work items): (1) [agents/config.md](agents/config.md), (2) resolve `tracker.backend` (default **markdown**; also accepts **linear**, **sqlite**, and **do-work-io**), (3) [agents/tracker/port.md](agents/tracker/port.md), (4) `agents/tracker/<backend>.md`, (5) call only named port ops for storage.
 
 **Hard-stop (no silent fallback):** when the **active** backend is unusable, agents **hard-stop** with setup instructions — they never fall through to another backend:
 
-| Backend | Hard-stop when |
-|---------|----------------|
-| **linear** | MCP missing/unauthenticated, team unresolved, missing `status_map` state, or `agents/tracker/linear.md` missing/unreadable |
-| **sqlite** | `sqlite3` missing, `agents/tracker/sqlite.md` missing/unreadable, DB corrupt / bad `user_version` (never markdown fallback) |
-| **do-work-io** | MCP missing/unauthenticated, PAT/base_url/project missing, or `agents/tracker/do-work-io.md` missing/unreadable |
-| **any** | Unknown `tracker.backend` string; skill-root cannot be resolved at entry or Load Config step 8 |
+| Backend        | Hard-stop when                                                                                                              |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **linear**     | MCP missing/unauthenticated, team unresolved, missing `status_map` state, or `agents/tracker/linear.md` missing/unreadable  |
+| **sqlite**     | `sqlite3` missing, `agents/tracker/sqlite.md` missing/unreadable, DB corrupt / bad `user_version` (never markdown fallback) |
+| **do-work-io** | MCP missing/unauthenticated, PAT/base_url/project missing, or `agents/tracker/do-work-io.md` missing/unreadable             |
+| **any**        | Unknown `tracker.backend` string; skill-root cannot be resolved at entry or Load Config step 8                              |
 
 Canonical contract: `agents/tracker/port.md` hard-stop matrix + Load Config steps 6–7c / 8 in `agents/config.md`.
 
@@ -230,11 +230,11 @@ No subcommand → print Quick Reference, then follow [agents/help.md](agents/hel
 
 Load only when the active task needs them (one hop from this file):
 
-| Reference | When |
-|-----------|------|
-| [references/commands.md](references/commands.md) | Executing a subcommand; install bootstrap YAML; full step stubs |
-| [references/tracker.md](references/tracker.md) | Configuring or debugging multi-tracker / Linear keys, claims, commits |
-| [references/concepts.md](references/concepts.md) | Naming, milestone mode, parallel coordination, layers, path-units, decisions, REQ header schema, commit convention, checkpointed verification |
+| Reference                                                  | When                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [references/commands.md](references/commands.md)           | Executing a subcommand; install bootstrap YAML; full step stubs                                                                                                                                                                            |
+| [references/tracker.md](references/tracker.md)             | Configuring or debugging multi-tracker / Linear keys, claims, commits                                                                                                                                                                      |
+| [references/concepts.md](references/concepts.md)           | Naming, milestone mode, parallel coordination, layers, path-units, decisions, REQ header schema, commit convention, checkpointed verification                                                                                              |
 | [references/field-lessons.md](references/field-lessons.md) | Start of a skill run (read); end of run append **only** if **“Will this improve do-work?”** is Yes (skill process for the next run). Product/repo lessons → project via session-capture, never here. Always read before acting if present. |
 
 Recovery (stuck / stopped / deadlock): `/do-work unblock`, `/do-work resume`, `/do-work status` — see agent files and [references/concepts.md](references/concepts.md#recovery-commands).

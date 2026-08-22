@@ -55,31 +55,31 @@ Operators want:
 
 ## 4. Decisions (locked)
 
-| Decision | Choice |
-|----------|--------|
-| Approach | **A:** SQLite sole store + static HTML board |
-| Backend name | `tracker.backend: sqlite` |
-| Default backend | Still **markdown** (opt-in sqlite) |
-| Integration | **One port** — `port.md` + `agents/tracker/{markdown,linear,sqlite}.md` |
-| Store path | `{project}/.do-work/work.db` (configurable) |
-| Migration | **None in v1** — empty DB from switch forward |
-| Board | Static HTML; **`/do-work board` only** |
-| Board scope | **sqlite only** in v1 |
-| Remote | Deferred |
-| External ids | **Slugs only** (`UR-NNN`, `REQ-NNN`) at agent/CLI/commit surface; integer PKs internal |
-| REQ body | **Single `body` markdown** with fixed section headings (parity with capture template) |
-| Claim atomicity | SQLite **transaction** + unique active claim constraint |
-| Coordination surface | **Single CLI** `lib/dw-db.sh` (or `lib/dw-db`) — not freehand SQL in agents |
-| Runtime dependency | **`sqlite3` CLI** on PATH (system SQLite) — no Python/Node required for v1 store ops |
-| Git | **`work.db`, `work.db-*`, `board/` gitignored** — install/upgrade **must** add rules when missing |
-| Status storage enum | DB stores `in_progress` (underscore); CLI/agents accept `in_progress` **or** `in-progress` on input; **never** write hyphen form into DB |
-| Milestone cursor | **Per-UR** (`milestone_state.ur_id` UNIQUE) — not product-wide single file |
-| Stale takeover | In one transaction: **UPDATE** active → `released`, then **INSERT** new active (history preserved) |
-| Cross-UR deps | **Allowed** (markdown parity); resolve by slug |
-| Dual-write | **Never** while backend is sqlite |
-| Unusable DB | **Hard-stop** — never silent markdown or Linear fallback |
-| Evidence paths | Local non-DB: `.do-work/evidence/UR-NNN/{ui,closure}-evidence/` — not under `user-requests/` |
-| Runtime / git | worktrees, merges, `state/*` locks, config, optional ledger telemetry stay local |
+| Decision             | Choice                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Approach             | **A:** SQLite sole store + static HTML board                                                                                             |
+| Backend name         | `tracker.backend: sqlite`                                                                                                                |
+| Default backend      | Still **markdown** (opt-in sqlite)                                                                                                       |
+| Integration          | **One port** — `port.md` + `agents/tracker/{markdown,linear,sqlite}.md`                                                                  |
+| Store path           | `{project}/.do-work/work.db` (configurable)                                                                                              |
+| Migration            | **None in v1** — empty DB from switch forward                                                                                            |
+| Board                | Static HTML; **`/do-work board` only**                                                                                                   |
+| Board scope          | **sqlite only** in v1                                                                                                                    |
+| Remote               | Deferred                                                                                                                                 |
+| External ids         | **Slugs only** (`UR-NNN`, `REQ-NNN`) at agent/CLI/commit surface; integer PKs internal                                                   |
+| REQ body             | **Single `body` markdown** with fixed section headings (parity with capture template)                                                    |
+| Claim atomicity      | SQLite **transaction** + unique active claim constraint                                                                                  |
+| Coordination surface | **Single CLI** `lib/dw-db.sh` (or `lib/dw-db`) — not freehand SQL in agents                                                              |
+| Runtime dependency   | **`sqlite3` CLI** on PATH (system SQLite) — no Python/Node required for v1 store ops                                                     |
+| Git                  | **`work.db`, `work.db-*`, `board/` gitignored** — install/upgrade **must** add rules when missing                                        |
+| Status storage enum  | DB stores `in_progress` (underscore); CLI/agents accept `in_progress` **or** `in-progress` on input; **never** write hyphen form into DB |
+| Milestone cursor     | **Per-UR** (`milestone_state.ur_id` UNIQUE) — not product-wide single file                                                               |
+| Stale takeover       | In one transaction: **UPDATE** active → `released`, then **INSERT** new active (history preserved)                                       |
+| Cross-UR deps        | **Allowed** (markdown parity); resolve by slug                                                                                           |
+| Dual-write           | **Never** while backend is sqlite                                                                                                        |
+| Unusable DB          | **Hard-stop** — never silent markdown or Linear fallback                                                                                 |
+| Evidence paths       | Local non-DB: `.do-work/evidence/UR-NNN/{ui,closure}-evidence/` — not under `user-requests/`                                             |
+| Runtime / git        | worktrees, merges, `state/*` locks, config, optional ledger telemetry stay local                                                         |
 
 ---
 
@@ -100,14 +100,14 @@ Operators want:
 
 **VCS policy (locked):**
 
-| Path | Git |
-|------|-----|
-| `.do-work/work.db` | **gitignore** (binary, machine-local) |
-| `.do-work/work.db-*` (WAL/SHM) | **gitignore** |
-| `.do-work/board/` | **gitignore** (regenerable snapshot) |
-| `.do-work/evidence/` | **gitignore** recommended (screenshots/binaries) |
-| `.do-work/config.yml` | tracked as today |
-| `.do-work/state/` | as today (project convention) |
+| Path                           | Git                                              |
+| ------------------------------ | ------------------------------------------------ |
+| `.do-work/work.db`             | **gitignore** (binary, machine-local)            |
+| `.do-work/work.db-*` (WAL/SHM) | **gitignore**                                    |
+| `.do-work/board/`              | **gitignore** (regenerable snapshot)             |
+| `.do-work/evidence/`           | **gitignore** recommended (screenshots/binaries) |
+| `.do-work/config.yml`          | tracked as today                                 |
+| `.do-work/state/`              | as today (project convention)                    |
 
 **Install / upgrade must** add ignore rules for `work.db`, `work.db-*`, and `board/` when missing (not optional). Evidence gitignore is recommended in the same templates.
 
@@ -115,13 +115,13 @@ Operators want:
 
 **Resolve `tracker.backend` (config Load Config + `port.md` — must be edited):**
 
-| Stored value | Effective backend |
-|--------------|-------------------|
-| missing / null / empty / whitespace | `markdown` |
-| `markdown` | `markdown` |
-| `linear` | `linear` |
-| `sqlite` | `sqlite` |
-| anything else | **hard-stop** unknown backend (do not guess) |
+| Stored value                        | Effective backend                            |
+| ----------------------------------- | -------------------------------------------- |
+| missing / null / empty / whitespace | `markdown`                                   |
+| `markdown`                          | `markdown`                                   |
+| `linear`                            | `linear`                                     |
+| `sqlite`                            | `sqlite`                                     |
+| anything else                       | **hard-stop** unknown backend (do not guess) |
 
 **Then:**
 
@@ -131,22 +131,22 @@ Operators want:
 
 ### 5.3 Hard-stop matrix (generalized — B1)
 
-| Condition | markdown | linear | sqlite |
-|-----------|----------|--------|--------|
-| Backend doc missing | n/a (default file always present) | hard-stop | hard-stop |
-| MCP / team / status_map fail | n/a | hard-stop | n/a |
-| DB corrupt / unreadable | n/a | n/a | hard-stop |
-| Schema version unsupported | n/a | n/a | hard-stop |
-| Lock timeout after retries | n/a | n/a | hard-stop or concurrent-conflict (claim races) |
-| Mid-flight after successful claim | leave claimed | leave claimed | leave claimed (active claims row) |
-| Fallback to another backend | never | never | never |
+| Condition                         | markdown                          | linear        | sqlite                                         |
+| --------------------------------- | --------------------------------- | ------------- | ---------------------------------------------- |
+| Backend doc missing               | n/a (default file always present) | hard-stop     | hard-stop                                      |
+| MCP / team / status_map fail      | n/a                               | hard-stop     | n/a                                            |
+| DB corrupt / unreadable           | n/a                               | n/a           | hard-stop                                      |
+| Schema version unsupported        | n/a                               | n/a           | hard-stop                                      |
+| Lock timeout after retries        | n/a                               | n/a           | hard-stop or concurrent-conflict (claim races) |
+| Mid-flight after successful claim | leave claimed                     | leave claimed | leave claimed (active claims row)              |
+| Fallback to another backend       | never                             | never         | never                                          |
 
 `port.md` must stop describing hard-stop as **Linear-only**. Shared rule: **unusable active backend → hard-stop; never silent fallback.**
 
 ### 5.4 Work-item vs runtime
 
-| In `work.db` (sqlite mode) | Always local runtime (not port sole-store) |
-|----------------------------|--------------------------------------------|
+| In `work.db` (sqlite mode)                                                                                                    | Always local runtime (not port sole-store)                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | URs, REQs, deps, claims, ideate/verify/close **report text**, **decisions**, **calibration**, **milestone cursor**, run notes | worktrees, git, `state/*` locks (incl. **gate-owner**), `config.yml`, optional `runs/` telemetry, **evidence binaries** under `.do-work/evidence/` |
 
 **Intentional divergence from markdown file homes:** under sqlite, decisions / calibration / milestone cursor live in the **DB** (sole store), not `.do-work/decisions.md` / `state/calibration.md` / `state/active-milestone.md`. Under markdown those files remain. Under Linear, Team Docs / milestone description remain as today.
@@ -175,45 +175,45 @@ Agents **must not** recreate `user-requests/UR-NNN/` solely for PNGs when `backe
 
 #### Concurrency knobs (locked)
 
-| Setting | Value |
-|---------|--------|
-| `journal_mode` | **WAL** (single-machine local disk; **not** recommended on network FS — optional risk) |
-| `busy_timeout` | **5000** ms (PRAGMA inside each connection) |
+| Setting           | Value                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `journal_mode`    | **WAL** (single-machine local disk; **not** recommended on network FS — optional risk)                                               |
+| `busy_timeout`    | **5000** ms (PRAGMA inside each connection)                                                                                          |
 | Outer CLI retries | up to **3** full CLI invocations, backoff **50ms / 100ms / 200ms**, wrapping the whole command (not nested inside busy_timeout only) |
-| After retries | claim ops → `concurrent-conflict` or hard-stop; other writes → hard-stop |
+| After retries     | claim ops → `concurrent-conflict` or hard-stop; other writes → hard-stop                                                             |
 
 #### CLI command parity (vs markdown `lib/*.sh`)
 
-| Concern | Markdown today | sqlite CLI (`dw-db`) |
-|---------|----------------|----------------------|
-| List claimable (port) | pick internals | `dw-db list-claimable [--ur UR-NNN]` — ordered full list |
-| Pick first claimable | `pick-req.sh` | `dw-db pick […]` = **first row** of that ordered list |
-| Claim | `claim-req.sh` | `dw-db claim <REQ-NNN> <agent_id>` |
-| Heartbeat | `heartbeat.sh` | `dw-db heartbeat <REQ-NNN> <agent_id>` |
-| Deps check | `check-deps.sh` | `dw-db check-deps <REQ-NNN>` |
-| Footprint check | `check-footprint.sh` | `dw-db check-footprint <REQ-NNN>` |
-| Scan stale | `scan-stale.sh` | `dw-db scan-stale` |
-| Archive integrity | `check-archive-integrity.sh` | `dw-db check-archive <REQ-NNN>` — criteria §8.8 |
-| Status situation room | `synth-status.sh` + `derive-status.sh` + `coverage-rollup.sh` | `dw-db status-synth [--ur UR-NNN]` **folds** derive + coverage (see below) |
-| Cycle / deadlock helpers | `cycle-check.sh`, `deadlock-check.sh` | `dw-db cycle-check`, `dw-db deadlock-check` |
-| Ensure schema / open | mkdir layout | `dw-db ensure` |
-| Board | n/a | `dw-db board` |
+| Concern                  | Markdown today                                                | sqlite CLI (`dw-db`)                                                       |
+| ------------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| List claimable (port)    | pick internals                                                | `dw-db list-claimable [--ur UR-NNN]` — ordered full list                   |
+| Pick first claimable     | `pick-req.sh`                                                 | `dw-db pick […]` = **first row** of that ordered list                      |
+| Claim                    | `claim-req.sh`                                                | `dw-db claim <REQ-NNN> <agent_id>`                                         |
+| Heartbeat                | `heartbeat.sh`                                                | `dw-db heartbeat <REQ-NNN> <agent_id>`                                     |
+| Deps check               | `check-deps.sh`                                               | `dw-db check-deps <REQ-NNN>`                                               |
+| Footprint check          | `check-footprint.sh`                                          | `dw-db check-footprint <REQ-NNN>`                                          |
+| Scan stale               | `scan-stale.sh`                                               | `dw-db scan-stale`                                                         |
+| Archive integrity        | `check-archive-integrity.sh`                                  | `dw-db check-archive <REQ-NNN>` — criteria §8.8                            |
+| Status situation room    | `synth-status.sh` + `derive-status.sh` + `coverage-rollup.sh` | `dw-db status-synth [--ur UR-NNN]` **folds** derive + coverage (see below) |
+| Cycle / deadlock helpers | `cycle-check.sh`, `deadlock-check.sh`                         | `dw-db cycle-check`, `dw-db deadlock-check`                                |
+| Ensure schema / open     | mkdir layout                                                  | `dw-db ensure`                                                             |
+| Board                    | n/a                                                           | `dw-db board`                                                              |
 
 **Status 1S parity (locked):** `status-synth` is not a thinner stub. It must emit the same situation-room classes markdown does:
 
-| Output | Source under sqlite |
-|--------|---------------------|
-| In-flight / backlog / done rows | `reqs` + `claims` |
-| proven / unproven | derive from `closure_proof` + AC checkboxes in `body` (same rules as `derive-status.sh`) |
-| coverage rollup | same arithmetic intent as `coverage-rollup.sh` over listed REQs |
-| UR closed | `urs.closed_at IS NOT NULL` **or** presence of `ur_artifacts.kind = 'close'` with successful overall (prefer: set `closed_at` on successful close write) |
+| Output                          | Source under sqlite                                                                                                                                      |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In-flight / backlog / done rows | `reqs` + `claims`                                                                                                                                        |
+| proven / unproven               | derive from `closure_proof` + AC checkboxes in `body` (same rules as `derive-status.sh`)                                                                 |
+| coverage rollup                 | same arithmetic intent as `coverage-rollup.sh` over listed REQs                                                                                          |
+| UR closed                       | `urs.closed_at IS NOT NULL` **or** presence of `ur_artifacts.kind = 'close'` with successful overall (prefer: set `closed_at` on successful close write) |
 
 **Shared non-sqlite scripts (do not reimplement in dw-db):**
 
-| Script | Role |
-|--------|------|
-| `lib/score-coverage.sh` | Pure arithmetic (flags in → score out) — verify phase stays shared |
-| worktree / git / events helpers | Runtime only |
+| Script                          | Role                                                               |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `lib/score-coverage.sh`         | Pure arithmetic (flags in → score out) — verify phase stays shared |
+| worktree / git / events helpers | Runtime only                                                       |
 
 **Agent-playbook ops:** `create_ur`, `create_req`, `update_req`, `set_*`, artifacts, archive field writes → `dw-db <subcommand>` with transactional SQL. Reads → `get-*` / `list-*`. `write_gate_state` → local `state/gate-owner.md` only.
 
@@ -229,26 +229,26 @@ Markdown `lib/pick-req.sh` etc. remain **markdown-only**. Do not teach them to o
 
 Use **port ops + `dw-db`** only (mirror Linear’s **1L** pattern → **1S**).
 
-| Agent | Today | Required for sqlite |
-|-------|--------|---------------------|
-| `config.md` | resolve markdown\|linear only | Accept `sqlite`; validate/ensure DB step; hard-stop matrix |
-| `intake.md` / `start.md` | FS UR dir vs Linear milestone | **1S:** `create_ur` via dw-db |
-| `ideate.md` | `ideate.md` file vs Linear | **1S:** `append_ideate` |
-| `question.md` | clarifications in input.md | **1S:** `append_clarifications` |
-| `capture.md` / `audit.md` | REQ files | **1S:** `create_req` / `update_req` / `list_reqs_for_ur` |
-| `verify.md` | score + console | **1S:** `write_verify_report` + list/read ops |
-| `run.md` | pick/claim scripts + working/ | **1S:** dw-db pick/claim/…; no FS claim |
-| `run-worker.md` | read REQ file path | **1S:** `read_req` by slug; heartbeat via dw-db |
-| `review.md` | working/ path vs Linear id | **1S:** `read_req` by slug |
-| `status.md` | synth-status + derive + coverage or 1L | **1S:** `dw-db status-synth` (full parity §5.5; not board-only) |
-| close/review evidence | `user-requests/…/ui-evidence` etc. | **1S:** `.do-work/evidence/UR-NNN/…` only |
-| `resume.md` / `unblock.md` | working/REQ | **1S:** `set_req_status` / `unblock_req` / claim ops by slug |
-| `close.md` | closure.md path | **1S:** `write_close_report` + list path-units from DB |
-| `retro.md` | local runs + calibration file | **1S:** read run_notes + write calibration row; local runs telemetry optional |
-| `log.md` | ledger / archive | Port-aware; no markdown-only REQ scans when sqlite |
-| `upgrade.md` | migrate to Linear | Refuse Linear migrate when backend is sqlite; no sqlite migrate |
-| `go.md` / `help.md` | docs | Document sqlite + board command |
-| `tracker/port.md` | two backends | Three backends + generalized hard-stop |
+| Agent                      | Today                                  | Required for sqlite                                                           |
+| -------------------------- | -------------------------------------- | ----------------------------------------------------------------------------- |
+| `config.md`                | resolve markdown\|linear only          | Accept `sqlite`; validate/ensure DB step; hard-stop matrix                    |
+| `intake.md` / `start.md`   | FS UR dir vs Linear milestone          | **1S:** `create_ur` via dw-db                                                 |
+| `ideate.md`                | `ideate.md` file vs Linear             | **1S:** `append_ideate`                                                       |
+| `question.md`              | clarifications in input.md             | **1S:** `append_clarifications`                                               |
+| `capture.md` / `audit.md`  | REQ files                              | **1S:** `create_req` / `update_req` / `list_reqs_for_ur`                      |
+| `verify.md`                | score + console                        | **1S:** `write_verify_report` + list/read ops                                 |
+| `run.md`                   | pick/claim scripts + working/          | **1S:** dw-db pick/claim/…; no FS claim                                       |
+| `run-worker.md`            | read REQ file path                     | **1S:** `read_req` by slug; heartbeat via dw-db                               |
+| `review.md`                | working/ path vs Linear id             | **1S:** `read_req` by slug                                                    |
+| `status.md`                | synth-status + derive + coverage or 1L | **1S:** `dw-db status-synth` (full parity §5.5; not board-only)               |
+| close/review evidence      | `user-requests/…/ui-evidence` etc.     | **1S:** `.do-work/evidence/UR-NNN/…` only                                     |
+| `resume.md` / `unblock.md` | working/REQ                            | **1S:** `set_req_status` / `unblock_req` / claim ops by slug                  |
+| `close.md`                 | closure.md path                        | **1S:** `write_close_report` + list path-units from DB                        |
+| `retro.md`                 | local runs + calibration file          | **1S:** read run_notes + write calibration row; local runs telemetry optional |
+| `log.md`                   | ledger / archive                       | Port-aware; no markdown-only REQ scans when sqlite                            |
+| `upgrade.md`               | migrate to Linear                      | Refuse Linear migrate when backend is sqlite; no sqlite migrate               |
+| `go.md` / `help.md`        | docs                                   | Document sqlite + board command                                               |
+| `tracker/port.md`          | two backends                           | Three backends + generalized hard-stop                                        |
 
 Primary silent-failure mode to prevent: **phase agent still globs `.do-work/REQ-*` while backend is sqlite.**
 
@@ -262,56 +262,61 @@ Single file DB. **Schema version:** `PRAGMA user_version = 1` at init. Migration
 
 **`urs`**
 
-| Column | Notes |
-|--------|--------|
-| `id` | Integer PK (internal only) |
-| `slug` | `UR-NNN` **UNIQUE** — external id |
-| `title` | short |
-| `class` | feature / … |
-| `brief` | verbatim intake |
-| `created_at` | ISO |
-| `closed_at` | null until **successful** `write_close_report` (overall pass / closed); set in same transaction as close artifact write |
+| Column       | Notes                                                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `id`         | Integer PK (internal only)                                                                                              |
+| `slug`       | `UR-NNN` **UNIQUE** — external id                                                                                       |
+| `title`      | short                                                                                                                   |
+| `class`      | feature / …                                                                                                             |
+| `brief`      | verbatim intake                                                                                                         |
+| `created_at` | ISO                                                                                                                     |
+| `closed_at`  | null until **successful** `write_close_report` (overall pass / closed); set in same transaction as close artifact write |
 
 **`ur_artifacts`** — UNIQUE(`ur_id`, `kind`)
 
-| kind | Write semantics |
-|------|-----------------|
-| `ideate` | **append** (concat with separator); never touch `urs.brief` |
-| `clarifications` | **append** Q/A blocks |
-| `open_gaps` | **replace** |
-| `capture_summary` | **replace** |
-| `verify` | **replace** full report body |
-| `close` | **replace** full closure body |
+| kind              | Write semantics                                             |
+| ----------------- | ----------------------------------------------------------- |
+| `ideate`          | **append** (concat with separator); never touch `urs.brief` |
+| `clarifications`  | **append** Q/A blocks                                       |
+| `open_gaps`       | **replace**                                                 |
+| `capture_summary` | **replace**                                                 |
+| `verify`          | **replace** full report body                                |
+| `close`           | **replace** full closure body                               |
 
 **`reqs`**
 
-| Column | Notes |
-|--------|--------|
-| `id` | Integer PK internal |
-| `slug` | `REQ-NNN` **UNIQUE** — external id |
-| `ur_id` | FK |
-| `title` | |
-| `status` | `backlog` \| `in_progress` \| `stopped` \| `done` — **underscore form in DB only** (see §4) |
-| `layer` | |
-| `parent_req_id` | nullable FK internal id of path-unit parent |
-| `entry_point` / `terminal_state` | path-unit parents |
-| `path_milestone` | `M1` / null (no `REQ-M*-` filenames) |
-| `files` | footprint text |
-| `size` | S\|M\|L |
-| `priority` | integer; **missing/null → treat as 2** at pick |
-| `criteria_approved` | |
-| `closure_proof` / `suite` | |
-| `body` | **single markdown** with frozen headings (below) |
-| `created_at` / `updated_at` | |
+| Column                           | Notes                                                                                       |
+| -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `id`                             | Integer PK internal                                                                         |
+| `slug`                           | `REQ-NNN` **UNIQUE** — external id                                                          |
+| `ur_id`                          | FK                                                                                          |
+| `title`                          |                                                                                             |
+| `status`                         | `backlog` \| `in_progress` \| `stopped` \| `done` — **underscore form in DB only** (see §4) |
+| `layer`                          |                                                                                             |
+| `parent_req_id`                  | nullable FK internal id of path-unit parent                                                 |
+| `entry_point` / `terminal_state` | path-unit parents                                                                           |
+| `path_milestone`                 | `M1` / null (no `REQ-M*-` filenames)                                                        |
+| `files`                          | footprint text                                                                              |
+| `size`                           | S\|M\|L                                                                                     |
+| `priority`                       | integer; **missing/null → treat as 2** at pick                                              |
+| `criteria_approved`              |                                                                                             |
+| `closure_proof` / `suite`        |                                                                                             |
+| `body`                           | **single markdown** with frozen headings (below)                                            |
+| `created_at` / `updated_at`      |                                                                                             |
 
 **Frozen `body` template sections (in order):**
 
 ```markdown
 ## Task
+
 ## Acceptance Criteria
+
 ## Verification Steps
+
 ## Integration
+
 ## Manual checks (advisory)
+
 ## Outputs
 ```
 
@@ -319,14 +324,14 @@ Single file DB. **Schema version:** `PRAGMA user_version = 1` at init. Migration
 
 **`claims`**
 
-| Column | Notes |
-|--------|--------|
-| `id` | Integer PK |
-| `req_id` | FK |
-| `agent_id` | |
-| `claimed_at` / `heartbeat` | ISO |
-| `session` | optional |
-| `status` | `active` \| `released` |
+| Column                     | Notes                  |
+| -------------------------- | ---------------------- |
+| `id`                       | Integer PK             |
+| `req_id`                   | FK                     |
+| `agent_id`                 |                        |
+| `claimed_at` / `heartbeat` | ISO                    |
+| `session`                  | optional               |
+| `status`                   | `active` \| `released` |
 
 **Constraint (locked):** at most **one** row with `status = 'active'` per `req_id` — implement via partial unique index:
 
@@ -375,35 +380,35 @@ Never allocate outside a transaction.
 
 ## 7. Full port-op → home map (B5)
 
-| Port op | sqlite home | Notes |
-|---------|-------------|--------|
-| `ensure_product_container` | create dirs + `dw-db ensure` | empty schema if missing |
-| `create_ur` | INSERT `urs` | brief only; no artifacts yet |
-| `read_ur` | SELECT `urs` + optional `ur_artifacts` | |
-| `list_urs` | SELECT slug, title, … | slim |
-| `append_ideate` | upsert `ur_artifacts` kind=ideate **append** | never modify brief |
-| `append_clarifications` | kind=clarifications **append** | |
-| `create_req` | INSERT `reqs` + optional `deps` | status=`backlog`; **parent / dep inputs are slugs** resolved to internal ids in-transaction; invalid slug → hard error (no silent drop) |
-| `update_req` | UPDATE `reqs` | not claim/archive |
-| `read_req` | SELECT by **slug** | |
-| `list_reqs_for_ur` | JOIN by ur slug | any status |
-| `list_claimable_reqs` | `dw-db list-claimable` (§8) | ordered list; `pick` = first row |
-| `claim_req` | transaction status+claims | |
-| `heartbeat_req` | **UPDATE** active claim row only | no new active row; session optional omit if unknown |
-| `set_req_status` | UPDATE status | normalize I/O to underscore; stopped keeps active claim |
-| `set_blocked_by` | replace `deps` rows | inputs: REQ **slugs** (any UR allowed); resolve FKs in-transaction; invalid → hard error |
-| `set_files` | UPDATE `files` | |
-| `archive_req` | proof + done + release claim | gate `check-archive` first (§8.8) |
-| `unblock_req` | backlog + release claim | |
-| `append_decision` | INSERT `decisions` | append-only |
-| `write_verify_report` | `ur_artifacts` kind=verify **replace** | |
-| `write_close_report` | kind=close **replace** | |
-| `append_run_note` | INSERT `run_notes` | authoritative; local `runs/` telemetry optional if ledger on |
-| `read_active_milestone` | `milestone_state` | |
-| `set_active_milestone` | upsert `milestone_state` | |
-| `list_milestone_reqs` | `reqs.path_milestone = active` | |
-| `write_gate_state` | **local** `state/gate-owner.md` only | not DB |
-| `migrate_markdown_to_linear` | **refuse** if backend is sqlite | also refuse if operator is “on sqlite”; no sqlite migrate op |
+| Port op                      | sqlite home                                  | Notes                                                                                                                                   |
+| ---------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `ensure_product_container`   | create dirs + `dw-db ensure`                 | empty schema if missing                                                                                                                 |
+| `create_ur`                  | INSERT `urs`                                 | brief only; no artifacts yet                                                                                                            |
+| `read_ur`                    | SELECT `urs` + optional `ur_artifacts`       |                                                                                                                                         |
+| `list_urs`                   | SELECT slug, title, …                        | slim                                                                                                                                    |
+| `append_ideate`              | upsert `ur_artifacts` kind=ideate **append** | never modify brief                                                                                                                      |
+| `append_clarifications`      | kind=clarifications **append**               |                                                                                                                                         |
+| `create_req`                 | INSERT `reqs` + optional `deps`              | status=`backlog`; **parent / dep inputs are slugs** resolved to internal ids in-transaction; invalid slug → hard error (no silent drop) |
+| `update_req`                 | UPDATE `reqs`                                | not claim/archive                                                                                                                       |
+| `read_req`                   | SELECT by **slug**                           |                                                                                                                                         |
+| `list_reqs_for_ur`           | JOIN by ur slug                              | any status                                                                                                                              |
+| `list_claimable_reqs`        | `dw-db list-claimable` (§8)                  | ordered list; `pick` = first row                                                                                                        |
+| `claim_req`                  | transaction status+claims                    |                                                                                                                                         |
+| `heartbeat_req`              | **UPDATE** active claim row only             | no new active row; session optional omit if unknown                                                                                     |
+| `set_req_status`             | UPDATE status                                | normalize I/O to underscore; stopped keeps active claim                                                                                 |
+| `set_blocked_by`             | replace `deps` rows                          | inputs: REQ **slugs** (any UR allowed); resolve FKs in-transaction; invalid → hard error                                                |
+| `set_files`                  | UPDATE `files`                               |                                                                                                                                         |
+| `archive_req`                | proof + done + release claim                 | gate `check-archive` first (§8.8)                                                                                                       |
+| `unblock_req`                | backlog + release claim                      |                                                                                                                                         |
+| `append_decision`            | INSERT `decisions`                           | append-only                                                                                                                             |
+| `write_verify_report`        | `ur_artifacts` kind=verify **replace**       |                                                                                                                                         |
+| `write_close_report`         | kind=close **replace**                       |                                                                                                                                         |
+| `append_run_note`            | INSERT `run_notes`                           | authoritative; local `runs/` telemetry optional if ledger on                                                                            |
+| `read_active_milestone`      | `milestone_state`                            |                                                                                                                                         |
+| `set_active_milestone`       | upsert `milestone_state`                     |                                                                                                                                         |
+| `list_milestone_reqs`        | `reqs.path_milestone = active`               |                                                                                                                                         |
+| `write_gate_state`           | **local** `state/gate-owner.md` only         | not DB                                                                                                                                  |
+| `migrate_markdown_to_linear` | **refuse** if backend is sqlite              | also refuse if operator is “on sqlite”; no sqlite migrate op                                                                            |
 
 **Calibration** (not a named port op today): document in `sqlite.md` like Linear Docs — retro full-replace `calibration` row; capture read advisory.
 
@@ -433,12 +438,12 @@ All of:
 
 ### 8.3 Stale / takeover (locked strategy)
 
-| Situation | Behavior |
-|-----------|----------|
-| Active claim, heartbeat age ≤ stale_max | foreign claim → **concurrent-conflict** |
-| Active claim, heartbeat age > stale_max | **stale** — reclaimable by `claim_req` |
-| Own active claim | claim_req idempotent success (optional heartbeat refresh) |
-| Mid-flight crash | row stays `active`; **leave claimed**; resume/unblock |
+| Situation                               | Behavior                                                  |
+| --------------------------------------- | --------------------------------------------------------- |
+| Active claim, heartbeat age ≤ stale_max | foreign claim → **concurrent-conflict**                   |
+| Active claim, heartbeat age > stale_max | **stale** — reclaimable by `claim_req`                    |
+| Own active claim                        | claim_req idempotent success (optional heartbeat refresh) |
+| Mid-flight crash                        | row stays `active`; **leave claimed**; resume/unblock     |
 
 **Takeover transaction (preferred, locked):** under the partial unique index, in one transaction:
 
@@ -477,10 +482,10 @@ Parity with `check-footprint.sh` / Linear algorithm:
 
 **When listing/picking:**
 
-| Call shape | Milestone filter |
-|------------|------------------|
-| **Scoped** `--ur UR-NNN` | If that UR has `active = M<n>`, only REQs with `path_milestone = 'M<n>'`. If no row / active null → no milestone filter for that UR. |
-| **Unscoped** (all URs) | For each candidate REQ, apply **that REQ’s UR** cursor: if UR has active `M<n>`, require `path_milestone = M<n>`; if UR has no active milestone, REQ is not milestone-filtered. |
+| Call shape               | Milestone filter                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scoped** `--ur UR-NNN` | If that UR has `active = M<n>`, only REQs with `path_milestone = 'M<n>'`. If no row / active null → no milestone filter for that UR.                                            |
+| **Unscoped** (all URs)   | For each candidate REQ, apply **that REQ’s UR** cursor: if UR has active `M<n>`, require `path_milestone = M<n>`; if UR has no active milestone, REQ is not milestone-filtered. |
 
 No `REQ-M*-` filename encoding. No product-global single active M in v1.
 
@@ -496,11 +501,11 @@ Fail → do not archive; leave claim active if already in-flight.
 
 ### 8.9 `list_claimable_reqs` vs `pick`
 
-| Surface | Behavior |
-|---------|----------|
-| Port `list_claimable_reqs` | Full ordered claimable list (`dw-db list-claimable`) |
-| `dw-db pick` | First element of that list (or empty exit like `pick-req.sh`) |
-| Run loop | May call pick for first-survivor; status may call list-claimable |
+| Surface                    | Behavior                                                         |
+| -------------------------- | ---------------------------------------------------------------- |
+| Port `list_claimable_reqs` | Full ordered claimable list (`dw-db list-claimable`)             |
+| `dw-db pick`               | First element of that list (or empty exit like `pick-req.sh`)    |
+| Run loop                   | May call pick for first-survivor; status may call list-claimable |
 
 ---
 
@@ -508,11 +513,11 @@ Fail → do not archive; leave claim active if already in-flight.
 
 ```yaml
 tracker:
-  backend: markdown          # markdown | linear | sqlite
+  backend: markdown # markdown | linear | sqlite
   sqlite:
-    path: ""                 # default: .do-work/work.db
-    board_path: ""           # default: .do-work/board/index.html
-    busy_timeout_ms: 5000    # optional override
+    path: '' # default: .do-work/work.db
+    board_path: '' # default: .do-work/board/index.html
+    busy_timeout_ms: 5000 # optional override
   linear:
     # existing — unchanged
 ```
@@ -528,14 +533,14 @@ Load Config when `sqlite`:
 
 ## 10. Board (visibility)
 
-| Item | Spec |
-|------|------|
-| Command | `/do-work board` → `dw-db board` |
-| Output | `board_path` default `.do-work/board/index.html` |
-| Regen | **Explicit only** |
-| Backend | **sqlite only**; else clear error |
-| Safety | **HTML-escape** all user-derived text (titles, slugs, excerpts, bodies if drilled) |
-| Format | Self-contained HTML, inline CSS, no required CDN |
+| Item    | Spec                                                                               |
+| ------- | ---------------------------------------------------------------------------------- |
+| Command | `/do-work board` → `dw-db board`                                                   |
+| Output  | `board_path` default `.do-work/board/index.html`                                   |
+| Regen   | **Explicit only**                                                                  |
+| Backend | **sqlite only**; else clear error                                                  |
+| Safety  | **HTML-escape** all user-derived text (titles, slugs, excerpts, bodies if drilled) |
+| Format  | Self-contained HTML, inline CSS, no required CDN                                   |
 
 ### Page content
 
@@ -543,10 +548,10 @@ Header (`generated_at`, project, backend); UR list with counts; REQ table by sta
 
 ### Status vs board
 
-| Command | Audience |
-|---------|----------|
+| Command           | Audience                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------- |
 | `/do-work status` | Terminal situation room — **all backends**; sqlite uses **`dw-db status-synth` (1S)** |
-| `/do-work board` | Human HTML snapshot — sqlite only |
+| `/do-work board`  | Human HTML snapshot — sqlite only                                                     |
 
 Done-when includes status 1S path, not board-only.
 
@@ -571,75 +576,75 @@ Applies when leaving **any** prior backend (markdown **or** Linear):
 
 ## 12. Conformance / install / upgrade
 
-| Concern | Rule |
-|---------|------|
-| Install / upgrade | **Must** add gitignore entries for `work.db`, `work.db-*`, `board/` when missing; recommend `evidence/` |
-| Ensure on first sqlite op | Create empty DB; do **not** require `user-requests/` or REQ files |
-| Conformance | Missing markdown trees when `backend: sqlite` is **not** drift |
-| Conformance | `backend: sqlite` + missing/corrupt DB → advisory or hard-stop on next op |
-| Upgrade migrate Linear | Preflight: backend must be **markdown** (idle); refuse if `sqlite` or `linear` |
-| Upgrade | Do not invent markdown→sqlite or Linear→sqlite migrate step in v1 |
+| Concern                   | Rule                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Install / upgrade         | **Must** add gitignore entries for `work.db`, `work.db-*`, `board/` when missing; recommend `evidence/` |
+| Ensure on first sqlite op | Create empty DB; do **not** require `user-requests/` or REQ files                                       |
+| Conformance               | Missing markdown trees when `backend: sqlite` is **not** drift                                          |
+| Conformance               | `backend: sqlite` + missing/corrupt DB → advisory or hard-stop on next op                               |
+| Upgrade migrate Linear    | Preflight: backend must be **markdown** (idle); refuse if `sqlite` or `linear`                          |
+| Upgrade                   | Do not invent markdown→sqlite or Linear→sqlite migrate step in v1                                       |
 
 ---
 
 ## 13. Error handling
 
-| Failure | Behavior |
-|---------|----------|
-| Unknown backend string | hard-stop |
-| `sqlite3` missing | hard-stop + install hint |
-| DB missing on ensure | create empty |
-| Corrupt / bad user_version | hard-stop; recreate empty option; no markdown fallback |
-| busy_timeout after retries | hard-stop or concurrent-conflict |
-| Claim race / unique active | concurrent-conflict |
-| Mid-flight crash | leave claimed (active row) |
-| Board on non-sqlite | clear error |
-| Agent globs markdown REQs on sqlite | forbidden — design/test against this |
+| Failure                             | Behavior                                               |
+| ----------------------------------- | ------------------------------------------------------ |
+| Unknown backend string              | hard-stop                                              |
+| `sqlite3` missing                   | hard-stop + install hint                               |
+| DB missing on ensure                | create empty                                           |
+| Corrupt / bad user_version          | hard-stop; recreate empty option; no markdown fallback |
+| busy_timeout after retries          | hard-stop or concurrent-conflict                       |
+| Claim race / unique active          | concurrent-conflict                                    |
+| Mid-flight crash                    | leave claimed (active row)                             |
+| Board on non-sqlite                 | clear error                                            |
+| Agent globs markdown REQs on sqlite | forbidden — design/test against this                   |
 
 ---
 
 ## 14. Testing and proof
 
-1. Markdown regression unchanged  
-2. Load path accepts `sqlite`; unknown backend still hard-stops  
-3. Port parity checklist every op → §7  
-4. CLI tests: ensure; slug alloc uses **numeric** max not string max (`UR-9` then `UR-10`); claim race; unique active; stale release-then-insert; deps invalid slug errors; footprint; pick order; list-claimable vs pick; heartbeat update-only; archive three criteria  
-5. Board: fixture DB → escaped HTML; board fails when backend markdown  
-6. Status-synth: proven/unproven + closed from close artifact / `closed_at`  
-7. Phase-agent wiring: no `REQ-*.md` / `user-requests/` live globs; evidence under `evidence/`  
+1. Markdown regression unchanged
+2. Load path accepts `sqlite`; unknown backend still hard-stops
+3. Port parity checklist every op → §7
+4. CLI tests: ensure; slug alloc uses **numeric** max not string max (`UR-9` then `UR-10`); claim race; unique active; stale release-then-insert; deps invalid slug errors; footprint; pick order; list-claimable vs pick; heartbeat update-only; archive three criteria
+5. Board: fixture DB → escaped HTML; board fails when backend markdown
+6. Status-synth: proven/unproven + closed from close artifact / `closed_at`
+7. Phase-agent wiring: no `REQ-*.md` / `user-requests/` live globs; evidence under `evidence/`
 8. No migration tests
 
 ---
 
 ## 15. Implementation phasing (for writing-plans)
 
-1. **Load path + hard-stop** — config, port.md, SKILL (accept sqlite; three-way matrix)  
-2. **Schema + `dw-db ensure`** + gitignore templates  
-3. **dw-db CLI** coordination: list-claimable, pick, claim, heartbeat, deps, footprint, scan-stale, check-archive (3 criteria), status-synth (full parity)  
-4. **UR/REQ CRUD** + numeric slug alloc transactions  
-5. **Artifacts** + decisions + calibration + milestone_state + run_notes + evidence path convention  
-6. **Phase-agent 1S branches** (inventory §5.6) — status, run, run-worker, resume, unblock, intake, capture, close, …  
-7. **`/do-work board`** + HTML escape  
+1. **Load path + hard-stop** — config, port.md, SKILL (accept sqlite; three-way matrix)
+2. **Schema + `dw-db ensure`** + gitignore templates
+3. **dw-db CLI** coordination: list-claimable, pick, claim, heartbeat, deps, footprint, scan-stale, check-archive (3 criteria), status-synth (full parity)
+4. **UR/REQ CRUD** + numeric slug alloc transactions
+5. **Artifacts** + decisions + calibration + milestone_state + run_notes + evidence path convention
+6. **Phase-agent 1S branches** (inventory §5.6) — status, run, run-worker, resume, unblock, intake, capture, close, …
+7. **`/do-work board`** + HTML escape
 8. **Conformance/upgrade** (gitignore must; refuse Linear migrate on sqlite) + docs/troubleshooting
 
 ---
 
 ## 16. Open risks
 
-1. **Phase agent still globs `.do-work/REQ-*`** — primary silent-markdown failure mode; 1S inventory + tests  
-2. Empty start feels lossy — documented; no migrate by design  
-3. Board staleness — explicit regen; show `generated_at`  
-4. SQLite multi-process on one machine only — WAL + busy_timeout; not multi-host; avoid network FS for `work.db`  
-5. Linear hierarchy pain unchanged — separate effort  
-6. Agents freehand SQL — mitigated by mandatory `dw-db` surface  
+1. **Phase agent still globs `.do-work/REQ-*`** — primary silent-markdown failure mode; 1S inventory + tests
+2. Empty start feels lossy — documented; no migrate by design
+3. Board staleness — explicit regen; show `generated_at`
+4. SQLite multi-process on one machine only — WAL + busy_timeout; not multi-host; avoid network FS for `work.db`
+5. Linear hierarchy pain unchanged — separate effort
+6. Agents freehand SQL — mitigated by mandatory `dw-db` surface
 7. **Per-UR milestone ≠ markdown global cursor** — multi-UR path-mode must set cursor per UR
 
 ---
 
 ## 17. References
 
-- `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` — port, Linear, dual-write ban  
-- `agents/tracker/port.md`, `markdown.md`, `linear.md`  
-- Validation review: blockers B1–B5 + majors 1–10  
-- Second review thin amend: slug numeric alloc, per-UR milestone pick, status-synth parity, evidence paths, status enum, takeover, archive criteria, list-claimable, Linear→sqlite greenfield, gitignore must  
-- Session: local primary, static board, no remote v1, opt-in, **no migration**  
+- `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md` — port, Linear, dual-write ban
+- `agents/tracker/port.md`, `markdown.md`, `linear.md`
+- Validation review: blockers B1–B5 + majors 1–10
+- Second review thin amend: slug numeric alloc, per-UR milestone pick, status-synth parity, evidence paths, status enum, takeover, archive criteria, list-claimable, Linear→sqlite greenfield, gitignore must
+- Session: local primary, static board, no remote v1, opt-in, **no migration**

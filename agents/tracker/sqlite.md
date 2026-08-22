@@ -34,17 +34,17 @@ Do **not** load this file for ordinary work-item ops when backend is `markdown` 
 └── runs/                — optional local ledger telemetry (not work-item truth)
 ```
 
-| Entity | Home |
-|--------|------|
-| Product container | project root + `dw-db ensure` (dirs + empty `work.db`) |
-| UR | `urs` row; external id = slug `UR-NNN` |
-| REQ | `reqs` row; external id = slug `REQ-NNN` |
-| Ideate / clarifications / verify / close | `ur_artifacts` (`kind`) |
-| Decisions | `decisions` table (append-only lines) |
-| Calibration | single-row `calibration` (id=1) |
-| Milestone cursor | `milestone_state` **per Issue** (`ur_id` UNIQUE) |
-| Run notes | `run_notes` rows on REQ |
-| Gate locks | **local** `.do-work/state/gate-owner.md` only — **not DB** |
+| Entity                                   | Home                                                       |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| Product container                        | project root + `dw-db ensure` (dirs + empty `work.db`)     |
+| UR                                       | `urs` row; external id = slug `UR-NNN`                     |
+| REQ                                      | `reqs` row; external id = slug `REQ-NNN`                   |
+| Ideate / clarifications / verify / close | `ur_artifacts` (`kind`)                                    |
+| Decisions                                | `decisions` table (append-only lines)                      |
+| Calibration                              | single-row `calibration` (id=1)                            |
+| Milestone cursor                         | `milestone_state` **per Issue** (`ur_id` UNIQUE)           |
+| Run notes                                | `run_notes` rows on REQ                                    |
+| Gate locks                               | **local** `.do-work/state/gate-owner.md` only — **not DB** |
 
 ### Hard rules (hierarchy)
 
@@ -60,12 +60,12 @@ Do **not** load this file for ordinary work-item ops when backend is `markdown` 
 
 When any of the following is true, **hard-stop** the phase. **Never** fall back to markdown or Linear.
 
-| Condition | Agent action |
-|-----------|--------------|
-| `sqlite3` not on `PATH` | Stop: install `sqlite3` (OS package / Xcode CLT) |
-| `agents/tracker/sqlite.md` missing | Stop: skill install/upgrade incomplete |
-| `dw-db ensure` / open fails (corrupt DB) | Stop: repair or recreate empty `work.db` (no history migrate) |
-| `PRAGMA user_version` ≠ supported (1) | Stop: unsupported schema; recreate empty DB |
+| Condition                                  | Agent action                                                    |
+| ------------------------------------------ | --------------------------------------------------------------- |
+| `sqlite3` not on `PATH`                    | Stop: install `sqlite3` (OS package / Xcode CLT)                |
+| `agents/tracker/sqlite.md` missing         | Stop: skill install/upgrade incomplete                          |
+| `dw-db ensure` / open fails (corrupt DB)   | Stop: repair or recreate empty `work.db` (no history migrate)   |
+| `PRAGMA user_version` ≠ supported (1)      | Stop: unsupported schema; recreate empty DB                     |
 | `dw-db` command non-zero for a required op | Stop with stderr; leave claims as-is (mid-flight leave-claimed) |
 
 Hard-stop message shape:
@@ -81,64 +81,64 @@ Do not fall back to markdown or Linear. Fix sqlite3 / work.db / skill install, t
 
 `{skill-root}` = resolved do-work skill root. `{root}` = project root.
 
-| Port op | Implementation |
-|---------|----------------|
-| `ensure_product_container` | `bash {skill-root}/lib/dw-db.sh ensure {root}` (creates `.do-work/`, `work.db`, `state/`, `evidence/`, `board/`) |
-| `create_ur` | `bash {skill-root}/lib/dw-db.sh create-ur {root} --title T --brief B [--class C]` → prints `UR-NNN` |
-| `read_ur` | `bash {skill-root}/lib/dw-db.sh get-ur {root} UR-NNN` → slug/title/class/brief/created_at/closed_at. Artifact bodies live in `ur_artifacts` (written via append/write-* commands); agents keep in-session text after write or re-query via future get-artifact — **no freehand SQL**. |
-| `list_urs` | `bash {skill-root}/lib/dw-db.sh list-urs {root}` |
-| `append_ideate` | `bash {skill-root}/lib/dw-db.sh append-ideate {root} UR-NNN --body TEXT` — **append**; **never** modifies `urs.brief` |
-| `append_clarifications` | `bash {skill-root}/lib/dw-db.sh append-clarifications {root} UR-NNN --body TEXT` — **append** |
-| `create_req` | `bash {skill-root}/lib/dw-db.sh create-req {root} --ur UR-NNN --title T [--body …] [--priority N] [--files …] [--deps "REQ-…"] [--parent REQ-…] [--layer L] [--path-milestone M1] [--size S]` → prints `REQ-NNN` |
-| `update_req` | `bash {skill-root}/lib/dw-db.sh update-req {root} REQ-NNN [--title …] [--body …] [--priority N] [--closure-proof …] …` |
-| `read_req` | `bash {skill-root}/lib/dw-db.sh get-req {root} REQ-NNN` |
-| `list_reqs_for_ur` | `bash {skill-root}/lib/dw-db.sh list-reqs {root} --ur UR-NNN` |
-| `list_claimable_reqs` | `bash {skill-root}/lib/dw-db.sh list-claimable {root} [--ur UR-NNN] [--stale-max N]` |
-| `claim_req` | `bash {skill-root}/lib/dw-db.sh claim {root} REQ-NNN AGENT_ID [--session S] [--stale-max N]` |
-| `heartbeat_req` | `bash {skill-root}/lib/dw-db.sh heartbeat {root} REQ-NNN AGENT_ID` — **UPDATE** active claim only |
-| `set_req_status` | `bash {skill-root}/lib/dw-db.sh set-status {root} REQ-NNN STATUS` (`in-progress` → stored `in_progress`) |
-| `set_blocked_by` | `bash {skill-root}/lib/dw-db.sh set-blocked-by {root} REQ-NNN "REQ-A REQ-B"` (empty clears) |
-| `set_files` | `bash {skill-root}/lib/dw-db.sh set-files {root} REQ-NNN "path1 path2"` |
-| `archive_req` | `bash {skill-root}/lib/dw-db.sh archive-req {root} REQ-NNN` (runs integrity gate first) |
-| `unblock_req` | `bash {skill-root}/lib/dw-db.sh unblock {root} REQ-NNN` |
-| `append_decision` | `bash {skill-root}/lib/dw-db.sh append-decision {root} "YYYY-MM-DD \| Issue/REQ ref \| decision \| rationale"` — **append-only** |
-| `write_verify_report` | `bash {skill-root}/lib/dw-db.sh write-verify {root} UR-NNN --body TEXT` — **replace** `ur_artifacts.kind=verify` |
-| `write_close_report` | `bash {skill-root}/lib/dw-db.sh write-close {root} UR-NNN --body TEXT` — **replace** close artifact + set `urs.closed_at` |
-| `append_run_note` | `bash {skill-root}/lib/dw-db.sh append-run-note {root} REQ-NNN --payload TEXT` |
-| `read_active_milestone` | `bash {skill-root}/lib/dw-db.sh get-active-milestone {root} UR-NNN` (empty = not in milestone mode for that Issue) |
-| `set_active_milestone` | `bash {skill-root}/lib/dw-db.sh set-active-milestone {root} UR-NNN M1` or `… UR-NNN ""` to clear; optional `--checklist JSON` |
-| `list_milestone_reqs` | `bash {skill-root}/lib/dw-db.sh list-milestone-reqs {root} UR-NNN [--milestone M1]` (default = that Issue’s active) |
-| `write_gate_state` | **Local only:** write/delete `{root}/.do-work/state/gate-owner.md` (and final-suite locks under `state/*`). **Never** write gate ownership into `work.db`. |
-| `migrate_markdown_to_linear` | **Refuse under sqlite.** Effective backend is already `sqlite` — do not run markdown→Linear cutover; do not invent markdown→sqlite migrate. Report refuse and leave config + DB unchanged. |
+| Port op                      | Implementation                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ensure_product_container`   | `bash {skill-root}/lib/dw-db.sh ensure {root}` (creates `.do-work/`, `work.db`, `state/`, `evidence/`, `board/`)                                                                                                                                                                      |
+| `create_ur`                  | `bash {skill-root}/lib/dw-db.sh create-ur {root} --title T --brief B [--class C]` → prints `UR-NNN`                                                                                                                                                                                   |
+| `read_ur`                    | `bash {skill-root}/lib/dw-db.sh get-ur {root} UR-NNN` → slug/title/class/brief/created_at/closed_at. Artifact bodies live in `ur_artifacts` (written via append/write-* commands); agents keep in-session text after write or re-query via future get-artifact — **no freehand SQL**. |
+| `list_urs`                   | `bash {skill-root}/lib/dw-db.sh list-urs {root}`                                                                                                                                                                                                                                      |
+| `append_ideate`              | `bash {skill-root}/lib/dw-db.sh append-ideate {root} UR-NNN --body TEXT` — **append**; **never** modifies `urs.brief`                                                                                                                                                                 |
+| `append_clarifications`      | `bash {skill-root}/lib/dw-db.sh append-clarifications {root} UR-NNN --body TEXT` — **append**                                                                                                                                                                                         |
+| `create_req`                 | `bash {skill-root}/lib/dw-db.sh create-req {root} --ur UR-NNN --title T [--body …] [--priority N] [--files …] [--deps "REQ-…"] [--parent REQ-…] [--layer L] [--path-milestone M1] [--size S]` → prints `REQ-NNN`                                                                      |
+| `update_req`                 | `bash {skill-root}/lib/dw-db.sh update-req {root} REQ-NNN [--title …] [--body …] [--priority N] [--closure-proof …] …`                                                                                                                                                                |
+| `read_req`                   | `bash {skill-root}/lib/dw-db.sh get-req {root} REQ-NNN`                                                                                                                                                                                                                               |
+| `list_reqs_for_ur`           | `bash {skill-root}/lib/dw-db.sh list-reqs {root} --ur UR-NNN`                                                                                                                                                                                                                         |
+| `list_claimable_reqs`        | `bash {skill-root}/lib/dw-db.sh list-claimable {root} [--ur UR-NNN] [--stale-max N]`                                                                                                                                                                                                  |
+| `claim_req`                  | `bash {skill-root}/lib/dw-db.sh claim {root} REQ-NNN AGENT_ID [--session S] [--stale-max N]`                                                                                                                                                                                          |
+| `heartbeat_req`              | `bash {skill-root}/lib/dw-db.sh heartbeat {root} REQ-NNN AGENT_ID` — **UPDATE** active claim only                                                                                                                                                                                     |
+| `set_req_status`             | `bash {skill-root}/lib/dw-db.sh set-status {root} REQ-NNN STATUS` (`in-progress` → stored `in_progress`)                                                                                                                                                                              |
+| `set_blocked_by`             | `bash {skill-root}/lib/dw-db.sh set-blocked-by {root} REQ-NNN "REQ-A REQ-B"` (empty clears)                                                                                                                                                                                           |
+| `set_files`                  | `bash {skill-root}/lib/dw-db.sh set-files {root} REQ-NNN "path1 path2"`                                                                                                                                                                                                               |
+| `archive_req`                | `bash {skill-root}/lib/dw-db.sh archive-req {root} REQ-NNN` (runs integrity gate first)                                                                                                                                                                                               |
+| `unblock_req`                | `bash {skill-root}/lib/dw-db.sh unblock {root} REQ-NNN`                                                                                                                                                                                                                               |
+| `append_decision`            | `bash {skill-root}/lib/dw-db.sh append-decision {root} "YYYY-MM-DD \| Issue/REQ ref \| decision \| rationale"` — **append-only**                                                                                                                                                      |
+| `write_verify_report`        | `bash {skill-root}/lib/dw-db.sh write-verify {root} UR-NNN --body TEXT` — **replace** `ur_artifacts.kind=verify`                                                                                                                                                                      |
+| `write_close_report`         | `bash {skill-root}/lib/dw-db.sh write-close {root} UR-NNN --body TEXT` — **replace** close artifact + set `urs.closed_at`                                                                                                                                                             |
+| `append_run_note`            | `bash {skill-root}/lib/dw-db.sh append-run-note {root} REQ-NNN --payload TEXT`                                                                                                                                                                                                        |
+| `read_active_milestone`      | `bash {skill-root}/lib/dw-db.sh get-active-milestone {root} UR-NNN` (empty = not in milestone mode for that Issue)                                                                                                                                                                    |
+| `set_active_milestone`       | `bash {skill-root}/lib/dw-db.sh set-active-milestone {root} UR-NNN M1` or `… UR-NNN ""` to clear; optional `--checklist JSON`                                                                                                                                                         |
+| `list_milestone_reqs`        | `bash {skill-root}/lib/dw-db.sh list-milestone-reqs {root} UR-NNN [--milestone M1]` (default = that Issue’s active)                                                                                                                                                                   |
+| `write_gate_state`           | **Local only:** write/delete `{root}/.do-work/state/gate-owner.md` (and final-suite locks under `state/*`). **Never** write gate ownership into `work.db`.                                                                                                                            |
+| `migrate_markdown_to_linear` | **Refuse under sqlite.** Effective backend is already `sqlite` — do not run markdown→Linear cutover; do not invent markdown→sqlite migrate. Report refuse and leave config + DB unchanged.                                                                                            |
 
 ### Non-port surfaces (documented for agents)
 
-| Surface | Command / path |
-|---------|----------------|
-| Calibration write (retro) | `bash {skill-root}/lib/dw-db.sh write-calibration {root} --body TEXT` — full **replace** |
-| Calibration read (capture advisory) | `bash {skill-root}/lib/dw-db.sh read-calibration {root}` |
-| Open gaps (ideate Continue) | `bash {skill-root}/lib/dw-db.sh write-open-gaps {root} UR-NNN --body TEXT` — **replace** |
-| Capture summary | `bash {skill-root}/lib/dw-db.sh write-capture-summary {root} UR-NNN --body TEXT` — **replace** |
-| Pick first claimable | `bash {skill-root}/lib/dw-db.sh pick {root} [--ur UR-NNN]` |
-| Deps / footprint / stale / archive preflight | `check-deps`, `check-footprint`, `scan-stale`, `check-archive` on `dw-db.sh` |
-| Capture cycle-check | `bash {skill-root}/lib/dw-db.sh cycle-check {root} [UR-NNN]` — whole-graph DFS over `deps` (self-loop aware); exit 0 acyclic, exit 1 + cycle path on cycle. REQ-017. (`agents/capture.md` Step 4e sqlite branch.) |
-| Runtime deadlock-check | `bash {skill-root}/lib/dw-db.sh deadlock-check {root}` — runtime-cycle diagnosis over `deps`; structured `deadlock-detected` block (signal: `runtime-cycle`) on cycle, empty stdout when acyclic. REQ-019. (Run loop sqlite branch.) |
-| Board HTML | `bash {skill-root}/lib/dw-db.sh board {root} [--path PATH] [--stale-max N]` — not a port op; agent gate in `agents/board.md` |
-| Status situation room | `bash {skill-root}/lib/dw-db.sh status-synth {root} [UR-NNN]` — folds synth + proven/unproven + coverage + closed |
-| Coverage arithmetic | shared `lib/score-coverage.sh` — **not** reimplemented in dw-db |
+| Surface                                      | Command / path                                                                                                                                                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Calibration write (retro)                    | `bash {skill-root}/lib/dw-db.sh write-calibration {root} --body TEXT` — full **replace**                                                                                                                                             |
+| Calibration read (capture advisory)          | `bash {skill-root}/lib/dw-db.sh read-calibration {root}`                                                                                                                                                                             |
+| Open gaps (ideate Continue)                  | `bash {skill-root}/lib/dw-db.sh write-open-gaps {root} UR-NNN --body TEXT` — **replace**                                                                                                                                             |
+| Capture summary                              | `bash {skill-root}/lib/dw-db.sh write-capture-summary {root} UR-NNN --body TEXT` — **replace**                                                                                                                                       |
+| Pick first claimable                         | `bash {skill-root}/lib/dw-db.sh pick {root} [--ur UR-NNN]`                                                                                                                                                                           |
+| Deps / footprint / stale / archive preflight | `check-deps`, `check-footprint`, `scan-stale`, `check-archive` on `dw-db.sh`                                                                                                                                                         |
+| Capture cycle-check                          | `bash {skill-root}/lib/dw-db.sh cycle-check {root} [UR-NNN]` — whole-graph DFS over `deps` (self-loop aware); exit 0 acyclic, exit 1 + cycle path on cycle. REQ-017. (`agents/capture.md` Step 4e sqlite branch.)                    |
+| Runtime deadlock-check                       | `bash {skill-root}/lib/dw-db.sh deadlock-check {root}` — runtime-cycle diagnosis over `deps`; structured `deadlock-detected` block (signal: `runtime-cycle`) on cycle, empty stdout when acyclic. REQ-019. (Run loop sqlite branch.) |
+| Board HTML                                   | `bash {skill-root}/lib/dw-db.sh board {root} [--path PATH] [--stale-max N]` — not a port op; agent gate in `agents/board.md`                                                                                                         |
+| Status situation room                        | `bash {skill-root}/lib/dw-db.sh status-synth {root} [UR-NNN]` — folds synth + proven/unproven + coverage + closed                                                                                                                    |
+| Coverage arithmetic                          | shared `lib/score-coverage.sh` — **not** reimplemented in dw-db                                                                                                                                                                      |
 
 ---
 
 ## Artifact write semantics
 
-| kind | Write | Notes |
-|------|-------|--------|
-| `ideate` | append | Concat with blank-line separator; **never** touch `urs.brief` |
-| `clarifications` | append | Q/A blocks |
-| `open_gaps` | replace | Continue-gate machine list |
-| `capture_summary` | replace | Capture rollup text |
-| `verify` | replace | Full verify report body |
-| `close` | replace + `closed_at` | Sets `urs.closed_at` on first successful close write (preserved on later replaces) |
+| kind              | Write                 | Notes                                                                              |
+| ----------------- | --------------------- | ---------------------------------------------------------------------------------- |
+| `ideate`          | append                | Concat with blank-line separator; **never** touch `urs.brief`                      |
+| `clarifications`  | append                | Q/A blocks                                                                         |
+| `open_gaps`       | replace               | Continue-gate machine list                                                         |
+| `capture_summary` | replace               | Capture rollup text                                                                |
+| `verify`          | replace               | Full verify report body                                                            |
+| `close`           | replace + `closed_at` | Sets `urs.closed_at` on first successful close write (preserved on later replaces) |
 
 ---
 
@@ -172,11 +172,11 @@ Do **not** write evidence under `user-requests/UR-NNN/`. REQ body still holds te
 
 Deploy-gate and final-suite coordination **must not** enter `work.db`.
 
-| Action | Path |
-|--------|------|
+| Action               | Path                                                                             |
+| -------------------- | -------------------------------------------------------------------------------- |
 | Claim gate ownership | Write `{root}/.do-work/state/gate-owner.md` with agent id; re-read confirms self |
-| Release gate | Delete `gate-owner.md` |
-| Final-suite lock | `{root}/.do-work/state/final-suite-running.md` (or milestone-scoped variant) |
+| Release gate         | Delete `gate-owner.md`                                                           |
+| Final-suite lock     | `{root}/.do-work/state/final-suite-running.md` (or milestone-scoped variant)     |
 
 This is **not** dual-write of work items — locks are runtime, same as markdown/Linear.
 
@@ -227,13 +227,13 @@ No markdown→Linear cutover and no markdown→sqlite import in v1.
 
 These remain **local scripts** (not work-item storage):
 
-| Script | Role |
-|--------|------|
-| `lib/score-coverage.sh` | Coverage arithmetic for verify |
+| Script                             | Role                                       |
+| ---------------------------------- | ------------------------------------------ |
+| `lib/score-coverage.sh`            | Coverage arithmetic for verify             |
 | `lib/check-acceptance-evidence.sh` | Evidence gate over files under `evidence/` |
-| `lib/check-policy.sh` | Policy gate |
-| `lib/provision-worktree.sh` | Git worktree provision |
-| `lib/ensure-integration-base.sh` | Integration base |
+| `lib/check-policy.sh`              | Policy gate                                |
+| `lib/provision-worktree.sh`        | Git worktree provision                     |
+| `lib/ensure-integration-base.sh`   | Integration base                           |
 
 Work-item fields those scripts need (status, files, deps) come from **`dw-db`**, not from globs of `REQ-*.md`.
 

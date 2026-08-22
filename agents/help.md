@@ -26,6 +26,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -40,10 +41,10 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 Check the following conditions in order (markdown backend; adapt via port/dw-db/MCP for linear/sqlite/do-work-io):
 
 1. Does `{project}/.do-work/` exist? (sqlite: `work.db` present after ensure)
-2. Are there `REQ-NNN-*.md` files in `{project}/.do-work/` (backlog root)? *(markdown only — sqlite: `list-reqs` backlog status)*
-3. Are there `REQ-NNN-*.md` files in `{project}/.do-work/working/`? *(markdown only — sqlite: `in_progress` via dw-db)*
-4. Are there `UR-NNN/` folders in `{project}/.do-work/user-requests/`? *(markdown only — sqlite: `list-urs`)*
-5. Are there REQ files in `{project}/.do-work/archive/`? *(markdown only — sqlite: status `done`)*
+2. Are there `REQ-NNN-*.md` files in `{project}/.do-work/` (backlog root)? _(markdown only — sqlite: `list-reqs` backlog status)_
+3. Are there `REQ-NNN-*.md` files in `{project}/.do-work/working/`? _(markdown only — sqlite: `in_progress` via dw-db)_
+4. Are there `UR-NNN/` folders in `{project}/.do-work/user-requests/`? _(markdown only — sqlite: `list-urs`)_
+5. Are there REQ files in `{project}/.do-work/archive/`? _(markdown only — sqlite: status `done`)_
 6. Are there `RUN-NNN.yml` files in `{project}/.do-work/runs/`? (Retro heuristic: runs exist but no calibration → suggest retro; sqlite: calibration row / run_notes)
 7. Path-unit close heuristic: path-units without close (markdown: `closure.md`; sqlite: `closed_at` / close artifact missing)
 
@@ -72,6 +73,7 @@ Suggested next steps:
 **If REQs exist in the backlog:**
 
 Before suggesting, scan the backlog REQs for TDD readiness:
+
 - Read each `REQ-NNN-*.md` in the backlog root
 - Check if each has a `## Verification Steps` section with at least one typed step (test/build/runtime/ui)
 - If any REQ lacks verification steps, add a warning line before the suggestions: `Warning: N REQ(s) missing verification steps — run /do-work verify UR-NNN --auto-fix to add them before executing.`

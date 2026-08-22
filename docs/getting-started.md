@@ -89,15 +89,15 @@ On first install, edit `.do-work/config.yml`:
 
 ```yaml
 project:
-  name: "my-project"
+  name: 'my-project'
 
-layers: [frontend, backend]   # example for a web app; [] opts out until you set them
+layers: [frontend, backend] # example for a web app; [] opts out until you set them
 
 test:
-  suite_command: "npx vitest run"   # your real suite command
+  suite_command: 'npx vitest run' # your real suite command
 
 verify:
-  threshold: 90   # go auto-runs only at or above this score unless --force
+  threshold: 90 # go auto-runs only at or above this score unless --force
 ```
 
 Empty `layers: []` opts out of layer gap-checks, but **feature** briefs may halt capture until you declare layers or pass `--no-layers`.
@@ -114,8 +114,8 @@ Minimal config:
 tracker:
   backend: linear
   linear:
-    team_id: ""       # required UUID — or set team_key
-    team_key: ""      # optional alternate team resolve
+    team_id: '' # required UUID — or set team_key
+    team_key: '' # optional alternate team resolve
     # product_project: ""  # empty by default — resolve → project.name → basename; ensure binds UUID
     # status_map / labels / claim marker: defaults in agents/config.md
 ```
@@ -145,8 +145,8 @@ Minimal config:
 tracker:
   backend: sqlite
   sqlite:
-    path: ""                 # default .do-work/work.db
-    board_path: ""           # default .do-work/board/index.html
+    path: '' # default .do-work/work.db
+    board_path: '' # default .do-work/board/index.html
     busy_timeout_ms: 5000
 ```
 
@@ -169,9 +169,9 @@ Minimal config:
 tracker:
   backend: do-work-io
   dowork:
-    base_url: ""                 # e.g. https://api.do-work.test
-    token_env: DOWORK_IO_PAT     # env var name — never paste the PAT into chat
-    project: ""                  # project slug
+    base_url: '' # e.g. https://api.do-work.test
+    token_env: DOWORK_IO_PAT # env var name — never paste the PAT into chat
+    project: '' # project slug
     mcp_profile: dowork.control
 ```
 
@@ -229,14 +229,14 @@ After a successful `go`:
 
 ## If something goes wrong
 
-| Symptom | What to do |
-|---------|------------|
-| `/do-work` not found | Confirm hub path and agent skill loading; re-run install |
-| Capture halts on layers | Set `layers` in config or use `--no-layers` |
-| `go` stops below 90% | Read verify gaps; fix REQs, or use `--auto-fix` / `--force` |
-| UR not found | Check `.do-work/user-requests/` for the real `UR-NNN` |
-| REQ stuck in `working/` | `/do-work status` then `/do-work unblock REQ-NNN` or `/do-work resume REQ-NNN` |
-| Linear hard-stop / no MCP | Connect Linear MCP + set `tracker.linear.team_id` (see [troubleshooting](troubleshooting.md#linear-tracker-backend)) |
+| Symptom                       | What to do                                                                                                                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/do-work` not found          | Confirm hub path and agent skill loading; re-run install                                                                                                                                |
+| Capture halts on layers       | Set `layers` in config or use `--no-layers`                                                                                                                                             |
+| `go` stops below 90%          | Read verify gaps; fix REQs, or use `--auto-fix` / `--force`                                                                                                                             |
+| UR not found                  | Check `.do-work/user-requests/` for the real `UR-NNN`                                                                                                                                   |
+| REQ stuck in `working/`       | `/do-work status` then `/do-work unblock REQ-NNN` or `/do-work resume REQ-NNN`                                                                                                          |
+| Linear hard-stop / no MCP     | Connect Linear MCP + set `tracker.linear.team_id` (see [troubleshooting](troubleshooting.md#linear-tracker-backend))                                                                    |
 | do-work.io hard-stop / no MCP | Export `DOWORK_IO_PAT`, set `tracker.dowork.base_url` + `tracker.dowork.project` (see [troubleshooting](troubleshooting.md#do-workio-tracker-backend)) — do not paste the PAT into chat |
 
 Full table: [Troubleshooting](troubleshooting.md).

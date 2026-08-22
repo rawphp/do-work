@@ -25,6 +25,7 @@ When the orchestrator claims a REQ into `working/`, it inserts the following blo
 
 ```markdown
 <!-- claimed-start -->
+
 **Claimed by:** <agent-id>
 **Claimed at:** <ISO-8601 UTC>
 **Heartbeat:** <ISO-8601 UTC>
@@ -37,6 +38,7 @@ Example of a claimed REQ header:
 # REQ-115: Pre-flight concurrent-slot check
 
 <!-- claimed-start -->
+
 **Claimed by:** mbp-tom.42137
 **Claimed at:** 2026-05-15T14:03:22Z
 **Heartbeat:** 2026-05-15T14:03:22Z
@@ -48,16 +50,15 @@ Example of a claimed REQ header:
 
 ### Stamp lifecycle
 
-| Phase | Actor | Action |
-|---|---|---|
-| Claim time | Orchestrator (REQ-114) | Inserts `<!-- claimed-start … claimed-end -->` block after claiming the file into `working/` |
-| Pre-flight | Sibling orchestrators (REQ-115) | Read `working/REQ-*.md` files; parse the block to attribute each slot to its owning agent |
-| Archive time | Worker (this file) | Strips the `<!-- claimed-start … claimed-end -->` block before moving the file to `archive/` |
+| Phase        | Actor                           | Action                                                                                       |
+| ------------ | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| Claim time   | Orchestrator (REQ-114)          | Inserts `<!-- claimed-start … claimed-end -->` block after claiming the file into `working/` |
+| Pre-flight   | Sibling orchestrators (REQ-115) | Read `working/REQ-*.md` files; parse the block to attribute each slot to its owning agent    |
+| Archive time | Worker (this file)              | Strips the `<!-- claimed-start … claimed-end -->` block before moving the file to `archive/` |
 
 The stamp is a filesystem-visible, human-readable contract. Archived REQs do not retain ownership metadata — only the git commit message records which agent committed the change.
 
 ---
-
 
 ---
 
@@ -98,10 +99,10 @@ bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
 # bash {skill-root}/lib/ensure-integration-base.sh
 ```
 
-| Outcome | Action |
-|---------|--------|
-| **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (detached HEAD, invalid Issue slug, checkout/merge failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. Dirty trees on a protected default are allowed — uncommitted changes carry onto `new-work`. |
-| **Exit 0** | Script prints the final branch name on stdout. Record it as the run's **integration base**. Subsequent worker W1 reads this branch via `git rev-parse --abbrev-ref HEAD` (or `git branch --show-current`) on the orchestrator checkout at worktree create — workers do not call ensure themselves. |
+| Outcome           | Action                                                                                                                                                                                                                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Exit non-zero** | **Hard-stop** the run phase. Surface the script's stderr (detached HEAD, invalid Issue slug, checkout/merge failure, etc.). Do **not** claim REQs, dispatch workers, or provision worktrees. Dirty trees on a protected default are allowed — uncommitted changes carry onto `new-work`.           |
+| **Exit 0**        | Script prints the final branch name on stdout. Record it as the run's **integration base**. Subsequent worker W1 reads this branch via `git rev-parse --abbrev-ref HEAD` (or `git branch --show-current`) on the orchestrator checkout at worktree create — workers do not call ensure themselves. |
 
 **Hard rules (do not invent branch switches):**
 
@@ -160,12 +161,12 @@ STALE_SLOTS=$(bash {skill-root}/lib/scan-stale.sh)
 
 Glob `{project}/.do-work/working/REQ-*.md`. For each file found, read its ownership stamp (the `<!-- claimed-start --> … <!-- claimed-end -->` block) and classify the slot into one of three buckets. **Retain all three buckets in memory. Do not prompt at this stage regardless of what the stale bucket contains.**
 
-| Bucket | Condition | Action |
-|---|---|---|
-| **`mine`** | `**Claimed by:**` in the stamp matches `AGENT_ID` | Resume this REQ — skip the claim step and jump directly to worker dispatch for it |
-| **`sibling`** | `**Claimed by:**` is set, differs from `AGENT_ID`, AND the slot path is NOT in `$STALE_SLOTS` | Leave alone — another live orchestrator owns it |
+| Bucket                 | Condition                                                                                                                                                                                        | Action                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`mine`**             | `**Claimed by:**` in the stamp matches `AGENT_ID`                                                                                                                                                | Resume this REQ — skip the claim step and jump directly to worker dispatch for it                                                            |
+| **`sibling`**          | `**Claimed by:**` is set, differs from `AGENT_ID`, AND the slot path is NOT in `$STALE_SLOTS`                                                                                                    | Leave alone — another live orchestrator owns it                                                                                              |
 | **`out-of-milestone`** | Milestone mode is active (`.do-work/state/active-milestone.md` exists) AND the slot's milestone id (parsed from the filename: `REQ-M<n>-NNN-slug.md` → `M<n>`) differs from the active milestone | Silently ignore — treat the same as `sibling` (a previous-milestone REQ still in flight during a milestone transition is informational only) |
-| **`stale`** | Slot path appears in `$STALE_SLOTS` output | Hold in memory — surface only as fallback when backlog has no claimable REQ |
+| **`stale`**            | Slot path appears in `$STALE_SLOTS` output                                                                                                                                                       | Hold in memory — surface only as fallback when backlog has no claimable REQ                                                                  |
 
 ### 3a. Timestamp reasoning rule
 
@@ -183,7 +184,7 @@ token from `scan-stale.sh`'s output — not the raw ISO timestamp.
 
 ### 3b. Legacy stranded REQ triage (advisory — no automatic state change)
 
-While classifying `working/` slots in §3, also identify **legacy stranded REQs**: files whose `**Status:**` is `stopped` and whose `**Reason:**` value is not in the canonical stop-reason vocabulary. The recognized set is the full union printed by `bash {skill-root}/lib/stop-reasons.sh --all` — the 8 worker-written reasons (`tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`) **plus** the 5 orchestrator-assigned reasons (`policy-blocked`, `review-failed`, `archive-integrity`, `path-unit-incomplete`, `missing-closure-proof`). A REQ correctly stopped by the orchestrator's own policy/review/archive gate is therefore **not** legacy stranded. The canonical example of a reason that *is* legacy stranded is `awaiting-human-verification`, an improvised reason from an older human-wait flow that is not in `lib/stop-reasons.sh --all`.
+While classifying `working/` slots in §3, also identify **legacy stranded REQs**: files whose `**Status:**` is `stopped` and whose `**Reason:**` value is not in the canonical stop-reason vocabulary. The recognized set is the full union printed by `bash {skill-root}/lib/stop-reasons.sh --all` — the 8 worker-written reasons (`tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `unknown-error`, `concurrent-conflict`) **plus** the 5 orchestrator-assigned reasons (`policy-blocked`, `review-failed`, `archive-integrity`, `path-unit-incomplete`, `missing-closure-proof`). A REQ correctly stopped by the orchestrator's own policy/review/archive gate is therefore **not** legacy stranded. The canonical example of a reason that _is_ legacy stranded is `awaiting-human-verification`, an improvised reason from an older human-wait flow that is not in `lib/stop-reasons.sh --all`.
 
 `lib/stop-reasons.sh` is the authority for the recognized set — do not re-hand-copy the list elsewhere; consult `bash {skill-root}/lib/stop-reasons.sh --all` for the live vocabulary (adding a reason there automatically extends this triage, so the two copies cannot drift).
 
@@ -243,7 +244,7 @@ Reached only when `pick-req.sh` returned no candidate AND the `mine` bucket is e
 
   - **Reclaim into this run:** For each stale REQ, rewrite its stamp to the local `AGENT_ID` and a fresh `**Claimed at:**` (ISO-8601 UTC). These REQs become the first ones this orchestrator processes in the loop — treat them as `mine`.
 
-    Before rewriting the stamp, classify *why* the slot went stale and emit feedback (best-effort, non-blocking) iff there has been **no commit activity** touching any path under the REQ's `**Files:**` declaration in the last hour:
+    Before rewriting the stamp, classify _why_ the slot went stale and emit feedback (best-effort, non-blocking) iff there has been **no commit activity** touching any path under the REQ's `**Files:**` declaration in the last hour:
 
     ```bash
     LAST_COMMIT_AGE_SEC=$(($(date +%s) - $(git log -1 --format=%ct -- <files-from-REQ> 2>/dev/null || echo 0)))
@@ -324,9 +325,9 @@ After classifying `subagent_type`, pick a `model` for the dispatch. Default to `
 
 Two structural signals are read directly from the REQ header and take precedence over everything below — check them first, in order:
 
-| Primary signal | model |
-|---|---|
-| REQ has a previous `status: stopped` attempt recorded in its body (retry after Sonnet failed) | `opus` |
+| Primary signal                                                                                                    | model  |
+| ----------------------------------------------------------------------------------------------------------------- | ------ |
+| REQ has a previous `status: stopped` attempt recorded in its body (retry after Sonnet failed)                     | `opus` |
 | REQ header carries `**Size:** L` (capture sized this REQ large from its file count / layer span / criteria count) | `opus` |
 
 If either primary signal fires, select `opus` and skip the lexical scan. The `**Size:**` field, when present, is capture's own up-front difficulty estimate — trust it over re-deriving difficulty from prose.
@@ -335,12 +336,12 @@ If either primary signal fires, select `opus` and skip the lexical scan. The `**
 
 When the REQ has **no `**Size:**` field** (legacy REQs, or capture left it off because the shape was ambiguous), fall back to scanning the REQ's `## Task`, `## Context`, and `## Acceptance Criteria` (top to bottom; first match wins). When `**Size:** S` or `**Size:** M` is present, these lexical rules still apply as a secondary check but never downgrade a `Size: L`:
 
-| Fallback signal in REQ | model |
-|---|---|
-| Task touches 4+ distinct files, OR spans 3+ layers (e.g. controller + model + view + test) | `opus` |
-| Task introduces new architecture: new service, new abstraction, new module boundary, schema design, or "design X" | `opus` |
-| Task involves debugging across layers, race conditions, concurrency, or performance investigation | `opus` |
-| `subagent_type` is `feature-dev:code-architect` or `feature-dev:code-reviewer` | `opus` |
+| Fallback signal in REQ                                                                                                                                | model    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Task touches 4+ distinct files, OR spans 3+ layers (e.g. controller + model + view + test)                                                            | `opus`   |
+| Task introduces new architecture: new service, new abstraction, new module boundary, schema design, or "design X"                                     | `opus`   |
+| Task involves debugging across layers, race conditions, concurrency, or performance investigation                                                     | `opus`   |
+| `subagent_type` is `feature-dev:code-architect` or `feature-dev:code-reviewer`                                                                        | `opus`   |
 | Anything else: single-file edits, doc/markdown updates, agent/skill/config edits, mechanical refactors, scoped bug fixes, test additions, exploration | `sonnet` |
 
 ### Fallback rule
@@ -352,7 +353,6 @@ When in doubt, **default to `sonnet`**. The worker's stopping-rules already catc
 The chosen `model` appears in the per-REQ announce line alongside `subagent_type` (see Step 1).
 
 ---
-
 
 ---
 
@@ -384,7 +384,7 @@ Resolve whether milestone mode is active via the tracker backend (REQ-298 Linear
 
 #### Step 1.0a — Sibling idle-waiting (milestone mode, empty active-milestone backlog)
 
-Reached only when Step 1.0 found the active milestone's backlog empty. The local orchestrator may be a *sibling* — another orchestrator could already be handling the deploy gate. Do not fall through to `## When the Backlog is Empty` yet; first check whether a gate is in progress.
+Reached only when Step 1.0 found the active milestone's backlog empty. The local orchestrator may be a _sibling_ — another orchestrator could already be handling the deploy gate. Do not fall through to `## When the Backlog is Empty` yet; first check whether a gate is in progress.
 
 1. Re-read the active cursor and capture as `<active_at_entry>`:
    - **Markdown:** re-read `{project}/.do-work/state/active-milestone.md`.
@@ -447,12 +447,12 @@ rm -f "$PICK_STDERR"
 
 `drain-classify.sh` (REQ-152) reads the stderr lines and emits one of four labels, precedence `overlap-blocked > deps-blocked > scope-blocked > truly-empty`:
 
-| Classification | Meaning | Action |
-|---|---|---|
-| `overlap-blocked` | At least one candidate blocked by footprint overlap with a sibling slot | Idle-wait (see below) |
-| `deps-blocked` | All survivors blocked on unsatisfied dependencies | Idle-wait (see below) |
-| `scope-blocked` | All candidates excluded by the `<scope>` filter | Idle-wait (see below) — a new capture or a scope change can add eligible REQs |
-| `truly-empty` | No candidates considered at all (backlog drained for this picker view) | Fall through to `## When the Backlog is Empty` |
+| Classification    | Meaning                                                                 | Action                                                                        |
+| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `overlap-blocked` | At least one candidate blocked by footprint overlap with a sibling slot | Idle-wait (see below)                                                         |
+| `deps-blocked`    | All survivors blocked on unsatisfied dependencies                       | Idle-wait (see below)                                                         |
+| `scope-blocked`   | All candidates excluded by the `<scope>` filter                         | Idle-wait (see below) — a new capture or a scope change can add eligible REQs |
+| `truly-empty`     | No candidates considered at all (backlog drained for this picker view)  | Fall through to `## When the Backlog is Empty`                                |
 
 **Idle-wait loop** (entered on `overlap-blocked`, `deps-blocked`, or `scope-blocked`). Log the entry classification once, then poll every **30 seconds**, max **30 minutes**:
 
@@ -580,11 +580,11 @@ The worker's stdout does not stream back to the orchestrator — only its final 
 
 The worker's final message is a fenced YAML block matching the schema defined in [agents/run-worker.md](run-worker.md) `## Return Report`. Parse it. Branch on `status`:
 
-| `status` | Action |
-|---|---|
-| `done` | Capture `commit` hash and `outputs`. Continue to Step 4 (Integrate). |
-| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). Continue to Step 5 (Recover) — handle per `## Stopping Rules`. Skip Step 4. **Workers never report a human-wait stopper** — there is no `awaiting-human-verification` reason. Inherently non-executable verification steps are *deferred* by the worker (returned in `deferred_checks:`) and are recorded as advisory manual checks during the normal archive path. |
-| `failed` | The worker crashed before completing. Treat as `stopped` with `reason: unknown-error`. |
+| `status`  | Action                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `done`    | Capture `commit` hash and `outputs`. Continue to Step 4 (Integrate).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `stopped` | The worker hit a stopper (`reason` enum: `tests-failing`, `verification-failing`, `missing-creds`, `ambiguous-criteria`, `scope-creep`, `dependency-missing`, `concurrent-conflict`, `unknown-error`). Continue to Step 5 (Recover) — handle per `## Stopping Rules`. Skip Step 4. **Workers never report a human-wait stopper** — there is no `awaiting-human-verification` reason. Inherently non-executable verification steps are _deferred_ by the worker (returned in `deferred_checks:`) and are recorded as advisory manual checks during the normal archive path. |
+| `failed`  | The worker crashed before completing. Treat as `stopped` with `reason: unknown-error`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 If the worker's report is missing or unparseable, treat as `status: failed` with `reason: unknown-error` and surface the raw output to the user.
 
@@ -681,10 +681,10 @@ Collect ledger inputs while the run progresses: REQ id (or Linear issue id), age
 
 **Backend branch for run notes (REQ-294):**
 
-| Backend | Authoritative note | Optional local file |
-|---------|--------------------|---------------------|
-| **markdown** | When `ledger.enabled`: `lib/run-ledger.sh` → `.do-work/runs/RUN-NNN.yml` (`append_run_note` in `markdown.md`) | same file is the store |
-| **linear** | **`append_run_note`** on the Issue (YAML-fenced comment per `linear.md`) | If `ledger.enabled: true`, **may also** write `RUN-NNN.yml` via `lib/run-ledger.sh` — **telemetry only**, not a second work-item store. Retro prefers Linear comments; falls back to local runs if comments unavailable |
+| Backend      | Authoritative note                                                                                            | Optional local file                                                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown** | When `ledger.enabled`: `lib/run-ledger.sh` → `.do-work/runs/RUN-NNN.yml` (`append_run_note` in `markdown.md`) | same file is the store                                                                                                                                                                                                  |
+| **linear**   | **`append_run_note`** on the Issue (YAML-fenced comment per `linear.md`)                                      | If `ledger.enabled: true`, **may also** write `RUN-NNN.yml` via `lib/run-ledger.sh` — **telemetry only**, not a second work-item store. Retro prefers Linear comments; falls back to local runs if comments unavailable |
 
 When `ledger.enabled` is true (either backend), record one append-only local run ledger entry per worker attempt under `{project}/.do-work/runs/RUN-NNN.yml` using `lib/run-ledger.sh` — under Linear this is the optional telemetry path above, **in addition to** `append_run_note`.
 
@@ -731,7 +731,7 @@ When the budget is non-empty:
    - **`SPENT < BUDGET` ⇒ under budget.** Continue normally to Step 4 (Integrate) and loop.
    - **`SPENT >= BUDGET` ⇒ budget exhausted.** Do **not** abandon the current attempt. **Finish the current REQ's integration first** (complete Step 4 fully — merge/archive/teardown/commit, or the PR delivery sequence — so the loop never stops mid-merge or mid-archive). Then, at the REQ boundary (where Step 8 would normally claim the next REQ), **stop gracefully** instead of looping: emit the **budget-stop report** and end the run.
 
-> **JUDGMENT:** The gate trips *after* the attempt that crossed the line, never mid-attempt. An in-flight integration always completes — abandoning a half-merged REQ would corrupt state, which is a worse failure than a small budget overshoot. The estimate is tier-weighted (see budget unit above), so the report names spend as an estimate, not a metered total.
+> **JUDGMENT:** The gate trips _after_ the attempt that crossed the line, never mid-attempt. An in-flight integration always completes — abandoning a half-merged REQ would corrupt state, which is a worse failure than a small budget overshoot. The estimate is tier-weighted (see budget unit above), so the report names spend as an estimate, not a metered total.
 
 **Budget-stop report** (print before ending; under `next_steps.enabled` + standalone, surface via `AskUserQuestion` like a stopper, else print and stop):
 
@@ -767,10 +767,10 @@ The guards in 4b and 4-pr.4 (path-unit closure and non-empty closure proof) and 
 
 From the orchestrator's checkout (the main working tree, NOT the worktree). Branch name is backend-specific:
 
-| Backend | Feature branch | Merge subject |
-|---------|----------------|---------------|
-| **markdown** | `req/REQ-NNN` | `merge(REQ-NNN): integrate` |
-| **linear** | `req/<sanitized-linear-id>` (e.g. `req/ENG-123` — same string worker created via linear.md Branch sanitize) | `merge(ENG-123): integrate` |
+| Backend      | Feature branch                                                                                              | Merge subject               |
+| ------------ | ----------------------------------------------------------------------------------------------------------- | --------------------------- |
+| **markdown** | `req/REQ-NNN`                                                                                               | `merge(REQ-NNN): integrate` |
+| **linear**   | `req/<sanitized-linear-id>` (e.g. `req/ENG-123` — same string worker created via linear.md Branch sanitize) | `merge(ENG-123): integrate` |
 
 ```bash
 # markdown:
@@ -807,8 +807,8 @@ Read the worker's YAML report's `outputs:` list and `closure_proof` value.
 3. Update `**Status:**` to `done`.
 4. Write the worker's `closure_proof` value into `**Closure proof:**`. If the header is absent, insert it before `**Files:**`.
 5. Append a `## Outputs` section based on the `outputs:` array from the worker's YAML report. One bullet per entry: `- <path> — <description>`.
-5a. **Manual checks (advisory).** If the worker report's `deferred_checks:` list is non-empty OR the REQ already carries a `## Manual checks (advisory)` section, consolidate all deferred items into that section before archiving. Create the section if absent. Keep existing bullets, and add one unchecked bullet per worker item: `- [ ] <step text> (<category>: <reason>)`. This section is advisory only; it never blocks archive. If any consolidated item carries `category: suite-not-run`, additionally write a `**Suite:** not-run` header field on the archived REQ (placed with the other header fields, below `**Closure proof:**`). This marker makes `lib/derive-status.sh` derive the REQ `unproven` even though it archives as `done` — archive and merge are unaffected; only the derived proof view changes. Human/device/environment deferrals never carry `category: suite-not-run` and never produce this marker.
-5b. **Archive-integrity gate.** With the working file now fully rewritten, run the deterministic guardrail on it before the move:
+   5a. **Manual checks (advisory).** If the worker report's `deferred_checks:` list is non-empty OR the REQ already carries a `## Manual checks (advisory)` section, consolidate all deferred items into that section before archiving. Create the section if absent. Keep existing bullets, and add one unchecked bullet per worker item: `- [ ] <step text> (<category>: <reason>)`. This section is advisory only; it never blocks archive. If any consolidated item carries `category: suite-not-run`, additionally write a `**Suite:** not-run` header field on the archived REQ (placed with the other header fields, below `**Closure proof:**`). This marker makes `lib/derive-status.sh` derive the REQ `unproven` even though it archives as `done` — archive and merge are unaffected; only the derived proof view changes. Human/device/environment deferrals never carry `category: suite-not-run` and never produce this marker.
+   5b. **Archive-integrity gate.** With the working file now fully rewritten, run the deterministic guardrail on it before the move:
    ```bash
    bash {skill-root}/lib/check-archive-integrity.sh {project}/.do-work/working/REQ-NNN-slug.md
    ```
@@ -854,7 +854,7 @@ Proceed to Step 7.
 
 #### 4-pr. PR delivery (delivery.mode: pr)
 
-Runs *instead of* 4a–4d when `config.delivery.mode` is `pr`. The closure-proof model is unchanged — evidence still gates archive; the PR is the delivery vehicle, not the proof. Execute these substeps in order; each must succeed before the next.
+Runs _instead of_ 4a–4d when `config.delivery.mode` is `pr`. The closure-proof model is unchanged — evidence still gates archive; the PR is the delivery vehicle, not the proof. Execute these substeps in order; each must succeed before the next.
 
 **4-pr.0 Precondition — remote + `gh` (never a silent merge fallback).** Before any push, verify both:
 
@@ -939,7 +939,7 @@ Remaining in backlog: N
 
 ### Step 7b: Milestone deploy-gate check (milestone mode only)
 
-The deploy-gate prompt is **owned by the orchestrator, not the worker**. The worker has no user-interaction surface and is explicitly forbidden from auto-confirming any gate. Under parallelism, only **one** orchestrator surfaces the prompt to the user — the first to detect milestone completion *and* observe a fully drained milestone backlog.
+The deploy-gate prompt is **owned by the orchestrator, not the worker**. The worker has no user-interaction surface and is explicitly forbidden from auto-confirming any gate. Under parallelism, only **one** orchestrator surfaces the prompt to the user — the first to detect milestone completion _and_ observe a fully drained milestone backlog.
 
 **Is milestone mode active?**
 
@@ -952,7 +952,7 @@ If milestone mode is active:
 
 1. Read `milestone_complete` from the worker's most recent return report.
 2. **Markdown:** if `milestone_complete` is `false`, continue the loop normally — claim the next REQ. If `true`, run the **first-to-detect drain check** before showing any prompt.
-3. **Linear:** if `milestone_complete` is `true`, **or** after a successful archive **`list_milestone_reqs`** for active M with status `backlog` is empty (and claimable for that M is empty), run the drain check. Worker `milestone_complete` alone is not required when the orchestrator can prove the M backlog is empty via port ops. First-to-detect still means *first whose drain check passes* and who claims the local gate.
+3. **Linear:** if `milestone_complete` is `true`, **or** after a successful archive **`list_milestone_reqs`** for active M with status `backlog` is empty (and claimable for that M is empty), run the drain check. Worker `milestone_complete` alone is not required when the orchestrator can prove the M backlog is empty via port ops. First-to-detect still means _first whose drain check passes_ and who claims the local gate.
 
 #### Step 7b.1 — Drain confirmation
 
@@ -1033,18 +1033,18 @@ Then (both backends):
 
 #### State file: `gate-owner.md` (local — both backends)
 
-| Action | Actor | When |
-|---|---|---|
-| **Write** | Gate-owning orchestrator (Step 7b.2) via **`write_gate_state`** | After drain confirmation passes, before printing the gate prompt |
-| **Read** | Sibling orchestrators (Step 1.0a) | When their active-milestone backlog is empty, to attribute the idle log line |
-| **Delete** | Gate-owning orchestrator (Step 7b.3 or Step 7b.4) | After the user answers y or n, before exit |
+| Action     | Actor                                                           | When                                                                         |
+| ---------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Write**  | Gate-owning orchestrator (Step 7b.2) via **`write_gate_state`** | After drain confirmation passes, before printing the gate prompt             |
+| **Read**   | Sibling orchestrators (Step 1.0a)                               | When their active-milestone backlog is empty, to attribute the idle log line |
+| **Delete** | Gate-owning orchestrator (Step 7b.3 or Step 7b.4)               | After the user answers y or n, before exit                                   |
 
 Contents: a single line — the gate-owner's `AGENT_ID`. No header, no trailing data. If the file is ever found with malformed contents, treat as absent and continue. **Never** store gate ownership in Linear (design §11 / REQ-298 path; REQ-299 concurrent serialize). Concurrent claims use **`write_gate_state`** re-read rules so ownership serializes via this local file even when the milestone cursor is remote.
 
 #### Non-delegation
 
 - **Sign-off is non-delegable.** The orchestrator must NOT auto-confirm the deploy gate. The orchestrator must NOT attempt to deploy or test deployment itself. The worker is also forbidden from these actions (see [agents/run-worker.md](run-worker.md)).
-- Only the *which orchestrator owns showing the prompt* changes under parallelism. The prompt text and the requirement for an explicit human y/n answer are unchanged.
+- Only the _which orchestrator owns showing the prompt_ changes under parallelism. The prompt text and the requirement for an explicit human y/n answer are unchanged.
 
 ### Step 8: Loop
 
@@ -1056,7 +1056,6 @@ A REQ with `deferred_checks:` is not a stopper — its code merged, its advisory
 
 ---
 
-
 ---
 
 ## Stopping Rules
@@ -1065,16 +1064,16 @@ Workers cannot pause and ask the user — they have no interaction surface. Ever
 
 ### Stopper category → worker `reason` enum
 
-| Situation | Worker emits `reason` |
-|-----------|----------------------|
-| Tests cannot be made to pass after 3 attempts | `tests-failing` |
-| Verification steps fail after 3 attempts | `verification-failing` |
-| A REQ has unmet dependencies on another REQ not yet complete | `dependency-missing` |
-| Task requires external credentials or access not available | `missing-creds` |
-| Acceptance criteria are ambiguous and cannot be interpreted | `ambiguous-criteria` |
-| A change would affect files outside the REQ's stated scope | `scope-creep` |
-| Commit or merge conflict unresolved after 5 retries (see run-worker.md `## Concurrent-Conflict Retry`) | `concurrent-conflict` |
-| Any other unrecoverable error | `unknown-error` |
+| Situation                                                                                              | Worker emits `reason`  |
+| ------------------------------------------------------------------------------------------------------ | ---------------------- |
+| Tests cannot be made to pass after 3 attempts                                                          | `tests-failing`        |
+| Verification steps fail after 3 attempts                                                               | `verification-failing` |
+| A REQ has unmet dependencies on another REQ not yet complete                                           | `dependency-missing`   |
+| Task requires external credentials or access not available                                             | `missing-creds`        |
+| Acceptance criteria are ambiguous and cannot be interpreted                                            | `ambiguous-criteria`   |
+| A change would affect files outside the REQ's stated scope                                             | `scope-creep`          |
+| Commit or merge conflict unresolved after 5 retries (see run-worker.md `## Concurrent-Conflict Retry`) | `concurrent-conflict`  |
+| Any other unrecoverable error                                                                          | `unknown-error`        |
 
 The worker captures relevant details in the report's `details` field. The worker does not retry beyond what's defined in [agents/run-worker.md](run-worker.md) and never asks the user a question — it exits with the structured report.
 
@@ -1094,7 +1093,7 @@ If this agent is running as a **delegate** inside go: print the stopper and the 
 
 ### Per-REQ retry counter (ambiguous-criteria recurrence)
 
-The orchestrator tracks per-REQ stopped-reason occurrences so a *second* `ambiguous-criteria` stop on the same REQ can surface as feedback (a single ambiguity is normal; a second on the same REQ means the user-facing clarification did not stick or the REQ wording is genuinely defective).
+The orchestrator tracks per-REQ stopped-reason occurrences so a _second_ `ambiguous-criteria` stop on the same REQ can surface as feedback (a single ambiguity is normal; a second on the same REQ means the user-facing clarification did not stick or the REQ wording is genuinely defective).
 
 Counter store: `{project}/.do-work/state/retry-counters.md`. Format — one Markdown table row per (REQ, reason) pair:
 
@@ -1121,10 +1120,9 @@ When the worker returns `status: stopped`, `reason: ambiguous-criteria`:
 
 3. Proceed to the existing user-interaction step above (AskUserQuestion or stop-and-print).
 
-> **JUDGMENT:** Fire feedback only on the 2nd+ occurrence — the first stop is the worker doing its job; the second is the signal. Title states the REQ id and occurrence count so the human inbox immediately knows which REQ needs editing. The body must point at the *criteria* as the problem (not the worker, not the model) so the human reaches for the REQ file rather than a retry button.
+> **JUDGMENT:** Fire feedback only on the 2nd+ occurrence — the first stop is the worker doing its job; the second is the signal. Title states the REQ id and occurrence count so the human inbox immediately knows which REQ needs editing. The body must point at the _criteria_ as the problem (not the worker, not the model) so the human reaches for the REQ file rather than a retry button.
 
 ---
-
 
 ## Field traps (orchestrator — from field-lessons)
 

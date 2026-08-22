@@ -42,6 +42,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -49,22 +50,24 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 ### Close report home — backend branch (REQ-296)
 
-| Backend | Where the closure report lives |
-|---------|--------------------------------|
-| **markdown** | `{project}/.do-work/user-requests/UR-NNN/closure.md` (+ optional `closure-evidence/`) |
-| **linear** | Port op **`write_close_report`** — do-work Issue (Project Milestone) description **`## Closure`** + milestone comment with the full report (`agents/tracker/linear.md`). Do **not** dual-write authoritative `closure.md` under `user-requests/`. Optional local evidence files for screenshots are fine; the report home is the Project Milestone. |
-| **sqlite** | Port op **`write_close_report`** → `bash {skill-root}/lib/dw-db.sh write-close {project} UR-NNN --body TEXT` (sets `closed_at`). Path-units via `list-reqs` + Entry/Terminal filter (Layer-agnostic). **Do not** create `user-requests/…/closure.md` as the store. Evidence binaries under `.do-work/evidence/UR-NNN/closure-evidence/` only. |
-| **do-work-io** | Port op **`write_close_report`** (`ur_write-close-report` / `ur.write-close-report` in `agents/tracker/do-work-io.md`) — sets Issue `closed_at`. **Do not** dual-write `user-requests/…/closure.md`. Evidence binaries under `.do-work/evidence/UR-NNN/closure-evidence/` only. |
+| Backend        | Where the closure report lives                                                                                                                                                                                                                                                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown**   | `{project}/.do-work/user-requests/UR-NNN/closure.md` (+ optional `closure-evidence/`)                                                                                                                                                                                                                                                               |
+| **linear**     | Port op **`write_close_report`** — do-work Issue (Project Milestone) description **`## Closure`** + milestone comment with the full report (`agents/tracker/linear.md`). Do **not** dual-write authoritative `closure.md` under `user-requests/`. Optional local evidence files for screenshots are fine; the report home is the Project Milestone. |
+| **sqlite**     | Port op **`write_close_report`** → `bash {skill-root}/lib/dw-db.sh write-close {project} UR-NNN --body TEXT` (sets `closed_at`). Path-units via `list-reqs` + Entry/Terminal filter (Layer-agnostic). **Do not** create `user-requests/…/closure.md` as the store. Evidence binaries under `.do-work/evidence/UR-NNN/closure-evidence/` only.       |
+| **do-work-io** | Port op **`write_close_report`** (`ur_write-close-report` / `ur.write-close-report` in `agents/tracker/do-work-io.md`) — sets Issue `closed_at`. **Do not** dual-write `user-requests/…/closure.md`. Evidence binaries under `.do-work/evidence/UR-NNN/closure-evidence/` only.                                                                     |
 
 **When effective backend is `linear`:** load the brief and path-unit Linear issues (REQs) via port ops (`read_ur`, `list_reqs_for_ur` / done-equivalent issues) rather than assuming local `input.md` / `archive/` are the store. Walk still runs against the **merged app** (local git). Persist only via **`write_close_report`**. Path-unit ids are **Linear issue identifiers** (e.g. `ENG-123`) — see linear.md **Close path-unit collection**.
 
 **When effective backend is `sqlite` (1S):**
+
 - Brief / path-units: `get-ur` / `list-reqs --ur UR-NNN` via dw-db; select path-units by non-empty Entry point + Terminal state (prefer `layer=none` when present; if none, fall back to any REQ with both path fields — field lesson §19)
 - Persist only via **`write-close`** — never dual-write `user-requests/UR-NNN/closure.md`
 - Evidence screenshots under `.do-work/evidence/UR-NNN/closure-evidence/` only
 - Hard-stop if dw-db fails
 
 **When effective backend is `do-work-io` (1D):**
+
 - Brief / path-units: **`read_ur`** + **`list_reqs_for_ur`** (`ur.get` / `req.list`) via `agents/tracker/do-work-io.md`; select path-units by Layer/Entry/Terminal fields (`req` = `REQ-NNN` slug)
 - Persist only via **`write_close_report`** — never dual-write `user-requests/UR-NNN/closure.md`
 - Evidence screenshots under `.do-work/evidence/UR-NNN/closure-evidence/` only
@@ -76,12 +79,12 @@ Keep these values in context: `test.suite_command` (for degraded `evidence-by-te
 
 **Backend branch (REQ-297):**
 
-| Backend | Brief source |
-|---------|--------------|
-| **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. If missing → report `"UR-NNN/input.md not found at {path}. Cannot close without a brief."` and stop. Do not write a partial `closure.md`. |
-| **linear** | Call port op **`read_ur`** for `UR-NNN` (Project Milestone description: `## Brief` and machine sections). If milestone / product Project missing → hard-stop with that error; do not invent a brief; do not fall back to local `input.md` as the store. |
-| **sqlite** | `bash {skill-root}/lib/dw-db.sh get-ur {project} UR-NNN` (title/brief). Missing → hard-stop; do not invent a local `input.md`. |
-| **do-work-io** | Port op **`read_ur`** (`ur.get`) for `UR-NNN`. Missing → hard-stop; do not invent a local `input.md`. |
+| Backend        | Brief source                                                                                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown**   | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. If missing → report `"UR-NNN/input.md not found at {path}. Cannot close without a brief."` and stop. Do not write a partial `closure.md`.                                              |
+| **linear**     | Call port op **`read_ur`** for `UR-NNN` (Project Milestone description: `## Brief` and machine sections). If milestone / product Project missing → hard-stop with that error; do not invent a brief; do not fall back to local `input.md` as the store. |
+| **sqlite**     | `bash {skill-root}/lib/dw-db.sh get-ur {project} UR-NNN` (title/brief). Missing → hard-stop; do not invent a local `input.md`.                                                                                                                          |
+| **do-work-io** | Port op **`read_ur`** (`ur.get`) for `UR-NNN`. Missing → hard-stop; do not invent a local `input.md`.                                                                                                                                                   |
 
 The brief is the user's own words — the contract the integrated app must satisfy. You read it for orientation only; the validated contract is each path-unit's declared entry point and terminal state (Step 2).
 
@@ -97,27 +100,27 @@ Do not read `**Closure proof:**`. Do not read non-path-unit items except to conf
 
 **Backend branch (REQ-297):**
 
-| Backend | How to collect path-units |
-|---------|---------------------------|
-| **markdown** | Scan `{project}/.do-work/archive/` for every `REQ-*.md` whose `**UR:**` field is `UR-NNN`. `req` = the `REQ-NNN` id. |
-| **linear** | Follow linear.md **Close path-unit collection**: resolve shared product Project + do-work Issue milestone; **`list_reqs_for_ur`** (include done/archived-equivalent Linear issues); select path-units by non-empty Entry/Terminal (Layer-agnostic; prefer `Layer: none` when present). **`req` = Linear issue identifier** only — never invent parallel `REQ-NNN` ids. Do not scan local `archive/` as the store. |
-| **sqlite** | `list-reqs --ur UR-NNN` via dw-db; same Entry/Terminal selection as Step 2 definition. `req` = `REQ-NNN` slug. Do not scan local `archive/` as the store. |
-| **do-work-io** | **`list_reqs_for_ur`** (`req.list`) via `agents/tracker/do-work-io.md`; select path-units by non-empty Entry/Terminal (Layer-agnostic; prefer `Layer: none` when present). `req` = `REQ-NNN` slug. Do not scan local `archive/` as the store. |
+| Backend        | How to collect path-units                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown**   | Scan `{project}/.do-work/archive/` for every `REQ-*.md` whose `**UR:**` field is `UR-NNN`. `req` = the `REQ-NNN` id.                                                                                                                                                                                                                                                                                              |
+| **linear**     | Follow linear.md **Close path-unit collection**: resolve shared product Project + do-work Issue milestone; **`list_reqs_for_ur`** (include done/archived-equivalent Linear issues); select path-units by non-empty Entry/Terminal (Layer-agnostic; prefer `Layer: none` when present). **`req` = Linear issue identifier** only — never invent parallel `REQ-NNN` ids. Do not scan local `archive/` as the store. |
+| **sqlite**     | `list-reqs --ur UR-NNN` via dw-db; same Entry/Terminal selection as Step 2 definition. `req` = `REQ-NNN` slug. Do not scan local `archive/` as the store.                                                                                                                                                                                                                                                         |
+| **do-work-io** | **`list_reqs_for_ur`** (`req.list`) via `agents/tracker/do-work-io.md`; select path-units by non-empty Entry/Terminal (Layer-agnostic; prefer `Layer: none` when present). `req` = `REQ-NNN` slug. Do not scan local `archive/` as the store.                                                                                                                                                                     |
 
 **Empty case.** If zero path-units are found, skip Steps 3–4 and go straight to Step 5 with the empty-case schema (`path_units: 0`, `overall: no-path-units`).
 
 ### 3. Classify and walk each path-unit
 
-For each path-unit, classify its `**Entry point:**` into a **walk kind** by keyword, then run the matching probe **in the merged app** — on the merged branch, post-integration, never inside a worktree. Each probe produces an *observed state* you compare against the declared `terminal_state`.
+For each path-unit, classify its `**Entry point:**` into a **walk kind** by keyword, then run the matching probe **in the merged app** — on the merged branch, post-integration, never inside a worktree. Each probe produces an _observed state_ you compare against the declared `terminal_state`.
 
-| Walk kind | Detection signal in `**Entry point:**` | Walk action | Observed-state source |
-|---|---|---|---|
-| `web` | path like `/route`, "page", "screen", "UI", "renders", "visits", "badge" | Navigate with Playwright (`browser_navigate`), snapshot the DOM, assert the terminal-state markers are present | rendered DOM + console errors |
-| `api` | "endpoint", `GET`/`POST`/`PUT`/`DELETE`, "API", a URL with a verb | `curl` the endpoint (method + representative payload), capture status + body | HTTP status + JSON/body shape |
-| `cli` | "run `cmd`", "command", "invokes", a shell invocation | Invoke the command via `Bash` with representative args, capture exit code + stdout/stderr | exit code + output |
-| `library` | "export", "function", "module", "import", "calls `fn()`" | Call the export through the test harness (`test.suite_command` scoped to a targeted call, or an inline harness snippet) | return value / assertion result |
-| `slash-command` | "`/do-work`", "slash command", "skill", or any surface that runs in a **different harness** than this closure run | Not live-walkable from here → degraded (Step 4) | — |
-| `human` | "user does", a manual workflow step with no automatable surface | Not live-walkable → degraded (Step 4) | — |
+| Walk kind       | Detection signal in `**Entry point:**`                                                                            | Walk action                                                                                                             | Observed-state source           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `web`           | path like `/route`, "page", "screen", "UI", "renders", "visits", "badge"                                          | Navigate with Playwright (`browser_navigate`), snapshot the DOM, assert the terminal-state markers are present          | rendered DOM + console errors   |
+| `api`           | "endpoint", `GET`/`POST`/`PUT`/`DELETE`, "API", a URL with a verb                                                 | `curl` the endpoint (method + representative payload), capture status + body                                            | HTTP status + JSON/body shape   |
+| `cli`           | "run `cmd`", "command", "invokes", a shell invocation                                                             | Invoke the command via `Bash` with representative args, capture exit code + stdout/stderr                               | exit code + output              |
+| `library`       | "export", "function", "module", "import", "calls `fn()`"                                                          | Call the export through the test harness (`test.suite_command` scoped to a targeted call, or an inline harness snippet) | return value / assertion result |
+| `slash-command` | "`/do-work`", "slash command", "skill", or any surface that runs in a **different harness** than this closure run | Not live-walkable from here → degraded (Step 4)                                                                         | —                               |
+| `human`         | "user does", a manual workflow step with no automatable surface                                                   | Not live-walkable → degraded (Step 4)                                                                                   | —                               |
 
 Detection is keyword-driven off the already-structured `**Entry point:**` field — route the surface that was recorded; do not invent a surface. When a `web`/`api`/`cli`/`library` entry point cannot be made automatable in practice (no dev server you can start, missing runtime), treat it as not-automatable and fall through to Step 4 rather than guessing.
 
@@ -135,18 +138,18 @@ Respect config: never run a probe whose command trips `security.blocked_commands
 
 ### 4. Degraded mode (never a silent skip)
 
-When an entry point is **not automatable** — a `human` step, a `slash-command`/skill that runs in a *different harness* than the one executing this closure agent (do-work closing itself is the canonical case), or a `web`/`api`/`cli`/`library` surface that genuinely cannot be exercised here — you do not silently skip and you do not auto-fail. Record one of two degraded verdicts:
+When an entry point is **not automatable** — a `human` step, a `slash-command`/skill that runs in a _different harness_ than the one executing this closure agent (do-work closing itself is the canonical case), or a `web`/`api`/`cli`/`library` surface that genuinely cannot be exercised here — you do not silently skip and you do not auto-fail. Record one of two degraded verdicts:
 
 - **`degraded:evidence-by-test`** — the integrated test suite covers this path-unit's behaviour. Run `test.suite_command` (from config) and cite the specific passing test(s) as the evidence. Use this whenever a real automated proof exists, even though it is not at the live entry-point surface. `evidence_ref` = the test name(s) + suite result.
 - **`degraded:human-confirmed`** — no automatable surface and no covering test. Emit **one explicit `AskUserQuestion`** describing the path-unit, its entry point, and what "reached terminal state" would look like; record the human's confirm/deny as the evidence. Never assume; always prompt. `evidence_ref` = the human-confirm prompt id and the answer.
 
 A degraded verdict is a **first-class outcome**, not a failure — it is counted in `verdict_summary` and an `evidence-by-test` / `human-confirmed:confirmed` row counts toward `overall: closed`. A `human-confirmed:denied` row is a gap (treat it as `not-reached` for the `overall` roll-up).
 
-| Walk kind | Automatable here? | Verdict path |
-|---|---|---|
-| `web` / `api` / `cli` / `library` (exercisable) | Yes | live walk → `closed` / `not-reached` / `terminal-mismatch` |
-| `slash-command` / skill (different harness) | No | `degraded:evidence-by-test` if a covering suite test exists, else `degraded:human-confirmed` |
-| `human` workflow step | No | `degraded:human-confirmed` (explicit prompt) |
+| Walk kind                                       | Automatable here? | Verdict path                                                                                 |
+| ----------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------- |
+| `web` / `api` / `cli` / `library` (exercisable) | Yes               | live walk → `closed` / `not-reached` / `terminal-mismatch`                                   |
+| `slash-command` / skill (different harness)     | No                | `degraded:evidence-by-test` if a covering suite test exists, else `degraded:human-confirmed` |
+| `human` workflow step                           | No                | `degraded:human-confirmed` (explicit prompt)                                                 |
 
 ### 5. Write the closure report
 
@@ -161,14 +164,14 @@ Place evidence artifacts (screenshots, captured command output) under `{project}
 
 **Front matter (required fields):**
 
-| Field | Type | Meaning |
-|---|---|---|
-| `ur` | `UR-NNN` | the Issue being closed |
-| `closed_at` | ISO-8601 timestamp | when the walk completed |
-| `branch` | string | the merged branch walked (e.g. `main`) |
-| `path_units` | int | count of path-unit REQs found |
-| `verdict_summary` | map | counts keyed by verdict (`closed`, `not-reached`, `terminal-mismatch`, `degraded:evidence-by-test`, `degraded:human-confirmed`) |
-| `overall` | enum | `closed` (all path-units `closed` or degraded-with-evidence) / `gaps` (≥1 `not-reached` or `terminal-mismatch`, or a denied human-confirm) / `no-path-units` |
+| Field             | Type               | Meaning                                                                                                                                                      |
+| ----------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ur`              | `UR-NNN`           | the Issue being closed                                                                                                                                       |
+| `closed_at`       | ISO-8601 timestamp | when the walk completed                                                                                                                                      |
+| `branch`          | string             | the merged branch walked (e.g. `main`)                                                                                                                       |
+| `path_units`      | int                | count of path-unit REQs found                                                                                                                                |
+| `verdict_summary` | map                | counts keyed by verdict (`closed`, `not-reached`, `terminal-mismatch`, `degraded:evidence-by-test`, `degraded:human-confirmed`)                              |
+| `overall`         | enum               | `closed` (all path-units `closed` or degraded-with-evidence) / `gaps` (≥1 `not-reached` or `terminal-mismatch`, or a denied human-confirm) / `no-path-units` |
 
 **Per-path-unit verdict row (required fields, one per path-unit):** `req` (markdown `REQ-NNN` or Linear issue id), `entry_point` (verbatim), `terminal_state` (verbatim), `walk_kind` (`web`/`api`/`cli`/`library`/`slash-command`/`human`), `action_taken`, `observed_state`, `verdict` (`closed`/`not-reached`/`terminal-mismatch`/`degraded:evidence-by-test`/`degraded:human-confirmed`), `evidence_ref`.
 
@@ -193,6 +196,7 @@ overall: gaps
 # Closure report — UR-NNN
 
 ## REQ-051 — closed
+
 - req: REQ-051
 - entry_point: "GET /api/invoices/:id returns the invoice as JSON"
 - terminal_state: "200 with {id, total, status:'paid'} for a paid invoice"
@@ -203,6 +207,7 @@ overall: gaps
 - evidence_ref: "curl-output:closure-evidence/req-051.txt"
 
 ## REQ-052 — terminal-mismatch
+
 - req: REQ-052
 - entry_point: "User visits /invoices and sees the paid badge on row 9"
 - terminal_state: "Row 9 shows a green 'Paid' badge"

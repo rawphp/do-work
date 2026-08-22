@@ -10,9 +10,9 @@ You sharpen REQs by fixing vague criteria, adding missing error paths, and annot
 
 The following checks require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
 
-| # | Step | Decision |
-|---|------|----------|
-| J1 | Dimension 7 — Footprint Plausibility | What counts as a "path-like token" in the task body? When is ambiguity acceptable vs. a flag? |
+| #   | Step                                 | Decision                                                                                      |
+| --- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| J1  | Dimension 7 — Footprint Plausibility | What counts as a "path-like token" in the task body? When is ambiguity acceptable vs. a flag? |
 
 ---
 
@@ -43,6 +43,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -61,7 +62,6 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 - Do not glob or rewrite live `REQ-*.md` or `user-requests/` as the store
 - UI evidence paths in criteria: `.do-work/evidence/UR-NNN/ui-evidence/` (not `user-requests/…/ui-evidence/`)
 - Hard-stop if dw-db fails
-
 
 ### 1. Read ground truth
 
@@ -160,12 +160,12 @@ Does the REQ's `## Verification Steps` contain steps that violate the worker-exe
 
 **Indicator categories (single source of truth: `agents/capture.md` `### Writing effective Verification Steps` — do not maintain a separate copy; cite and apply the same four categories):**
 
-| Category | Example indicator phrases |
-|---|---|
-| **Human judgment** | "user confirms", "manually check", "looks correct", "[HUMAN]", "confirm the badge looks right to you" — do **not** relocate automated Playwright screenshot `ui` steps (navigate + `ui-evidence` PNG + vision assert) |
-| **Physical device** | "on-device", "on the phone", "on iOS", "on Android", "on the watch" |
-| **Unprovisionable environment** | "in production", "requires login", "against the live API", "on-device build" |
-| **Explicit human-action phrasing** | "Ask the user to...", "Have someone...", "Check with the team..." |
+| Category                           | Example indicator phrases                                                                                                                                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Human judgment**                 | "user confirms", "manually check", "looks correct", "[HUMAN]", "confirm the badge looks right to you" — do **not** relocate automated Playwright screenshot `ui` steps (navigate + `ui-evidence` PNG + vision assert) |
+| **Physical device**                | "on-device", "on the phone", "on iOS", "on Android", "on the watch"                                                                                                                                                   |
+| **Unprovisionable environment**    | "in production", "requires login", "against the live API", "on-device build"                                                                                                                                          |
+| **Explicit human-action phrasing** | "Ask the user to...", "Have someone...", "Check with the team..."                                                                                                                                                     |
 
 **Scan procedure:**
 
@@ -207,6 +207,7 @@ This is the same behaviour capture.md Step 4d applies at write time. Audit appli
 **This guard is purely additive** — do not delete or rewrite existing content. Do not block the run. Do not flag these as errors if the augmentations are already present; only act when they are missing.
 
 **Do NOT:**
+
 - Delete REQs
 - Merge REQs
 - Change scope (add or remove features)
@@ -243,6 +244,7 @@ Audit Report — UR-NNN
 ```
 
 **Marker meanings:**
+
 - `[FIXED]` — auto-fix applied, REQ file was modified
 - `[OK]` — dimension passed with no issues
 - `[FLAG]` — issue found but not auto-fixable, requires user judgment
@@ -297,7 +299,6 @@ If `config.next_steps.enabled` is `false`, missing, or this agent is running as 
 - If you cannot confidently determine the right fix, flag instead of guessing
 - Acknowledge that capture already runs a vague-qualifier scan (Step 4b) — focus on what slipped through, not redundant scanning
 - Do not block the pipeline. You are a sharpening pass.
-
 
 ## Field traps (from field-lessons)
 

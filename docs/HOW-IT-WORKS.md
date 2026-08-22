@@ -13,7 +13,8 @@ do-work is an agent-harness skill that turns a natural-language brief into a seq
 It is **file-based by default**: every artifact (brief, decomposed task, claim stamp, commit) is a file in the project's git history. There is no daemon, no in-memory queue, no central coordinator. Optional backends store the same work items in **Linear**, a local **SQLite** DB, or **do-work.io** (remote MCP) only (see [Multi-tracker](#multi-tracker-work-item-backends) below); runtime and git isolation stay local on every backend.
 
 **Why file-based (default):** The alternative is a stateful tool (a queue, a server, an MCP backend). Files give you four things for free that a stateful tool charges for:
-1. **Auditability** — `git log` *is* the audit log.
+
+1. **Auditability** — `git log` _is_ the audit log.
 2. **Resumability** — kill the process, the state survives.
 3. **Multi-agent coordination** — `git mv` is an atomic primitive across processes; no lock service needed.
 4. **Inspectability** — `cat`, `ls`, and `grep` are the debugger.
@@ -24,12 +25,12 @@ It is **file-based by default**: every artifact (brief, decomposed task, claim s
 
 Work items (Issues, REQs, decisions, verify/close reports, run notes) go through a **tracker port**. Config key `tracker.backend` selects the store:
 
-| `tracker.backend` | Work-item store |
-|-------------------|-----------------|
-| **unset / empty / `markdown`** | Default: local `.do-work/` + `lib/*.sh` |
-| **`linear`** | Linear only (product Project / **Issue milestones** / Issues) — **no dual-write** |
-| **`sqlite`** | Local `.do-work/work.db` only via `lib/dw-db.sh` — **no dual-write**; greenfield empty DB on switch |
-| **`do-work-io`** | do-work.io only (remote MCP; slugs `UR-NNN` / `REQ-NNN`; identity `status_map`) — **no dual-write**; web UI is the board |
+| `tracker.backend`              | Work-item store                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **unset / empty / `markdown`** | Default: local `.do-work/` + `lib/*.sh`                                                                                  |
+| **`linear`**                   | Linear only (product Project / **Issue milestones** / Issues) — **no dual-write**                                        |
+| **`sqlite`**                   | Local `.do-work/work.db` only via `lib/dw-db.sh` — **no dual-write**; greenfield empty DB on switch                      |
+| **`do-work-io`**               | do-work.io only (remote MCP; slugs `UR-NNN` / `REQ-NNN`; identity `status_map`) — **no dual-write**; web UI is the board |
 
 **Load path** (every phase agent that touches work items):
 
@@ -193,6 +194,7 @@ Triggered automatically by `/do-work start` unless `--no-ideate` is passed.
 Surfaces assumptions, risks, missing context, and adjacent concerns in the brief. The output is written to `user-requests/UR-NNN/ideate.md`.
 
 Ends at an **interactive gate** with three options:
+
 - **Grill** — drop into `/do-work question`, which asks the user one targeted question at a time
 - **Continue** — proceed to capture as-is
 - **Stop** — pause so the user can edit `input.md` themselves before re-running
@@ -211,14 +213,14 @@ Decomposes the brief into discrete REQ files in the backlog (`{project}/.do-work
 
 Each REQ carries a structured header:
 
-| Field | Purpose |
-|---|---|
-| `**UR:**` | Parent UR identifier — traces every REQ back to its brief |
-| `**Status:**` | `backlog` / `in-progress` / `stopped` / `done` |
-| `**Created:**` | ISO date |
-| `**Layer:**` | One of the project's declared layers, or `none` |
-| `**Files:**` | Primary output files — used by the footprint checker for overlap detection |
-| `**Depends on:**` | Optional list of REQs that must finish first |
+| Field             | Purpose                                                                    |
+| ----------------- | -------------------------------------------------------------------------- |
+| `**UR:**`         | Parent UR identifier — traces every REQ back to its brief                  |
+| `**Status:**`     | `backlog` / `in-progress` / `stopped` / `done`                             |
+| `**Created:**`    | ISO date                                                                   |
+| `**Layer:**`      | One of the project's declared layers, or `none`                            |
+| `**Files:**`      | Primary output files — used by the footprint checker for overlap detection |
+| `**Depends on:**` | Optional list of REQs that must finish first                               |
 
 #### Layers
 
@@ -234,7 +236,7 @@ For `feature`-class briefs, capture enforces that every declared layer is covere
 
 #### Integration block
 
-Every feature REQ that adds *new surface* (anything callable or visible from outside its own code) carries an `## Integration` section answering three questions, with concrete file references:
+Every feature REQ that adds _new surface_ (anything callable or visible from outside its own code) carries an `## Integration` section answering three questions, with concrete file references:
 
 - **Reachability** — how does the user/caller reach this?
 - **Data dependencies** — what existing data does it read or write?
@@ -267,6 +269,7 @@ Triggered by `/do-work verify` (or implicitly by `/do-work go`).
 Scores REQ coverage against the original brief — produces a 0–100% confidence number plus a structured list of gaps.
 
 Three structural checks beyond raw coverage:
+
 1. **Layer coverage** — every declared layer represented (or explicitly skipped)
 2. **Integration block present** — on every new-surface feature REQ
 3. **Partial-confidence acknowledgement** — capture flagged any low-confidence answers
@@ -289,12 +292,12 @@ Executes the backlog autonomously, one REQ at a time, until empty or a stopper i
 
 Before any claim, worker dispatch, or worktree provision, go and run call `lib/ensure-integration-base.sh` so workers never integrate into a protected default branch (`main`, `master`, or the remote HEAD short name when resolvable):
 
-| Orchestrator checkout | Behaviour |
-|-----------------------|-----------|
-| Already off a protected default | Keep that branch; it is the integration base |
+| Orchestrator checkout                     | Behaviour                                                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Already off a protected default           | Keep that branch; it is the integration base                                                                                         |
 | On protected default (scoped or unscoped) | Create-or-checkout fixed branch `new-work`; if it already exists, checkout and **merge** the protected tip just left into `new-work` |
-| On protected default + **dirty** tree | Allowed — uncommitted changes **carry** onto `new-work` (no dirt-only hard-stop) |
-| Detached HEAD | **Hard-stop** |
+| On protected default + **dirty** tree     | Allowed — uncommitted changes **carry** onto `new-work` (no dirt-only hard-stop)                                                     |
+| Detached HEAD                             | **Hard-stop**                                                                                                                        |
 
 `/do-work start` does **not** call this helper and does not switch branches — only go/run enforce the guard.
 
@@ -366,6 +369,7 @@ Once a safe, dep-satisfied candidate is picked, `lib/claim-req.sh` writes the ow
 
 ```markdown
 <!-- claimed-start -->
+
 **Claimed by:** hostname.pid
 **Claimed at:** 2026-05-21T11:42:08Z
 **Heartbeat:** 2026-05-21T11:42:08Z
@@ -382,7 +386,7 @@ Each worker refreshes the `**Heartbeat:**` timestamp in its REQ file while activ
 
 **Why filesystem-only heartbeats, not git commits:** A heartbeat every few seconds would flood `git log` with `chore: heartbeat` commits. Direct file writes don't pollute history.
 
-**Why surface stale slots instead of auto-unblocking:** Auto-unblock would unblock REQs whose worker is *slow*, not dead — and the cost of re-doing work plus a possible conflict cleanup exceeds the cost of waiting for human triage. Stale slots show up in `/do-work status`; the human runs `/do-work unblock REQ-NNN` if confirmed dead.
+**Why surface stale slots instead of auto-unblocking:** Auto-unblock would unblock REQs whose worker is _slow_, not dead — and the cost of re-doing work plus a possible conflict cleanup exceeds the cost of waiting for human triage. Stale slots show up in `/do-work status`; the human runs `/do-work unblock REQ-NNN` if confirmed dead.
 
 ### Deadlock detection
 
@@ -405,11 +409,11 @@ If a worker's commit collides on shared files, it waits with exponential backoff
 
 ## Recovery commands
 
-| Situation | Command | What it does |
-|---|---|---|
-| Worker died / stuck / heartbeat stale | `/do-work unblock REQ-NNN` | Strips claim, returns REQ to backlog. Includes a judgment gate on partial commits. |
-| REQ stopped (concurrent-conflict / transient error) | `/do-work resume REQ-NNN` | Refreshes heartbeat, re-dispatches a fresh worker. Preserves the claim. |
-| Unclear state / "what's going on?" | `/do-work status [UR-NNN]` | Live situation room: in-flight REQs, claimers, heartbeat ages, deadlock banners. Read-only. |
+| Situation                                           | Command                    | What it does                                                                                |
+| --------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
+| Worker died / stuck / heartbeat stale               | `/do-work unblock REQ-NNN` | Strips claim, returns REQ to backlog. Includes a judgment gate on partial commits.          |
+| REQ stopped (concurrent-conflict / transient error) | `/do-work resume REQ-NNN`  | Refreshes heartbeat, re-dispatches a fresh worker. Preserves the claim.                     |
+| Unclear state / "what's going on?"                  | `/do-work status [UR-NNN]` | Live situation room: in-flight REQs, claimers, heartbeat ages, deadlock banners. Read-only. |
 
 **Why three distinct verbs:** `unblock` (force-return), `resume` (re-dispatch), and `status` (observe) are different intents. Collapsing them would force users to pick between destructive and non-destructive paths via flags — slower and more error-prone than three named commands.
 
@@ -444,7 +448,7 @@ This means: `git log` is the audit log, `cat REQ-007-slug.md` is the inspector, 
 
 ### 2. The brief is the source of truth
 
-Intake never rewrites the brief. Verify scores REQ coverage *against the original brief*. The user's words remain queryable forever.
+Intake never rewrites the brief. Verify scores REQ coverage _against the original brief_. The user's words remain queryable forever.
 
 ### 3. Small commits, one per REQ
 
@@ -452,7 +456,7 @@ Every REQ produces exactly one commit. Reverts are surgical. `git bisect` works.
 
 ### 4. Gates, not autonomy, for irreversible actions
 
-The skill is autonomous *inside* well-bounded loops (one REQ → fresh subagent → TDD → commit) but **always halts at irreversible boundaries**: deploy gates, sub-90% verify scores (without `--force`), the ideate review (Grill / Continue / Stop), partial-commit decisions in `unblock`.
+The skill is autonomous _inside_ well-bounded loops (one REQ → fresh subagent → TDD → commit) but **always halts at irreversible boundaries**: deploy gates, sub-90% verify scores (without `--force`), the ideate review (Grill / Continue / Stop), partial-commit decisions in `unblock`.
 
 ### 5. Heuristics replace per-task questions
 
