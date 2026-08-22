@@ -6,10 +6,10 @@ One hop from [`agents/tracker/linear.md`](../agents/tracker/linear.md). Load whe
 
 ## Disambiguation: Milestone-as-Issue vs path-milestone mode (M1/M2)
 
-| Concept | What it is | Where it lives |
-|---------|------------|----------------|
-| **Milestone-as-Issue** | The Linear **Project Milestone** entity that *is* the do-work Issue (`UR-NNN`) | On shared **product Project** (`product_project`) |
-| **Path-milestone mode (M1/M2)** | Optional *delivery* mode inside one Issue when the brief has `source: /saas-thesis handoff` + `### Milestones` | Cursor block `<!-- do-work-milestone -->` on the **Issue Project Milestone description**; Linear issues (REQs) tagged `M1`/`M2` |
+| Concept                         | What it is                                                                                                     | Where it lives                                                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Milestone-as-Issue**          | The Linear **Project Milestone** entity that _is_ the do-work Issue (`UR-NNN`)                                 | On shared **product Project** (`product_project`)                                                                               |
+| **Path-milestone mode (M1/M2)** | Optional _delivery_ mode inside one Issue when the brief has `source: /saas-thesis handoff` + `### Milestones` | Cursor block `<!-- do-work-milestone -->` on the **Issue Project Milestone description**; Linear issues (REQs) tagged `M1`/`M2` |
 
 Do **not** create Linear Initiatives for do-work Issues. Do **not** treat M1/M2 path-milestones as separate Issues.
 
@@ -17,21 +17,21 @@ Do **not** create Linear Initiatives for do-work Issues. Do **not** treat M1/M2 
 
 ## Path: Linear MCP capability spike (REQ-288)
 
-| | |
-|---|---|
-| **Entry point** | Operator sets a **sandbox** Linear team (`tracker.linear.team_id` / `team_key`); agent rediscovers MCP tools live before any full CRUD wiring |
+|                    |                                                                                                                                                                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | Operator sets a **sandbox** Linear team (`tracker.linear.team_id` / `team_key`); agent rediscovers MCP tools live before any full CRUD wiring                                                                                                                                                 |
 | **Terminal state** | Capability matrix present; live probe records **available**/**missing**/**partial** **or** documents **matrix unavailable** + hard-stop when MCP is down; **no production work-item migration** on this path; CRUD REQs unblocked only after a future MCP-connected fill marks required cells |
 
 This path answers design risk §17 #1 (**MCP thin / offline tools**) and the clarification **spike first, then implement**. Full port op sequences, templates, claim, and migration live in later path-units — **not** here.
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
-| Live tool rediscovery on sandbox team | `search_tool` → `use_tool` probes; fill matrix cells from **observed** tools only | REQ-289 ran — **matrix unavailable** (no Linear MCP) |
-| Hard-stop / setup copy | Verbatim operator instructions when MCP missing (this file + Linear skill) | REQ-288 skeleton → REQ-289 confirmed |
-| `status_map` vs real team states | Document defaults + hard-fail; validate names on sandbox workflow | Defaults documented; live names **not validated** (MCP missing) |
-| Full op sequences / templates / claim | Deferred — other path-units after matrix is known | REQ-290 documents Issue/REQ CRUD sequences (still `search_tool` live; claim/run later) |
+| Area                                  | Responsibility                                                                    | REQ                                                                                    |
+| ------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Live tool rediscovery on sandbox team | `search_tool` → `use_tool` probes; fill matrix cells from **observed** tools only | REQ-289 ran — **matrix unavailable** (no Linear MCP)                                   |
+| Hard-stop / setup copy                | Verbatim operator instructions when MCP missing (this file + Linear skill)        | REQ-288 skeleton → REQ-289 confirmed                                                   |
+| `status_map` vs real team states      | Document defaults + hard-fail; validate names on sandbox workflow                 | Defaults documented; live names **not validated** (MCP missing)                        |
+| Full op sequences / templates / claim | Deferred — other path-units after matrix is known                                 | REQ-290 documents Issue/REQ CRUD sequences (still `search_tool` live; claim/run later) |
 
 **Do not** invent Linear tool names as if proven. Until a **later** live probe (post-REQ-289, with Linear MCP connected) records a row as **available**, treat tool names as **unknown**. CRUD sequences below still call `search_tool` first and hard-stop if undiscoverable — they do **not** treat skill “typical tools” tables as proven.
 
@@ -39,9 +39,9 @@ This path answers design risk §17 #1 (**MCP thin / offline tools**) and the cla
 
 ## Path: Linear Issue/REQ CRUD (REQ-290)
 
-| | |
-|---|---|
-| **Entry point** | `/do-work` intake or start with `tracker.backend: linear` and valid team config (Load Config step 7) |
+|                    |                                                                                                                                                                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | `/do-work` intake or start with `tracker.backend: linear` and valid team config (Load Config step 7)                                                                                                                                                                                  |
 | **Terminal state** | product Project + Issue Project Milestone + Linear issues (REQs) on that milestone exist with §9 templates; `create_ur` / `create_req` / `update_req` / `read_req` / `list_reqs_for_ur` (+ `read_ur` / `list_urs`) sequences are documented as agent steps that rediscover tools live |
 
 This path-unit wires **work-item create/read/update/list** only (design §6 hierarchy, §9 templates). Claim/heartbeat/pick/status/unblock/resume are REQ-292; archive, non-ticket Docs, milestone, and migration remain later path-units.
@@ -56,22 +56,22 @@ This path-unit wires **work-item create/read/update/list** only (design §6 hier
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
-| UR create/read/list sequences | product Project (`product_project`) + Issue Project Milestone (`ur_milestone_name_pattern`) | REQ-290 (this section) |
-| REQ create/update/read/list | Issues in that Project; §9.2 body; path-unit `parentId` sub-issues | REQ-290 (this section) |
-| Templates + append/deps/footprint ops | §9 field semantics; `append_ideate` / `append_clarifications` / `set_blocked_by` / `set_files` | REQ-291 |
-| Claim / heartbeat / pick / status / unblock / resume | Optimistic claim comment protocol (§8); human assignee preserved | REQ-292 |
-| Archive / non-ticket homes | Deferred → REQ-294–297 | later REQs |
-| Idle markdown→Linear migration | Deferred → **REQ-300** | upgrade + this file |
+| Area                                                 | Responsibility                                                                                 | REQ                    |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------- |
+| UR create/read/list sequences                        | product Project (`product_project`) + Issue Project Milestone (`ur_milestone_name_pattern`)    | REQ-290 (this section) |
+| REQ create/update/read/list                          | Issues in that Project; §9.2 body; path-unit `parentId` sub-issues                             | REQ-290 (this section) |
+| Templates + append/deps/footprint ops                | §9 field semantics; `append_ideate` / `append_clarifications` / `set_blocked_by` / `set_files` | REQ-291                |
+| Claim / heartbeat / pick / status / unblock / resume | Optimistic claim comment protocol (§8); human assignee preserved                               | REQ-292                |
+| Archive / non-ticket homes                           | Deferred → REQ-294–297                                                                         | later REQs             |
+| Idle markdown→Linear migration                       | Deferred → **REQ-300**                                                                         | upgrade + this file    |
 
 ---
 
 ## Path: Linear templates + append/deps/footprint (REQ-291)
 
-| | |
-|---|---|
-| **Entry point** | Any phase that writes UR sections (ideate/question) or REQ deps/footprint under `tracker.backend: linear` |
+|                    |                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Entry point**    | Any phase that writes UR sections (ideate/question) or REQ deps/footprint under `tracker.backend: linear`                                                                                                                                                                                                                                                    |
 | **Terminal state** | §9.1 / §9.2 templates (machine markers `<!-- do-work-ur -->` / `<!-- do-work-req -->`), labels (`Layer/*`, `Size/*`, `path-unit`), `status_map` hard-fail rules, and full agent sequences for `append_ideate`, `append_clarifications`, `set_blocked_by` (blocks relations + `**Depends on:**` mirror), and `set_files` are documented with live rediscovery |
 
 This path-unit **extends** REQ-290 CRUD: templates become the field contract, and the remaining create/update surface for intake→capture without claim is complete.
@@ -88,9 +88,9 @@ This path-unit **extends** REQ-290 CRUD: templates become the field contract, an
 
 ## Path: Linear claim / status / unblock / resume (REQ-292)
 
-| | |
-|---|---|
-| **Entry point** | `/do-work run` \| `status` \| `unblock` \| `resume` with `tracker.backend: linear` |
+|                    |                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | `/do-work run` \| `status` \| `unblock` \| `resume` with `tracker.backend: linear`                                                                      |
 | **Terminal state** | Optimistic claim comment protocol works; status reports claimers/heartbeats; unblock/resume match markdown semantics; mid-flight failure leaves claimed |
 
 This path-unit implements design **§8 Claim protocol** as Linear agent sequences for `list_claimable_reqs`, `claim_req`, `heartbeat_req`, `set_req_status`, `unblock_req`, plus **resume** and **status** consumers. Semantics stay in `port.md`; representation is workflow state + claim **comments** (not a local claim stamp file).
@@ -107,19 +107,19 @@ This path-unit implements design **§8 Claim protocol** as Linear agent sequence
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
-| Claim comment protocol + claim/heartbeat/unblock/resume/status/list_claimable | Full sequences in this section | REQ-292 |
-| Phase playbooks that *call* these ops | `status` / `unblock` / `resume` / `run` Linear op callouts | REQ-293 |
-| `archive_req` + `append_run_note` + run commit convention | Done + proof + outputs; run notes; §6.5 commits | REQ-294 |
+| Area                                                                          | Responsibility                                             | REQ     |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------- | ------- |
+| Claim comment protocol + claim/heartbeat/unblock/resume/status/list_claimable | Full sequences in this section                             | REQ-292 |
+| Phase playbooks that _call_ these ops                                         | `status` / `unblock` / `resume` / `run` Linear op callouts | REQ-293 |
+| `archive_req` + `append_run_note` + run commit convention                     | Done + proof + outputs; run notes; §6.5 commits            | REQ-294 |
 
 ---
 
 ## Path: Linear run coordination (REQ-294)
 
-| | |
-|---|---|
-| **Entry point** | `/do-work run` with `tracker.backend: linear` (after claim path) |
+|                    |                                                                                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Entry point**    | `/do-work run` with `tracker.backend: linear` (after claim path)                                                                                                                                                                     |
 | **Terminal state** | Worker/orchestrator can pick → claim → deps/footprint checks → archive a REQ using Linear as sole work-item store; worktrees/git remain local; commit messages use Linear issue ids; mid-flight MCP failure leaves the issue claimed |
 
 This path-unit closes the **run loop** on Linear (design phasing step 5 + §5.5 runtime split + §6.5 commits + §7 ledger note + clarification leave-claimed). Claim/pick sequences are REQ-292/293; this path adds **`archive_req`**, **`append_run_note`**, commit/PR message convention, and the ledger telemetry rule.
@@ -136,18 +136,18 @@ This path-unit closes the **run loop** on Linear (design phasing step 5 + §5.5 
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
+| Area                                                                       | Responsibility                                   | REQ                    |
+| -------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------- |
 | `archive_req` + `append_run_note` sequences + §6.5 + ledger telemetry rule | Documented in this file; run/run-worker callouts | REQ-294 (this section) |
-| Deeper pick ordering / review-gate / branch sanitize wiring | Further run-agent refinements | REQ-295 |
+| Deeper pick ordering / review-gate / branch sanitize wiring                | Further run-agent refinements                    | REQ-295                |
 
 ---
 
 ## Path: Linear run pick ordering / footprint / review-gate / branch sanitize (REQ-295)
 
-| | |
-|---|---|
-| **Entry point** | `/do-work run` with `tracker.backend: linear` after REQ-294 archive/notes/commits path |
+|                    |                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | `/do-work run` with `tracker.backend: linear` after REQ-294 archive/notes/commits path                                                                                                                                                                                                                                                                                                                                             |
 | **Terminal state** | `list_claimable_reqs` has deterministic pick order + skip reasons + footprint algorithm parity; `archive_req` / `append_run_note` stay the only Linear archive/note ops; worktree branches use `req/<linear-id>` (sanitized); review gate still blocks archive when `review.required`; failed review/evidence never calls `archive_req`; claim loss → `concurrent-conflict` with resume; **no** Linear-aware bash in `lib/` for v1 |
 
 This path-unit **refines** the REQ-294 run loop for production pick/integrate edge cases. It does **not** re-open claim protocol (REQ-292) or invent new port op names.
@@ -164,20 +164,20 @@ This path-unit **refines** the REQ-294 run loop for production pick/integrate ed
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
-| Deeper `list_claimable_reqs` order + skip reasons + footprint algorithm | This file | REQ-295 (this section) |
-| Review-gate / failed-gate → no `archive_req`; branch sanitize wiring | `agents/run.md`, `agents/run-worker.md`, `agents/review.md` + this file | REQ-295 |
-| `archive_req` + `append_run_note` (YAML-fenced Issue comment) | Remain as REQ-294 sequences; preconditions tightened here | REQ-294/295 |
+| Area                                                                    | Responsibility                                                          | REQ                    |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------- |
+| Deeper `list_claimable_reqs` order + skip reasons + footprint algorithm | This file                                                               | REQ-295 (this section) |
+| Review-gate / failed-gate → no `archive_req`; branch sanitize wiring    | `agents/run.md`, `agents/run-worker.md`, `agents/review.md` + this file | REQ-295                |
+| `archive_req` + `append_run_note` (YAML-fenced Issue comment)           | Remain as REQ-294 sequences; preconditions tightened here               | REQ-294/295            |
 
 ---
 
 ## Path: Linear non-ticket artifacts (REQ-296)
 
-| | |
-|---|---|
-| **Entry point** | capture `append_decision`; verify/close write reports; retro calibration; run notes; gate coordination — with `tracker.backend: linear` |
-| **Terminal state** | Artifacts live **only** in fixed Linear homes (design §10); agents never invent ad-hoc locations; gate locks stay local `state/*` |
+|                    |                                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | capture `append_decision`; verify/close write reports; retro calibration; run notes; gate coordination — with `tracker.backend: linear` |
+| **Terminal state** | Artifacts live **only** in fixed Linear homes (design §10); agents never invent ad-hoc locations; gate locks stay local `state/*`       |
 
 This path-unit maps **non-ticket** work-item artifacts to Linear homes and documents write/read sequences. Ticket lifecycle (Issue/REQ/claim/archive) is prior path-units; this path freezes **where** decisions, calibration, verify, close, and run notes live.
 
@@ -193,33 +193,33 @@ This path-unit maps **non-ticket** work-item artifacts to Linear homes and docum
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
-| §10 home map + `append_decision` / calibration Doc / `write_verify_report` / `write_close_report` / `write_gate_state` sequences | This file | REQ-296 (this section) |
-| Phase agents call those homes | `agents/capture.md`, `agents/verify.md`, `agents/close.md`, `agents/retro.md` | REQ-296 |
-| Full consumer wiring + hard-stop invent ban + close Linear path-unit walk + retro prefer run notes | This file + capture/ideate/question/verify/close/retro/run-worker | REQ-297 |
-| `append_run_note` Issue comments | Remain as REQ-294 sequences | REQ-294 |
+| Area                                                                                                                             | Responsibility                                                                | REQ                    |
+| -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------- |
+| §10 home map + `append_decision` / calibration Doc / `write_verify_report` / `write_close_report` / `write_gate_state` sequences | This file                                                                     | REQ-296 (this section) |
+| Phase agents call those homes                                                                                                    | `agents/capture.md`, `agents/verify.md`, `agents/close.md`, `agents/retro.md` | REQ-296                |
+| Full consumer wiring + hard-stop invent ban + close Linear path-unit walk + retro prefer run notes                               | This file + capture/ideate/question/verify/close/retro/run-worker             | REQ-297                |
+| `append_run_note` Issue comments                                                                                                 | Remain as REQ-294 sequences                                                   | REQ-294                |
 
 ---
 
 ## Path: Linear artifact home consumers (REQ-297)
 
-| | |
-|---|---|
-| **Entry point** | capture / ideate / question / verify / close / retro / run-worker after load path with `tracker.backend: linear` |
+|                    |                                                                                                                                                                                                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | capture / ideate / question / verify / close / retro / run-worker after load path with `tracker.backend: linear`                                                                                                                                                     |
 | **Terminal state** | All §10 readers and writers use port sequences in this file; Doc titles from config; decisions one-line grammar identical to markdown; close walks **Linear issue ids**; retro prefers Linear run notes; create/update failures hard-stop with **no invented homes** |
 
 REQ-296 documented the homes and write sequences. **REQ-297** finishes the consumer surface:
 
-| Consumer | Linear port ops / helpers (this file) |
-|----------|----------------------------------------|
-| `agents/capture.md` | **Read decisions**; **`append_decision`**; **Read calibration Doc** |
-| `agents/ideate.md` | **Read decisions** (constraints for Connector / contradiction flags) |
-| `agents/question.md` | **Read decisions** (self-answer pass evidence) |
-| `agents/run-worker.md` | **Read decisions** (standing constraints; conflict → stop) |
-| `agents/verify.md` | **`write_verify_report`** (and `read_ur` / `list_reqs_for_ur` for brief + REQs) |
-| `agents/close.md` | Path-unit walk via **Linear issue ids** + **`write_close_report`** |
-| `agents/retro.md` | **List run notes** (prefer) → local `RUN-NNN.yml` fallback; **Write calibration Doc** |
+| Consumer               | Linear port ops / helpers (this file)                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| `agents/capture.md`    | **Read decisions**; **`append_decision`**; **Read calibration Doc**                   |
+| `agents/ideate.md`     | **Read decisions** (constraints for Connector / contradiction flags)                  |
+| `agents/question.md`   | **Read decisions** (self-answer pass evidence)                                        |
+| `agents/run-worker.md` | **Read decisions** (standing constraints; conflict → stop)                            |
+| `agents/verify.md`     | **`write_verify_report`** (and `read_ur` / `list_reqs_for_ur` for brief + REQs)       |
+| `agents/close.md`      | Path-unit walk via **Linear issue ids** + **`write_close_report`**                    |
+| `agents/retro.md`      | **List run notes** (prefer) → local `RUN-NNN.yml` fallback; **Write calibration Doc** |
 
 **Hard rules (REQ-297):**
 
@@ -234,9 +234,9 @@ REQ-296 documented the homes and write sequences. **REQ-297** finishes the consu
 
 ## Path: Linear milestone mode (REQ-298)
 
-| | |
-|---|---|
-| **Entry point** | Milestone-shaped UR (`source: /saas-thesis handoff` + `### Milestones`) with `tracker.backend: linear` — capture, run claim loop, deploy gate |
+|                    |                                                                                                                                                                                                                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | Milestone-shaped UR (`source: /saas-thesis handoff` + `### Milestones`) with `tracker.backend: linear` — capture, run claim loop, deploy gate                                                                                                                                       |
 | **Terminal state** | Active milestone cursor lives on **Project description** `<!-- do-work-milestone -->`; `list_milestone_reqs` / `set_active_milestone` / `read_active_milestone` work via this file; deploy gate remains **local** `state/gate-owner.md` with human y/n; **trigger shape unchanged** |
 
 This path-unit implements design **§11 Milestone mode (Linear)**. Trigger and gate ownership match markdown; only the **cursor store** and **REQ listing** move to Linear.
@@ -253,39 +253,39 @@ This path-unit implements design **§11 Milestone mode (Linear)**. Trigger and g
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
-| Path narrative + trigger/cursor home/gate locality hard rules | This file (above) | REQ-298 |
-| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` full sequences + marker parse + empty→null | This file | **REQ-299** |
-| Capture Linear branches call port ops after decompose | `agents/capture.md` | REQ-298 path; **REQ-299** ops |
-| Run filter / idle-wait / deploy-gate drain call port ops; local gate-owner serialize | `agents/run.md` | REQ-298 path; **REQ-299** ops |
-| `write_gate_state` (local-only + concurrent serialize) | This file + run.md | REQ-296 home; **REQ-299** concurrent rules |
+| Area                                                                                                                | Responsibility      | REQ                                        |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------ |
+| Path narrative + trigger/cursor home/gate locality hard rules                                                       | This file (above)   | REQ-298                                    |
+| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` full sequences + marker parse + empty→null | This file           | **REQ-299**                                |
+| Capture Linear branches call port ops after decompose                                                               | `agents/capture.md` | REQ-298 path; **REQ-299** ops              |
+| Run filter / idle-wait / deploy-gate drain call port ops; local gate-owner serialize                                | `agents/run.md`     | REQ-298 path; **REQ-299** ops              |
+| `write_gate_state` (local-only + concurrent serialize)                                                              | This file + run.md  | REQ-296 home; **REQ-299** concurrent rules |
 
 ---
 
 ## Path: Linear milestone cursor ops (REQ-299)
 
-| | |
-|---|---|
-| **Entry point** | Capture milestone decompose; run Step 1.0 / 1.0a / 7b under `tracker.backend: linear` |
+|                    |                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | Capture milestone decompose; run Step 1.0 / 1.0a / 7b under `tracker.backend: linear`                                                                                                                                                                                                                                                   |
 | **Terminal state** | Milestone cursor ops complete: marker format documented + parsed; empty marker → `active: null` (does **not** invent a milestone id); siblings idle on deploy gate same as markdown; concurrent gate ownership serializes via **local** `state/gate-owner.md`; `write_gate_state` remains local-allowed; capture/run call port ops only |
 
 REQ-298 documented the §11 path (trigger, cursor home, local gate). **REQ-299** finishes the **port op surface** and acceptance rules:
 
-| Op / rule | Where | Notes |
-|-----------|-------|--------|
-| Marker format + parse algorithm | This file — **Project description cursor block** + **Parse algorithm** | `<!-- do-work-milestone -->` + `**Active:**` + `# Milestones` checklist |
-| `read_active_milestone` | This file | Empty / missing marker → `active: null`; **does not invent a milestone id** |
-| `set_active_milestone` | This file | Set / advance / clear on Project description only |
-| `list_milestone_reqs` | This file | Filter by do-work Linear-issue path-milestone markers; no widen to other M |
-| Sibling idle on deploy gate | `agents/run.md` Step 1.0a | Same idle loop as markdown; Linear polls `read_active_milestone` + **local** `gate-owner.md` |
-| Concurrent gate ownership | `write_gate_state` (this file) + run Step 7b.2 | Serializes via **local** `state/gate-owner.md` even when cursor content is remote |
-| Capture / run Linear branches | `agents/capture.md`, `agents/run.md` | Call port ops; never treat local `active-milestone.md` as Linear store |
+| Op / rule                       | Where                                                                  | Notes                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Marker format + parse algorithm | This file — **Project description cursor block** + **Parse algorithm** | `<!-- do-work-milestone -->` + `**Active:**` + `# Milestones` checklist                      |
+| `read_active_milestone`         | This file                                                              | Empty / missing marker → `active: null`; **does not invent a milestone id**                  |
+| `set_active_milestone`          | This file                                                              | Set / advance / clear on Project description only                                            |
+| `list_milestone_reqs`           | This file                                                              | Filter by do-work Linear-issue path-milestone markers; no widen to other M                   |
+| Sibling idle on deploy gate     | `agents/run.md` Step 1.0a                                              | Same idle loop as markdown; Linear polls `read_active_milestone` + **local** `gate-owner.md` |
+| Concurrent gate ownership       | `write_gate_state` (this file) + run Step 7b.2                         | Serializes via **local** `state/gate-owner.md` even when cursor content is remote            |
+| Capture / run Linear branches   | `agents/capture.md`, `agents/run.md`                                   | Call port ops; never treat local `active-milestone.md` as Linear store                       |
 
 **Hard rules (REQ-299):**
 
 1. **Marker format is authoritative** — Project description machine block must start with `<!-- do-work-milestone -->` then `**Active:**` then `# Milestones` checklist (see block template below). Parse only that format; do not invent alternate markers (YAML frontmatter, Initiative fields, Team Docs).
-2. **Empty marker → null active (does not invent a milestone id)** — when the Project description has **no** `<!-- do-work-milestone -->` marker, or the block is present but `**Active:**` is empty / `none` / missing, `read_active_milestone` returns `active: null` (not-in-milestone / not-active). It **must not** invent `M1` or any other id on read. Capture may *choose* `M1` as first-decompose default **after** observing null — that default is capture policy, not a return value of `read_active_milestone`.
+2. **Empty marker → null active (does not invent a milestone id)** — when the Project description has **no** `<!-- do-work-milestone -->` marker, or the block is present but `**Active:**` is empty / `none` / missing, `read_active_milestone` returns `active: null` (not-in-milestone / not-active). It **must not** invent `M1` or any other id on read. Capture may _choose_ `M1` as first-decompose default **after** observing null — that default is capture policy, not a return value of `read_active_milestone`.
 3. **`write_gate_state` remains local-allowed** — gate ownership and final-suite locks stay under `{project}/.do-work/state/` (design §5.5 / §10 / §11). Never Linear Issues as gate locks; never Team Docs for gate ownership. Not dual-write of work items.
 4. **Concurrent gate ownership serializes via local `gate-owner.md`** — even when milestone **cursor** content is remote (Project description), gate ownership is **only** the local file. First successful claim (absent→write own `AGENT_ID`, re-read confirms self) owns the human y/n prompt; losers idle on Step 1.0a. Do **not** invent a Linear lock or Project-description gate field.
 5. **Siblings idle same as markdown** — empty active-M backlog + foreign `gate-owner.md` → idle-wait; wake on cursor advance (`set_active_milestone` / `read_active_milestone`) or cursor clear + gate release. Poll interval and 30-minute stuck prompt parity with markdown Step 1.0a.
@@ -295,9 +295,9 @@ REQ-298 documented the §11 path (trigger, cursor home, local gate). **REQ-299**
 
 ## Path: Idle markdown→Linear migration (REQ-300 path + REQ-301 upgrade wiring)
 
-| | |
-|---|---|
-| **Entry point** | `/do-work upgrade migrate` (or upgrade **Step 9** migrate path) when the project still uses the **markdown** work-item store and wants a one-shot cutover to Linear — design §12 |
+|                    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | `/do-work upgrade migrate` (or upgrade **Step 9** migrate path) when the project still uses the **markdown** work-item store and wants a one-shot cutover to Linear — design §12                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **Terminal state** | All Issues/REQs from markdown backlog + archive exist in Linear (product Project + Issue Project Milestones / Issues on those milestones); Team Docs for decisions (+ empty calibration if missing); `tracker.backend: linear` + resolved team ids written to config; local `user-requests/` + `archive/` (and backlog REQ files) left as **read-only historical** trees; **post-cutover work-item ops ignore historical markdown trees**; **no dual-write**; dry-run lists planned creates without write; re-run when already linear **refuses without rewriting Linear issues** |
 
 This path-unit implements design **§12 Migration (markdown → Linear)**. It is **idle-only**, **operator-confirmed** (destructive apply gate) or **dry-run**, and **all-or-nothing** on preflight / MCP failure (no partial cutover).
@@ -320,38 +320,38 @@ This path-unit implements design **§12 Migration (markdown → Linear)**. It is
 
 **Surfacing (upgrade / conformance — REQ-301 wiring):**
 
-| Surface | Role |
-|---------|------|
-| `agents/upgrade.md` Step **9** / `/do-work upgrade migrate` | Operator-facing UX: preflight, **destructive confirm** or dry-run, invoke this sequence, report; already-linear refuse |
-| `lib/conformance-scan.sh` | Documents that `migrate-linear` is **not** a drift row; historical trees after cutover are not drift; never auto-flags markdown backend |
-| Port op `migrate_markdown_to_linear` | Shared contract (preconditions, refuse / hard-stop, dry-run) — `agents/tracker/port.md` |
-| This section | Full agent sequence + status/relation/parent mapping + post-cutover ignore rules |
+| Surface                                                     | Role                                                                                                                                    |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `agents/upgrade.md` Step **9** / `/do-work upgrade migrate` | Operator-facing UX: preflight, **destructive confirm** or dry-run, invoke this sequence, report; already-linear refuse                  |
+| `lib/conformance-scan.sh`                                   | Documents that `migrate-linear` is **not** a drift row; historical trees after cutover are not drift; never auto-flags markdown backend |
+| Port op `migrate_markdown_to_linear`                        | Shared contract (preconditions, refuse / hard-stop, dry-run) — `agents/tracker/port.md`                                                 |
+| This section                                                | Full agent sequence + status/relation/parent mapping + post-cutover ignore rules                                                        |
 
 **Child work under this path:**
 
-| Area | Responsibility | REQ |
-|------|----------------|-----|
-| Path narrative + hard rules + agent sequence | This file | **REQ-300** |
-| Port op contract + shared refuse/hard-stop rules | `agents/tracker/port.md` | **REQ-300** |
-| Upgrade migrate step + dry-run flag UX (initial) | `agents/upgrade.md` | **REQ-300** |
+| Area                                                                                                                       | Responsibility                                            | REQ         |
+| -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ----------- |
+| Path narrative + hard rules + agent sequence                                                                               | This file                                                 | **REQ-300** |
+| Port op contract + shared refuse/hard-stop rules                                                                           | `agents/tracker/port.md`                                  | **REQ-300** |
+| Upgrade migrate step + dry-run flag UX (initial)                                                                           | `agents/upgrade.md`                                       | **REQ-300** |
 | Upgrade/conformance wiring: destructive confirm, dry-run list, already-linear no-rewrite, post-cutover ignore, scan header | `agents/upgrade.md`, `lib/conformance-scan.sh`, this file | **REQ-301** |
 
 ---
 
 ### `migrate_markdown_to_linear` (agent sequence)
 
-| | |
-|---|---|
-| **Intent** | One-shot idle markdown → Linear cutover (design §12). |
-| **Preconditions** | See hard rules. Team id/key intended for Linear must be known (config `tracker.linear.team_id` / `team_key` or operator-supplied before write). |
-| **Modes** | `dry-run` (report planned creates only) \| `apply` (writes + config flip after full success; requires destructive confirm). |
-| **Does not** | Delete markdown trees; dual-write after cutover; migrate mid-flight working/ REQs; flip config on partial failure; rewrite Issues when already linear. |
+|                   |                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Intent**        | One-shot idle markdown → Linear cutover (design §12).                                                                                                  |
+| **Preconditions** | See hard rules. Team id/key intended for Linear must be known (config `tracker.linear.team_id` / `team_key` or operator-supplied before write).        |
+| **Modes**         | `dry-run` (report planned creates only) \| `apply` (writes + config flip after full success; requires destructive confirm).                            |
+| **Does not**      | Delete markdown trees; dual-write after cutover; migrate mid-flight working/ REQs; flip config on partial failure; rewrite Issues when already linear. |
 
 #### Step M0 — Invocation flags
 
-| Flag | Meaning |
-|------|---------|
-| `--dry-run` / dry-run mode | Inventory + **list planned creates** only; no Linear write; no config write |
+| Flag                                    | Meaning                                                                                      |
+| --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `--dry-run` / dry-run mode              | Inventory + **list planned creates** only; no Linear write; no config write                  |
 | apply (default when operator confirmed) | Full sequence after **destructive confirm**; config flip only at M6 after successful creates |
 
 Upgrade agent passes the mode after confirm / dry-run selection (`agents/upgrade.md` Step 9).
@@ -382,13 +382,13 @@ Upgrade agent passes the mode after confirm / dry-run selection (`agents/upgrade
 
 Build a plan from the **markdown** store (allowed because backend is still markdown):
 
-| Source | Collect |
-|--------|---------|
-| `{project}/.do-work/user-requests/UR-*/` | Each `UR-NNN`: `input.md` brief, ideate, clarifications, verify/close artifacts if present |
-| `{project}/.do-work/REQ-*.md` (backlog root) | Open REQs (not working, not archive) |
-| `{project}/.do-work/archive/REQ-*.md` | Done REQs |
-| `{project}/.do-work/decisions.md` | Standing decision lines (if present) |
-| `{project}/.do-work/state/calibration.md` | Calibration body (if present) — else plan empty calibration Doc |
+| Source                                       | Collect                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `{project}/.do-work/user-requests/UR-*/`     | Each `UR-NNN`: `input.md` brief, ideate, clarifications, verify/close artifacts if present |
+| `{project}/.do-work/REQ-*.md` (backlog root) | Open REQs (not working, not archive)                                                       |
+| `{project}/.do-work/archive/REQ-*.md`        | Done REQs                                                                                  |
+| `{project}/.do-work/decisions.md`            | Standing decision lines (if present)                                                       |
+| `{project}/.do-work/state/calibration.md`    | Calibration body (if present) — else plan empty calibration Doc                            |
 
 For each REQ file parse: `**UR:**`, `**Status:**`, `**Parent:**`, `**Depends on:**`, `**Files:**`, `**Layer:**`, `**Entry point:**` / `**Terminal state:**` (path-unit), `## Task`, `## Acceptance Criteria` (preserve `- [ ]` / `- [x]`), `## Verification Steps`, `## Outputs`, `**Closure proof:**`, size/priority/criteria-approved headers.
 
@@ -477,48 +477,48 @@ If config write fails after Linear creates succeeded: **hard-stop** with: Linear
 
 #### Failure matrix (no partial cutover)
 
-| Failure | Behavior |
-|---------|----------|
-| Already `tracker.backend: linear` | **Refuse** `already-linear` / already-migrated — **no Issue rewrites**; config unchanged |
-| `working/` non-empty or active claims | **Refuse entirely** — no Linear writes; config unchanged |
-| Operator declines confirm (apply) | **Refuse** — no writes |
-| Linear MCP missing / unauthenticated / team unresolved / status_map missing | **Hard-stop** with setup instructions — markdown trees + config unchanged |
-| MCP dies during M4–M5 | **Hard-stop** — config **not** flipped; list orphans; markdown unchanged |
-| Config write fails after creates | **Hard-stop** — report manual flip or orphan cleanup; no dual-write mode |
-| Dry-run | **List planned creates** only — always safe; zero writes |
+| Failure                                                                     | Behavior                                                                                 |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Already `tracker.backend: linear`                                           | **Refuse** `already-linear` / already-migrated — **no Issue rewrites**; config unchanged |
+| `working/` non-empty or active claims                                       | **Refuse entirely** — no Linear writes; config unchanged                                 |
+| Operator declines confirm (apply)                                           | **Refuse** — no writes                                                                   |
+| Linear MCP missing / unauthenticated / team unresolved / status_map missing | **Hard-stop** with setup instructions — markdown trees + config unchanged                |
+| MCP dies during M4–M5                                                       | **Hard-stop** — config **not** flipped; list orphans; markdown unchanged                 |
+| Config write fails after creates                                            | **Hard-stop** — report manual flip or orphan cleanup; no dual-write mode                 |
+| Dry-run                                                                     | **List planned creates** only — always safe; zero writes                                 |
 
 #### Mapping summary
 
-| Markdown | Linear |
-|----------|--------|
+| Markdown                        | Linear                                                                     |
+| ------------------------------- | -------------------------------------------------------------------------- |
 | `user-requests/UR-NNN/` + brief | do-work Issue Project Milestone (`<!-- do-work-ur -->`) on product Project |
-| Backlog `REQ-*.md` | Issue in Project; state `status_map.backlog` |
-| `archive/REQ-*.md` | Issue in Project; state `status_map.done` (+ closure/outputs in body) |
-| `**Parent:** REQ-X` | `parentId` + `**Parent:** <Linear id>` after id map |
-| `**Depends on:** REQ-A REQ-B` | `blocks` relations + body mirror with Linear ids |
-| AC `- [ ]` / `- [x]` | Same checkbox markdown in Issue description |
-| `decisions.md` | Team Doc `do-work/decisions` (or config title) |
-| `state/calibration.md` | Team Doc `do-work/calibration` (or config title); empty if missing |
-| `tracker.backend` after success | `linear` + team ids |
+| Backlog `REQ-*.md`              | Issue in Project; state `status_map.backlog`                               |
+| `archive/REQ-*.md`              | Issue in Project; state `status_map.done` (+ closure/outputs in body)      |
+| `**Parent:** REQ-X`             | `parentId` + `**Parent:** <Linear id>` after id map                        |
+| `**Depends on:** REQ-A REQ-B`   | `blocks` relations + body mirror with Linear ids                           |
+| AC `- [ ]` / `- [x]`            | Same checkbox markdown in Issue description                                |
+| `decisions.md`                  | Team Doc `do-work/decisions` (or config title)                             |
+| `state/calibration.md`          | Team Doc `do-work/calibration` (or config title); empty if missing         |
+| `tracker.backend` after success | `linear` + team ids                                                        |
 
 ---
 
 ## Path: Linear claim phase-agent wiring (REQ-293)
 
-| | |
-|---|---|
-| **Entry point** | `/do-work status` \| `unblock` \| `resume` \| `run` after load path with `tracker.backend: linear` |
+|                    |                                                                                                                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entry point**    | `/do-work status` \| `unblock` \| `resume` \| `run` after load path with `tracker.backend: linear`                                                                                                                        |
 | **Terminal state** | Those phase agents call **only** the named port ops in this file for claim/pick/status/unblock/resume (no `.do-work/working/` claim stamps, no `pick-req.sh` / `claim-req.sh` / `synth-status.sh` as the work-item store) |
 
 REQ-292 documents the op sequences. **REQ-293** wires the consumers:
 
-| Phase agent | Linear port ops / sections (this file) |
-|-------------|----------------------------------------|
-| `agents/status.md` | **Status reporting (claimers / heartbeats)**; Helper: read active claim; optional `list_reqs_for_ur` scope |
-| `agents/unblock.md` | **`unblock_req`** (release claim + backlog state); git partial-commit judgment stays local |
-| `agents/resume.md` | **Resume** (compose `set_req_status` + `heartbeat_req`); worktree/branch stay local |
-| `agents/run.md` | **`list_claimable_reqs`** → **`claim_req`**; **`archive_req`** + **`append_run_note`**; worker **`heartbeat_req`** checkpoints; mid-flight **leave claimed**; §6.5 commits |
-| `agents/run-worker.md` | §6.5 commit/PR format; mid-flight **leave claimed**; Linear **`heartbeat_req`** when issue-id claim |
+| Phase agent            | Linear port ops / sections (this file)                                                                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agents/status.md`     | **Status reporting (claimers / heartbeats)**; Helper: read active claim; optional `list_reqs_for_ur` scope                                                                 |
+| `agents/unblock.md`    | **`unblock_req`** (release claim + backlog state); git partial-commit judgment stays local                                                                                 |
+| `agents/resume.md`     | **Resume** (compose `set_req_status` + `heartbeat_req`); worktree/branch stay local                                                                                        |
+| `agents/run.md`        | **`list_claimable_reqs`** → **`claim_req`**; **`archive_req`** + **`append_run_note`**; worker **`heartbeat_req`** checkpoints; mid-flight **leave claimed**; §6.5 commits |
+| `agents/run-worker.md` | §6.5 commit/PR format; mid-flight **leave claimed**; Linear **`heartbeat_req`** when issue-id claim                                                                        |
 
 **Hard rules for wired consumers:**
 
@@ -530,33 +530,31 @@ REQ-292 documents the op sequences. **REQ-293** wires the consumers:
 
 ---
 
-
-
 ---
 
 ## Capability matrix (spike)
 
 **Status legend**
 
-| Status | Meaning |
-|--------|---------|
-| **unknown** | Not proven in a live session; do not wire production ops on this cell |
+| Status        | Meaning                                                                           |
+| ------------- | --------------------------------------------------------------------------------- |
+| **unknown**   | Not proven in a live session; do not wire production ops on this cell             |
 | **available** | Live `search_tool` / `use_tool` confirmed (record qualified name + date in Notes) |
-| **missing** | Live probe ran; no tool for this need — document fallback or hard gap |
-| **partial** | Related tools exist but not full create/link/read needed by port |
+| **missing**   | Live probe ran; no tool for this need — document fallback or hard gap             |
+| **partial**   | Related tools exist but not full create/link/read needed by port                  |
 
 ### Matrix availability (REQ-289 live probe)
 
-| | |
-|---|---|
-| **Probe date** | 2026-07-31 |
-| **Protocol** | `search_tool` queries: `"linear"`, `"linear issues initiative project document"`, `"server:linear mcp.linear"` |
-| **Result** | **Matrix unavailable** — Linear MCP server not connected; zero `linear__*` tools discovered |
-| **Connected MCP servers observed** | `github`, `gmail`, `google_calendar`, `google_drive`, `notion`, `skill-seekers`, `tasks` (no `linear`) |
-| **use_tool probes** | **Not run** — no qualified Linear tool names returned; inventing calls is forbidden |
-| **Sandbox team** | Not reachable (no team list/get tools); `tracker.linear.team_id` / `team_key` not validated this session |
-| **Operator action** | Hard-stop applies when `tracker.backend: linear` — follow setup block below (API key / OAuth / `mcp.linear.app`), restart agent, re-run discovery, then fill rows as **available** / **missing** / **partial** from live tools only |
-| **Secrets** | None used or recorded |
+|                                    |                                                                                                                                                                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Probe date**                     | 2026-07-31                                                                                                                                                                                                                          |
+| **Protocol**                       | `search_tool` queries: `"linear"`, `"linear issues initiative project document"`, `"server:linear mcp.linear"`                                                                                                                      |
+| **Result**                         | **Matrix unavailable** — Linear MCP server not connected; zero `linear__*` tools discovered                                                                                                                                         |
+| **Connected MCP servers observed** | `github`, `gmail`, `google_calendar`, `google_drive`, `notion`, `skill-seekers`, `tasks` (no `linear`)                                                                                                                              |
+| **use_tool probes**                | **Not run** — no qualified Linear tool names returned; inventing calls is forbidden                                                                                                                                                 |
+| **Sandbox team**                   | Not reachable (no team list/get tools); `tracker.linear.team_id` / `team_key` not validated this session                                                                                                                            |
+| **Operator action**                | Hard-stop applies when `tracker.backend: linear` — follow setup block below (API key / OAuth / `mcp.linear.app`), restart agent, re-run discovery, then fill rows as **available** / **missing** / **partial** from live tools only |
+| **Secrets**                        | None used or recorded                                                                                                                                                                                                               |
 
 **Session note (REQ-288 path skeleton, 2026-07-31):** earlier worker also lacked Linear MCP; all rows left **unknown**.
 
@@ -564,45 +562,43 @@ REQ-292 documents the op sequences. **REQ-293** wires the consumers:
 
 ### Required capabilities vs port needs
 
-| Capability (design need) | Port / design use | Live status | Qualified tool name(s) | Notes / fallback |
-|--------------------------|-------------------|-------------|------------------------|------------------|
-| **Team resolve** | `ensure_product_container`; config validation | unknown | — | REQ-289: MCP missing — unproven |
-| **Workflow states** | `status_map` validation; claim/status/archive | unknown | — | REQ-289: cannot list team states without MCP |
-| **Project Milestones** (UR) | `create_ur`, `read_ur`, `list_urs`, verify/close homes | unknown | — | REQ-289: **unproven** (MCP missing); hierarchy = Milestone-as-Issue on `product_project` |
-| **Product Project** (`product_project`) | Shared container; Linear issues scoped by do-work Issue milestone | unknown | — | REQ-289: unproven |
-| **Issue Project Milestone attach** | Issues attached to do-work Issue milestone on product Project | unknown | — | No Initiative create; MCP has no Initiative create tools |
-| **Issues** (REQ) | `create_req`, `read_req`, `update_req`, list | unknown | — | REQ-289: unproven; Linear issue ids only once available |
-| **Sub-issues / parent** | Path-unit parent + layer children (`parentId`) | unknown | — | REQ-289: unproven |
-| **Issue relations `blocks`** | `set_blocked_by`; deps **authoritative** | unknown | — | REQ-289: **unproven**; if later **missing** → description-only deps + one-time warning (port rule) or GraphQL fallback |
-| **Comments** | Claim/heartbeat protocol; `append_run_note` | unknown | — | REQ-289: unproven |
-| **Team Docs** | `append_decision`, calibration | unknown | — | REQ-289: **unproven** (MCP missing); titles stay config-driven when proven |
-| **Labels** | Layer / Size / path-unit | unknown | — | REQ-289: unproven |
-| **Assignee** | Human `default_assignee_id` on create | unknown | — | REQ-289: unproven |
+| Capability (design need)                | Port / design use                                                 | Live status | Qualified tool name(s) | Notes / fallback                                                                                                       |
+| --------------------------------------- | ----------------------------------------------------------------- | ----------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Team resolve**                        | `ensure_product_container`; config validation                     | unknown     | —                      | REQ-289: MCP missing — unproven                                                                                        |
+| **Workflow states**                     | `status_map` validation; claim/status/archive                     | unknown     | —                      | REQ-289: cannot list team states without MCP                                                                           |
+| **Project Milestones** (UR)             | `create_ur`, `read_ur`, `list_urs`, verify/close homes            | unknown     | —                      | REQ-289: **unproven** (MCP missing); hierarchy = Milestone-as-Issue on `product_project`                               |
+| **Product Project** (`product_project`) | Shared container; Linear issues scoped by do-work Issue milestone | unknown     | —                      | REQ-289: unproven                                                                                                      |
+| **Issue Project Milestone attach**      | Issues attached to do-work Issue milestone on product Project     | unknown     | —                      | No Initiative create; MCP has no Initiative create tools                                                               |
+| **Issues** (REQ)                        | `create_req`, `read_req`, `update_req`, list                      | unknown     | —                      | REQ-289: unproven; Linear issue ids only once available                                                                |
+| **Sub-issues / parent**                 | Path-unit parent + layer children (`parentId`)                    | unknown     | —                      | REQ-289: unproven                                                                                                      |
+| **Issue relations `blocks`**            | `set_blocked_by`; deps **authoritative**                          | unknown     | —                      | REQ-289: **unproven**; if later **missing** → description-only deps + one-time warning (port rule) or GraphQL fallback |
+| **Comments**                            | Claim/heartbeat protocol; `append_run_note`                       | unknown     | —                      | REQ-289: unproven                                                                                                      |
+| **Team Docs**                           | `append_decision`, calibration                                    | unknown     | —                      | REQ-289: **unproven** (MCP missing); titles stay config-driven when proven                                             |
+| **Labels**                              | Layer / Size / path-unit                                          | unknown     | —                      | REQ-289: unproven                                                                                                      |
+| **Assignee**                            | Human `default_assignee_id` on create                             | unknown     | —                      | REQ-289: unproven                                                                                                      |
 
 ### Port op readiness
 
-| Port op | Depends on capability rows | Sequence status |
-|---------|----------------------------|-----------------|
-| `ensure_product_container` | Team resolve, labels (optional) | Documented (CRUD preflight) |
-| `create_ur` / `read_ur` / `list_urs` | Product Project + Project Milestones | **Documented** (REQ-290) — live `search_tool` required; hard-stop if undiscoverable |
-| `append_ideate` / `append_clarifications` | Issue Project Milestone (description/comments) | **Documented** (REQ-291) — section append under §9.1; rediscover update tools |
-| `create_req` / `update_req` / `read_req` | Issues, Projects, labels, statuses | **Documented** (REQ-290) |
-| `list_reqs_for_ur` | Issues by Project | **Documented** (REQ-290) |
-| `list_claimable_reqs` | Issues + relations + comments + statuses | **Documented** (REQ-292/294/295) — Priority DESC (missing→2) → created_at ASC → id ASC; skip reasons; deps via **blocks**; footprint algorithm; no claim side-effect |
-| `claim_req` / `heartbeat_req` / `unblock_req` | Issues status + comments | **Documented** (REQ-292) — optimistic claim comment protocol |
-| `set_req_status` | Workflow states, issues | **Documented** (REQ-292) — stopped / in-progress without archive or unclaim |
-| `archive_req` | Workflow states, issues, claim release, body proof/outputs | **Documented** (REQ-294/295) — done + proof + outputs + claim released; **not** called after failed review/evidence |
-| `set_blocked_by` | Issue relations `blocks` (+ body mirror) | **Documented** (REQ-291) — dual-write; if relations **missing** → body-only + one-time warning (port rule) |
-| `set_files` | Issue description headers | **Documented** (REQ-291) — updates `**Files:**` only; no claim side-effect |
-| `append_decision` | Team Doc `decisions_doc_title` | **Documented** (REQ-296 ops; REQ-297 consumers) — create-if-missing; same one-line grammar; hard-stop on create/update fail |
-| Calibration (retro write / capture read) | Team Doc `calibration_doc_title` | **Documented** (REQ-296/297) — create-if-missing; full replace body; hard-stop invent ban |
-| `write_verify_report` | Issue Project Milestone `## Verify` + milestone comment | **Documented** (REQ-296/297) — dual-fail hard-stop |
-| `write_close_report` | Issue Project Milestone `## Closure` + milestone comment | **Documented** (REQ-296/297) — close path-unit walk uses Linear issue ids |
-| `append_run_note` | Issue comments (+ optional project update) | **Documented** (REQ-294) — authoritative run/cost notes; local ledger optional telemetry |
-| List run notes (helper) | Issue comments `<!-- do-work-run-note -->` | **Documented** (REQ-297) — retro prefers Linear notes, falls back to local telemetry |
-| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` | Issue Project Milestone description `<!-- do-work-milestone -->` + Linear-issue path-milestone markers (M1/M2) | **Documented** (REQ-298 path; **REQ-299** ops) — empty marker → null; does not invent milestone id |
-| `write_gate_state` | **Local** `state/gate-owner.md` (not Linear) | **Documented** (REQ-296 home; **REQ-299** concurrent serialize) — local only; never Linear |
+| Port op                                                                  | Depends on capability rows                                                                                     | Sequence status                                                                                                                                                      |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ensure_product_container`                                               | Team resolve, labels (optional)                                                                                | Documented (CRUD preflight)                                                                                                                                          |
+| `create_ur` / `read_ur` / `list_urs`                                     | Product Project + Project Milestones                                                                           | **Documented** (REQ-290) — live `search_tool` required; hard-stop if undiscoverable                                                                                  |
+| `append_ideate` / `append_clarifications`                                | Issue Project Milestone (description/comments)                                                                 | **Documented** (REQ-291) — section append under §9.1; rediscover update tools                                                                                        |
+| `create_req` / `update_req` / `read_req`                                 | Issues, Projects, labels, statuses                                                                             | **Documented** (REQ-290)                                                                                                                                             |
+| `list_reqs_for_ur`                                                       | Issues by Project                                                                                              | **Documented** (REQ-290)                                                                                                                                             |
+| `list_claimable_reqs`                                                    | Issues + relations + comments + statuses                                                                       | **Documented** (REQ-292/294/295) — Priority DESC (missing→2) → created_at ASC → id ASC; skip reasons; deps via **blocks**; footprint algorithm; no claim side-effect |
+| `claim_req` / `heartbeat_req` / `unblock_req`                            | Issues status + comments                                                                                       | **Documented** (REQ-292) — optimistic claim comment protocol                                                                                                         |
+| `set_req_status`                                                         | Workflow states, issues                                                                                        | **Documented** (REQ-292) — stopped / in-progress without archive or unclaim                                                                                          |
+| `archive_req`                                                            | Workflow states, issues, claim release, body proof/outputs                                                     | **Documented** (REQ-294/295) — done + proof + outputs + claim released; **not** called after failed review/evidence                                                  |
+| `set_blocked_by`                                                         | Issue relations `blocks` (+ body mirror)                                                                       | **Documented** (REQ-291) — dual-write; if relations **missing** → body-only + one-time warning (port rule)                                                           |
+| `set_files`                                                              | Issue description headers                                                                                      | **Documented** (REQ-291) — updates `**Files:**` only; no claim side-effect                                                                                           |
+| `append_decision`                                                        | Team Doc `decisions_doc_title`                                                                                 | **Documented** (REQ-296 ops; REQ-297 consumers) — create-if-missing; same one-line grammar; hard-stop on create/update fail                                          |
+| Calibration (retro write / capture read)                                 | Team Doc `calibration_doc_title`                                                                               | **Documented** (REQ-296/297) — create-if-missing; full replace body; hard-stop invent ban                                                                            |
+| `write_verify_report`                                                    | Issue Project Milestone `## Verify` + milestone comment                                                        | **Documented** (REQ-296/297) — dual-fail hard-stop                                                                                                                   |
+| `write_close_report`                                                     | Issue Project Milestone `## Closure` + milestone comment                                                       | **Documented** (REQ-296/297) — close path-unit walk uses Linear issue ids                                                                                            |
+| `append_run_note`                                                        | Issue comments (+ optional project update)                                                                     | **Documented** (REQ-294) — authoritative run/cost notes; local ledger optional telemetry                                                                             |
+| List run notes (helper)                                                  | Issue comments `<!-- do-work-run-note -->`                                                                     | **Documented** (REQ-297) — retro prefers Linear notes, falls back to local telemetry                                                                                 |
+| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` | Issue Project Milestone description `<!-- do-work-milestone -->` + Linear-issue path-milestone markers (M1/M2) | **Documented** (REQ-298 path; **REQ-299** ops) — empty marker → null; does not invent milestone id                                                                   |
+| `write_gate_state`                                                       | **Local** `state/gate-owner.md` (not Linear)                                                                   | **Documented** (REQ-296 home; **REQ-299** concurrent serialize) — local only; never Linear                                                                           |
 
 ---
-
-

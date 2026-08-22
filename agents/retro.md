@@ -30,6 +30,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -48,12 +49,11 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 - Calibration: `write-calibration` / `read-calibration` on DB row — **not** `state/calibration.md` as store
 - Hard-stop if dw-db fails for required writes
 
-
 ### Calibration / run-notes home — backend branch (REQ-296 / REQ-297)
 
-| Concern | Markdown | Linear (`linear.md`) |
-|---------|----------|----------------------|
-| Calibration write | Truncate-write `{project}/.do-work/state/calibration.md` | **Write calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`), create-if-missing, **full replace** body. Create/update failure → hard-stop; never invent alternate titles or local store |
+| Concern                | Markdown                                                                 | Linear (`linear.md`)                                                                                                                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Calibration write      | Truncate-write `{project}/.do-work/state/calibration.md`                 | **Write calibration Doc** — Team Doc `tracker.linear.calibration_doc_title` (default `do-work/calibration`), create-if-missing, **full replace** body. Create/update failure → hard-stop; never invent alternate titles or local store                     |
 | Run history for rollup | Local `.do-work/runs/RUN-NNN.yml` via `{skill-root}/lib/retro-rollup.sh` | **Prefer Linear first (REQ-297):** **List run notes** helper — Issue comments with `<!-- do-work-run-note -->` from `append_run_note`. Fall back to local `RUN-NNN.yml` only if comments unavailable. Local files are telemetry only when `ledger.enabled` |
 
 **When effective backend is `linear`:** do **not** write local `state/calibration.md` as the store. Use the calibration Team Doc sequence only. Fixed home — never invent alternate Doc titles.
@@ -75,11 +75,11 @@ If `$SKILL_ROOT/lib/retro-rollup.sh` is missing **and** backend is markdown, rep
 
 **Interpretation priority under Linear:**
 
-| Situation | What you interpret |
-|-----------|--------------------|
-| Linear run notes present | Prefer those notes as authoritative history (design §7); local rollup numbers are secondary if they disagree on coverage |
-| Linear notes empty/unavailable, local `runs=N` > 0 | Fall back to local rollup stdout (telemetry) |
-| Both empty | Empty-state branch (Step 2) |
+| Situation                                          | What you interpret                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Linear run notes present                           | Prefer those notes as authoritative history (design §7); local rollup numbers are secondary if they disagree on coverage |
+| Linear notes empty/unavailable, local `runs=N` > 0 | Fall back to local rollup stdout (telemetry)                                                                             |
+| Both empty                                         | Empty-state branch (Step 2)                                                                                              |
 
 Do not invent spend/stats. Never dual-write a fabricated local ledger from partial Linear data.
 
@@ -97,12 +97,12 @@ This is the documented degraded output. It is not an error.
 
 For a non-empty rollup, render a `/do-work retro` report with these sections, each grounded in the rollup lines (cite the numbers, do not invent them):
 
-| Section | Source lines | What you write |
-|---|---|---|
-| Stop reasons by REQ shape | `stop ...`, `stop_rate ...` | Which shapes stall or go verification-failing, with the rate. |
-| Model escalation | `escalation_rate=...`, `escalation <shape>=...` | Which shapes escalate sonnet→opus and how often. |
-| Footprint accuracy | `footprint under/over/exact`, `footprint_missed ...` | Whether declared `**Files:**` under- or over-predict, and which globs are missed most. |
-| Recurring failures | `recurrence <event>:<shape> ...` | Same failure ≥2× — ranked by weighted (recency-boosted) count. |
+| Section                   | Source lines                                         | What you write                                                                         |
+| ------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Stop reasons by REQ shape | `stop ...`, `stop_rate ...`                          | Which shapes stall or go verification-failing, with the rate.                          |
+| Model escalation          | `escalation_rate=...`, `escalation <shape>=...`      | Which shapes escalate sonnet→opus and how often.                                       |
+| Footprint accuracy        | `footprint under/over/exact`, `footprint_missed ...` | Whether declared `**Files:**` under- or over-predict, and which globs are missed most. |
+| Recurring failures        | `recurrence <event>:<shape> ...`                     | Same failure ≥2× — ranked by weighted (recency-boosted) count.                         |
 
 The shape key reads `<layer>/<ac-bucket>/<files-bucket>` (e.g. `agents/>4AC/>3file`). Translate it into plain language in the report.
 

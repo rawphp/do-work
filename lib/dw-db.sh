@@ -19,11 +19,17 @@ iso_now() {
 }
 
 # Escape a string for use inside a single-quoted SQL literal.
-# Double single-quotes (SQL standard). Do NOT use ${s//\'/\'\'} — bash emits
+# Double single-quotes (SQL standard).
+# Do NOT use ${s//\'/''} as the replacement: bash 5.2 parses '' inside
+# ${var/pat/repl} as an empty quoted string and strips apostrophes
+# ("it's" → "its"). Do NOT use ${s//\'/\'\'} either — bash 3.2 emits
 # backslash-escaped quotes (it\'s) which break SQLite string literals.
+# Expanding a variable that already holds two quote characters is portable
+# across bash 3.2 (macOS) and bash 5.2 (Ubuntu CI).
 sql_quote() {
   local s="${1:-}"
-  s="${s//\'/''}"
+  local doubled="''"
+  s="${s//\'/$doubled}"
   printf "'%s'" "$s"
 }
 

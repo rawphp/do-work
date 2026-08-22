@@ -10,25 +10,25 @@ Invoke with no subcommand for help plus suggested next steps:
 
 ## Command map (when to use which)
 
-| Goal | Command |
-|------|---------|
-| First-time project folders | `/do-work install` |
-| Align old `.do-work/` with current skill | `/do-work upgrade` |
-| New work end-to-end (define) | `/do-work start [brief]` |
-| Execute a defined UR | `/do-work go UR-NNN` |
-| Record brief only | `/do-work intake [brief]` |
-| Creative review only | `/do-work ideate UR-NNN` |
-| Grill the brief | `/do-work question UR-NNN` |
-| Decompose only | `/do-work capture UR-NNN` |
-| Score coverage only | `/do-work verify UR-NNN` |
-| Sharpen REQ quality | `/do-work audit UR-NNN` |
-| Run backlog (no verify gate) | `/do-work run [UR-NNN]` |
-| Live situation room | `/do-work status [UR-NNN]` |
-| Stuck REQ → backlog | `/do-work unblock REQ-NNN` |
-| Re-dispatch stopped REQ | `/do-work resume REQ-NNN` |
-| Validate integrated UR paths | `/do-work close UR-NNN` |
-| Learn from run history | `/do-work retro` |
-| Draft social posts | `/do-work log` |
+| Goal                                     | Command                    |
+| ---------------------------------------- | -------------------------- |
+| First-time project folders               | `/do-work install`         |
+| Align old `.do-work/` with current skill | `/do-work upgrade`         |
+| New work end-to-end (define)             | `/do-work start [brief]`   |
+| Execute a defined UR                     | `/do-work go UR-NNN`       |
+| Record brief only                        | `/do-work intake [brief]`  |
+| Creative review only                     | `/do-work ideate UR-NNN`   |
+| Grill the brief                          | `/do-work question UR-NNN` |
+| Decompose only                           | `/do-work capture UR-NNN`  |
+| Score coverage only                      | `/do-work verify UR-NNN`   |
+| Sharpen REQ quality                      | `/do-work audit UR-NNN`    |
+| Run backlog (no verify gate)             | `/do-work run [UR-NNN]`    |
+| Live situation room                      | `/do-work status [UR-NNN]` |
+| Stuck REQ → backlog                      | `/do-work unblock REQ-NNN` |
+| Re-dispatch stopped REQ                  | `/do-work resume REQ-NNN`  |
+| Validate integrated UR paths             | `/do-work close UR-NNN`    |
+| Learn from run history                   | `/do-work retro`           |
+| Draft social posts                       | `/do-work log`             |
 
 ---
 
@@ -40,9 +40,9 @@ Invoke with no subcommand for help plus suggested next steps:
 
 **Pipeline:** intake → ideate (default) → capture. Does **not** run verify or implementation.
 
-| Flag | Effect |
-|------|--------|
-| `--no-ideate` | Skip ideate and its Grill/Continue/Stop gate |
+| Flag          | Effect                                                                   |
+| ------------- | ------------------------------------------------------------------------ |
+| `--no-ideate` | Skip ideate and its Grill/Continue/Stop gate                             |
 | `--no-layers` | Skip layer-coverage checks for this Issue; records `layers_in_scope: []` |
 
 **Notes:**
@@ -64,11 +64,11 @@ Invoke with no subcommand for help plus suggested next steps:
 
 **Pipeline:** verify → (if gate passes) audit → run → optional close offer → optional log.
 
-| Flag | Effect |
-|------|--------|
-| `--force` | Run even if score &lt; threshold; verify still runs |
-| `--auto-fix` | One verify pass that creates missing REQs, re-scores; run only if ≥ threshold afterward |
-| `--no-layers` | Skip layer-coverage checks; passed through to capture if `--auto-fix` re-runs capture |
+| Flag          | Effect                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------- |
+| `--force`     | Run even if score &lt; threshold; verify still runs                                     |
+| `--auto-fix`  | One verify pass that creates missing REQs, re-scores; run only if ≥ threshold afterward |
+| `--no-layers` | Skip layer-coverage checks; passed through to capture if `--auto-fix` re-runs capture   |
 
 **Threshold:** `verify.threshold` in `.do-work/config.yml` (default **90**).
 
@@ -132,8 +132,8 @@ Use to resume after a failed start-at-capture, or to re-decompose after you edit
 
 Scores REQ coverage against the original brief (0–100%) and lists gaps. Includes layer, integration-block, and partial-confidence structural checks.
 
-| Flag | Effect |
-|------|--------|
+| Flag         | Effect                             |
+| ------------ | ---------------------------------- |
 | `--auto-fix` | Create missing REQs, then re-score |
 
 Use before `run` when you are not using `go`, or after manual REQ edits.
@@ -154,9 +154,9 @@ Executes the backlog: claim REQ → worker TDD loop → evidence validation → 
 
 Does **not** run the verify confidence gate (unlike `go`).
 
-| Flag | Effect |
-|------|--------|
-| `--parallel N` | One terminal dispatches up to N concurrent workers (default serial; capped at 10). Uses `parallel.max_workers` defaults when applicable |
+| Flag                | Effect                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--parallel N`      | One terminal dispatches up to N concurrent workers (default serial; capped at 10). Uses `parallel.max_workers` defaults when applicable                                |
 | `--budget <amount>` | Cap estimated model spend for this run; overrides `cost.budget`. Stops at the next REQ boundary after the in-flight REQ finishes integration. Empty budget = unlimited |
 
 **Parallelism without flags:** open multiple terminals and run `/do-work run` in each; claims coordinate via the filesystem/`git mv`.
@@ -211,34 +211,34 @@ Skipped when `log.enabled` is false or `platforms` is empty. `go` can trigger lo
 
 Same surface as README / SKILL quick reference:
 
-| Command | What it does |
-|---------|--------------|
-| `/do-work start [brief]` | Brief + REQs; ideate on by default |
-| `/do-work start [brief] --no-ideate` | Skip creative review |
-| `/do-work start [brief] --no-layers` | Skip layer checks for this Issue |
-| `/do-work go [UR-NNN]` | Verify; auto-run if ≥ threshold |
-| `/do-work go [UR-NNN] --force` | Verify + run regardless of score |
-| `/do-work go [UR-NNN] --auto-fix` | Verify, fix gaps once, run if ≥ threshold |
-| `/do-work go [UR-NNN] --no-layers` | Verify + run; skip layer checks |
-| `/do-work install` | Create `.do-work/` |
-| `/do-work upgrade` | Conformance fixes for `.do-work/` |
-| `/do-work intake [brief]` | Verbatim Issue only |
-| `/do-work capture [UR-NNN]` | UR → REQ files |
-| `/do-work question [UR-NNN]` | Interactive grilling |
-| `/do-work audit [UR-NNN]` | REQ quality pass |
-| `/do-work ideate [UR-NNN]` | Assumptions and risks |
-| `/do-work verify [UR-NNN]` | Coverage score + gaps |
-| `/do-work verify [UR-NNN] --auto-fix` | Verify + create missing REQs |
-| `/do-work run [UR-NNN]` | Execute backlog (optional Issue scope) |
-| `/do-work run --parallel N` | Single-session parallel workers |
-| `/do-work run --budget <amount>` | Spend cap for the run |
-| `/do-work status [UR-NNN]` | Situation room |
-| `/do-work close UR-NNN` | Integrated Issue closure report |
-| `/do-work unblock REQ-NNN` | Stuck REQ → backlog |
-| `/do-work resume REQ-NNN` | Re-dispatch stopped REQ |
-| `/do-work retro` | Ledger → calibration report |
-| `/do-work log` | Build-in-public drafts |
-| `/do-work` | Help |
+| Command                               | What it does                              |
+| ------------------------------------- | ----------------------------------------- |
+| `/do-work start [brief]`              | Brief + REQs; ideate on by default        |
+| `/do-work start [brief] --no-ideate`  | Skip creative review                      |
+| `/do-work start [brief] --no-layers`  | Skip layer checks for this Issue          |
+| `/do-work go [UR-NNN]`                | Verify; auto-run if ≥ threshold           |
+| `/do-work go [UR-NNN] --force`        | Verify + run regardless of score          |
+| `/do-work go [UR-NNN] --auto-fix`     | Verify, fix gaps once, run if ≥ threshold |
+| `/do-work go [UR-NNN] --no-layers`    | Verify + run; skip layer checks           |
+| `/do-work install`                    | Create `.do-work/`                        |
+| `/do-work upgrade`                    | Conformance fixes for `.do-work/`         |
+| `/do-work intake [brief]`             | Verbatim Issue only                       |
+| `/do-work capture [UR-NNN]`           | UR → REQ files                            |
+| `/do-work question [UR-NNN]`          | Interactive grilling                      |
+| `/do-work audit [UR-NNN]`             | REQ quality pass                          |
+| `/do-work ideate [UR-NNN]`            | Assumptions and risks                     |
+| `/do-work verify [UR-NNN]`            | Coverage score + gaps                     |
+| `/do-work verify [UR-NNN] --auto-fix` | Verify + create missing REQs              |
+| `/do-work run [UR-NNN]`               | Execute backlog (optional Issue scope)    |
+| `/do-work run --parallel N`           | Single-session parallel workers           |
+| `/do-work run --budget <amount>`      | Spend cap for the run                     |
+| `/do-work status [UR-NNN]`            | Situation room                            |
+| `/do-work close UR-NNN`               | Integrated Issue closure report           |
+| `/do-work unblock REQ-NNN`            | Stuck REQ → backlog                       |
+| `/do-work resume REQ-NNN`             | Re-dispatch stopped REQ                   |
+| `/do-work retro`                      | Ledger → calibration report               |
+| `/do-work log`                        | Build-in-public drafts                    |
+| `/do-work`                            | Help                                      |
 
 ## Related
 

@@ -96,18 +96,23 @@ Autonomously interrogate every REQ's quality after capture. Auto-fix soft spots 
 4. For each REQ, interrogate five dimensions:
 
 #### Dimension 1: Acceptance Criteria Specificity
+
 Is each criterion falsifiable? Could you write a test for it? Rewrite vague qualifiers ("correctly", "properly", "as expected") into concrete observable outcomes.
 
 #### Dimension 2: Error Path Coverage
+
 Does the REQ account for what happens when things fail? Add missing error/edge case criteria where the happy path is defined but failure isn't.
 
 #### Dimension 3: Scope Boundary Clarity
+
 Is it clear what this REQ touches and what it doesn't? Flag REQs that could bleed into adjacent work.
 
 #### Dimension 4: Dependency Ordering
+
 Does this REQ assume something from another REQ that hasn't been completed yet? Flag out-of-order dependencies.
 
 #### Dimension 5: Brief Alignment
+
 Does this REQ's description and criteria trace back to something in the brief? Flag scope creep (work not rooted in the brief) and drift (subtle misinterpretation of the brief).
 
 5. Auto-fix what it can:
@@ -120,6 +125,7 @@ Does this REQ's description and criteria trace back to something in the brief? F
 ### Auto-Fix Boundaries
 
 The audit agent:
+
 - **Does** rewrite vague criteria into specific ones.
 - **Does** add missing error path criteria.
 - **Does** annotate dependency ordering issues.
@@ -242,10 +248,10 @@ Log
 
 ## File Inventory
 
-| File | Type | New/Modified |
-|------|------|-------------|
-| `agents/question.md` | Agent | New |
-| `agents/audit.md` | Agent | New |
-| `agents/start.md` | Agent | Modified (add `--grill` flag support) |
-| `agents/go.md` | Agent | Modified (add audit step after verify) |
-| `SKILL.md` | Skill definition | Modified (document new commands and flags) |
+| File                 | Type             | New/Modified                               |
+| -------------------- | ---------------- | ------------------------------------------ |
+| `agents/question.md` | Agent            | New                                        |
+| `agents/audit.md`    | Agent            | New                                        |
+| `agents/start.md`    | Agent            | Modified (add `--grill` flag support)      |
+| `agents/go.md`       | Agent            | Modified (add audit step after verify)     |
+| `SKILL.md`           | Skill definition | Modified (document new commands and flags) |

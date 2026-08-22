@@ -32,7 +32,7 @@ Create the do-work folder structure. Idempotent — safe to run multiple times.
 # Load Config step 8 (empty → project.name → basename → ensure → UUID).
 
 project:
-  name: "{project-basename}"   # install seeds from git-root directory basename when empty
+  name: '{project-basename}' # install seeds from git-root directory basename when empty
 
 # Declare your project's layers, e.g. [frontend, backend] for a web app,
 # [commands, core, output] for a CLI, [agents, commands, templates] for do-work.
@@ -41,7 +41,8 @@ project:
 layers: []
 
 test:
-  suite_command: ""      # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
+  suite_command: '' # e.g. "./vendor/bin/pest", "npx vitest run", "npm test"
+
 
 # Work-item store. Unset/empty tracker.backend also means markdown (default).
 # Full tracker.linear.* schema + product_project resolve: agents/config.md

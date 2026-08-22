@@ -26,10 +26,10 @@ Do **not** load this file for ordinary work-item ops when backend is `markdown` 
 
 **Noun disambiguation (required when reading this file):**
 
-| Phrase | Means |
-|--------|--------|
-| **do-work Issue** / **UR-NNN** | Product brief entity = Linear **Project Milestone** (`<!-- do-work-ur -->`) |
-| **Linear issue** / **REQ** | Work item = native Linear **issue** id (e.g. `ENG-123`, `<!-- do-work-req -->`) |
+| Phrase                         | Means                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------- |
+| **do-work Issue** / **UR-NNN** | Product brief entity = Linear **Project Milestone** (`<!-- do-work-ur -->`)     |
+| **Linear issue** / **REQ**     | Work item = native Linear **issue** id (e.g. `ENG-123`, `<!-- do-work-req -->`) |
 
 Never say bare "Issue's Issues". Prefer "do-work Issue's Linear issues (REQs)".
 
@@ -41,16 +41,17 @@ Team (config)
         └── Sub-issue (layer child)
 ```
 
-| Entity | Naming / config |
-|--------|-----------------|
-| Product Project | `tracker.linear.product_project` — **shared** name or UUID; **default empty**. Resolve via config chain (explicit `product_project` → `project.name` → git-root basename); `ensure_product_container` create-if-missing + **always persist UUID**. Never fall through to skill name `do-work` for empty config. Example for this skill repo only: name `do-work`. |
-| do-work Issue (UR) | **Project Milestone** on that project; name `ur_milestone_name_pattern` (default `{ur_id}: {title}`) |
-| REQ | **Linear issue id only** (e.g. `ENG-123`) — no parallel `REQ-NNN` |
-| REQ scope | product Project + do-work Issue (UR) Project Milestone membership |
+| Entity             | Naming / config                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product Project    | `tracker.linear.product_project` — **shared** name or UUID; **default empty**. Resolve via config chain (explicit `product_project` → `project.name` → git-root basename); `ensure_product_container` create-if-missing + **always persist UUID**. Never fall through to skill name `do-work` for empty config. Example for this skill repo only: name `do-work`. |
+| do-work Issue (UR) | **Project Milestone** on that project; name `ur_milestone_name_pattern` (default `{ur_id}: {title}`)                                                                                                                                                                                                                                                              |
+| REQ                | **Linear issue id only** (e.g. `ENG-123`) — no parallel `REQ-NNN`                                                                                                                                                                                                                                                                                                 |
+| REQ scope          | product Project + do-work Issue (UR) Project Milestone membership                                                                                                                                                                                                                                                                                                 |
 
 ### Hard rules (hierarchy)
 
 <!-- UR-002 path closed via children ORI-15..18: empty product_project → project.name → basename → ensure create+persist UUID; never invent skill name do-work -->
+
 1. **No Initiative as do-work Issue container** — MCP has no reliable Initiative create path; do-work Issues are Project Milestones.
 2. **`product_project` is shared per local product** — do not create per–do-work-Issue Projects (including `do-work/{UR-id}` patterns) as the do-work Issue container.
 3. **Atomic `create_ur`** — product Project ensure + milestone create; no partial do-work Issue; hard-stop on failure.
@@ -59,13 +60,13 @@ Team (config)
 
 ### Disambiguation: Milestone-as-Issue vs path-milestone mode (M1/M2)
 
-| | **Milestone-as-Issue** | **Path-milestone mode (M1/M2)** |
-|--|---------------------|--------------------------------|
-| What | The do-work Issue *entity* (UR-NNN) | Optional delivery mode *inside* one do-work Issue |
-| Trigger | Every do-work Issue (Project Milestone) | Brief has `source: /saas-thesis handoff` **and** `### Milestones` with `#### M1`+ |
-| Store | Linear Project Milestone | Cursor `<!-- do-work-milestone -->` on that **same** milestone description; Linear issues (REQs) marked `M1`/`M2` |
-| Ops | `create_ur` / `read_ur` / `list_urs` | `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` |
-| Detail | This section + [linear-ops.md](../../references/linear-ops.md) | [linear-path-milestones.md](../../references/linear-path-milestones.md) |
+|         | **Milestone-as-Issue**                                         | **Path-milestone mode (M1/M2)**                                                                                   |
+| ------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| What    | The do-work Issue _entity_ (UR-NNN)                            | Optional delivery mode _inside_ one do-work Issue                                                                 |
+| Trigger | Every do-work Issue (Project Milestone)                        | Brief has `source: /saas-thesis handoff` **and** `### Milestones` with `#### M1`+                                 |
+| Store   | Linear Project Milestone                                       | Cursor `<!-- do-work-milestone -->` on that **same** milestone description; Linear issues (REQs) marked `M1`/`M2` |
+| Ops     | `create_ur` / `read_ur` / `list_urs`                           | `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs`                                          |
+| Detail  | This section + [linear-ops.md](../../references/linear-ops.md) | [linear-path-milestones.md](../../references/linear-path-milestones.md)                                           |
 
 ---
 
@@ -83,43 +84,43 @@ Official remote MCP: `https://mcp.linear.app/mcp`. Setup: Linear skill `SKILL.md
 
 Read the pointed reference **when executing that op** (one hop only — no references→references chains for further sequences).
 
-| Port op / surface | When to load | Reference |
-|-------------------|--------------|-----------|
-| `ensure_product_container` | Before first CRUD in session; intake | [linear-ops.md](../../references/linear-ops.md) § ensure_product_container |
-| **`create_ur`** | Intake / start | [linear-ops.md](../../references/linear-ops.md) § create_ur |
-| `read_ur` / `list_urs` | Any phase needing brief / UR list | [linear-ops.md](../../references/linear-ops.md) |
-| `create_req` / `update_req` / `read_req` / `list_reqs_for_ur` | Capture / workers | [linear-ops.md](../../references/linear-ops.md) |
-| `append_ideate` / `append_clarifications` | Ideate / question | [linear-ops.md](../../references/linear-ops.md) |
-| `set_blocked_by` / `set_files` | Deps / footprint writers | [linear-ops.md](../../references/linear-ops.md) |
-| `list_claimable_reqs` / `claim_req` / `heartbeat_req` | Run pick/claim | [linear-ops.md](../../references/linear-ops.md) |
-| `set_req_status` / `unblock_req` / Resume / Status | Stop / unblock / resume / status | [linear-ops.md](../../references/linear-ops.md) |
-| **`archive_req`** / `append_run_note` | Post-worker integrate | [linear-ops.md](../../references/linear-ops.md) |
-| `append_decision` / calibration Doc | Capture / retro | [linear-ops.md](../../references/linear-ops.md) |
-| `write_verify_report` / `write_close_report` | Verify / close | [linear-ops.md](../../references/linear-ops.md) |
-| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` / `write_gate_state` | Path-milestone mode only | [linear-path-milestones.md](../../references/linear-path-milestones.md) |
-| §9 templates / labels / path-units | Creating or parsing bodies | [linear-ops.md](../../references/linear-ops.md) § Templates |
-| Commits / branch sanitize (§6.5) | Worker / merge under Linear | [linear-path-milestones.md](../../references/linear-path-milestones.md) (commits section) or [linear-ops.md](../../references/linear-ops.md) |
-| Path narratives / capability matrix / migration | Spike fill, upgrade migrate | [linear-paths.md](../../references/linear-paths.md) |
+| Port op / surface                                                                             | When to load                         | Reference                                                                                                                                    |
+| --------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ensure_product_container`                                                                    | Before first CRUD in session; intake | [linear-ops.md](../../references/linear-ops.md) § ensure_product_container                                                                   |
+| **`create_ur`**                                                                               | Intake / start                       | [linear-ops.md](../../references/linear-ops.md) § create_ur                                                                                  |
+| `read_ur` / `list_urs`                                                                        | Any phase needing brief / UR list    | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `create_req` / `update_req` / `read_req` / `list_reqs_for_ur`                                 | Capture / workers                    | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `append_ideate` / `append_clarifications`                                                     | Ideate / question                    | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `set_blocked_by` / `set_files`                                                                | Deps / footprint writers             | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `list_claimable_reqs` / `claim_req` / `heartbeat_req`                                         | Run pick/claim                       | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `set_req_status` / `unblock_req` / Resume / Status                                            | Stop / unblock / resume / status     | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| **`archive_req`** / `append_run_note`                                                         | Post-worker integrate                | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `append_decision` / calibration Doc                                                           | Capture / retro                      | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `write_verify_report` / `write_close_report`                                                  | Verify / close                       | [linear-ops.md](../../references/linear-ops.md)                                                                                              |
+| `read_active_milestone` / `set_active_milestone` / `list_milestone_reqs` / `write_gate_state` | Path-milestone mode only             | [linear-path-milestones.md](../../references/linear-path-milestones.md)                                                                      |
+| §9 templates / labels / path-units                                                            | Creating or parsing bodies           | [linear-ops.md](../../references/linear-ops.md) § Templates                                                                                  |
+| Commits / branch sanitize (§6.5)                                                              | Worker / merge under Linear          | [linear-path-milestones.md](../../references/linear-path-milestones.md) (commits section) or [linear-ops.md](../../references/linear-ops.md) |
+| Path narratives / capability matrix / migration                                               | Spike fill, upgrade migrate          | [linear-paths.md](../../references/linear-paths.md)                                                                                          |
 
 ### Templates (pointers only)
 
-| Entity | Marker | Full template |
-|--------|--------|---------------|
-| do-work Issue Project Milestone (UR) | `<!-- do-work-ur -->` | [linear-ops.md](../../references/linear-ops.md) §9.1 |
-| Linear issue (REQ) | `<!-- do-work-req -->` | [linear-ops.md](../../references/linear-ops.md) §9.2 |
+| Entity                               | Marker                 | Full template                                        |
+| ------------------------------------ | ---------------------- | ---------------------------------------------------- |
+| do-work Issue Project Milestone (UR) | `<!-- do-work-ur -->`  | [linear-ops.md](../../references/linear-ops.md) §9.1 |
+| Linear issue (REQ)                   | `<!-- do-work-req -->` | [linear-ops.md](../../references/linear-ops.md) §9.2 |
 
 On read/update: missing marker → **stop the op**; do not invent headers.
 
 ### Non-ticket artifact homes (summary)
 
-| Artifact | Home | Op |
-|----------|------|-----|
-| Decisions | Team Doc `decisions_doc_title` | `append_decision` |
-| Calibration | Team Doc `calibration_doc_title` | Write/read calibration |
-| Run notes | Issue comment `<!-- do-work-run-note -->` | `append_run_note` |
-| Verify / close | do-work Issue Project Milestone `## Verify` / `## Closure` + comment | `write_verify_report` / `write_close_report` |
-| Path-milestone cursor | do-work Issue Project Milestone description `<!-- do-work-milestone -->` | milestone ops |
-| Gate locks | **Local** `state/gate-owner.md` only | `write_gate_state` |
+| Artifact              | Home                                                                     | Op                                           |
+| --------------------- | ------------------------------------------------------------------------ | -------------------------------------------- |
+| Decisions             | Team Doc `decisions_doc_title`                                           | `append_decision`                            |
+| Calibration           | Team Doc `calibration_doc_title`                                         | Write/read calibration                       |
+| Run notes             | Issue comment `<!-- do-work-run-note -->`                                | `append_run_note`                            |
+| Verify / close        | do-work Issue Project Milestone `## Verify` / `## Closure` + comment     | `write_verify_report` / `write_close_report` |
+| Path-milestone cursor | do-work Issue Project Milestone description `<!-- do-work-milestone -->` | milestone ops                                |
+| Gate locks            | **Local** `state/gate-owner.md` only                                     | `write_gate_state`                           |
 
 Full sequences: [linear-ops.md](../../references/linear-ops.md).
 
@@ -127,12 +128,12 @@ Full sequences: [linear-ops.md](../../references/linear-ops.md).
 
 ## status_map
 
-| do-work status | Config key | Default Linear state name |
-|----------------|------------|---------------------------|
-| `backlog` | `status_map.backlog` | `Todo` |
-| `in_progress` | `status_map.in_progress` | `In Progress` |
-| `stopped` | `status_map.stopped` | `Canceled` |
-| `done` | `status_map.done` | `Done` |
+| do-work status | Config key               | Default Linear state name |
+| -------------- | ------------------------ | ------------------------- |
+| `backlog`      | `status_map.backlog`     | `Todo`                    |
+| `in_progress`  | `status_map.in_progress` | `In Progress`             |
+| `stopped`      | `status_map.stopped`     | `Canceled`                |
+| `done`         | `status_map.done`        | `Done`                    |
 
 **Hard-fail:** when `backend: linear`, every mapped state **name** must exist on the team workflow. Missing → hard-stop (rename team state or override map). **Never** invent states; **never** pick “close enough”; **never** fall back to markdown.
 
@@ -199,25 +200,25 @@ use /do-work resume or unblock after MCP recovers (port: leave claimed).
 
 ### Conditions → stop (summary)
 
-| Condition | Behavior |
-|-----------|----------|
-| `search_tool` returns no Linear tools | Hard stop + setup steps above |
-| MCP offline / unauthenticated mid-session | Hard stop; if already claimed → leave claimed |
-| Team id/key unresolved | Hard stop; do not guess |
-| `product_project` empty-name after resolve chain | Hard stop; set `project.name` or `product_project`; **no** skill-name invent; **no** markdown fallback |
-| `product_project` multi-match by name on team | Hard stop; require UUID in `tracker.linear.product_project` |
-| `product_project` unresolved / uncreatable | Hard stop |
-| Any `status_map` value missing on team workflow | Hard stop + rename / override instructions |
-| Milestone / issue create tools missing for `create_ur` / `create_req` | Hard stop; **no** Initiative-as-do-work-Issue substitute; **no** markdown dual-write |
-| Relation tools missing after spike documents **missing** | Prefer body-only deps + one-time warning — still no markdown fallback |
+| Condition                                                             | Behavior                                                                                               |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `search_tool` returns no Linear tools                                 | Hard stop + setup steps above                                                                          |
+| MCP offline / unauthenticated mid-session                             | Hard stop; if already claimed → leave claimed                                                          |
+| Team id/key unresolved                                                | Hard stop; do not guess                                                                                |
+| `product_project` empty-name after resolve chain                      | Hard stop; set `project.name` or `product_project`; **no** skill-name invent; **no** markdown fallback |
+| `product_project` multi-match by name on team                         | Hard stop; require UUID in `tracker.linear.product_project`                                            |
+| `product_project` unresolved / uncreatable                            | Hard stop                                                                                              |
+| Any `status_map` value missing on team workflow                       | Hard stop + rename / override instructions                                                             |
+| Milestone / issue create tools missing for `create_ur` / `create_req` | Hard stop; **no** Initiative-as-do-work-Issue substitute; **no** markdown dual-write                   |
+| Relation tools missing after spike documents **missing**              | Prefer body-only deps + one-time warning — still no markdown fallback                                  |
 
 ### Claim / mid-flight (summary)
 
-| Event | Behavior |
-|-------|----------|
-| Fresh foreign active claim | `concurrent-conflict`; resume for owner |
+| Event                                 | Behavior                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Fresh foreign active claim            | `concurrent-conflict`; resume for owner                                                   |
 | MCP dies after successful `claim_req` | **Leave claimed**; stop for resume/unblock; never silent-release; never markdown fallback |
-| Human assignee | Sacred — agents never steal Linear assignee for claim |
+| Human assignee                        | Sacred — agents never steal Linear assignee for claim                                     |
 
 Full claim/archive sequences: [linear-ops.md](../../references/linear-ops.md).
 
@@ -225,14 +226,14 @@ Full claim/archive sequences: [linear-ops.md](../../references/linear-ops.md).
 
 ## Run-loop rules (pointers)
 
-| Concern | Rule | Detail |
-|---------|------|--------|
-| Deps | Native **`blocks`** relations authoritative; body `**Depends on:**` mirror | [linear-ops.md](../../references/linear-ops.md) |
-| Footprint | Issue `**Files:**` vs in-flight claims; empty = free | [linear-ops.md](../../references/linear-ops.md) |
-| Pick order | Priority DESC (missing→2) → created_at ASC → id ASC | `list_claimable_reqs` |
-| Archive | Only via **`archive_req`** after evidence + review gates | [linear-ops.md](../../references/linear-ops.md) |
-| Commits | `feat(ENG-123):` + `Issue:` footer; branch `req/<sanitized-id>` | [linear-path-milestones.md](../../references/linear-path-milestones.md) |
-| No Linear bash in `lib/` (v1) | Sequences are agent/MCP only | Heartbeat enforcement is therefore **procedural**, not a runtime bash guard: a hard-stop assertion in `heartbeat_req` (patch-in-place; stop on no active claim — sqlite `die`-on-0-rows parity) plus a regression test under `lib/tests/`. See findings-doc F16 and UR-004. |
+| Concern                       | Rule                                                                       | Detail                                                                                                                                                                                                                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deps                          | Native **`blocks`** relations authoritative; body `**Depends on:**` mirror | [linear-ops.md](../../references/linear-ops.md)                                                                                                                                                                                                                             |
+| Footprint                     | Issue `**Files:**` vs in-flight claims; empty = free                       | [linear-ops.md](../../references/linear-ops.md)                                                                                                                                                                                                                             |
+| Pick order                    | Priority DESC (missing→2) → created_at ASC → id ASC                        | `list_claimable_reqs`                                                                                                                                                                                                                                                       |
+| Archive                       | Only via **`archive_req`** after evidence + review gates                   | [linear-ops.md](../../references/linear-ops.md)                                                                                                                                                                                                                             |
+| Commits                       | `feat(ENG-123):` + `Issue:` footer; branch `req/<sanitized-id>`            | [linear-path-milestones.md](../../references/linear-path-milestones.md)                                                                                                                                                                                                     |
+| No Linear bash in `lib/` (v1) | Sequences are agent/MCP only                                               | Heartbeat enforcement is therefore **procedural**, not a runtime bash guard: a hard-stop assertion in `heartbeat_req` (patch-in-place; stop on no active claim — sqlite `die`-on-0-rows parity) plus a regression test under `lib/tests/`. See findings-doc F16 and UR-004. |
 
 ---
 
@@ -244,14 +245,14 @@ A **diagnostic** sequence that reads a do-work Issue's Linear issues' (REQs') na
 
 - **Read-side / best-effort only.** This is an **audit / diagnostic**, not a gate. It never blocks claim, write, or archive, and is not a `list_claimable_reqs` input.
 - **Linear `blocks` relations are eventually-consistent.** A relation just written via `set_blocked_by` may not be readable immediately. If a cycle-check runs right after a relation write, **re-read after a settle** before trusting a "no cycle" result.
-- **Linear permits cyclic `blocks` relations** — it does **not** enforce acyclicity. Therefore **write-time rejection is infeasible and is NOT claimed** by this sequence. Unlike sqlite (REQ-018 rejects cyclic deps at `set-blocked-by`), Linear has no write-side cycle guard; this command can only *report* cycles after the fact.
+- **Linear permits cyclic `blocks` relations** — it does **not** enforce acyclicity. Therefore **write-time rejection is infeasible and is NOT claimed** by this sequence. Unlike sqlite (REQ-018 rejects cyclic deps at `set-blocked-by`), Linear has no write-side cycle guard; this command can only _report_ cycles after the fact.
 - **Linear MCP read / relation tools only.** No do-work-side store write, no freehand SQL, no `lib/*.sh` Linear client (none exists in v1). The graph is assembled in the agent's working memory from relation reads.
 
 ### Agent sequence
 
 1. **Scope the do-work Issue** — resolve product Project + do-work Issue Project Milestone; call **`list_reqs_for_ur`** ([linear-ops.md](../../references/linear-ops.md)) to enumerate that milestone's Linear issues / REQs (any status). Capture each Linear issue id.
 2. **Rediscover relation-read tools** — `search_tool` for Linear issue **relations** (queries such as `"linear issue relations"`, `"linear blocks"`, `"linear dependencies"`). Map hits to **observed** tool names + `input_schema` from search — never hard-code tool names. If zero relation-read tools are discoverable → emit a one-time warning and **fall back to each Linear issue's body `**Depends on:**` mirror** (display only; `blocks` relations are authoritative per **Deps authority** in [port.md](port.md)). Still no markdown store, no SQL.
-3. **Read `blocks` relations per Linear issue** — for each REQ, list its native `blocks` / "is blocked by" edges. Direction (matches `set_blocked_by` in [linear-ops.md](../../references/linear-ops.md)): a dependency **blocks** the current Linear issue — i.e. *this REQ is blocked by its dependencies*. Model each edge as a **depends-on** edge `current → dependency`.
+3. **Read `blocks` relations per Linear issue** — for each REQ, list its native `blocks` / "is blocked by" edges. Direction (matches `set_blocked_by` in [linear-ops.md](../../references/linear-ops.md)): a dependency **blocks** the current Linear issue — i.e. _this REQ is blocked by its dependencies_. Model each edge as a **depends-on** edge `current → dependency`.
 4. **Build the directed graph client-side** — nodes = Linear issue ids for this do-work Issue; edges = depends-on edges from step 3. Only REQs that are dependencies of (or depended-on by) a listed REQ are in scope; do not pull the whole team graph.
 5. **Run cycle detection (DFS)** over the graph. On finding a back-edge, record the **cycle path** as an ordered list of Linear ids (e.g. `ENG-100 → ENG-101 → ENG-102 → ENG-100`).
 6. **Report** — emit `acyclic` when no cycle is found, or a `cycle-detected` block listing every discovered cycle path. When the check ran immediately after a `set_blocked_by` write, note that eventual consistency may hide a fresh edge and advise a re-read after settle.
@@ -259,11 +260,11 @@ A **diagnostic** sequence that reads a do-work Issue's Linear issues' (REQs') na
 
 ### Direction & authority cross-ref
 
-| Concern | Source |
-|---------|--------|
+| Concern         | Source                                                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Graph direction | Matches `set_blocked_by` ([linear-ops.md](../../references/linear-ops.md)): dependency **blocks** the current Issue; depends-on edge `current → dependency` for cycle DFS |
-| Deps authority | [port.md](port.md) **Deps authority** — `blocks` relations authoritative; body `**Depends on:**` mirror only |
-| Parity concept | sqlite `cycle-check` (REQ-017) + `deadlock-check` (REQ-019) in [sqlite.md](sqlite.md) are write-side-enforced; under Linear the graph is **read-side only** |
+| Deps authority  | [port.md](port.md) **Deps authority** — `blocks` relations authoritative; body `**Depends on:**` mirror only                                                              |
+| Parity concept  | sqlite `cycle-check` (REQ-017) + `deadlock-check` (REQ-019) in [sqlite.md](sqlite.md) are write-side-enforced; under Linear the graph is **read-side only**               |
 
 ---
 
@@ -276,7 +277,6 @@ A **diagnostic** sequence that reads a do-work Issue's Linear issues' (REQs') na
 - `agents/config.md` — `tracker.*` schema
 - `agents/intake.md` / phase agents — Milestone-as-Issue consumers (ORI-9)
 - Design: `docs/superpowers/specs/2026-07-31-do-work-multi-tracker-design.md`
-
 
 ## Field traps (from field-lessons)
 

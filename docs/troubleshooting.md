@@ -285,8 +285,8 @@ Then re-run the phase. If a claim was already active when MCP died mid-flight, *
 tracker:
   backend: linear
   linear:
-    team_id: "<linear-team-uuid>"   # preferred
-    team_key: ""                    # optional alternate resolve
+    team_id: '<linear-team-uuid>' # preferred
+    team_key: '' # optional alternate resolve
 ```
 
 Do **not** guess a team. Agents hard-stop until one resolves. Full schema: `agents/config.md`.
@@ -347,8 +347,8 @@ Optional local work-item store when `tracker.backend: sqlite` in `.do-work/confi
 tracker:
   backend: sqlite
   sqlite:
-    path: ""                 # default .do-work/work.db
-    board_path: ""           # default .do-work/board/index.html
+    path: '' # default .do-work/work.db
+    board_path: '' # default .do-work/board/index.html
     busy_timeout_ms: 5000
 ```
 
@@ -447,10 +447,10 @@ Optional remote work-item store when `tracker.backend: do-work-io` in `.do-work/
 tracker:
   backend: do-work-io
   dowork:
-    base_url: ""                 # e.g. https://api.do-work.test (origin, no /mcp path)
-    token_env: DOWORK_IO_PAT     # process env var holding the Sanctum PAT
-    project: ""                  # project slug (identity key)
-    mcp_profile: dowork.control  # dowork.read | dowork.control | dowork.admin
+    base_url: '' # e.g. https://api.do-work.test (origin, no /mcp path)
+    token_env: DOWORK_IO_PAT # process env var holding the Sanctum PAT
+    project: '' # project slug (identity key)
+    mcp_profile: dowork.control # dowork.read | dowork.control | dowork.admin
 ```
 
 Rules that matter:

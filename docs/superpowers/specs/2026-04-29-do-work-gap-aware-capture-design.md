@@ -10,7 +10,7 @@
 
 Briefs the user expects to be full-stack frequently produce REQs that are backend-only, or UI-only without integration wiring into the existing app. The failure mode is invisible because the user doesn't read REQ files closely. By the time the run loop has shipped half the feature, the gap is already cost.
 
-Capture currently has no structural check that forces coverage of the layers a project actually has, and no enforcement that a new feature is *connected* to anything. Ideate surfaces gaps in the brief itself but exits without giving the user a moment to act on them.
+Capture currently has no structural check that forces coverage of the layers a project actually has, and no enforcement that a new feature is _connected_ to anything. Ideate surfaces gaps in the brief itself but exits without giving the user a moment to act on them.
 
 A first version of this spec tried to solve the layer problem with manifest-based detection (`package.json`, `composer.json`, etc.). That was theatre. The detection produced one of two web-shaped buckets — frontend or backend — and silently failed for CLIs, libraries, mobile apps, IaC, ML pipelines, and the do-work tool itself (which has no recognised manifest and would fall through every detection path). The verify checks also baked in web vocabulary like "UI element" and "endpoint." This revision drops the detection model entirely.
 
@@ -40,7 +40,7 @@ No new commands. No new artifacts. The refactor is internal to the existing agen
 The project declares its layers once in `do-work/config.yml`:
 
 ```yaml
-layers: [frontend, backend]   # web app
+layers: [frontend, backend] # web app
 # layers: [commands, core, output]            # CLI tool
 # layers: [public_api, internal]              # library / SDK
 # layers: [agents, commands, templates]       # do-work itself
@@ -75,11 +75,11 @@ or pass `--no-layers` to skip layer-coverage checks for this UR only.
 
 Before any layer logic, capture classifies the brief using the same heuristic `run.md` already applies (commit `25ee3fb`). The result is recorded in UR state.
 
-| Class | Capture behavior |
-|---|---|
-| **bug-fix** | Skip layer-coverage check. Produce minimal REQ(s) targeting the affected layer only. Integration block exempt. |
-| **feature** | Default. Full layer-coverage check applies. Integration block required for REQs adding new surface. |
-| **infra / refactor / docs / other** | Capture asks once: *"Treat this as bug-fix-style minimal capture, or feature-style full-stack capture?"* Records the answer. |
+| Class                               | Capture behavior                                                                                                             |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **bug-fix**                         | Skip layer-coverage check. Produce minimal REQ(s) targeting the affected layer only. Integration block exempt.               |
+| **feature**                         | Default. Full layer-coverage check applies. Integration block required for REQs adding new surface.                          |
+| **infra / refactor / docs / other** | Capture asks once: _"Treat this as bug-fix-style minimal capture, or feature-style full-stack capture?"_ Records the answer. |
 
 Classification logic is shared between `capture.md` and `run.md` — extracted to a helper or duplicated, decided in the plan.
 
@@ -108,7 +108,7 @@ Default: continue.
 
 **Prompt input convention** (applies to every interactive prompt in this spec): typing the option number (`1`, `2`, `3`) picks that option. An empty response — just hitting enter — picks the documented default. Anything else gets a one-line clarification and a re-prompt. There is no idle timeout in Claude Code; "default" is concretely "what empty input selects," nothing else.
 
-This **replaces** the `--grill` flag on `start`. The flag is removed. Users decide *after seeing the gaps* whether to be grilled, which is more informed than deciding upfront.
+This **replaces** the `--grill` flag on `start`. The flag is removed. Users decide _after seeing the gaps_ whether to be grilled, which is more informed than deciding upfront.
 
 ### REQ frontmatter gains a `layer:` field
 
@@ -135,6 +135,7 @@ After capture writes its initial REQ list, it self-audits in a single pass.
 1. **Build coverage matrix.** For each declared layer, check whether at least one REQ has `layer: <name>` in its frontmatter.
 
 2. **For each layer with zero coverage, prompt:**
+
    ```
    Project declares layer "{layer}", but no REQ covers it.
    Brief: <one-line summary>
@@ -169,13 +170,13 @@ These three are deliberately stack-agnostic. They apply to a Vue page, a CLI com
 
 Capture answers these first by inspecting the codebase (reading routes files, nav components, existing service classes, command registries, library exports). Then:
 
-| Confidence | Behavior |
-|---|---|
-| **High** — concrete file path or symbol reference for all three sub-questions | Write the `## Integration` block into the REQ as fact. |
-| **Partial** — answers for some, gaps for others | Write what's known; surface the gaps as a single prompt offering concrete options. |
-| **Low** — can't answer at least two of three from the codebase | Surface what was checked and ask the user directly. No silent defaults. |
+| Confidence                                                                    | Behavior                                                                           |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **High** — concrete file path or symbol reference for all three sub-questions | Write the `## Integration` block into the REQ as fact.                             |
+| **Partial** — answers for some, gaps for others                               | Write what's known; surface the gaps as a single prompt offering concrete options. |
+| **Low** — can't answer at least two of three from the codebase                | Surface what was checked and ask the user directly. No silent defaults.            |
 
-**Confidence bar:** "high" requires a concrete file path or symbol reference for each sub-question (e.g. `routes/web.php:42`, `<MainNav>` component reference, `cmd/foo/main.go:14`). **Capture must verify each reference exists before accepting "high"** — file existence via Read, symbol existence via grep. Any unverifiable reference drops the rating to "partial." This catches the failure mode where the agent self-rates high confidence but the cited file or symbol doesn't actually exist; "high" must mean *checked*, not *felt confident*.
+**Confidence bar:** "high" requires a concrete file path or symbol reference for each sub-question (e.g. `routes/web.php:42`, `<MainNav>` component reference, `cmd/foo/main.go:14`). **Capture must verify each reference exists before accepting "high"** — file existence via Read, symbol existence via grep. Any unverifiable reference drops the rating to "partial." This catches the failure mode where the agent self-rates high confidence but the cited file or symbol doesn't actually exist; "high" must mean _checked_, not _felt confident_.
 
 The `## Integration` block is required for feature-class REQs that add new surface. Pure refactor / rename / test-only REQs are exempt — they add nothing to integrate.
 
@@ -191,17 +192,16 @@ ur: UR-007
 created: 2026-04-29
 classification: feature
 layers_in_scope: [frontend, backend]
-layer_decisions:                  # only present when user opts a layer out
-  backend: no                     # example: a frontend-only UR
+layer_decisions: # only present when user opts a layer out
+  backend: no # example: a frontend-only UR
 open_gaps:
-  - "How should X behave under Y?"
+  - 'How should X behave under Y?'
   - "What's the timeout for Z?"
 reqs:
   - { id: REQ-100, layer: frontend, integration_confidence: high }
-  - { id: REQ-101, layer: backend,  integration_confidence: partial }
-acknowledged_partials: []           # REQ ids whose partial confidence the user has reviewed and waved through
+  - { id: REQ-101, layer: backend, integration_confidence: partial }
+acknowledged_partials: [] # REQ ids whose partial confidence the user has reviewed and waved through
 ---
-
 # Original brief
 
 <verbatim user text>
@@ -216,16 +216,16 @@ After capture runs, capture prepends a one-shot summary block to the UR body (ab
 ```markdown
 ## Capture summary (2026-04-29)
 
-| Item | Value |
-|---|---|
-| Classification | feature |
-| Layers in scope | frontend, backend |
+| Item            | Value                |
+| --------------- | -------------------- |
+| Classification  | feature              |
+| Layers in scope | frontend, backend    |
 | Layer decisions | (none — all covered) |
-| REQs generated | 2 |
+| REQs generated  | 2                    |
 
-| REQ | Layer | Integration confidence |
-|---|---|---|
-| REQ-100 | frontend | high |
+| REQ     | Layer    | Integration confidence                           |
+| ------- | -------- | ------------------------------------------------ |
+| REQ-100 | frontend | high                                             |
 | REQ-101 | backend  | partial — service dependency unknown, asked user |
 ```
 
@@ -243,11 +243,12 @@ Verify already scores REQ coverage 0–100% against the brief. Three additional 
 
 3. **Partial-confidence check.** A REQ recorded with `integration_confidence: partial` in UR state is treated as a gap unless its id appears in `acknowledged_partials:`. This stops partial-confidence REQs from silently slipping through to run, while still letting the user proceed when the gap has been reviewed.
 
-   *Acknowledgement UX, v1:* the user edits UR frontmatter directly to add the REQ id to `acknowledged_partials`. This is a known papercut. *Intended next iteration:* when verify flags a partial-confidence REQ, it offers an inline prompt — `(1) Resolve — re-run integration question, (2) Acknowledge — wave through, (3) Skip — leave gap` — and option 2 writes the ack automatically. Tracked as a follow-up; not in scope for this spec, but called out so the manual edit isn't permanent.
+   _Acknowledgement UX, v1:_ the user edits UR frontmatter directly to add the REQ id to `acknowledged_partials`. This is a known papercut. _Intended next iteration:_ when verify flags a partial-confidence REQ, it offers an inline prompt — `(1) Resolve — re-run integration question, (2) Acknowledge — wave through, (3) Skip — leave gap` — and option 2 writes the ack automatically. Tracked as a follow-up; not in scope for this spec, but called out so the manual edit isn't permanent.
 
 **No vocabulary check.** The previous spec's check ("acceptance criteria phrased in frontend terms") is dropped. With `layer:` tagging, capture is the source of truth for which layer a REQ belongs to; verify doesn't second-guess by sniffing keywords.
 
 **`--auto-fix` extensions:**
+
 - Missing layer → re-run capture's layer-coverage prompt for that layer.
 - Missing Integration block → re-run capture's integration question scoped to that REQ.
 - Partial confidence → not auto-fixed. Auto-fix would just re-run the same exploration and likely produce the same partial result; the user must either resolve the gap or acknowledge it explicitly.
@@ -268,6 +269,7 @@ layer: frontend
 # Customer search box
 
 ## Acceptance criteria
+
 - ...
 
 ## Integration
@@ -293,7 +295,7 @@ Bug-fix and pure-refactor REQs may omit the Integration section.
 Capture is re-runnable. Re-running on a UR with existing frontmatter follows these rules:
 
 - `classification` — preserved. Re-classification requires a separate command (out of scope for this spec).
-- `layers_in_scope` — on each capture run, re-derived from current config and written to UR frontmatter. Verify reads the persisted snapshot, which reflects the *last* capture run, not necessarily current config. See "Config drift" below.
+- `layers_in_scope` — on each capture run, re-derived from current config and written to UR frontmatter. Verify reads the persisted snapshot, which reflects the _last_ capture run, not necessarily current config. See "Config drift" below.
 - `layer_decisions` — preserved. Past "no" decisions stay until the user explicitly clears them by editing frontmatter. Capture does not re-prompt for layers the user already opted out of.
 - `open_gaps` — overwritten if ideate is re-invoked in the same run; otherwise preserved.
 - `reqs:` list — merged. Entries matched by REQ id are preserved; new REQs from this run are appended; entries pointing at REQ files that no longer exist are dropped.
@@ -321,20 +323,20 @@ If implementation finds capture's cost prohibitive in practice, the capture/wire
 
 ## Files affected
 
-| File | Change |
-|---|---|
-| `agents/ideate.md` | End with interactive 3-option gate; remove `--grill` precondition logic; write `open_gaps` to UR frontmatter on Continue |
-| `agents/capture.md` | Add classification step, read declared layers from config, assign `layer:` to each REQ, layer-coverage prompt, integration question pass, write capture summary block, populate UR frontmatter |
-| `agents/verify.md` | Replace check vocabulary with frontmatter reads; add layer-coverage check + integration-block check; drop the keyword-sniffing check; extend `--auto-fix` |
-| `agents/run.md` | Reuse classification heuristic (no behavior change, just shared source) |
-| `agents/install` step (in `SKILL.md`) | Write `layers: []` (empty placeholder + explanatory comment) into new config; do not auto-populate |
-| `agents/start.md` | Remove `--grill` handling; accept new `--no-layers` flag and pass it through to capture |
-| `agents/go.md` | Accept `--no-layers` flag if `go` is the entry point that triggered capture re-run |
-| REQ template (wherever it lives) | Add required `layer:` frontmatter field; add required `## Integration` section for new-surface feature REQs |
-| UR template / `intake.md` | Switch to YAML frontmatter on `input.md`; preserve the verbatim brief in the body |
-| `do-work/config.yml` template | Add `layers:` field with comment explaining declaration |
-| `SKILL.md` | Drop `--grill` flag, document new ideate gate, document `layers:` config, document `layer:` REQ field, document Integration section requirement |
-| `CHANGELOG.md` | Document the refactor |
+| File                                  | Change                                                                                                                                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agents/ideate.md`                    | End with interactive 3-option gate; remove `--grill` precondition logic; write `open_gaps` to UR frontmatter on Continue                                                                       |
+| `agents/capture.md`                   | Add classification step, read declared layers from config, assign `layer:` to each REQ, layer-coverage prompt, integration question pass, write capture summary block, populate UR frontmatter |
+| `agents/verify.md`                    | Replace check vocabulary with frontmatter reads; add layer-coverage check + integration-block check; drop the keyword-sniffing check; extend `--auto-fix`                                      |
+| `agents/run.md`                       | Reuse classification heuristic (no behavior change, just shared source)                                                                                                                        |
+| `agents/install` step (in `SKILL.md`) | Write `layers: []` (empty placeholder + explanatory comment) into new config; do not auto-populate                                                                                             |
+| `agents/start.md`                     | Remove `--grill` handling; accept new `--no-layers` flag and pass it through to capture                                                                                                        |
+| `agents/go.md`                        | Accept `--no-layers` flag if `go` is the entry point that triggered capture re-run                                                                                                             |
+| REQ template (wherever it lives)      | Add required `layer:` frontmatter field; add required `## Integration` section for new-surface feature REQs                                                                                    |
+| UR template / `intake.md`             | Switch to YAML frontmatter on `input.md`; preserve the verbatim brief in the body                                                                                                              |
+| `do-work/config.yml` template         | Add `layers:` field with comment explaining declaration                                                                                                                                        |
+| `SKILL.md`                            | Drop `--grill` flag, document new ideate gate, document `layers:` config, document `layer:` REQ field, document Integration section requirement                                                |
+| `CHANGELOG.md`                        | Document the refactor                                                                                                                                                                          |
 
 ## Open questions for the plan
 

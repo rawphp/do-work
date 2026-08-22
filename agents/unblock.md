@@ -10,9 +10,9 @@ This is the manual override path for REQs whose worker died, whose concurrent-co
 
 The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
 
-| # | Step | Decision |
-|---|------|----------|
-| J1 | Step 3 — Partial commits | When implementation commits already exist for this REQ, decide (via user prompt) whether to revert them, keep them and unblock anyway, or fold them into a new explanatory commit. |
+| #   | Step                     | Decision                                                                                                                                                                           |
+| --- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J1  | Step 3 — Partial commits | When implementation commits already exist for this REQ, decide (via user prompt) whether to revert them, keep them and unblock anyway, or fold them into a new explanatory commit. |
 
 ---
 
@@ -43,6 +43,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -50,12 +51,12 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 **Branch on effective backend** after load path:
 
-| Backend | Work-item unblock |
-|---------|-------------------|
-| **`markdown`** | Steps **1–8** below (working/ stamp strip + backlog move) |
-| **`linear`** | Steps **L1–L4** — port op **`unblock_req`** in `agents/tracker/linear.md`. Id is a **Linear issue id** (e.g. `ENG-123`). No `.do-work/working/` claim stamps. |
-| **`sqlite`** | **1S** — `bash {skill-root}/lib/dw-db.sh unblock {project} REQ-NNN` by **slug**. No `working/` move. |
-| **`do-work-io`** | **1D** — port op **`unblock_req`** (`req_unblock` / `req.unblock` in `agents/tracker/do-work-io.md`) by **REQ-NNN slug**. No `working/` move. |
+| Backend          | Work-item unblock                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`markdown`**   | Steps **1–8** below (working/ stamp strip + backlog move)                                                                                                     |
+| **`linear`**     | Steps **L1–L4** — port op **`unblock_req`** in `agents/tracker/linear.md`. Id is a **Linear issue id** (e.g. `ENG-123`). No `.do-work/working/` claim stamps. |
+| **`sqlite`**     | **1S** — `bash {skill-root}/lib/dw-db.sh unblock {project} REQ-NNN` by **slug**. No `working/` move.                                                          |
+| **`do-work-io`** | **1D** — port op **`unblock_req`** (`req_unblock` / `req.unblock` in `agents/tracker/do-work-io.md`) by **REQ-NNN slug**. No `working/` move.                 |
 
 ### When backend is sqlite (1S)
 

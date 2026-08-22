@@ -35,6 +35,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -60,11 +61,11 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 Before delegating to any sub-agent, confirm the Issue exists on the **active backend**:
 
-| Backend | How to confirm |
-|---------|----------------|
-| **markdown** | `{project}/.do-work/user-requests/UR-NNN/input.md` exists |
-| **sqlite** | `get-ur` via dw-db |
-| **linear** | `read_ur` |
+| Backend        | How to confirm                                                  |
+| -------------- | --------------------------------------------------------------- |
+| **markdown**   | `{project}/.do-work/user-requests/UR-NNN/input.md` exists       |
+| **sqlite**     | `get-ur` via dw-db                                              |
+| **linear**     | `read_ur`                                                       |
 | **do-work-io** | `read_ur` (`ur.get`) — **never** require local `user-requests/` |
 
 If it does not exist, report: "UR-NNN not found" (name the backend; markdown may include the `user-requests/` path) and stop. Never probe markdown paths when backend is not markdown.
@@ -79,10 +80,10 @@ bash {skill-root}/lib/ensure-integration-base.sh UR-NNN
 # unscoped: bash {skill-root}/lib/ensure-integration-base.sh
 ```
 
-| Outcome | Action |
-|---------|--------|
-| **Non-zero exit** | Hard-stop the go phase. Surface the script's stderr. Do **not** dispatch verify, audit, run, or workers. |
-| **Exit 0** | Script prints the integration-base branch name on stdout. Record it. **That printed name is authoritative.** |
+| Outcome           | Action                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Non-zero exit** | Hard-stop the go phase. Surface the script's stderr. Do **not** dispatch verify, audit, run, or workers.     |
+| **Exit 0**        | Script prints the integration-base branch name on stdout. Record it. **That printed name is authoritative.** |
 
 **Hard rules (agents must not invent branch switches):**
 
@@ -109,12 +110,12 @@ Capture the confidence score from the verify report.
 
 The gate is `config.verify.threshold` (loaded in Step 0; default 90 if unset). Substitute that value for `THRESHOLD` below.
 
-| Condition | Action |
-|-----------|--------|
-| Score >= THRESHOLD | Announce "Confidence NN% — proceeding to run." and continue to Step 3. |
-| Score < THRESHOLD and `--force` specified | Announce "Confidence NN% (below THRESHOLD) — force flag set, proceeding anyway." and continue to Step 3. |
+| Condition                                    | Action                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Score >= THRESHOLD                           | Announce "Confidence NN% — proceeding to run." and continue to Step 3.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Score < THRESHOLD and `--force` specified    | Announce "Confidence NN% (below THRESHOLD) — force flag set, proceeding anyway." and continue to Step 3.                                                                                                                                                                                                                                                                                                                                                                               |
 | Score < THRESHOLD and `--auto-fix` specified | Run verify with `--auto-fix` (which creates missing REQs and re-scores internally). If `--no-layers` was set on this go invocation, pass it through to verify so capture re-runs skip the layer-coverage check. Read the new score from verify's report. If now >= THRESHOLD, continue to Step 3. If still < THRESHOLD after auto-fix, stop: "Auto-fix raised score from NN% to NN%, but still below THRESHOLD. Manual review needed." Do NOT auto-fix more than once — one pass only. |
-| Score < THRESHOLD | Stop. Output the verify report and recommend: "Score is NN%. Review gaps above, then either fix manually and re-run, or use `--auto-fix`." |
+| Score < THRESHOLD                            | Stop. Output the verify report and recommend: "Score is NN%. Review gaps above, then either fix manually and re-run, or use `--auto-fix`."                                                                                                                                                                                                                                                                                                                                             |
 
 ### 2b. Run Audit (always-on)
 
@@ -172,11 +173,11 @@ Otherwise, evaluate both config conditions:
 1. Is `config.log.enabled` set to `true`?
 2. Is `config.log.platforms` non-empty (at least one platform listed)?
 
-| Condition | Action |
-|-----------|--------|
-| Both true | Read and follow [log.md](log.md) in full. Set `log_outcome` to "completed". |
-| `log.enabled` is `false` | Set `log_outcome` to "skipped — logging disabled". |
-| `log.platforms` is empty | Set `log_outcome` to "skipped — no platforms configured". |
+| Condition                | Action                                                                      |
+| ------------------------ | --------------------------------------------------------------------------- |
+| Both true                | Read and follow [log.md](log.md) in full. Set `log_outcome` to "completed". |
+| `log.enabled` is `false` | Set `log_outcome` to "skipped — logging disabled".                          |
+| `log.platforms` is empty | Set `log_outcome` to "skipped — no platforms configured".                   |
 
 **You must set `log_outcome` to one of the values above before continuing. Step 5 requires it.**
 
@@ -220,7 +221,6 @@ If `config.next_steps.enabled` is `false` or missing: output `Next step: /do-wor
 - Never skip Verify — it must run before any execution starts
 - The `--force` flag overrides the threshold but still runs verify (so you see the report)
 - If the run agent hits a stopper, respect it — do not retry or override
-
 
 ## Field traps (from field-lessons)
 

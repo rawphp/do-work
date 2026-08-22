@@ -27,15 +27,15 @@ working directory.
 Rows accrete over time. When a future maintenance row is added, add its detector
 to `lib/conformance-scan.sh` and add its fix contract here in the same change.
 
-| row-id | detector | fix | class |
-|---|---|---|---|
-| `legacy-dir` | `safe-blocking` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when `do-work/` exists and `.do-work/` does not | `git mv do-work .do-work` with fallback plain `mv`, then `.gitignore` rewrite, then consumer-ref advisory scan | auto-apply |
-| `dir-conflict` | `blocking` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when both `do-work/` and `.do-work/` exist | none — halt with the existing conflict message | manual |
-| `config-keys` | `safe-silent` missing or incomplete `.do-work/config.yml`, detected and migrated by the `agents/config.md` loader | load config per `agents/config.md`; its missing-key migration has already applied by Step 0 | auto-apply |
-| `pending-dir` | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation | interactive confirm |
-| `stale-config-key` | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when a tombstoned config key is present | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation | interactive confirm |
-| `session-hooks` | `bash {skill-root}/lib/install-hooks.sh --check {project}` prints `absent` (session telemetry hooks missing from `.claude/settings.json`) | run `bash {skill-root}/lib/install-hooks.sh {project}` — idempotent, additive merge | auto-apply |
-| `migrate-linear` | **Optional / opt-in only** — not an auto-scan drift row (`lib/conformance-scan.sh` never emits it; see header comment there). Operator runs `/do-work upgrade migrate` (or upgrade Step 9) when they want design §12 idle markdown→Linear cutover. Detector for *eligibility* is preflight in Step 9 (working empty, no active claims, backend still markdown, Linear MCP usable) | invoke port op **`migrate_markdown_to_linear`** sequences in `agents/tracker/linear.md` (dry-run or apply). **Apply mode is destructive** — requires explicit operator confirm gate. Dry-run is non-destructive. | **destructive** interactive confirm (or dry-run) |
+| row-id             | detector                                                                                                                                                                                                                                                                                                                                                                          | fix                                                                                                                                                                                                              | class                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `legacy-dir`       | `safe-blocking` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when `do-work/` exists and `.do-work/` does not                                                                                                                                                                                                                                             | `git mv do-work .do-work` with fallback plain `mv`, then `.gitignore` rewrite, then consumer-ref advisory scan                                                                                                   | auto-apply                                       |
+| `dir-conflict`     | `blocking` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when both `do-work/` and `.do-work/` exist                                                                                                                                                                                                                                                       | none — halt with the existing conflict message                                                                                                                                                                   | manual                                           |
+| `config-keys`      | `safe-silent` missing or incomplete `.do-work/config.yml`, detected and migrated by the `agents/config.md` loader                                                                                                                                                                                                                                                                 | load config per `agents/config.md`; its missing-key migration has already applied by Step 0                                                                                                                      | auto-apply                                       |
+| `pending-dir`      | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when `.do-work/pending/` exists, including when empty                                                                                                                                                                                                                                         | archive parked REQs and delete `.do-work/pending/` after explicit `AskUserQuestion` confirmation                                                                                                                 | interactive confirm                              |
+| `stale-config-key` | `destructive` drift line from `bash {skill-root}/lib/conformance-scan.sh {project}` when a tombstoned config key is present                                                                                                                                                                                                                                                       | remove the key line(s) from `.do-work/config.yml` — and the parent section if the removal leaves it empty — after explicit `AskUserQuestion` confirmation                                                        | interactive confirm                              |
+| `session-hooks`    | `bash {skill-root}/lib/install-hooks.sh --check {project}` prints `absent` (session telemetry hooks missing from `.claude/settings.json`)                                                                                                                                                                                                                                         | run `bash {skill-root}/lib/install-hooks.sh {project}` — idempotent, additive merge                                                                                                                              | auto-apply                                       |
+| `migrate-linear`   | **Optional / opt-in only** — not an auto-scan drift row (`lib/conformance-scan.sh` never emits it; see header comment there). Operator runs `/do-work upgrade migrate` (or upgrade Step 9) when they want design §12 idle markdown→Linear cutover. Detector for _eligibility_ is preflight in Step 9 (working empty, no active claims, backend still markdown, Linear MCP usable) | invoke port op **`migrate_markdown_to_linear`** sequences in `agents/tracker/linear.md` (dry-run or apply). **Apply mode is destructive** — requires explicit operator confirm gate. Dry-run is non-destructive. | **destructive** interactive confirm (or dry-run) |
 
 **`session-hooks` detector location.** This row is the one exception to the
 accretion rule below: its detector lives in `lib/install-hooks.sh --check`, not
@@ -76,6 +76,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -110,12 +111,12 @@ location to `.do-work/`.
 
 Apply these detection branches:
 
-| State at `{project}` | Action |
-|---|---|
-| `.do-work/` exists AND `do-work/` does not exist | Already migrated. Continue silently. |
-| `do-work/` exists AND `.do-work/` does not exist | Migrate, then continue. |
-| Both `do-work/` and `.do-work/` exist | Halt. Output the conflict message in Step 3 and stop the subcommand. |
-| Neither exists | No migration needed. Continue. |
+| State at `{project}`                             | Action                                                               |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| `.do-work/` exists AND `do-work/` does not exist | Already migrated. Continue silently.                                 |
+| `do-work/` exists AND `.do-work/` does not exist | Migrate, then continue.                                              |
+| Both `do-work/` and `.do-work/` exist            | Halt. Output the conflict message in Step 3 and stop the subcommand. |
+| Neither exists                                   | No migration needed. Continue.                                       |
 
 Migration procedure:
 
@@ -246,6 +247,7 @@ For each parked REQ file under `{project}/.do-work/pending/` matching
 
    If the check fails for a file, stop before moving that file and report the
    failure. Do not delete `pending/`.
+
 7. Move the rewritten file into `{project}/.do-work/archive/`, preserving its
    basename. Prefer `git mv`; fall back to plain `mv` when `.do-work/` is
    gitignored:
@@ -485,11 +487,11 @@ documents that `migrate-linear` is never a drift row.
 
 #### 9a. When this step runs
 
-| Invocation | Action |
-|------------|--------|
-| `/do-work upgrade` only (no migrate) | **Skip** Step 9 entirely. Markdown backend remains default. |
-| `/do-work upgrade migrate` | Run Step 9 after Steps 0–8 (or after conformance if already conformant). |
-| `/do-work upgrade migrate --dry-run` | Step 9 in **dry-run** mode only (lists planned creates; no writes). |
+| Invocation                           | Action                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `/do-work upgrade` only (no migrate) | **Skip** Step 9 entirely. Markdown backend remains default.              |
+| `/do-work upgrade migrate`           | Run Step 9 after Steps 0–8 (or after conformance if already conformant). |
+| `/do-work upgrade migrate --dry-run` | Step 9 in **dry-run** mode only (lists planned creates; no writes).      |
 
 #### 9b. Preflight (refuse = entire abort, no partial cutover)
 
@@ -502,10 +504,10 @@ Before any Linear write or config flip:
    - **Do not create, update, or rewrite Linear Issues** (or Initiatives / Projects / Docs).
    - **Do not** re-inventory markdown trees as a write plan.
    - Config and Linear store left unchanged.
-   This makes re-running `/do-work upgrade migrate` **idempotent by clear refuse**
-   when cutover already happened.
-   If effective backend is **`sqlite`**, **refuse** with
-   **`migrate-linear: refused-sqlite-backend`** and stop immediately:
+     This makes re-running `/do-work upgrade migrate` **idempotent by clear refuse**
+     when cutover already happened.
+     If effective backend is **`sqlite`**, **refuse** with
+     **`migrate-linear: refused-sqlite-backend`** and stop immediately:
    - markdown→Linear migration does not apply under sqlite (sole store is
      `.do-work/work.db`; no history import and no Linear cutover from sqlite).
    - **Do not** create Linear entities or change config.
@@ -535,6 +537,7 @@ Before any Linear write or config flip:
 
    Record `migrate-linear: refused-working-non-empty`. **Do not** create Linear
    entities. **Do not** change config.
+
 3. **No active claims** — with working empty, markdown claims are clear; if any
    active claim protocol is still detected, refuse the same way
    (`migrate-linear: refused-active-claims`).
@@ -563,10 +566,10 @@ destructive and does not require the confirm gate.
 
 Follow `agents/tracker/linear.md` → **`migrate_markdown_to_linear`**:
 
-| Mode | Behavior |
-|------|----------|
-| **dry-run** | Inventory markdown Issues/REQs + decisions/calibration; **list planned** Initiatives / Projects / Issues / Docs / config flip **without writing**; **zero** Linear writes; **zero** config changes. Record `migrate-linear: dry-run-reported`. |
-| **apply** | Only after destructive confirm. Team Docs → Initiatives/Projects/Issues (map status, relations, parents, AC checkboxes) → set `tracker.backend: linear` + team ids in `.do-work/config.yml` → leave `user-requests/`, backlog `REQ-*.md`, and `archive/` on disk as **read-only historical** (do not delete). **Post-cutover work-item ops ignore historical markdown trees** (Linear-only store). Record `migrate-linear: converged`. |
+| Mode        | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **dry-run** | Inventory markdown Issues/REQs + decisions/calibration; **list planned** Initiatives / Projects / Issues / Docs / config flip **without writing**; **zero** Linear writes; **zero** config changes. Record `migrate-linear: dry-run-reported`.                                                                                                                                                                                         |
+| **apply**   | Only after destructive confirm. Team Docs → Initiatives/Projects/Issues (map status, relations, parents, AC checkboxes) → set `tracker.backend: linear` + team ids in `.do-work/config.yml` → leave `user-requests/`, backlog `REQ-*.md`, and `archive/` on disk as **read-only historical** (do not delete). **Post-cutover work-item ops ignore historical markdown trees** (Linear-only store). Record `migrate-linear: converged`. |
 
 On mid-migration MCP failure: **hard-stop** per linear.md failure matrix — config
 backend left **markdown**; list any orphan Linear ids; markdown trees unchanged

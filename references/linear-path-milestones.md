@@ -4,13 +4,13 @@ One hop from [`agents/tracker/linear.md`](../agents/tracker/linear.md). Load for
 
 ## Disambiguation (read first)
 
-| | **Milestone-as-Issue** | **Path-milestone mode (M1/M2)** |
-|--|---------------------|--------------------------------|
-| Purpose | Hierarchy: the Issue itself | Delivery bridges *within* one UR |
-| Linear entity | **Project Milestone** named via `ur_milestone_name_pattern` | Not a separate Issue entity |
-| Cursor | n/a (the milestone *is* the do-work Issue) | `<!-- do-work-milestone -->` block on the **Issue Project Milestone description** |
-| Issues | All REQs for the do-work Issue attach to the do-work Issue milestone | Additionally tagged `M1` / `**Milestone:** M1` for listing |
-| Gate | n/a | Local `state/gate-owner.md` only |
+|               | **Milestone-as-Issue**                                               | **Path-milestone mode (M1/M2)**                                                   |
+| ------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Purpose       | Hierarchy: the Issue itself                                          | Delivery bridges _within_ one UR                                                  |
+| Linear entity | **Project Milestone** named via `ur_milestone_name_pattern`          | Not a separate Issue entity                                                       |
+| Cursor        | n/a (the milestone _is_ the do-work Issue)                           | `<!-- do-work-milestone -->` block on the **Issue Project Milestone description** |
+| Issues        | All REQs for the do-work Issue attach to the do-work Issue milestone | Additionally tagged `M1` / `**Milestone:** M1` for listing                        |
+| Gate          | n/a                                                                  | Local `state/gate-owner.md` only                                                  |
 
 **Never** invent Initiative-as-do-work-Issue. **Never** put gate ownership in Linear.
 
@@ -33,6 +33,7 @@ Authoritative work-item cursor under `backend: linear`. Lives on the **Issue Pro
 
 ```markdown
 <!-- do-work-milestone -->
+
 **Active:** M1
 
 # Milestones
@@ -42,20 +43,20 @@ Authoritative work-item cursor under `backend: linear`. Lives on the **Issue Pro
 - [ ] M3 — <name> — pending
 ```
 
-| Field | Rules |
-|-------|--------|
-| `<!-- do-work-milestone -->` | Required first line of the machine block. Absent on Project ⇒ **not** in milestone mode (same as missing `active-milestone.md`). |
-| `**Active:**` | Single token `M<n>` (e.g. `M1`) or empty / `none` when cursor cleared after all deployed or gate stop. |
-| `# Milestones` checklist | One line per bridge milestone. Status suffix: `pending` \| `captured` \| `running` \| `deployed` (parity with markdown `milestones.md`). Checked box when status is `captured` or later; agents may keep `[x]` only for `deployed` if they prefer — **status word is authoritative**. |
+| Field                        | Rules                                                                                                                                                                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<!-- do-work-milestone -->` | Required first line of the machine block. Absent on Project ⇒ **not** in milestone mode (same as missing `active-milestone.md`).                                                                                                                                                      |
+| `**Active:**`                | Single token `M<n>` (e.g. `M1`) or empty / `none` when cursor cleared after all deployed or gate stop.                                                                                                                                                                                |
+| `# Milestones` checklist     | One line per bridge milestone. Status suffix: `pending` \| `captured` \| `running` \| `deployed` (parity with markdown `milestones.md`). Checked box when status is `captured` or later; agents may keep `[x]` only for `deployed` if they prefer — **status word is authoritative**. |
 
 **Statuses (same vocabulary as markdown capture):**
 
-| Status | Meaning |
-|--------|---------|
-| `pending` | Not yet captured |
-| `captured` | REQs written for this M |
-| `running` | Run loop active for this M (optional stamp) |
-| `deployed` | Deploy gate passed for this M |
+| Status     | Meaning                                     |
+| ---------- | ------------------------------------------- |
+| `pending`  | Not yet captured                            |
+| `captured` | REQs written for this M                     |
+| `running`  | Run loop active for this M (optional stamp) |
+| `deployed` | Deploy gate passed for this M               |
 
 #### Parse algorithm (REQ-299)
 
@@ -82,12 +83,12 @@ Path-unit parents and layer children for the same unit share the same milestone 
 
 ### `read_active_milestone`
 
-| | |
-|---|---|
-| **Intent** | Read the active milestone cursor (if any). |
-| ****Home** | Issue Project Milestone description block `<!-- do-work-milestone -->` (path-milestone mode cursor — not the do-work Issue entity itself). |
-| **Preconditions** | None beyond readable Project; missing / empty block ⇒ not in milestone mode. |
-| **Returns** | `{ active: "M1" \| null, checklist: [...] }` — `active` null when marker missing, `**Active:**` empty/`none`/malformed, or Project unresolved. **Does not invent a milestone id.** |
+|                   |                                                                                                                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Intent**        | Read the active milestone cursor (if any).                                                                                                                                         |
+| ****Home**        | Issue Project Milestone description block `<!-- do-work-milestone -->` (path-milestone mode cursor — not the do-work Issue entity itself).                                         |
+| **Preconditions** | None beyond readable Project; missing / empty block ⇒ not in milestone mode.                                                                                                       |
+| **Returns**       | `{ active: "M1" \| null, checklist: [...] }` — `active` null when marker missing, `**Active:**` empty/`none`/malformed, or Project unresolved. **Does not invent a milestone id.** |
 
 **Agent sequence:**
 
@@ -96,23 +97,23 @@ Path-unit parents and layer children for the same unit share the same milestone 
 3. **Read description.** Apply **Parse algorithm** above.
 4. **Return** structured result. Do **not** read local `state/active-milestone.md` as the store. Do **not** default missing cursor to `M1` inside this op. Do **not** confuse path-milestone cursor with the Issue Project Milestone entity.
 
-| Failure | Behavior |
-|---------|----------|
-| Milestone tools missing | Hard-stop — Linear setup; do **not** fall back to local `active-milestone.md` as work-item store |
-| Issue Project Milestone missing | Hard-stop (UR not provisioned) |
-| Marker missing | Return `active: null` (not-in-milestone) — **does not invent a milestone id**; not an error |
-| `**Active:**` empty / `none` / malformed | Return `active: null` — **does not invent a milestone id** |
+| Failure                                  | Behavior                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Milestone tools missing                  | Hard-stop — Linear setup; do **not** fall back to local `active-milestone.md` as work-item store |
+| Issue Project Milestone missing          | Hard-stop (UR not provisioned)                                                                   |
+| Marker missing                           | Return `active: null` (not-in-milestone) — **does not invent a milestone id**; not an error      |
+| `**Active:**` empty / `none` / malformed | Return `active: null` — **does not invent a milestone id**                                       |
 
 **Caller defaults (not part of this op):** capture Step 1b may use `M1` as the first-decompose target when `active` is null and the brief trigger is true. That policy lives in `agents/capture.md` and must call **`set_active_milestone`** to persist — it is not a fabricated return from `read_active_milestone`.
 
 ### `set_active_milestone`
 
-| | |
-|---|---|
-| **Intent** | Set, advance, or clear the active milestone cursor; maintain checklist status. |
-| **Home** | Same Project description block as `read_active_milestone`. |
+|                   |                                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Intent**        | Set, advance, or clear the active milestone cursor; maintain checklist status.                                  |
+| **Home**          | Same Project description block as `read_active_milestone`.                                                      |
 | **Preconditions** | Milestone mode applicable (trigger was true at capture, or block already exists); target id is `M<n>` or clear. |
-| **Does not** | Own the deploy-gate y/n prompt; write `gate-owner.md` (use **`write_gate_state`**); create Issues. |
+| **Does not**      | Own the deploy-gate y/n prompt; write `gate-owner.md` (use **`write_gate_state`**); create Issues.              |
 
 **Agent sequence:**
 
@@ -126,20 +127,20 @@ Path-unit parents and layer children for the same unit share the same milestone 
 5. ****Write** Issue Project Milestone description — replace **only** the `<!-- do-work-milestone -->` path-milestone machine block; preserve §9.1 sections outside the block.
 6. **Return** new `active` value (or null if cleared).
 
-| Failure | Behavior |
-|---------|----------|
+| Failure                                | Behavior                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------- |
 | Milestone tools missing / update fails | Hard-stop; do **not** write local `active-milestone.md` as substitute store |
-| Invalid target id | Hard-stop / refuse |
+| Invalid target id                      | Hard-stop / refuse                                                          |
 
 **Deploy-gate consumers (run Step 7b):** on human **y**, call `set_active_milestone` with next pending id (or clear if none). On human **n**, clear active. Gate file lifecycle stays on **`write_gate_state`**.
 
 ### `list_milestone_reqs`
 
-| | |
-|---|---|
-| **Intent** | List REQs (Linear Issues) belonging to the active or named milestone. |
-| **Preconditions** | Milestone id known (`M<n>`) or active cursor set via `read_active_milestone`. |
-| ****Scope** | Linear issues on product Project attached to this do-work Issue Project Milestone only. |
+|                   |                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| **Intent**        | List REQs (Linear Issues) belonging to the active or named milestone.                   |
+| **Preconditions** | Milestone id known (`M<n>`) or active cursor set via `read_active_milestone`.           |
+| ****Scope**       | Linear issues on product Project attached to this do-work Issue Project Milestone only. |
 
 **Agent sequence:**
 
@@ -156,27 +157,27 @@ Path-unit parents and layer children for the same unit share the same milestone 
 
 **Used by:**
 
-| Consumer | How |
-|----------|-----|
-| Run Step 1.0 | Constrain claim pool to active M (`list_milestone_reqs` ∩ `list_claimable_reqs`, or pass milestone scope into claimable walk) |
-| Run Step 7b drain | Backlog for M must be empty; no foreign in-flight claims for M |
-| Worker milestone_complete | No remaining non-done issues for active M in Project (or no backlog + no foreign in-flight) |
-| Capture numbering | Count existing issues for M when assigning sequence metadata (Linear ids remain authoritative identifiers) |
+| Consumer                  | How                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Run Step 1.0              | Constrain claim pool to active M (`list_milestone_reqs` ∩ `list_claimable_reqs`, or pass milestone scope into claimable walk) |
+| Run Step 7b drain         | Backlog for M must be empty; no foreign in-flight claims for M                                                                |
+| Worker milestone_complete | No remaining non-done issues for active M in Project (or no backlog + no foreign in-flight)                                   |
+| Capture numbering         | Count existing issues for M when assigning sequence metadata (Linear ids remain authoritative identifiers)                    |
 
-| Failure | Behavior |
-|---------|----------|
-| Issue list tools missing | Hard-stop |
+| Failure                      | Behavior   |
+| ---------------------------- | ---------- |
+| Issue list tools missing     | Hard-stop  |
 | Active unknown and no id arg | Empty list |
 
 **No fallback to other milestones** — same rule as markdown: empty list means this M is drained for that filter; do not widen to M2 while active is M1.
 
 ### `write_gate_state`
 
-| | |
-|---|---|
-| **Intent** | Coordinate deploy-gate ownership / final-suite locks. |
-| **Home** | **Local only** — `{project}/.do-work/state/gate-owner.md` (and related `state/final-suite-*.md` locks). **Never** Linear Docs, Issues, Project description, or Initiative fields. **Remains local-allowed** under Linear backend (REQ-299). |
-| **Preconditions** | Milestone / gate flow active; project filesystem writable. |
+|                   |                                                                                                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Intent**        | Coordinate deploy-gate ownership / final-suite locks.                                                                                                                                                                                       |
+| **Home**          | **Local only** — `{project}/.do-work/state/gate-owner.md` (and related `state/final-suite-*.md` locks). **Never** Linear Docs, Issues, Project description, or Initiative fields. **Remains local-allowed** under Linear backend (REQ-299). |
+| **Preconditions** | Milestone / gate flow active; project filesystem writable.                                                                                                                                                                                  |
 
 **Agent sequence (backend-agnostic; same under markdown and linear):**
 
@@ -191,10 +192,10 @@ Path-unit parents and layer children for the same unit share the same milestone 
 4. Final-suite coordination files under `state/` follow existing run-agent rules.
 5. **Return** path written/deleted and ownership result.
 
-| Failure | Behavior |
-|---------|----------|
-| Cannot write `state/` | Hard-stop gate coordination; do not invent a Linear lock substitute |
-| Foreign owner already present | Yield — do not clobber; siblings idle |
+| Failure                       | Behavior                                                            |
+| ----------------------------- | ------------------------------------------------------------------- |
+| Cannot write `state/`         | Hard-stop gate coordination; do not invent a Linear lock substitute |
+| Foreign owner already present | Yield — do not clobber; siblings idle                               |
 
 This op is **not** a dual-write of work items — it is the intentional local runtime lock allowed by design §5.5 / §10 / §11 / port.md. Under Linear milestone mode, **cursor** changes go through `set_active_milestone` (Project description); **gate ownership** always goes through this local file. **Siblings idle on deploy gate the same as markdown mode** (run Step 1.0a): foreign `gate-owner.md` → poll `read_active_milestone` + local gate file until cursor advances or clears.
 
@@ -212,15 +213,15 @@ UR: UR-007
 Output: path/to/primary/output
 ```
 
-| Rule | Detail |
-|------|--------|
-| Subject scope | `feat(ENG-123):` / `fix(ENG-123):` / `chore(ENG-123):` — Linear identifier, not `REQ-NNN` |
-| Footer | `Issue: ENG-123` (required); `UR: UR-NNN` when known; `Output:` primary path |
-| Archive path | **No** `.do-work/archive/REQ-…` line required |
-| Branch | **`req/<linear-id>`** after **Branch sanitize** (below) |
-| Worktree dir | `{project}/.worktrees/req-<sanitized-lower>` (hard default lowercase; see sanitize) |
-| PR title/body | Same id convention when `delivery.mode: pr` |
-| Markdown backend | Unchanged: `feat(REQ-NNN):` + `REQ:` / `UR:` / `Output:` paths |
+| Rule             | Detail                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| Subject scope    | `feat(ENG-123):` / `fix(ENG-123):` / `chore(ENG-123):` — Linear identifier, not `REQ-NNN` |
+| Footer           | `Issue: ENG-123` (required); `UR: UR-NNN` when known; `Output:` primary path              |
+| Archive path     | **No** `.do-work/archive/REQ-…` line required                                             |
+| Branch           | **`req/<linear-id>`** after **Branch sanitize** (below)                                   |
+| Worktree dir     | `{project}/.worktrees/req-<sanitized-lower>` (hard default lowercase; see sanitize)       |
+| PR title/body    | Same id convention when `delivery.mode: pr`                                               |
+| Markdown backend | Unchanged: `feat(REQ-NNN):` + `REQ:` / `UR:` / `Output:` paths                            |
 
 Workers and orchestrators under `backend: linear` use this convention for implementation commits and PR metadata. See `agents/run-worker.md` W2 / Step 8 and `agents/run.md` merge/archive/PR steps.
 
@@ -228,15 +229,15 @@ Workers and orchestrators under `backend: linear` use this convention for implem
 
 Git refs disallow some characters. Derive branch and worktree names from the Linear issue id:
 
-| Step | Rule | Example (`ENG-123`) |
-|------|------|---------------------|
-| 1. Start | Linear issue identifier as returned by Linear | `ENG-123` |
-| 2. Allowed set | Keep `[A-Za-z0-9._-]` only | `ENG-123` |
-| 3. Replace | Map every other character (spaces, `/`, `:`, etc.) to `-` | — |
-| 4. Collapse | Collapse consecutive `-` / `.` runs; strip leading/trailing `-` and `.` | — |
-| 5. Branch | `req/<sanitized-id>` (preserve identifier case as sanitized) | `req/ENG-123` |
+| Step             | Rule                                                                                                                                                                                                                      | Example (`ENG-123`)      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| 1. Start         | Linear issue identifier as returned by Linear                                                                                                                                                                             | `ENG-123`                |
+| 2. Allowed set   | Keep `[A-Za-z0-9._-]` only                                                                                                                                                                                                | `ENG-123`                |
+| 3. Replace       | Map every other character (spaces, `/`, `:`, etc.) to `-`                                                                                                                                                                 | —                        |
+| 4. Collapse      | Collapse consecutive `-` / `.` runs; strip leading/trailing `-` and `.`                                                                                                                                                   | —                        |
+| 5. Branch        | `req/<sanitized-id>` (preserve identifier case as sanitized)                                                                                                                                                              | `req/ENG-123`            |
 | 6. Worktree path | **Hard default:** `{project}/.worktrees/req-<sanitized-lower>` — always lowercase the sanitized id for the directory name (FS consistency across case-sensitive/insensitive hosts). Do not keep mixed-case worktree dirs. | `.worktrees/req-eng-123` |
-| 7. Empty guard | If sanitize yields empty, hard-stop (do not invent a branch name) | — |
+| 7. Empty guard   | If sanitize yields empty, hard-stop (do not invent a branch name)                                                                                                                                                         | —                        |
 
 Orchestrator merge / PR / teardown **must** use the same branch string the worker created (pass it through the worker report or reconstruct via the same sanitize function). Never mix `req/REQ-NNN` markdown naming with Linear issue ids on the same run.
 
@@ -244,11 +245,11 @@ Orchestrator merge / PR / teardown **must** use the same branch string the worke
 
 ### `unblock_req`
 
-| | |
-|---|---|
-| **Intent** | Return a REQ to backlog and **release** the agent claim (markdown: strip stamp + move out of `working/`). |
-| **Preconditions** | Issue is in-flight or stopped with a claim, or explicitly targeted by operator `/do-work unblock`. |
-| **Does not** | Change human assignee; delete issue; auto-revert git commits (git recovery stays local/operator, same as `agents/unblock.md` judgment). |
+|                   |                                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Intent**        | Return a REQ to backlog and **release** the agent claim (markdown: strip stamp + move out of `working/`).                               |
+| **Preconditions** | Issue is in-flight or stopped with a claim, or explicitly targeted by operator `/do-work unblock`.                                      |
+| **Does not**      | Change human assignee; delete issue; auto-revert git commits (git recovery stays local/operator, same as `agents/unblock.md` judgment). |
 
 **Agent sequence:**
 
@@ -258,6 +259,7 @@ Orchestrator merge / PR / teardown **must** use the same branch string the worke
 
    ```markdown
    <!-- do-work-claim -->
+
    agent_id: {prior_or_operator}
    claimed_at: {prior_claimed_at_or_now}
    heartbeat: {now_iso}
@@ -266,15 +268,16 @@ Orchestrator merge / PR / teardown **must** use the same branch string the worke
    ```
 
    Prefer preserving prior `agent_id` / `claimed_at` when known so history remains readable. Latest block with `status: released` means **unclaimed**.
+
 4. **State → backlog** — set workflow to `status_map.backlog`. **Assignee unchanged.**
 5. **Do not** write local backlog files. Optional: `append_run_note` that unblock occurred.
 6. **Return** issue id + released.
 
-| Failure | Behavior |
-|---------|----------|
-| Issue missing | Error (“nothing to unblock”) |
-| MCP missing after partial write | Hard-stop; operator re-runs unblock when healthy — do not silent-markdown |
-| Comment posted but state update fails | Hard-stop with recovery: re-run unblock to set backlog |
+| Failure                               | Behavior                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| Issue missing                         | Error (“nothing to unblock”)                                              |
+| MCP missing after partial write       | Hard-stop; operator re-runs unblock when healthy — do not silent-markdown |
+| Comment posted but state update fails | Hard-stop with recovery: re-run unblock to set backlog                    |
 
 **Parity with markdown `agents/unblock.md`:** claim cleared + status backlog + available for `list_claimable_reqs`. Git partial-commit judgment remains outside the tracker port (local).
 
@@ -284,11 +287,11 @@ Orchestrator merge / PR / teardown **must** use the same branch string the worke
 
 Resume is **not** a separate port op name; it composes `set_req_status` + `heartbeat_req` (and preserves claim ownership). Match markdown resume semantics:
 
-| | |
-|---|---|
-| **Intent** | Re-dispatch work for a **stopped** REQ without unclaim / backlog round-trip. |
-| **Preserves** | Active claim (`agent_id`, `claimed_at`); human assignee. |
-| **Changes** | Workflow `stopped` → `in_progress`; heartbeat refreshed. |
+|               |                                                                              |
+| ------------- | ---------------------------------------------------------------------------- |
+| **Intent**    | Re-dispatch work for a **stopped** REQ without unclaim / backlog round-trip. |
+| **Preserves** | Active claim (`agent_id`, `claimed_at`); human assignee.                     |
+| **Changes**   | Workflow `stopped` → `in_progress`; heartbeat refreshed.                     |
 
 **Agent sequence:**
 
@@ -299,12 +302,12 @@ Resume is **not** a separate port op name; it composes `set_req_status` + `heart
 5. **`heartbeat_req`** — refresh `heartbeat` now; keep `agent_id` / `claimed_at`.
 6. **Return** issue id; orchestrator re-dispatches worker (worktree/branch rules stay local).
 
-| Failure | Behavior |
-|---------|----------|
-| Not stopped | Refuse |
-| No active claim | Refuse — not a resume candidate |
-| Fresh foreign claim | `concurrent-conflict` / refuse |
-| MCP missing | Hard-stop; **leave claimed** (still stopped or partial in_progress) |
+| Failure             | Behavior                                                            |
+| ------------------- | ------------------------------------------------------------------- |
+| Not stopped         | Refuse                                                              |
+| No active claim     | Refuse — not a resume candidate                                     |
+| Fresh foreign claim | `concurrent-conflict` / refuse                                      |
+| MCP missing         | Hard-stop; **leave claimed** (still stopped or partial in_progress) |
 
 ---
 
@@ -326,18 +329,16 @@ Do **not** glob `.do-work/working/` or run `lib/synth-status.sh` as the work-ite
 
 ### Concurrent-conflict and mid-flight (summary)
 
-| Event | Behavior |
-|-------|----------|
-| Claim re-read sees foreign **fresh** active claim | Stop `concurrent-conflict`; no assignee change; resume allowed for claim owner |
-| Lost race on post-write re-read | Same stopper; do not delete the other agent’s comment |
+| Event                                                   | Behavior                                                                                                                                 |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Claim re-read sees foreign **fresh** active claim       | Stop `concurrent-conflict`; no assignee change; resume allowed for claim owner                                                           |
+| Lost race on post-write re-read                         | Same stopper; do not delete the other agent’s comment                                                                                    |
 | MCP dies after successful claim, before archive/unblock | **Leave claimed** (in_progress + active claim comment + last heartbeat); worker/orchestrator **stops**; resume or unblock after recovery |
-| MCP dies mid-`archive_req` before claim release | **Leave claimed** if still active; re-run archive when healthy |
-| MCP dies before claim completes | Hard-stop; no markdown substitute store |
-| Silent-release or markdown fallback after claim | **Forbidden** — never auto-release claim; never switch to markdown work-item ops while `backend: linear` |
-| Operator clears claim comments in Linear UI mid-run | Protocol broken — status should warn; treat as unclaimed/ambiguous and stop rather than invent state |
+| MCP dies mid-`archive_req` before claim release         | **Leave claimed** if still active; re-run archive when healthy                                                                           |
+| MCP dies before claim completes                         | Hard-stop; no markdown substitute store                                                                                                  |
+| Silent-release or markdown fallback after claim         | **Forbidden** — never auto-release claim; never switch to markdown work-item ops while `backend: linear`                                 |
+| Operator clears claim comments in Linear UI mid-run     | Protocol broken — status should warn; treat as unclaimed/ambiguous and stop rather than invent state                                     |
 
 **Mid-flight policy (run path — REQ-294 / port):** after a successful `claim_req`, any Linear MCP failure leaves the Issue **claimed** (`status_map.in_progress` + latest claim `status: active`). The failing agent exits stopped (appropriate stopper reason). Operator recovers with `/do-work resume` or `/do-work unblock` once MCP is healthy. Same multi-agent recovery story as markdown concurrent-conflict / stale slots.
 
 ---
-
-

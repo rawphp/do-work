@@ -30,33 +30,35 @@
 
 ## File map
 
-| Path | Responsibility |
-|------|----------------|
-| `lib/sqlite-schema.sql` | Canonical schema `user_version=1` |
-| `lib/dw-db.sh` | Sole agent-facing CLI for sqlite work-item ops |
-| `lib/tests/dw-db-*.test.sh` | CLI + schema tests |
-| `agents/tracker/sqlite.md` | Port op sequences for agents |
-| `agents/tracker/port.md` | Accept `sqlite`; generalized hard-stop matrix |
-| `agents/config.md` | Resolve/validate `sqlite`; config template keys |
-| `agents/*.md` (phase list in Task 6) | **1S** branches |
-| `agents/board.md` (or help + commands) | `/do-work board` agent stub |
-| `references/commands.md`, `SKILL.md` | Document backend + board |
-| `docs/troubleshooting.md`, `docs/HOW-IT-WORKS.md` | Operator docs |
-| `agents/upgrade.md` | Gitignore must; refuse Linear migrate on sqlite |
-| `lib/conformance-scan.sh` | Optional detector notes for sqlite |
-| Project consumer `.gitignore` helpers | Patterns for work.db / board / evidence |
+| Path                                              | Responsibility                                  |
+| ------------------------------------------------- | ----------------------------------------------- |
+| `lib/sqlite-schema.sql`                           | Canonical schema `user_version=1`               |
+| `lib/dw-db.sh`                                    | Sole agent-facing CLI for sqlite work-item ops  |
+| `lib/tests/dw-db-*.test.sh`                       | CLI + schema tests                              |
+| `agents/tracker/sqlite.md`                        | Port op sequences for agents                    |
+| `agents/tracker/port.md`                          | Accept `sqlite`; generalized hard-stop matrix   |
+| `agents/config.md`                                | Resolve/validate `sqlite`; config template keys |
+| `agents/*.md` (phase list in Task 6)              | **1S** branches                                 |
+| `agents/board.md` (or help + commands)            | `/do-work board` agent stub                     |
+| `references/commands.md`, `SKILL.md`              | Document backend + board                        |
+| `docs/troubleshooting.md`, `docs/HOW-IT-WORKS.md` | Operator docs                                   |
+| `agents/upgrade.md`                               | Gitignore must; refuse Linear migrate on sqlite |
+| `lib/conformance-scan.sh`                         | Optional detector notes for sqlite              |
+| Project consumer `.gitignore` helpers             | Patterns for work.db / board / evidence         |
 
 ---
 
 ### Task 1: Load path accepts `sqlite` (config + port + SKILL)
 
 **Files:**
+
 - Modify: `agents/config.md` (template `tracker.backend` comment, Load Config step 6, schema table for `tracker.backend` + `tracker.sqlite.*`, hard-stop exceptions)
 - Modify: `agents/tracker/port.md` (resolve branch, hard-stop section generalized beyond Linear-only)
 - Modify: `SKILL.md` (hard-stops table / multi-tracker summary: three backends)
 - Test: document-only task — verify with `rg` self-check; no bash unit test required beyond Task 2+
 
 **Interfaces:**
+
 - Produces: effective backend may be `sqlite`; agents know to load `agents/tracker/sqlite.md`
 - Consumes: existing Load Config / port load path pattern
 
@@ -74,12 +76,12 @@ In `agents/tracker/port.md` load path step 2, change so:
 
 Replace Linear-only hard-stop section with a **three-backend matrix** matching design §5.3:
 
-| Condition | markdown | linear | sqlite |
-|-----------|----------|--------|--------|
-| Backend doc missing | n/a | hard-stop | hard-stop |
-| MCP/team/status_map fail | n/a | hard-stop | n/a |
-| DB corrupt / bad user_version / no sqlite3 | n/a | n/a | hard-stop |
-| Fallback to another backend | never | never | never |
+| Condition                                  | markdown | linear    | sqlite    |
+| ------------------------------------------ | -------- | --------- | --------- |
+| Backend doc missing                        | n/a      | hard-stop | hard-stop |
+| MCP/team/status_map fail                   | n/a      | hard-stop | n/a       |
+| DB corrupt / bad user_version / no sqlite3 | n/a      | n/a       | hard-stop |
+| Fallback to another backend                | never    | never     | never     |
 
 Add note: mid-flight leave-claimed applies to all backends (sqlite = active claims row).
 
@@ -104,10 +106,10 @@ Template YAML:
 
 ```yaml
 tracker:
-  backend: markdown          # markdown | linear | sqlite
+  backend: markdown # markdown | linear | sqlite
   sqlite:
-    path: ""                 # default .do-work/work.db
-    board_path: ""           # default .do-work/board/index.html
+    path: '' # default .do-work/work.db
+    board_path: '' # default .do-work/board/index.html
     busy_timeout_ms: 5000
   linear:
     # unchanged
@@ -121,11 +123,11 @@ Hard-stop exceptions list: add sqlite unusable (missing binary/doc/corrupt DB af
 
 Hard-stops / tracker table:
 
-| backend | behavior |
-|---------|----------|
-| unset/markdown | local files |
-| linear | Linear sole store |
-| sqlite | `.do-work/work.db` sole store |
+| backend        | behavior                      |
+| -------------- | ----------------------------- |
+| unset/markdown | local files                   |
+| linear         | Linear sole store             |
+| sqlite         | `.do-work/work.db` sole store |
 
 One line: no dual-write; greenfield on switch; `/do-work board` sqlite-only.
 
@@ -149,6 +151,7 @@ git commit -m "docs: accept sqlite tracker backend in load path and hard-stop ma
 ### Task 2: Schema + `dw-db ensure` + gitignore helpers
 
 **Files:**
+
 - Create: `lib/sqlite-schema.sql`
 - Create: `lib/dw-db.sh` (skeleton: `ensure`, path resolve, open helper)
 - Create: `lib/tests/dw-db-ensure.test.sh`
@@ -156,6 +159,7 @@ git commit -m "docs: accept sqlite tracker backend in load path and hard-stop ma
 - Modify: any install bootstrap that writes consumer `.gitignore` (search `references/commands.md` install template / upgrade legacy gitignore)
 
 **Interfaces:**
+
 - Produces: `bash lib/dw-db.sh ensure <project-root>` creates `.do-work/work.db` with `user_version=1`
 - Produces: env/config path default `{project}/.do-work/work.db`
 - Consumes: `sqlite3` on PATH
@@ -362,11 +366,13 @@ git commit -m "feat(sqlite): schema and dw-db ensure with WAL and user_version=1
 ### Task 3: Numeric slug alloc + UR/REQ CRUD
 
 **Files:**
+
 - Modify: `lib/dw-db.sh` — `create-ur`, `get-ur`, `list-urs`, `create-req`, `get-req`, `list-reqs`, `update-req`, `set-status`, `set-files`, `set-blocked-by`
 - Create: `lib/tests/dw-db-crud.test.sh`
 - Create: `lib/tests/dw-db-slug.test.sh`
 
 **Interfaces:**
+
 - `dw-db.sh create-ur <root> --title T --brief B [--class C]` → prints `UR-NNN`
 - `dw-db.sh create-req <root> --ur UR-NNN --title T [--body ...] [--priority N] [--files ...] [--deps "REQ-1,REQ-2"] [--parent REQ-P] [--layer L] [--path-milestone M1]` → prints `REQ-NNN`
 - All outputs use **slugs**; invalid parent/dep slug → exit 1 with error text
@@ -452,12 +458,14 @@ git commit -m "feat(sqlite): transactional UR/REQ CRUD with numeric slug allocat
 ### Task 4: Claim, pick, deps, footprint, heartbeat, archive integrity
 
 **Files:**
+
 - Modify: `lib/dw-db.sh` — `list-claimable`, `pick`, `claim`, `heartbeat`, `check-deps`, `check-footprint`, `scan-stale`, `check-archive`, `archive-req`, `unblock`
 - Create: `lib/tests/dw-db-claim.test.sh`
 - Create: `lib/tests/dw-db-pick.test.sh`
 - Create: `lib/tests/dw-db-archive.test.sh`
 
 **Interfaces:**
+
 - Exit codes: claim race → exit **2** + stderr `concurrent-conflict` (align with markdown claim lost spirit)
 - `list-claimable` stdout: one REQ slug per line, ordered
 - `pick` stdout: one slug or empty + exit 1 if none
@@ -503,8 +511,8 @@ Deps: unsatisfied if any depends_on req status ≠ done.
 
 - [ ] **Step 4: check-archive three criteria**
 
-1. closure_proof non-empty  
-2. no `- [ ]` under `## Acceptance Criteria` in body  
+1. closure_proof non-empty
+2. no `- [ ]` under `## Acceptance Criteria` in body
 3. status is `done` after archive, or archive-req sets done only after 1–2 pass (match markdown: check-archive before move — require proof+AC; status becomes done in archive-req)
 
 - [ ] **Step 5: Tests green + commit**
@@ -523,20 +531,21 @@ git commit -m "feat(sqlite): claim pick footprint archive coordination via dw-db
 ### Task 5: Artifacts, decisions, calibration, milestones, run notes
 
 **Files:**
+
 - Modify: `lib/dw-db.sh` — `append-ideate`, `append-clarifications`, `write-verify`, `write-close`, `append-decision`, `write-calibration`, `read-calibration`, `set-active-milestone`, `get-active-milestone`, `list-milestone-reqs`, `append-run-note`
 - Create: `lib/tests/dw-db-artifacts.test.sh`
 - Create: `agents/tracker/sqlite.md` (full port op index → dw-db commands)
 
 **Interfaces (artifact semantics):**
 
-| kind | write |
-|------|--------|
-| ideate | append |
-| clarifications | append |
-| open_gaps | replace |
-| capture_summary | replace |
-| verify | replace |
-| close | replace + set `urs.closed_at` on successful overall |
+| kind            | write                                               |
+| --------------- | --------------------------------------------------- |
+| ideate          | append                                              |
+| clarifications  | append                                              |
+| open_gaps       | replace                                             |
+| capture_summary | replace                                             |
+| verify          | replace                                             |
+| close           | replace + set `urs.closed_at` on successful overall |
 
 - [ ] **Step 1: Write artifact tests** (append ideate twice grows body; brief unchanged; close sets closed_at)
 
@@ -546,15 +555,15 @@ git commit -m "feat(sqlite): claim pick footprint archive coordination via dw-db
 
 Structure mirror `linear.md` condensed:
 
-- When to load  
-- Hierarchy: product = project root + work.db  
-- Port op index table → `bash {skill-root}/lib/dw-db.sh …`  
-- Hard-stop template (sqlite3 missing, corrupt DB, bad version)  
-- Claim protocol summary pointing at dw-db  
-- Evidence paths `.do-work/evidence/UR-NNN/…`  
-- `write_gate_state` → local gate-owner only  
-- Calibration non-port read/write via dw-db  
-- `migrate_markdown_to_linear`: refuse under sqlite  
+- When to load
+- Hierarchy: product = project root + work.db
+- Port op index table → `bash {skill-root}/lib/dw-db.sh …`
+- Hard-stop template (sqlite3 missing, corrupt DB, bad version)
+- Claim protocol summary pointing at dw-db
+- Evidence paths `.do-work/evidence/UR-NNN/…`
+- `write_gate_state` → local gate-owner only
+- Calibration non-port read/write via dw-db
+- `migrate_markdown_to_linear`: refuse under sqlite
 
 - [ ] **Step 4: Commit**
 
@@ -569,23 +578,23 @@ git commit -m "feat(sqlite): artifacts milestones decisions and sqlite.md port m
 
 **Files (each must gain explicit sqlite branch; no live `REQ-*.md` / `user-requests/` globs when backend=sqlite):**
 
-| Agent | 1S behavior |
-|-------|-------------|
-| `status.md` | Step **1S**: `dw-db status-synth` (implement status-synth in Task 6a if not done — **must fold** derive+coverage+closed) |
-| `intake.md` / `start.md` | `create-ur` |
-| `ideate.md` | `append-ideate` |
-| `question.md` | `append-clarifications` |
-| `capture.md` / `audit.md` | create/update/list reqs via dw-db |
-| `verify.md` | list+read + write-verify; score-coverage.sh stays shared |
-| `run.md` | pick/claim via dw-db; no working/ |
-| `run-worker.md` | read-req by slug; heartbeat; files from DB |
-| `review.md` | read-req by slug |
-| `resume.md` / `unblock.md` | dw-db claim/unblock by slug |
-| `close.md` | write-close; evidence under evidence/ |
-| `retro.md` | run_notes + calibration in DB |
-| `log.md` | port-aware |
-| `go.md` / `help.md` | mention board + sqlite |
-| `upgrade.md` | already Task 2 refuse migrate |
+| Agent                      | 1S behavior                                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `status.md`                | Step **1S**: `dw-db status-synth` (implement status-synth in Task 6a if not done — **must fold** derive+coverage+closed) |
+| `intake.md` / `start.md`   | `create-ur`                                                                                                              |
+| `ideate.md`                | `append-ideate`                                                                                                          |
+| `question.md`              | `append-clarifications`                                                                                                  |
+| `capture.md` / `audit.md`  | create/update/list reqs via dw-db                                                                                        |
+| `verify.md`                | list+read + write-verify; score-coverage.sh stays shared                                                                 |
+| `run.md`                   | pick/claim via dw-db; no working/                                                                                        |
+| `run-worker.md`            | read-req by slug; heartbeat; files from DB                                                                               |
+| `review.md`                | read-req by slug                                                                                                         |
+| `resume.md` / `unblock.md` | dw-db claim/unblock by slug                                                                                              |
+| `close.md`                 | write-close; evidence under evidence/                                                                                    |
+| `retro.md`                 | run_notes + calibration in DB                                                                                            |
+| `log.md`                   | port-aware                                                                                                               |
+| `go.md` / `help.md`        | mention board + sqlite                                                                                                   |
+| `upgrade.md`               | already Task 2 refuse migrate                                                                                            |
 
 **Also implement `dw-db status-synth` in this task if not present:**
 
@@ -609,6 +618,7 @@ Minimum for run.md:
 
 ```markdown
 ### When backend is sqlite
+
 - list_claimable / claim / heartbeat / archive via `lib/dw-db.sh` only
 - Worker receives REQ **slug** not filesystem path
 - Do not mkdir user-requests or write REQ-*.md
@@ -634,12 +644,14 @@ git commit -m "feat(sqlite): phase-agent 1S branches and status-synth parity"
 ### Task 7: `/do-work board` HTML snapshot
 
 **Files:**
+
 - Modify: `lib/dw-db.sh` — `board` command
 - Create: `lib/tests/dw-db-board.test.sh`
 - Create: `agents/board.md` (or extend `agents/help.md` + `references/commands.md`)
 - Modify: `SKILL.md` Quick Reference row for `/do-work board`
 
 **Interfaces:**
+
 - `dw-db.sh board <project-root>` → writes `.do-work/board/index.html` (or config board_path), prints path
 - HTML-escapes all user text (`<`, `>`, `&`, quotes)
 - Includes `generated_at` ISO timestamp
@@ -684,6 +696,7 @@ git commit -m "feat(sqlite): static HTML board generator with escaped content"
 ### Task 8: Docs, conformance notes, final regression
 
 **Files:**
+
 - Modify: `docs/troubleshooting.md` — sqlite section (switch greenfield, no migrate, board explicit, sqlite3 install, corrupt DB)
 - Modify: `docs/HOW-IT-WORKS.md` — multi-tracker includes sqlite hierarchy (work.db)
 - Modify: `docs/getting-started.md` if it lists backends
@@ -695,6 +708,7 @@ git commit -m "feat(sqlite): static HTML board generator with escaped content"
 
 ```markdown
 ## SQLite tracker backend
+
 - Set tracker.backend: sqlite
 - Requires sqlite3 on PATH
 - Starts empty — prior markdown/Linear not imported
@@ -725,20 +739,20 @@ git commit -m "docs: sqlite tracker operator guide and multi-tracker HOW-IT-WORK
 
 ## Self-review (plan vs spec)
 
-| Spec area | Task |
-|-----------|------|
-| Load path + hard-stop matrix | Task 1 |
-| Schema, ensure, WAL, user_version, gitignore must | Task 2 |
-| Numeric slug, CRUD, slug API, cross-UR deps | Task 3 |
-| Claim/pick/footprint/stale release-insert/archive 3 checks/list-claimable | Task 4 |
-| Artifacts, decisions, calibration, milestones, run notes, sqlite.md | Task 5 |
-| Phase 1S inventory + status-synth parity | Task 6 |
-| Board HTML escape, explicit command | Task 7 |
-| Docs, refuse migrate, conformance | Task 8 |
-| No migration | All tasks (no migrate op) |
-| score-coverage shared | Task 6 verify note |
-| Evidence paths | Task 5/6 |
-| Default markdown regression | every task runs `run-all.sh` |
+| Spec area                                                                 | Task                         |
+| ------------------------------------------------------------------------- | ---------------------------- |
+| Load path + hard-stop matrix                                              | Task 1                       |
+| Schema, ensure, WAL, user_version, gitignore must                         | Task 2                       |
+| Numeric slug, CRUD, slug API, cross-UR deps                               | Task 3                       |
+| Claim/pick/footprint/stale release-insert/archive 3 checks/list-claimable | Task 4                       |
+| Artifacts, decisions, calibration, milestones, run notes, sqlite.md       | Task 5                       |
+| Phase 1S inventory + status-synth parity                                  | Task 6                       |
+| Board HTML escape, explicit command                                       | Task 7                       |
+| Docs, refuse migrate, conformance                                         | Task 8                       |
+| No migration                                                              | All tasks (no migrate op)    |
+| score-coverage shared                                                     | Task 6 verify note           |
+| Evidence paths                                                            | Task 5/6                     |
+| Default markdown regression                                               | every task runs `run-all.sh` |
 
 **Placeholder scan:** none intentional.
 
@@ -752,7 +766,7 @@ Plan complete and saved to `docs/superpowers/plans/2026-08-11-do-work-sqlite-tra
 
 **Two execution options:**
 
-1. **Subagent-Driven (recommended)** — fresh subagent per task, review between tasks  
-2. **Inline Execution** — this session with executing-plans and checkpoints  
+1. **Subagent-Driven (recommended)** — fresh subagent per task, review between tasks
+2. **Inline Execution** — this session with executing-plans and checkpoints
 
 Which approach?

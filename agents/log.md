@@ -29,6 +29,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -45,7 +46,6 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 - Load brief / ideate / REQs via dw-db port ops (`get-ur`, artifacts, `list-reqs`) — not live `user-requests/` or `REQ-*.md` globs
 - Hard-stop if dw-db unusable when backend is sqlite
-
 
 If `config.log.enabled` is `false`, stop silently — output nothing.
 
@@ -65,6 +65,7 @@ Read all REQ files in `{project}/.do-work/archive/` that are newer than the high
 If no new work exists since the last log, output: "Nothing new to log since LOG-NNN." and stop.
 
 For each REQ, extract:
+
 - REQ number and title
 - Task summary and context
 - Key outputs
@@ -127,16 +128,19 @@ Each platform has formatting constraints that **every draft must respect, regard
 **Character ceiling (all platforms):** Before saving any draft, check `config.log.max_chars[platform]` and ensure the draft's character count is at or below that value. If `config.log.max_chars` is missing or the platform is not listed, fall back to these defaults: `x: 280`, `blog: 500`, `linkedin: 1300`. The ceiling is a hard limit — enforcement is handled in **Step 5b** below.
 
 **X (Twitter):**
+
 - **Max length:** `config.log.max_chars.x` (default 280) characters per post — hard limit, enforced in Step 5b
 - **Thread format:** If the approach's typical length suggests a thread, use multiple tweets separated by `---`, each under the same limit
 - **Hashtags:** Optional, max 2, only if genuinely relevant
 
 **LinkedIn:**
+
 - **Max length:** `config.log.max_chars.linkedin` (default 1300) characters — enforced in Step 5b
 - **Format:** 1-3 short paragraphs. Can include bullet points.
 - **No hashtags** unless the user has explicitly requested them
 
 **Blog:**
+
 - **Max length:** `config.log.max_chars.blog` (default 500) characters — enforced in Step 5b. Assumes a personal-blog microblog/log-stream entry; override in config for long-form posts.
 - **Format:** 1-3 short paragraphs or a single tight idea. Plain prose — no markdown headings in the body, no lists unless the content truly demands one. The entry should read naturally in a timeline, not like a structured article.
 - **Links:** Inline and sparing — at most one link per entry, and only if it adds real context. Never expand URLs into full citations.
@@ -147,60 +151,70 @@ Each platform has formatting constraints that **every draft must respect, regard
 Generate one draft per approach. Each approach has a different primary value that determines what the post optimizes for. Use the deep source material from Step 2 — the original brief, the ideate observations, the code diffs — not just REQ titles.
 
 **Approach 1: The Curiosity Gap** — Slug: `curiosity-gap`
+
 - **Primary value:** Curiosity | **Priority:** Curiosity → Entertain → Inform
 - **Tone:** Intriguing, slightly mysterious, withheld
 - **Typical length:** 1-2 tweets (under 200 chars ideal)
 - **Structure:** Open a question or paradox. Don't answer it fully. The work is evidence, not the point.
 
 **Approach 2: The Teaching Moment** — Slug: `teaching-moment`
+
 - **Primary value:** Teach | **Priority:** Teach → Inform → Connect
 - **Tone:** Direct, instructive, peer-to-peer
 - **Typical length:** Thread (3-5 tweets) or 280 chars with a principle
 - **Structure:** State a transferable lesson. Explain why with evidence. The reader should gain something even if they never visit the project.
 
 **Approach 3: The Confession** — Slug: `confession`
+
 - **Primary value:** Confess | **Priority:** Confess → Connect → Curiosity
 - **Tone:** Raw, honest, self-deprecating but not self-pitying
 - **Typical length:** 1-2 tweets, punchy
 - **Structure:** Admit something embarrassing or surprising. No spin. The vulnerability creates connection.
 
 **Approach 4: The Provocation** — Slug: `provocation`
+
 - **Primary value:** Provoke | **Priority:** Provoke → Curiosity → Teach
 - **Tone:** Bold, slightly contrarian, argumentative
 - **Typical length:** Single tweet (often shorter than 280 chars)
 - **Structure:** Make a claim most would disagree with at first glance. The work is the evidence, the claim is the star.
 
 **Approach 5: The Behind-the-Curtain** — Slug: `behind-the-curtain`
+
 - **Primary value:** Demonstrate | **Priority:** Demonstrate → Curiosity → Inform
 - **Tone:** Show-don't-tell, observational, documentary
 - **Typical length:** Thread (2-4 tweets) or single tweet
 - **Structure:** Describe what actually happened — terminal output, unexpected behavior, the moment of realization. No abstraction.
 
 **Approach 6: The Philosophy** — Slug: `philosophy`
+
 - **Primary value:** Philosophize | **Priority:** Philosophize → Teach → Connect
 - **Tone:** Reflective, measured, slightly abstract
 - **Typical length:** 280 chars or 2-tweet thread
 - **Structure:** Extract a broader principle about building, tools, or work. The work is a jumping-off point, not the destination.
 
 **Approach 7: The Tease** — Slug: `tease`
+
 - **Primary value:** Tease | **Priority:** Tease → Curiosity → Entertain
 - **Tone:** Casual, forward-looking, understated
 - **Typical length:** Under 140 chars
 - **Structure:** Hint at what changed without explaining. Brevity signals confidence.
 
 **Approach 8: The Connection** — Slug: `connection`
+
 - **Primary value:** Connect | **Priority:** Connect → Confess → Inform
 - **Tone:** Warm, conversational, inviting dialogue
 - **Typical length:** 1-2 tweets ending with a genuine question
 - **Structure:** Share something, then ask the reader about their experience. The question must be genuine, not rhetorical.
 
 **Approach 9: The Entertainment** — Slug: `entertainment`
+
 - **Primary value:** Entertain | **Priority:** Entertain → Curiosity → Confess
 - **Tone:** Funny, self-aware, irreverent
 - **Typical length:** Single tweet, under 200 chars ideal
 - **Structure:** Find the absurd angle. Lean into the irony. The humor makes technical content palatable.
 
 **Approach 10: The Informer** — Slug: `informer`
+
 - **Primary value:** Inform | **Priority:** Inform → Demonstrate → Teach
 - **Tone:** Clear, factual, no-nonsense
 - **Typical length:** 280 chars or short thread
@@ -260,12 +274,12 @@ Saved to: {project}/.do-work/logs/LOG-NNN/drafts/
 
 **Every AskUserQuestion call MUST use exactly 4 options.** This is not optional — it is the consistent interface the user expects every time. The structure is:
 
-| Slot | Non-final batch | Final batch |
-|------|----------------|-------------|
-| Option 1 | Draft approach A | Draft approach A |
-| Option 2 | Draft approach B | Draft approach B |
+| Slot     | Non-final batch   | Final batch      |
+| -------- | ----------------- | ---------------- |
+| Option 1 | Draft approach A  | Draft approach A |
+| Option 2 | Draft approach B  | Draft approach B |
 | Option 3 | "More approaches" | Draft approach C |
-| Option 4 | "Skip" | "Skip" |
+| Option 4 | "Skip"            | "Skip"           |
 
 - **Draft options** show the approach name as the label and the full draft content as the `preview`
 - **"More approaches"** advances to the next batch (only present when unshown approaches remain)
@@ -293,6 +307,7 @@ For each platform in `config.log.platforms`, repeat:
 3. **Prompt with AskUserQuestion:** Use the `AskUserQuestion` tool with exactly 4 options.
 
    Example for a non-final batch (more approaches remain):
+
    ```
    options:
      - label: "Curiosity Gap"
@@ -308,6 +323,7 @@ For each platform in `config.log.platforms`, repeat:
    ```
 
    Example for the final batch (no more approaches remain):
+
    ```
    options:
      - label: "Curiosity Gap"
@@ -340,7 +356,7 @@ Append an entry to `{project}/.do-work/logs/log-history.yml`:
   draft_file: x-curiosity-gap-draft.md
   platform: x
   approach: curiosity-gap
-  selected_at: "YYYY-MM-DDTHH:MM:SS"
+  selected_at: 'YYYY-MM-DDTHH:MM:SS'
   last_req_archived: REQ-NNN
 ```
 
@@ -359,7 +375,7 @@ Append a skip entry to log-history.yml:
   draft_file: skipped
   platform: all
   approach: skipped
-  selected_at: "YYYY-MM-DDTHH:MM:SS"
+  selected_at: 'YYYY-MM-DDTHH:MM:SS'
   last_req_archived: REQ-NNN
 ```
 

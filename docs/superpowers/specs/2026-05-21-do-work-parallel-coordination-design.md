@@ -25,7 +25,7 @@ This spec defines that layer.
 - A central daemon, scheduler, or orchestrator-of-orchestrators. The design is file + git + bash, no long-running coordination process.
 - Replacing the existing run loop. The orchestrator and worker agents stay; their decision steps gain bash primitives and their stamp/header schemas extend.
 - Auto-resolving merge conflicts. Workers still refuse to edit files containing `<<<<<<<`.
-- Hard reservation of URs to specific agents. UR scope is a *filter on what this orchestrator will claim*, not a lock that excludes others.
+- Hard reservation of URs to specific agents. UR scope is a _filter on what this orchestrator will claim_, not a lock that excludes others.
 - Distributed locking across machines. Coordination is per-repo via git + filesystem; multi-machine parallelism works because each machine's `hostname.pid` is unique, but no special cross-machine consensus is implemented.
 
 ---
@@ -53,20 +53,20 @@ Steps in **bold** are new or materially changed: pre-flight heartbeat, claim cyc
 2. **Working slots** (`working/REQ-NNN-slug.md`) — claimed work. Ownership stamp carries heartbeat.
 3. **Archive** (`archive/REQ-NNN-slug.md`) — completed work. Used for dep satisfaction checks.
 
-**No `plan.md` file is stored.** It would be a coordination hotspot — every claim would commit a plan.md change and every commit would merge-conflict with every sibling's commit. The "plan" is a *projection* synthesized on demand by `lib/synth-status.sh`.
+**No `plan.md` file is stored.** It would be a coordination hotspot — every claim would commit a plan.md change and every commit would merge-conflict with every sibling's commit. The "plan" is a _projection_ synthesized on demand by `lib/synth-status.sh`.
 
 **No separate `agents/<agent-id>.md` registry.** Heartbeat data lives in the existing claim stamp inside each working/ slot. One glob of `working/` gives every agent the complete sibling picture.
 
 **Optional state files** (only created when relevant):
 
-| File | When written | When deleted |
-|---|---|---|
-| `.do-work/state/active-milestone.md` | Milestone mode (existing) | Last milestone deployed |
-| `.do-work/state/milestones.md` | Milestone mode (existing) | Never (audit trail) |
-| `.do-work/state/gate-owner.md` | Orchestrator owns a deploy gate (existing) | Gate resolved |
-| `.do-work/state/final-suite-*.md` | Final suite lock (existing) | Suite released |
-| `.do-work/state/deadlock.md` | Deadlock detected (new) | User resolves and runs `/do-work resume` or `/do-work unblock` |
-| `.do-work/state/feedback.lock` | `flock` guard for feedback emission (new) | Each call (transient) |
+| File                                 | When written                               | When deleted                                                   |
+| ------------------------------------ | ------------------------------------------ | -------------------------------------------------------------- |
+| `.do-work/state/active-milestone.md` | Milestone mode (existing)                  | Last milestone deployed                                        |
+| `.do-work/state/milestones.md`       | Milestone mode (existing)                  | Never (audit trail)                                            |
+| `.do-work/state/gate-owner.md`       | Orchestrator owns a deploy gate (existing) | Gate resolved                                                  |
+| `.do-work/state/final-suite-*.md`    | Final suite lock (existing)                | Suite released                                                 |
+| `.do-work/state/deadlock.md`         | Deadlock detected (new)                    | User resolves and runs `/do-work resume` or `/do-work unblock` |
+| `.do-work/state/feedback.lock`       | `flock` guard for feedback emission (new)  | Each call (transient)                                          |
 
 ### REQ header schema
 
@@ -82,13 +82,13 @@ Capture writes a **fixed header block** at the top of every REQ. The block is re
 **Status:** backlog
 ```
 
-| Field | Value | Source |
-|---|---|---|
-| `**UR:**` | Single UR id | Existing |
-| `**Layer:**` | One of the layers declared in `config.yml`, or `none` | Existing |
-| `**Files:**` (new) | Comma-separated list of paths/globs the REQ will touch | Capture (judgment) |
+| Field                   | Value                                                                                               | Source             |
+| ----------------------- | --------------------------------------------------------------------------------------------------- | ------------------ |
+| `**UR:**`               | Single UR id                                                                                        | Existing           |
+| `**Layer:**`            | One of the layers declared in `config.yml`, or `none`                                               | Existing           |
+| `**Files:**` (new)      | Comma-separated list of paths/globs the REQ will touch                                              | Capture (judgment) |
 | `**Depends on:**` (new) | Comma-separated list of REQ ids that must be archived before this REQ can be claimed; empty allowed | Capture (judgment) |
-| `**Status:**` | `backlog`, `in-progress`, `done`, `stopped` | Lifecycle |
+| `**Status:**`           | `backlog`, `in-progress`, `done`, `stopped`                                                         | Lifecycle          |
 
 When the REQ moves to `working/`, the ownership stamp is inserted directly under the heading (before the header block):
 
@@ -96,6 +96,7 @@ When the REQ moves to `working/`, the ownership stamp is inserted directly under
 # REQ-007: Add Foo model
 
 <!-- claimed-start -->
+
 **Claimed by:** mbp-tom.42137
 **Claimed at:** 2026-05-21T13:42:08Z
 **Heartbeat:** 2026-05-21T14:08:12Z
@@ -114,19 +115,19 @@ When the REQ moves to `working/`, the ownership stamp is inserted directly under
 
 All deterministic operations move into `~/.claude/skills/do-work/lib/`. One responsibility per script. Exit code communicates the decision; stdout is the result the orchestrator needs; stderr is diagnostic.
 
-| Script | Args | Output |
-|---|---|---|
-| `pick-req.sh` | `<scope>` (UR-NNN or `any`), `<agent-id>` | Path of next claimable REQ to stdout, or empty if none. Stderr lists categorised rejection reasons (`dep:REQ-005`, `overlap:REQ-007`, `scope:UR-001`). |
-| `claim-req.sh` | `<req-path>`, `<agent-id>` | Atomic `git mv` + stamp insert + status update + scoped commit. Prints commit short hash on success. |
-| `heartbeat.sh` | `<req-path>` | Updates the `**Heartbeat:**` line in the claim stamp. No commit. |
-| `check-footprint.sh` | `<req-path>` | Lists working/ slots whose `**Files:**` intersect this REQ's `**Files:**`. Empty = no overlap. |
-| `check-deps.sh` | `<req-path>` | Lists REQ ids from this REQ's `**Depends on:**` that are not yet in `archive/`. Empty = deps satisfied. |
-| `scan-stale.sh` | (none) | Lists working/ slots whose `**Heartbeat:**` is older than the stale threshold (default 300s). |
-| `cycle-check.sh` | `[UR-NNN]` | Validates that the `**Depends on:**` graph (optionally scoped to one UR) is acyclic. Exit 1 if a cycle exists. |
-| `synth-status.sh` | `[UR-NNN]` | Renders the live situation as a markdown table (REQ, UR, status, claimer, heartbeat-age, deps-status, footprint). |
-| `deadlock-check.sh` | (none) | Diagnoses deadlock conditions. Empty stdout = no deadlock; otherwise prints a structured diagnosis. |
-| `file-feedback.sh` | `<event-type>`, `<fingerprint>`, `<context-json>` | Ensures a GitHub issue exists (or comments on the existing one). Respects `feedback.enabled` config. Silent if disabled. |
-| `drain-classify.sh` | (none) | Reads stderr categories from a prior `pick-req.sh` run and classifies the backlog: `deps-blocked`, `overlap-blocked`, `scope-blocked`, `truly-empty`. |
+| Script               | Args                                              | Output                                                                                                                                                 |
+| -------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pick-req.sh`        | `<scope>` (UR-NNN or `any`), `<agent-id>`         | Path of next claimable REQ to stdout, or empty if none. Stderr lists categorised rejection reasons (`dep:REQ-005`, `overlap:REQ-007`, `scope:UR-001`). |
+| `claim-req.sh`       | `<req-path>`, `<agent-id>`                        | Atomic `git mv` + stamp insert + status update + scoped commit. Prints commit short hash on success.                                                   |
+| `heartbeat.sh`       | `<req-path>`                                      | Updates the `**Heartbeat:**` line in the claim stamp. No commit.                                                                                       |
+| `check-footprint.sh` | `<req-path>`                                      | Lists working/ slots whose `**Files:**` intersect this REQ's `**Files:**`. Empty = no overlap.                                                         |
+| `check-deps.sh`      | `<req-path>`                                      | Lists REQ ids from this REQ's `**Depends on:**` that are not yet in `archive/`. Empty = deps satisfied.                                                |
+| `scan-stale.sh`      | (none)                                            | Lists working/ slots whose `**Heartbeat:**` is older than the stale threshold (default 300s).                                                          |
+| `cycle-check.sh`     | `[UR-NNN]`                                        | Validates that the `**Depends on:**` graph (optionally scoped to one UR) is acyclic. Exit 1 if a cycle exists.                                         |
+| `synth-status.sh`    | `[UR-NNN]`                                        | Renders the live situation as a markdown table (REQ, UR, status, claimer, heartbeat-age, deps-status, footprint).                                      |
+| `deadlock-check.sh`  | (none)                                            | Diagnoses deadlock conditions. Empty stdout = no deadlock; otherwise prints a structured diagnosis.                                                    |
+| `file-feedback.sh`   | `<event-type>`, `<fingerprint>`, `<context-json>` | Ensures a GitHub issue exists (or comments on the existing one). Respects `feedback.enabled` config. Silent if disabled.                               |
+| `drain-classify.sh`  | (none)                                            | Reads stderr categories from a prior `pick-req.sh` run and classifies the backlog: `deps-blocked`, `overlap-blocked`, `scope-blocked`, `truly-empty`.  |
 
 **Format rules the scripts depend on** (load-bearing):
 
@@ -191,11 +192,11 @@ Heartbeat commits are intentionally avoided — `heartbeat.sh` writes the file v
 
 `deadlock-check.sh` triggers on any of:
 
-| Signal | Bash check |
-|---|---|
-| No pickable REQ + working/ non-empty + no `.do-work/` commits in 5 minutes | `git log --since="5 minutes ago" -- .do-work/` returns empty |
-| All live slots have stale heartbeats AND backlog non-empty | `scan-stale.sh` returns ≥ count of working/ slots |
-| Dependency cycle observed at runtime | `cycle-check.sh` exit 1 (defensive — capture should catch it) |
+| Signal                                                                     | Bash check                                                    |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| No pickable REQ + working/ non-empty + no `.do-work/` commits in 5 minutes | `git log --since="5 minutes ago" -- .do-work/` returns empty  |
+| All live slots have stale heartbeats AND backlog non-empty                 | `scan-stale.sh` returns ≥ count of working/ slots             |
+| Dependency cycle observed at runtime                                       | `cycle-check.sh` exit 1 (defensive — capture should catch it) |
 
 When triggered:
 
@@ -212,22 +213,22 @@ If `config.next_steps.enabled` is false or this orchestrator is running as a del
 
 ### Recovery taxonomy
 
-| Stuck state | Recovery |
-|---|---|
-| Heartbeat stale, slot abandoned | Existing batch-prompt: reclaim into this run, return to backlog, or abort |
-| Worker `stopped`, reason `concurrent-conflict` | REQ stays in `working/` with `**Status:** stopped` and a `**Reason:**` field. `/do-work resume REQ-NNN` re-dispatches a fresh worker on it. |
-| Worker `stopped`, reason `ambiguous-criteria` / `scope-creep` | Surface to user. No auto-retry. User edits REQ or `unblock`s it. File feedback. |
-| Worker `stopped`, reason `dependency-missing` | Diagnostic: capture missed a dep. File feedback with the inferred missing dep. User edits `**Depends on:**`. |
-| Worktree merge failed after 5 retries | Feature branch stays alive; REQ stopped with `**Reason:** concurrent-conflict`. `/do-work resume REQ-NNN` re-dispatches a worker that checks out the existing feature branch and continues from there. |
+| Stuck state                                                         | Recovery                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Heartbeat stale, slot abandoned                                     | Existing batch-prompt: reclaim into this run, return to backlog, or abort                                                                                                                                                                                                           |
+| Worker `stopped`, reason `concurrent-conflict`                      | REQ stays in `working/` with `**Status:** stopped` and a `**Reason:**` field. `/do-work resume REQ-NNN` re-dispatches a fresh worker on it.                                                                                                                                         |
+| Worker `stopped`, reason `ambiguous-criteria` / `scope-creep`       | Surface to user. No auto-retry. User edits REQ or `unblock`s it. File feedback.                                                                                                                                                                                                     |
+| Worker `stopped`, reason `dependency-missing`                       | Diagnostic: capture missed a dep. File feedback with the inferred missing dep. User edits `**Depends on:**`.                                                                                                                                                                        |
+| Worktree merge failed after 5 retries                               | Feature branch stays alive; REQ stopped with `**Reason:** concurrent-conflict`. `/do-work resume REQ-NNN` re-dispatches a worker that checks out the existing feature branch and continues from there.                                                                              |
 | Footprint-miss (worker touched files outside declared `**Files:**`) | At commit-time, the worker diffs `git diff --name-only --cached` against its declared `**Files:**`. Differences are logged + fed back. Does NOT block the commit, but the REQ's `**Files:**` is updated in place to the actual touched paths so future overlap checks are accurate. |
 
 ### New commands
 
-| Command | Job | Implementation |
-|---|---|---|
-| `/do-work status [UR-NNN]` | Render the situation room: REQs + status + claimers + heartbeats + deadlock warnings | `synth-status.sh` |
+| Command                    | Job                                                                                                                                                                                                                      | Implementation                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `/do-work status [UR-NNN]` | Render the situation room: REQs + status + claimers + heartbeats + deadlock warnings                                                                                                                                     | `synth-status.sh`                                               |
 | `/do-work unblock REQ-NNN` | Force-return a stuck REQ to backlog. Strip ownership stamp, reset status, `git mv` back. If implementation commits exist for this REQ, surface them and ask the user whether to revert, keep, or fold into a new commit. | mostly mechanical; one judgment point (partial-commit handling) |
-| `/do-work resume REQ-NNN` | Re-dispatch a worker on a `working/` REQ in `stopped` state. Fresh subagent session. For worktree-mode REQs, checks out the existing `req/REQ-NNN` branch in place. | reuses existing dispatch path |
+| `/do-work resume REQ-NNN`  | Re-dispatch a worker on a `working/` REQ in `stopped` state. Fresh subagent session. For worktree-mode REQs, checks out the existing `req/REQ-NNN` branch in place.                                                      | reuses existing dispatch path                                   |
 
 Existing commands gain small extensions:
 
@@ -241,15 +242,15 @@ Existing commands gain small extensions:
 
 **One new script:** `lib/file-feedback.sh`. Triggered from specific friction events with a stable fingerprint.
 
-| Event | Fingerprint format | Where it fires |
-|---|---|---|
-| Deadlock | `deadlock:<signal>:<live-slot-count>:<hash>` | `deadlock-check.sh` consumer |
-| Footprint miss | `footprint-miss:<diff-hash>` | Worker Step 8 commit prep |
-| Concurrent-conflict after 5 retries | `concurrent-conflict:<files-hash>` | Worker exit path |
-| Cycle detected at capture | `cap-cycle:<UR-id>` | `cycle-check.sh` |
-| Stale slot reclaim (no recent commit) | `stale-slot:<reason-class>` | Pre-flight reclaim handler |
-| Ambiguous-criteria stop, 2nd occurrence on same REQ | `ambiguous-req:<REQ-NNN>` | Orchestrator stopping-rules path |
-| Verification-failing after 3 retries | `verify-fail:<step-type>` | Worker exit path |
+| Event                                               | Fingerprint format                           | Where it fires                   |
+| --------------------------------------------------- | -------------------------------------------- | -------------------------------- |
+| Deadlock                                            | `deadlock:<signal>:<live-slot-count>:<hash>` | `deadlock-check.sh` consumer     |
+| Footprint miss                                      | `footprint-miss:<diff-hash>`                 | Worker Step 8 commit prep        |
+| Concurrent-conflict after 5 retries                 | `concurrent-conflict:<files-hash>`           | Worker exit path                 |
+| Cycle detected at capture                           | `cap-cycle:<UR-id>`                          | `cycle-check.sh`                 |
+| Stale slot reclaim (no recent commit)               | `stale-slot:<reason-class>`                  | Pre-flight reclaim handler       |
+| Ambiguous-criteria stop, 2nd occurrence on same REQ | `ambiguous-req:<REQ-NNN>`                    | Orchestrator stopping-rules path |
+| Verification-failing after 3 retries                | `verify-fail:<step-type>`                    | Worker exit path                 |
 
 **Dedup:** body always embeds `<!-- fingerprint: <value> -->`. `gh issue list --search "fingerprint:<value> in:body"` finds priors. Existing issue → `gh issue comment`. No issue → `gh issue create`.
 
@@ -261,15 +262,16 @@ Existing commands gain small extensions:
 
 ```yaml
 feedback:
-  enabled: false                              # opt-in
-  repo: tomkaczocha/do-work                   # default points at the skill upstream
+  enabled: false # opt-in
+  repo: tomkaczocha/do-work # default points at the skill upstream
   label: auto:do-work-feedback
-  project_repo: ""                            # optional: route project-class events here
+  project_repo: '' # optional: route project-class events here
 ```
 
 **Default routing:**
-- *System-class* (deadlock, footprint-miss, concurrent-conflict, cap-cycle, stale-slot) → `feedback.repo`.
-- *Project-class* (ambiguous-criteria, verify-fail) → `feedback.project_repo` if set, otherwise `feedback.repo`.
+
+- _System-class_ (deadlock, footprint-miss, concurrent-conflict, cap-cycle, stale-slot) → `feedback.repo`.
+- _Project-class_ (ambiguous-criteria, verify-fail) → `feedback.project_repo` if set, otherwise `feedback.repo`.
 
 **Self-targeting default:** when running inside the do-work skill's own source repo (detected by `git remote get-url origin` matching the upstream URL pattern), `feedback.enabled` defaults to true.
 
@@ -285,17 +287,17 @@ The synthesized status view (`synth-status.sh` output, rendered to the user, not
 
 Compared to a plan.md design: no per-claim plan.md edit, no per-claim plan.md merge, no per-claim plan.md commit. One fewer commit per claim across all agents.
 
-Compared to the current implementation: roughly equal LLM-token cost per claim (the existing stale-slot scan + classification dominate), plus the added cost of one bash invocation. The savings come from *avoiding redo*: footprint-aware claims mean fewer concurrent-conflict retries and fewer stomp-driven re-implementations.
+Compared to the current implementation: roughly equal LLM-token cost per claim (the existing stale-slot scan + classification dominate), plus the added cost of one bash invocation. The savings come from _avoiding redo_: footprint-aware claims mean fewer concurrent-conflict retries and fewer stomp-driven re-implementations.
 
 ### Judgment points (indexed)
 
 Every agent file gains a top-of-file index of where model judgment is required. The convention is documented once in `CONTRIBUTING.md` and applied across all agent files.
 
-| Agent | Judgment points |
-|---|---|
-| `capture.md` | Choosing `**Files:**` footprint per REQ; choosing `**Depends on:**` per REQ |
-| `audit.md` | Plausibility check that `**Files:**` matches the REQ's stated task |
-| `run.md` | Subagent_type classification (existing); model selection (existing); deadlock diagnosis narrative; partial-commit handling in `unblock` |
+| Agent           | Judgment points                                                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `capture.md`    | Choosing `**Files:**` footprint per REQ; choosing `**Depends on:**` per REQ                                                                                               |
+| `audit.md`      | Plausibility check that `**Files:**` matches the REQ's stated task                                                                                                        |
+| `run.md`        | Subagent_type classification (existing); model selection (existing); deadlock diagnosis narrative; partial-commit handling in `unblock`                                   |
 | `run-worker.md` | Scope-creep vs continue-and-correct decision when a step requires touching a file outside `**Files:**`; narrative title + body for any feedback event filed by the worker |
 
 Marker convention inside an agent file:
@@ -321,7 +323,7 @@ This catches a class of bug where capture invents a circular dependency — curr
 
 Isolation mode stays a per-REQ decision but the signals shift. The existing heuristics in `run-worker.md` (`migration`, `schema change`, `rename across`, `**Layer:** none` ⇒ same-branch, etc.) remain. Two additions:
 
-1. **Overlap-driven worktree.** If `check-footprint.sh` finds overlap at claim-time and the REQ is still desired (e.g. it's the only pickable REQ in scope and would otherwise idle-wait), the orchestrator forces `worktree` mode for the dispatch. This is the only path where worktree mode is chosen based on *live* state rather than REQ content.
+1. **Overlap-driven worktree.** If `check-footprint.sh` finds overlap at claim-time and the REQ is still desired (e.g. it's the only pickable REQ in scope and would otherwise idle-wait), the orchestrator forces `worktree` mode for the dispatch. This is the only path where worktree mode is chosen based on _live_ state rather than REQ content.
 2. **Force flag.** Users can add `**Isolation:** worktree` to a REQ explicitly to force worktree mode; capture writes this when the design clearly requires it.
 
 `run-worker.md`'s isolation heuristic gains a check: if the dispatch passed `--isolation=worktree`, honour it regardless of the REQ's content signals.
@@ -332,29 +334,29 @@ Isolation mode stays a per-REQ decision but the signals shift. The existing heur
 
 ### Skill source (`~/.claude/skills/do-work/`)
 
-| File | Change |
-|---|---|
-| `SKILL.md` | Document new subcommands (`status`, `unblock`, `resume`), updated REQ header schema, feedback config |
-| `agents/run.md` | Replace inline claim/staleness logic with calls to `pick-req.sh`, `claim-req.sh`, `scan-stale.sh`, `heartbeat.sh`. Add deadlock detection path. Add judgment-point index. |
-| `agents/run-worker.md` | Add heartbeat background loop. Add footprint-miss check at commit. Add overlap-driven worktree honoring. Add judgment-point index. |
-| `agents/capture.md` | Write `**Files:**` and `**Depends on:**` fields. Call `cycle-check.sh`. Add judgment-point index. |
-| `agents/audit.md` | Add footprint plausibility check. |
-| `agents/verify.md` | Add dangling-dep check. |
-| `agents/status.md` (new) | Wraps `synth-status.sh` + `deadlock-check.sh`. |
-| `agents/unblock.md` (new) | Reset-a-REQ command with partial-commit judgment. |
-| `agents/resume.md` (new) | Re-dispatch worker on a stopped working/ slot. |
-| `agents/config.md` | Add `feedback`, `parallel.stale_threshold_seconds` keys. |
-| `lib/` (new directory) | All bash scripts listed above. |
-| `CONTRIBUTING.md` | Document the judgment-point marker convention. |
+| File                      | Change                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SKILL.md`                | Document new subcommands (`status`, `unblock`, `resume`), updated REQ header schema, feedback config                                                                      |
+| `agents/run.md`           | Replace inline claim/staleness logic with calls to `pick-req.sh`, `claim-req.sh`, `scan-stale.sh`, `heartbeat.sh`. Add deadlock detection path. Add judgment-point index. |
+| `agents/run-worker.md`    | Add heartbeat background loop. Add footprint-miss check at commit. Add overlap-driven worktree honoring. Add judgment-point index.                                        |
+| `agents/capture.md`       | Write `**Files:**` and `**Depends on:**` fields. Call `cycle-check.sh`. Add judgment-point index.                                                                         |
+| `agents/audit.md`         | Add footprint plausibility check.                                                                                                                                         |
+| `agents/verify.md`        | Add dangling-dep check.                                                                                                                                                   |
+| `agents/status.md` (new)  | Wraps `synth-status.sh` + `deadlock-check.sh`.                                                                                                                            |
+| `agents/unblock.md` (new) | Reset-a-REQ command with partial-commit judgment.                                                                                                                         |
+| `agents/resume.md` (new)  | Re-dispatch worker on a stopped working/ slot.                                                                                                                            |
+| `agents/config.md`        | Add `feedback`, `parallel.stale_threshold_seconds` keys.                                                                                                                  |
+| `lib/` (new directory)    | All bash scripts listed above.                                                                                                                                            |
+| `CONTRIBUTING.md`         | Document the judgment-point marker convention.                                                                                                                            |
 
 ### Project state schema (`{project}/.do-work/`)
 
-| File / dir | Change |
-|---|---|
-| `config.yml` | New `feedback:` and `parallel:` sections |
-| `state/deadlock.md` | New file, written on deadlock detection |
-| `state/feedback.lock` | New transient lockfile |
-| REQ files | New `**Files:**`, `**Depends on:**` header fields; ownership stamp gains `**Heartbeat:**` |
+| File / dir            | Change                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| `config.yml`          | New `feedback:` and `parallel:` sections                                                  |
+| `state/deadlock.md`   | New file, written on deadlock detection                                                   |
+| `state/feedback.lock` | New transient lockfile                                                                    |
+| REQ files             | New `**Files:**`, `**Depends on:**` header fields; ownership stamp gains `**Heartbeat:**` |
 
 ---
 
@@ -367,6 +369,6 @@ Isolation mode stays a per-REQ decision but the signals shift. The existing heur
 
 ## Non-decisions
 
-- We do NOT introduce a "queue" file the user manually edits. The backlog *is* the queue. User direction comes through `/do-work run UR-NNN` scope flags, `/do-work unblock`, and editing REQ files directly.
+- We do NOT introduce a "queue" file the user manually edits. The backlog _is_ the queue. User direction comes through `/do-work run UR-NNN` scope flags, `/do-work unblock`, and editing REQ files directly.
 - We do NOT introduce a coordinator process. Every orchestrator is symmetric.
 - We do NOT change the existing commit convention (`feat(REQ-NNN): ...`). The new claim commit (`chore(REQ-NNN): claim by <agent-id>`) is the only new commit shape, and it already exists in the current parallel-execution implementation.

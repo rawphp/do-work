@@ -10,10 +10,10 @@ You sharpen the brief by asking what the user already knows but didn't say. You 
 
 You will be given an Issue reference:
 
-| Backend | Invocation |
-|---------|------------|
-| **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/` |
-| **linear** | Issue slug (e.g. `UR-001`) and/or Issue Project Milestone id — no local folder required |
+| Backend      | Invocation                                                                              |
+| ------------ | --------------------------------------------------------------------------------------- |
+| **markdown** | Path to a user-request folder, e.g. `{project}/.do-work/user-requests/UR-001/`          |
+| **linear**   | Issue slug (e.g. `UR-001`) and/or Issue Project Milestone id — no local folder required |
 
 You may also be invoked from the ideate gate when the user selects "Grill me", or run standalone via the `/do-work question` subcommand.
 
@@ -35,6 +35,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -42,12 +43,12 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 ### Clarifications store — backend branch (ORI-9)
 
-| Backend | Persist Q&A |
-|---------|-------------|
-| **markdown** | Append `## Clarifications` to `{project}/.do-work/user-requests/UR-NNN/input.md` |
-| **sqlite** | Port op **`append_clarifications`** → `bash {skill-root}/lib/dw-db.sh append-clarifications {project} UR-NNN --body TEXT`. **Do not** dual-write `input.md` as the store. |
-| **linear** | Port op **`append_clarifications`** — append Q&A under `## Clarifications` on the **UR Project Milestone** description. Never overwrite `## Brief`. **No** local `input.md` dual-write. |
-| **do-work-io** | Port op **`append_clarifications`** (`ur_append-clarifications` / `ur.append-clarifications` in `agents/tracker/do-work-io.md`). **No** local `input.md` dual-write. |
+| Backend        | Persist Q&A                                                                                                                                                                             |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown**   | Append `## Clarifications` to `{project}/.do-work/user-requests/UR-NNN/input.md`                                                                                                        |
+| **sqlite**     | Port op **`append_clarifications`** → `bash {skill-root}/lib/dw-db.sh append-clarifications {project} UR-NNN --body TEXT`. **Do not** dual-write `input.md` as the store.               |
+| **linear**     | Port op **`append_clarifications`** — append Q&A under `## Clarifications` on the **UR Project Milestone** description. Never overwrite `## Brief`. **No** local `input.md` dual-write. |
+| **do-work-io** | Port op **`append_clarifications`** (`ur_append-clarifications` / `ur.append-clarifications` in `agents/tracker/do-work-io.md`). **No** local `input.md` dual-write.                    |
 
 ### When backend is sqlite (1S)
 
@@ -76,18 +77,23 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 Examine the brief for ambiguity across five vectors:
 
 #### Scope gaps
+
 What's mentioned but not bounded? Look for features, behaviors, or concepts referenced without clear limits.
 
 #### Unstated assumptions
+
 What's implied but not said? Look for technical choices, platform constraints, or environmental requirements taken for granted.
 
 #### Missing actors
+
 Who's involved but not named? Look for users, systems, admins, or external services that interact with the described feature but aren't mentioned.
 
 #### Undefined outcomes
+
 What does success look like? What does failure look like? Look for behaviors described without specifying what happens when things go right or wrong.
 
 #### Dependency blindspots
+
 Does this require something that doesn't exist yet? Look for references to systems, data, or infrastructure that may not be in place.
 
 Build a prioritized list of ambiguities, ordered by impact on the downstream decomposition. High-impact ambiguities — ones where different interpretations would lead to fundamentally different REQ decompositions — come first.
@@ -104,23 +110,25 @@ Before asking the user anything, attempt to resolve each ambiguity from existing
 For each ambiguity, classify the resolution into one of three buckets:
 
 #### (a) Confidently inferred
+
 Artifact evidence is clear and unambiguous — a single reading of the codebase or prior decisions produces the answer. Record the evidence (file + line or excerpt) alongside the inference.
 
 **Do not infer without artifact evidence. A reasoned guess with no file to cite is not a confident inference — it is a guess and must be treated as (c).**
 
-*Example of what is NOT confidently inferred:* "The test runner is probably Pest because this is a Laravel project." This is a convention assumption, not artifact evidence. Unless `composer.json` shows `pestphp/pest` or a `phpunit.xml`/`pest.php` config file exists, this belongs in (c).
+_Example of what is NOT confidently inferred:_ "The test runner is probably Pest because this is a Laravel project." This is a convention assumption, not artifact evidence. Unless `composer.json` shows `pestphp/pest` or a `phpunit.xml`/`pest.php` config file exists, this belongs in (c).
 
-*Example of what IS confidently inferred:* `composer.json` contains `"pestphp/pest": "^2.0"` in `require-dev`. The test runner is Pest.
+_Example of what IS confidently inferred:_ `composer.json` contains `"pestphp/pest": "^2.0"` in `require-dev`. The test runner is Pest.
 
 Batch all (a) inferences into a single `AskUserQuestion` interaction:
 
 > **Here's what I inferred from the codebase — confirm or correct:**
 >
-> - [Ambiguity 1]: [inference] (evidence: `path/to/file`, line N)
-> - [Ambiguity 2]: [inference] (evidence: prior UR-NNN clarification)
+> - [Ambiguity 1]: [inference] 'evidence: `path/to/file`, line N'
+> - [Ambiguity 2]: [inference] 'evidence: prior UR-NNN clarification'
 > - …
 
 Options:
+
 1. **"Confirm all"** — all inferences accepted as-is
 2. **"Correct some"** — user identifies which to override; for each correction, treat it as a directly-asked answer
 3. **"Ask me everything"** — discard inferences, treat all (a) items as (c)
@@ -128,12 +136,15 @@ Options:
 This single interaction counts as one exchange, not one per inference.
 
 #### (b) Partially inferred
+
 Some artifact evidence exists but it is incomplete or admits multiple readings. Ask as a normal Step 3 question but offer the candidate answer as the first option.
 
 #### (c) Genuinely unknowable from artifacts
+
 No artifact evidence exists. Ask open as a normal Step 3 question. Do not guess, do not batch.
 
 After the self-answer pass:
+
 - Remaining (b) and (c) items join the Step 3 queue, in priority order.
 - If all ambiguities resolved as (a) and the user confirms, skip to Step 5.
 
@@ -176,19 +187,19 @@ For inferences confirmed in the Step 2.5 batch, use this format — the provenan
 
 ```markdown
 **Q:** [The ambiguity that was resolved, referencing the brief's language]
-**A:** [The inferred resolution, as confirmed by the user] *(inferred, confirmed)*
+**A:** [The inferred resolution, as confirmed by the user] _(inferred, confirmed)_
 ```
 
 If the user chose "Correct some" for specific inferences, record the corrected values without the `*(inferred, confirmed)*` marker — the correction makes them directly-asserted answers.
 
 **Persist via backend branch (ORI-9):**
 
-| Backend | How |
-|---------|-----|
-| **markdown** | Append a `## Clarifications` section to `{project}/.do-work/user-requests/UR-NNN/input.md`. If the section already exists, append new Q&A below existing entries. Never overwrite prior clarifications. Never modify the original brief text above the section. |
-| **linear** | Call port op **`append_clarifications`** (`agents/tracker/linear.md`) with each Q&A pair. Appends under `## Clarifications` on the **Issue Project Milestone**; creates the section if missing; never overwrites `## Brief` or prior Q&A. **Do not** write local `input.md`. If MCP fails → hard-stop. |
-| **sqlite** | Call port op **`append_clarifications`** via dw-db. **Do not** write local `input.md`. |
-| **do-work-io** | Call port op **`append_clarifications`** (`agents/tracker/do-work-io.md`). **Do not** write local `input.md`. If MCP fails → hard-stop. |
+| Backend        | How                                                                                                                                                                                                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **markdown**   | Append a `## Clarifications` section to `{project}/.do-work/user-requests/UR-NNN/input.md`. If the section already exists, append new Q&A below existing entries. Never overwrite prior clarifications. Never modify the original brief text above the section.                                        |
+| **linear**     | Call port op **`append_clarifications`** (`agents/tracker/linear.md`) with each Q&A pair. Appends under `## Clarifications` on the **Issue Project Milestone**; creates the section if missing; never overwrites `## Brief` or prior Q&A. **Do not** write local `input.md`. If MCP fails → hard-stop. |
+| **sqlite**     | Call port op **`append_clarifications`** via dw-db. **Do not** write local `input.md`.                                                                                                                                                                                                                 |
+| **do-work-io** | Call port op **`append_clarifications`** (`agents/tracker/do-work-io.md`). **Do not** write local `input.md`. If MCP fails → hard-stop.                                                                                                                                                                |
 
 The brief is the source of truth — clarifications are additive context.
 

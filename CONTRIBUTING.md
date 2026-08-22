@@ -86,13 +86,13 @@ If your change isn't tied to a REQ, use `feat:`, `fix:`, or `docs:` without a RE
 
 `do-work` treats feature completeness as a proof problem, not a confidence report. The system should make dropped wiring and unproven work visible by construction.
 
-| Principle | Mechanism |
-|---|---|
-| Human is not the completeness detector | `/do-work status` and coverage rollups show intended vs proven work automatically. |
-| Prevent by construction | Capture groups feature work into reachable path-units with entry points, terminal states, and child layer REQs. |
-| Derived, not declared | Writable `**Status:**` remains coordination state; `proven` is derived from `**Closure proof:**`. |
-| Localize failures | Verification steps are ordered checkpoints that report the last good step and failing handoff. |
-| Criteria provenance is visible | `**Criteria approved:** agent-drafted` records that capture generated the criteria, but it does not block run. Stop only when criteria are actually ambiguous, contradictory, or unverifiable. |
+| Principle                              | Mechanism                                                                                                                                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Human is not the completeness detector | `/do-work status` and coverage rollups show intended vs proven work automatically.                                                                                                             |
+| Prevent by construction                | Capture groups feature work into reachable path-units with entry points, terminal states, and child layer REQs.                                                                                |
+| Derived, not declared                  | Writable `**Status:**` remains coordination state; `proven` is derived from `**Closure proof:**`.                                                                                              |
+| Localize failures                      | Verification steps are ordered checkpoints that report the last good step and failing handoff.                                                                                                 |
+| Criteria provenance is visible         | `**Criteria approved:** agent-drafted` records that capture generated the criteria, but it does not block run. Stop only when criteria are actually ambiguous, contradictory, or unverifiable. |
 
 When changing capture, verify, run, or status behavior, preserve these invariants. A REQ should not be treated as complete merely because a worker reports `done`; it needs checkpointed evidence, closure proof, and derived proof visibility.
 
@@ -126,14 +126,14 @@ This schema is load-bearing. Scripts in `lib/` depend on it. Capture is the only
 
 ### Fields (in order)
 
-| Field | Required | Value |
-|---|---|---|
-| `**UR:**` | yes | Single UR id (e.g. `UR-030`). |
-| `**Status:**` | yes | One of `backlog`, `in-progress`, `done`, `stopped`. |
-| `**Created:**` | yes | ISO-8601 date (`YYYY-MM-DD`). |
-| `**Layer:**` | yes | One of the layers declared in `config.yml`, or `none`. |
-| `**Files:**` | yes | Comma-separated list of project-relative paths or globs the REQ will touch. Optional spaces after commas. May be empty for pure-discussion REQs but the line must still exist. |
-| `**Depends on:**` | optional value | Comma-separated list of REQ ids that must be archived before this REQ can be claimed. The line is mandatory; the value may be empty. |
+| Field             | Required       | Value                                                                                                                                                                          |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `**UR:**`         | yes            | Single UR id (e.g. `UR-030`).                                                                                                                                                  |
+| `**Status:**`     | yes            | One of `backlog`, `in-progress`, `done`, `stopped`.                                                                                                                            |
+| `**Created:**`    | yes            | ISO-8601 date (`YYYY-MM-DD`).                                                                                                                                                  |
+| `**Layer:**`      | yes            | One of the layers declared in `config.yml`, or `none`.                                                                                                                         |
+| `**Files:**`      | yes            | Comma-separated list of project-relative paths or globs the REQ will touch. Optional spaces after commas. May be empty for pure-discussion REQs but the line must still exist. |
+| `**Depends on:**` | optional value | Comma-separated list of REQ ids that must be archived before this REQ can be claimed. The line is mandatory; the value may be empty.                                           |
 
 ### Format rules (load-bearing)
 
@@ -150,17 +150,18 @@ When a REQ moves from `backlog/` to `working/`, the orchestrator inserts an **ow
 
 ```markdown
 <!-- claimed-start -->
+
 **Claimed by:** <agent-id>
 **Claimed at:** <ISO-8601 UTC>
 **Heartbeat:** <ISO-8601 UTC>
 <!-- claimed-end -->
 ```
 
-| Field | Required | Value |
-|---|---|---|
-| `**Claimed by:**` | yes | Agent id (e.g. `mbp-tom.42137`). |
-| `**Claimed at:**` | yes | ISO-8601 UTC timestamp with `Z` suffix. Set once at claim, never updated. |
-| `**Heartbeat:**` | yes | ISO-8601 UTC timestamp with `Z` suffix. Updated repeatedly by the worker (every 60s) for liveness detection. |
+| Field             | Required | Value                                                                                                        |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `**Claimed by:**` | yes      | Agent id (e.g. `mbp-tom.42137`).                                                                             |
+| `**Claimed at:**` | yes      | ISO-8601 UTC timestamp with `Z` suffix. Set once at claim, never updated.                                    |
+| `**Heartbeat:**`  | yes      | ISO-8601 UTC timestamp with `Z` suffix. Updated repeatedly by the worker (every 60s) for liveness detection. |
 
 `**Heartbeat:**` is the only field updated repeatedly during a worker's run. It is updated by `lib/heartbeat.sh` via `sed` — **no commit** — so siblings see freshness by reading the working/ file directly.
 
@@ -183,6 +184,7 @@ When a REQ moves from `backlog/` to `working/`, the orchestrator inserts an **ow
 # REQ-007: Add Foo model
 
 <!-- claimed-start -->
+
 **Claimed by:** mbp-tom.42137
 **Claimed at:** 2026-05-21T13:42:08Z
 **Heartbeat:** 2026-05-21T14:08:12Z
@@ -200,19 +202,19 @@ When a REQ moves from `backlog/` to `working/`, the orchestrator inserts an **ow
 
 Scripts in `lib/` use these line-anchored patterns to extract field values:
 
-| Field | Regex (POSIX ERE) |
-|---|---|
-| `**UR:**` | `^\*\*UR:\*\* (.+)$` |
-| `**Status:**` | `^\*\*Status:\*\* (.+)$` |
-| `**Created:**` | `^\*\*Created:\*\* (.+)$` |
-| `**Layer:**` | `^\*\*Layer:\*\* (.+)$` |
-| `**Files:**` | `^\*\*Files:\*\* (.+)$` |
+| Field             | Regex (POSIX ERE)                                            |
+| ----------------- | ------------------------------------------------------------ |
+| `**UR:**`         | `^\*\*UR:\*\* (.+)$`                                         |
+| `**Status:**`     | `^\*\*Status:\*\* (.+)$`                                     |
+| `**Created:**`    | `^\*\*Created:\*\* (.+)$`                                    |
+| `**Layer:**`      | `^\*\*Layer:\*\* (.+)$`                                      |
+| `**Files:**`      | `^\*\*Files:\*\* (.+)$`                                      |
 | `**Depends on:**` | `^\*\*Depends on:\*\*[[:space:]]*(.*)$` (value may be empty) |
-| `**Claimed by:**` | `^\*\*Claimed by:\*\* (.+)$` |
-| `**Claimed at:**` | `^\*\*Claimed at:\*\* (.+)$` |
-| `**Heartbeat:**` | `^\*\*Heartbeat:\*\* (.+)$` |
-| Claim block start | `^<!-- claimed-start -->$` |
-| Claim block end | `^<!-- claimed-end -->$` |
+| `**Claimed by:**` | `^\*\*Claimed by:\*\* (.+)$`                                 |
+| `**Claimed at:**` | `^\*\*Claimed at:\*\* (.+)$`                                 |
+| `**Heartbeat:**`  | `^\*\*Heartbeat:\*\* (.+)$`                                  |
+| Claim block start | `^<!-- claimed-start -->$`                                   |
+| Claim block end   | `^<!-- claimed-end -->$`                                     |
 
 After extraction, comma-separated values are split on `,` and trimmed of surrounding whitespace.
 
@@ -233,13 +235,14 @@ Each agent file that requires model judgment SHOULD open with a `## Judgment Poi
 
 The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
 
-| # | Step | Decision |
-|---|------|----------|
-| J1 | Step N — <field name> | One-sentence description of what the model must decide. |
-| J2 | Step N — <field name> | One-sentence description. |
+| #   | Step                  | Decision                                                |
+| --- | --------------------- | ------------------------------------------------------- |
+| J1  | Step N — <field name> | One-sentence description of what the model must decide. |
+| J2  | Step N — <field name> | One-sentence description.                               |
 ```
 
 Rules:
+
 - Each row corresponds to exactly one inline `> **JUDGMENT:**` marker elsewhere in the file.
 - The `Step` column names the heading and subheading where the marker appears (e.g. `Step 4 — Files`).
 - Rows are numbered `J1`, `J2`, … in the order they appear in the file.
@@ -253,6 +256,7 @@ At the exact step where the model must exercise judgment, insert a blockquote ma
 ```
 
 Rules:
+
 - The label in brackets (`[J1 — Files]`) matches the `#` and `Step` columns in the top-of-file index.
 - The body explains three things: (1) what choice the model is making, (2) what inputs or signals should guide the choice, (3) what goes wrong if the model chooses badly.
 - Keep it to 1-3 sentences. If more is needed, the step itself should be split or the rule should be made explicit.
@@ -268,10 +272,10 @@ The following shows both parts of the convention. It is drawn from `agents/captu
 
 The following steps require model judgment that cannot be reduced to a rule. Each is marked inline with a `> **JUDGMENT:**` block at the relevant step.
 
-| # | Step | Decision |
-|---|------|----------|
-| J1 | Step 4 — Files | Which files will this REQ touch? List paths relative to the project root. Err toward specificity; vague globs are less useful than named files. |
-| J2 | Step 4 — Depends on | Which other REQs must be committed before this one can start? Only hard ordering constraints (not soft "nice to have" ordering). Empty list is valid and common. |
+| #   | Step                | Decision                                                                                                                                                         |
+| --- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J1  | Step 4 — Files      | Which files will this REQ touch? List paths relative to the project root. Err toward specificity; vague globs are less useful than named files.                  |
+| J2  | Step 4 — Depends on | Which other REQs must be committed before this one can start? Only hard ordering constraints (not soft "nice to have" ordering). Empty list is valid and common. |
 ```
 
 **Inline markers (inside Step 4 of `agents/capture.md`):**

@@ -7,6 +7,7 @@ You are the Intake agent in the Do Work system. Your job is to receive a natural
 ## When Invoked
 
 You will be given:
+
 1. A project do-work path: `{project}/.do-work/`
 2. The user's message or brief to record
 
@@ -28,6 +29,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -35,22 +37,24 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 ### Intake store — backend branch (ORI-9)
 
-| Backend | How intake records an Issue |
-|---------|-------------------------|
-| **linear** | Port op **`create_ur`** only (`agents/tracker/linear.md`) — product Project + **Issue Project Milestone** with §9.1 body and verbatim brief. **Do not** create `{project}/.do-work/user-requests/UR-NNN/` or write local `input.md` as the store. Report **Issue slug + product project id/name + milestone id/name**. |
-| **sqlite** | Port op **`create_ur`** only via `bash {skill-root}/lib/dw-db.sh create-ur {project} --title T --brief B` (`agents/tracker/sqlite.md`). **Do not** create `user-requests/UR-NNN/` or write local `input.md` as the store. Report **Issue slug**. Hard-stop if dw-db/sqlite unusable. |
-| **do-work-io** | Port op **`create_ur`** only (`agents/tracker/do-work-io.md` → `ur.create`). **Do not** create `user-requests/UR-NNN/` or write local `input.md` as the store. Report **Issue slug**. Hard-stop if MCP/PAT/project unusable. |
-| **markdown** | Local folder + `input.md` under `{project}/.do-work/user-requests/UR-NNN/` (steps 1–5 below). |
+| Backend        | How intake records an Issue                                                                                                                                                                                                                                                                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **linear**     | Port op **`create_ur`** only (`agents/tracker/linear.md`) — product Project + **Issue Project Milestone** with §9.1 body and verbatim brief. **Do not** create `{project}/.do-work/user-requests/UR-NNN/` or write local `input.md` as the store. Report **Issue slug + product project id/name + milestone id/name**. |
+| **sqlite**     | Port op **`create_ur`** only via `bash {skill-root}/lib/dw-db.sh create-ur {project} --title T --brief B` (`agents/tracker/sqlite.md`). **Do not** create `user-requests/UR-NNN/` or write local `input.md` as the store. Report **Issue slug**. Hard-stop if dw-db/sqlite unusable.                                   |
+| **do-work-io** | Port op **`create_ur`** only (`agents/tracker/do-work-io.md` → `ur.create`). **Do not** create `user-requests/UR-NNN/` or write local `input.md` as the store. Report **Issue slug**. Hard-stop if MCP/PAT/project unusable.                                                                                           |
+| **markdown**   | Local folder + `input.md` under `{project}/.do-work/user-requests/UR-NNN/` (steps 1–5 below).                                                                                                                                                                                                                          |
 
 **When effective backend is `linear`:** run **Linear path** (steps L1–L4) and skip markdown folder steps. If Linear MCP / milestone tools unusable → **hard-stop** — never silent markdown fallback.
 
 **When effective backend is `sqlite` (1S):**
+
 - `create_ur` / `read_ur` / `list_urs` via `lib/dw-db.sh` only
 - Do **not** mkdir `user-requests/` or write `input.md` as the work-item store
 - Evidence (if any) under `.do-work/evidence/UR-NNN/` only
 - Hard-stop if `dw-db` fails — never fall back to markdown paths
 
 **When effective backend is `do-work-io` (1D):** sole store is do-work.io via `agents/tracker/do-work-io.md` MCP tools. Do **not** dual-write `user-requests/` or `REQ-*.md`. Hard-stop if MCP unusable.
+
 - `create_ur` / `read_ur` / `list_urs` via `ur.create` / `ur.get` / `ur.list` only (port ops in `do-work-io.md`)
 - Do **not** mkdir `user-requests/` or write `input.md` as the work-item store
 - Hard-stop if MCP/PAT/project unusable — never fall back to markdown, Linear, or sqlite
@@ -125,6 +129,7 @@ Next steps:
 ### 1. Check if the user is referencing an existing UR
 
 If the brief explicitly references an existing UR (e.g. "update UR-003", "add to UR-003", "modify UR-003"):
+
 - Check if `{project}/.do-work/user-requests/UR-NNN/` exists. If the directory does not exist, report: "UR-NNN does not exist. Creating a new Issue instead." and continue to Step 2.
 - Read `{project}/.do-work/user-requests/UR-NNN/input.md`
 - If **status: intake** (in YAML frontmatter — Capture has not been run yet):
@@ -140,7 +145,7 @@ Otherwise, continue to Step 2.
 ### 2. Find the next Issue number
 
 Use the Glob tool to list all folders matching:
-  `{project}/.do-work/user-requests/UR-*/`
+`{project}/.do-work/user-requests/UR-*/`
 
 Extract the numeric suffix from each folder name (e.g. `UR-007` → `7`).
 Take the maximum. The new Issue number = max + 1, zero-padded to 3 digits.
@@ -245,7 +250,6 @@ Next steps:
 - **do-work-io:** do not dual-write local `user-requests/` or Linear; sole store is **`create_ur`** via `do-work-io.md`; report Issue slug
 - Hard-stop if backend is `linear` and Linear MCP is unusable — never silent markdown fallback
 - Hard-stop if backend is `do-work-io` and MCP/PAT/project is unusable — never silent markdown fallback
-
 
 ## Field traps (from field-lessons)
 
