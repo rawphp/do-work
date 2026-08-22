@@ -8,13 +8,13 @@ Implements the tracker port (`agents/tracker/port.md`) with **do-work.io as the 
 
 ## Product naming vs wire (frozen)
 
-| Surface | Value |
-|---------|--------|
-| **Product noun** (UI, agent prose) | **Issue** — top-level brief container |
-| **Agent / wire id** | slug **`UR-NNN`** (zero-padded); param name **`ur`** |
-| **MCP / capability wire** | **`ur.*`** / **`ur_*`** (`ur.create`, `ur_create`, …) |
-| **Port ops** | still `create_ur`, `read_ur`, `list_urs`, … |
-| **DB tables** | `issues`, `issue_artifacts` (FKs `issue_id`) |
+| Surface                            | Value                                                 |
+| ---------------------------------- | ----------------------------------------------------- |
+| **Product noun** (UI, agent prose) | **Issue** — top-level brief container                 |
+| **Agent / wire id**                | slug **`UR-NNN`** (zero-padded); param name **`ur`**  |
+| **MCP / capability wire**          | **`ur.*`** / **`ur_*`** (`ur.create`, `ur_create`, …) |
+| **Port ops**                       | still `create_ur`, `read_ur`, `list_urs`, …           |
+| **DB tables**                      | `issues`, `issue_artifacts` (FKs `issue_id`)          |
 
 **Do not invent** `issue.create`, `issue_create`, `ISSUE-NNN`, or param `issue` for MCP calls. Wire stays `ur.*` until a deliberate product capability cutover. Markdown on-disk path `.do-work/user-requests/` is the **markdown backend only** — not the do-work-io store.
 
@@ -36,15 +36,15 @@ Do **not** load this file when backend is `markdown`, `linear`, or `sqlite`.
 
 ## Hierarchy (authoritative)
 
-| Entity | Home |
-|--------|------|
-| Product container | do-work.io `projects` row; identity = **slug**; REST id = ULID |
-| **Issue** | `issues` row; agent id = slug `UR-NNN`; wire param `ur` |
-| REQ | `requirements` row; agent id = slug `REQ-NNN` |
-| Ideate / clarifications / verify / close | `issue_artifacts` (`kind`) |
-| Decisions | `decisions` (append-only) |
-| Run notes | `run_notes` |
-| Gate locks | **local** `{project}/.do-work/state/gate-owner.md` only |
+| Entity                                   | Home                                                           |
+| ---------------------------------------- | -------------------------------------------------------------- |
+| Product container                        | do-work.io `projects` row; identity = **slug**; REST id = ULID |
+| **Issue**                                | `issues` row; agent id = slug `UR-NNN`; wire param `ur`        |
+| REQ                                      | `requirements` row; agent id = slug `REQ-NNN`                  |
+| Ideate / clarifications / verify / close | `issue_artifacts` (`kind`)                                     |
+| Decisions                                | `decisions` (append-only)                                      |
+| Run notes                                | `run_notes`                                                    |
+| Gate locks                               | **local** `{project}/.do-work/state/gate-owner.md` only        |
 
 ### Hard rules
 
@@ -123,15 +123,15 @@ leave it; use /do-work resume or unblock after MCP recovers (port: leave claimed
 
 ### Conditions → stop (summary)
 
-| Condition | Behavior |
-|-----------|----------|
-| `agents/tracker/do-work-io.md` missing or unreadable | Hard stop; restore from skill install |
-| `tracker.dowork.base_url` missing / empty | Hard stop |
-| `${token_env}` unset or rejected (401) | Hard stop |
-| `tracker.dowork.project` missing / empty / not found | Hard stop |
-| `search_tool` returns no do-work.io tools | Hard stop |
-| MCP offline / unauthenticated mid-session | Hard stop; if already claimed → **leave claimed** |
-| Required capability missing on the profile | Hard stop (use `dowork.control` for the loop) |
+| Condition                                            | Behavior                                          |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| `agents/tracker/do-work-io.md` missing or unreadable | Hard stop; restore from skill install             |
+| `tracker.dowork.base_url` missing / empty            | Hard stop                                         |
+| `${token_env}` unset or rejected (401)               | Hard stop                                         |
+| `tracker.dowork.project` missing / empty / not found | Hard stop                                         |
+| `search_tool` returns no do-work.io tools            | Hard stop                                         |
+| MCP offline / unauthenticated mid-session            | Hard stop; if already claimed → **leave claimed** |
+| Required capability missing on the profile           | Hard stop (use `dowork.control` for the loop)     |
 
 **Never** write “fall back to markdown” (or Linear / sqlite) as a recovery step.
 
@@ -152,35 +152,35 @@ If MCP/PAT becomes unusable **after** a successful `claim_req` (`req_claim` / `r
 
 **Wire name** (primary) = capability id with `.` → `_`. Capability id (fallback `search_tool` / DTO identity) stays dotted. Every call includes `project: {tracker.dowork.project}` except `auth_whoami` / `auth.whoami` / `project_list` / `project.list` / `project_ensure` / `project.ensure`.
 
-| Port op | MCP wire name (primary) | Capability id (fallback search) | Arguments (conceptual) |
-|---------|-------------------------|---------------------------------|------------------------|
-| `ensure_product_container` | `project_ensure` | `project.ensure` | `{ slug: tracker.dowork.project, name?: project.name \|\| slug }` — create-or-return |
-| `create_ur` | `ur_create` | `ur.create` | Create Issue; `{ project, title, brief }` → `data.slug` is `UR-NNN` |
-| `read_ur` | `ur_get` | `ur.get` | Read Issue; `{ project, ur: UR-NNN }` |
-| `list_urs` | `ur_list` | `ur.list` | List Issues; `{ project }` |
-| `append_ideate` | `ur_append-ideate` | `ur.append-ideate` | `{ project, ur, body }` — append; never overwrite brief |
-| `append_clarifications` | `ur_append-clarifications` | `ur.append-clarifications` | `{ project, ur, body }` |
-| `create_req` | `req_create` | `req.create` | `{ project, ur, title, files?, ... }` → `data.slug` is `REQ-NNN` (`ur` = parent Issue) |
-| `update_req` | `req_update` | `req.update` | `{ project, req, ... }` — not for claim/archive |
-| `read_req` | `req_get` | `req.get` | `{ project, req }` — embeds `active_claim: {id, agent_id, heartbeat_at, claimed_at} \| null`; returns at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` |
-| `list_reqs_for_ur` | `req_list` | `req.list` | `{ project, ur }` — same `active_claim` embed; each item returns at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` |
-| `list_claimable_reqs` | `req_list-claimable` | `req.list-claimable` | `{ project }` — Priority DESC, REQ-id ASC; already deps+footprint filtered |
-| `claim_req` | `req_claim` | `req.claim` | `{ project, req, agent_id, session? }` — `concurrent-conflict:` / `footprint-overlap:` / `not-claimable:` in the error message |
-| `heartbeat_req` | `req_heartbeat` | `req.heartbeat` | `{ project, req }` |
-| `set_req_status` | `req_set-status` | `req.set-status` | `{ project, req, status }` (`backlog`/`in_progress`/`stopped`/`done`) |
-| `set_blocked_by` | `req_set-blocked-by` | `req.set-blocked-by` | `{ project, req, depends_on: ["REQ-…"] }` (empty clears) |
-| `set_files` | `req_set-files` | `req.set-files` | `{ project, req, files: ["path"] }` |
-| `archive_req` | `req_archive` | `req.archive` | `{ project, req }` — gate: done + proof + all AC checked; releases claim |
-| `unblock_req` | `req_unblock` | `req.unblock` | `{ project, req }` |
-| `append_decision` | `decision_append` | `decision.append` | `{ project, date, ref?, decision, rationale? }` |
-| `write_verify_report` | `ur_write-verify-report` | `ur.write-verify-report` | `{ project, ur, body }` |
-| `write_close_report` | `ur_write-close-report` | `ur.write-close-report` | `{ project, ur, body }` — sets `closed_at` |
-| `append_run_note` | `req_append-run-note` | `req.append-run-note` | `{ project, payload, req?, ur? }` |
-| `read_active_milestone` | **Refuse (v1.1)** | Not implemented as MCP. Treat as “not in milestone mode.” Do not invent a local cursor. |
-| `set_active_milestone` | **Refuse (v1.1)** | Same. |
-| `list_milestone_reqs` | **Refuse (v1.1)** | Same. |
-| `write_gate_state` | **Local only** | `{project}/.do-work/state/gate-owner.md` — never a do-work.io / MCP op |
-| `migrate_markdown_to_linear` | **Refuse** | Backend is already `do-work-io` |
+| Port op                      | MCP wire name (primary)    | Capability id (fallback search)                                                         | Arguments (conceptual)                                                                                                                                                           |
+| ---------------------------- | -------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ensure_product_container`   | `project_ensure`           | `project.ensure`                                                                        | `{ slug: tracker.dowork.project, name?: project.name \|\| slug }` — create-or-return                                                                                             |
+| `create_ur`                  | `ur_create`                | `ur.create`                                                                             | Create Issue; `{ project, title, brief }` → `data.slug` is `UR-NNN`                                                                                                              |
+| `read_ur`                    | `ur_get`                   | `ur.get`                                                                                | Read Issue; `{ project, ur: UR-NNN }`                                                                                                                                            |
+| `list_urs`                   | `ur_list`                  | `ur.list`                                                                               | List Issues; `{ project }`                                                                                                                                                       |
+| `append_ideate`              | `ur_append-ideate`         | `ur.append-ideate`                                                                      | `{ project, ur, body }` — append; never overwrite brief                                                                                                                          |
+| `append_clarifications`      | `ur_append-clarifications` | `ur.append-clarifications`                                                              | `{ project, ur, body }`                                                                                                                                                          |
+| `create_req`                 | `req_create`               | `req.create`                                                                            | `{ project, ur, title, files?, ... }` → `data.slug` is `REQ-NNN` (`ur` = parent Issue)                                                                                           |
+| `update_req`                 | `req_update`               | `req.update`                                                                            | `{ project, req, ... }` — not for claim/archive                                                                                                                                  |
+| `read_req`                   | `req_get`                  | `req.get`                                                                               | `{ project, req }` — embeds `active_claim: {id, agent_id, heartbeat_at, claimed_at} \| null`; returns at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite` |
+| `list_reqs_for_ur`           | `req_list`                 | `req.list`                                                                              | `{ project, ur }` — same `active_claim` embed; each item returns at least `body`, `layer`, `size`, `entry_point`, `terminal_state`, `suite`                                      |
+| `list_claimable_reqs`        | `req_list-claimable`       | `req.list-claimable`                                                                    | `{ project }` — Priority DESC, REQ-id ASC; already deps+footprint filtered                                                                                                       |
+| `claim_req`                  | `req_claim`                | `req.claim`                                                                             | `{ project, req, agent_id, session? }` — `concurrent-conflict:` / `footprint-overlap:` / `not-claimable:` in the error message                                                   |
+| `heartbeat_req`              | `req_heartbeat`            | `req.heartbeat`                                                                         | `{ project, req }`                                                                                                                                                               |
+| `set_req_status`             | `req_set-status`           | `req.set-status`                                                                        | `{ project, req, status }` (`backlog`/`in_progress`/`stopped`/`done`)                                                                                                            |
+| `set_blocked_by`             | `req_set-blocked-by`       | `req.set-blocked-by`                                                                    | `{ project, req, depends_on: ["REQ-…"] }` (empty clears)                                                                                                                         |
+| `set_files`                  | `req_set-files`            | `req.set-files`                                                                         | `{ project, req, files: ["path"] }`                                                                                                                                              |
+| `archive_req`                | `req_archive`              | `req.archive`                                                                           | `{ project, req }` — gate: done + proof + all AC checked; releases claim                                                                                                         |
+| `unblock_req`                | `req_unblock`              | `req.unblock`                                                                           | `{ project, req }`                                                                                                                                                               |
+| `append_decision`            | `decision_append`          | `decision.append`                                                                       | `{ project, date, ref?, decision, rationale? }`                                                                                                                                  |
+| `write_verify_report`        | `ur_write-verify-report`   | `ur.write-verify-report`                                                                | `{ project, ur, body }`                                                                                                                                                          |
+| `write_close_report`         | `ur_write-close-report`    | `ur.write-close-report`                                                                 | `{ project, ur, body }` — sets `closed_at`                                                                                                                                       |
+| `append_run_note`            | `req_append-run-note`      | `req.append-run-note`                                                                   | `{ project, payload, req?, ur? }`                                                                                                                                                |
+| `read_active_milestone`      | **Refuse (v1.1)**          | Not implemented as MCP. Treat as “not in milestone mode.” Do not invent a local cursor. |
+| `set_active_milestone`       | **Refuse (v1.1)**          | Same.                                                                                   |
+| `list_milestone_reqs`        | **Refuse (v1.1)**          | Same.                                                                                   |
+| `write_gate_state`           | **Local only**             | `{project}/.do-work/state/gate-owner.md` — never a do-work.io / MCP op                  |
+| `migrate_markdown_to_linear` | **Refuse**                 | Backend is already `do-work-io`                                                         |
 
 AC checkboxes (product op, not a port name): wire `req_set-acceptance-criteria` (capability `req.set-acceptance-criteria`) — `{ project, req, items: [{body, is_checked?}] }` replace.
 

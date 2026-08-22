@@ -42,6 +42,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -100,23 +101,23 @@ Return a structured YAML report:
 
 ```yaml
 status: passed # passed | failed
-reason: "" # required when failed
+reason: '' # required when failed
 findings:
   - severity: blocker # blocker | warning
     check: scope
-    detail: ""
+    detail: ''
 evidence_checked:
   - AC1
   - verification-step-1
 changed_files:
-  - path: ""
+  - path: ''
 risk_triggers:
-  - ""
+  - ''
 policy:
   check: check-policy
   status: clear # clear | blocked | review_required
   diagnostics:
-    - ""
+    - ''
 ```
 
 Use `status: failed` when any blocker exists. Warnings may pass if they do not invalidate the REQ.
@@ -127,10 +128,10 @@ Use `status: failed` when any blocker exists. Warnings may pass if they do not i
 
 If review fails, the run orchestrator must **not archive**:
 
-| Backend | On `status: failed` |
-|---------|---------------------|
-| **markdown** | Leave the REQ in `working/`; set/report stopped reason; do not move to `archive/` |
-| **linear** | **Do not call `archive_req`**; issue stays `in_progress`/`stopped` with **claim protocol intact** (active claim comment remains); orchestrator may `set_req_status` → stopped + optional `append_run_note` |
+| Backend      | On `status: failed`                                                                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown** | Leave the REQ in `working/`; set/report stopped reason; do not move to `archive/`                                                                                                                          |
+| **linear**   | **Do not call `archive_req`**; issue stays `in_progress`/`stopped` with **claim protocol intact** (active claim comment remains); orchestrator may `set_req_status` → stopped + optional `append_run_note` |
 
 When `review.required: true` (config default), this gate is mandatory before archive on both backends. When `review.required: false`, the orchestrator may skip dispatching this agent entirely.
 

@@ -25,9 +25,9 @@ Read and follow the **Load Config** section of [config.md](config.md).
 
 Resolve effective `tracker.backend` (missing/empty/whitespace → `markdown`).
 
-| Backend | Action |
-|---------|--------|
-| **`sqlite`** | Continue |
+| Backend                                    | Action                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| **`sqlite`**                               | Continue                                                                               |
 | **`markdown`**, **`linear`**, or any other | **Hard-stop** — do not call `dw-db board`, do not invent a markdown/Linear HTML export |
 
 Hard-stop message (adapt paths as needed):

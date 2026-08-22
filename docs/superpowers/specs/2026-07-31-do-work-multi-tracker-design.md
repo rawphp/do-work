@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-31  
 **Status:** approved for implementation planning  
-**Source:** `.scratch/do-work-multi-tracker/` wayfinder + brainstorming session  
+**Source:** `.scratch/do-work-multi-tracker/` wayfinder + brainstorming session
 
 ## 1. Problem
 
@@ -33,22 +33,22 @@ do-work stores work items (URs, REQs, decisions, verify/close reports) only as l
 
 ## 4. Decisions (locked)
 
-| Decision | Choice |
-|----------|--------|
-| Architecture | Tracker port docs: `agents/tracker/{port,markdown,linear}.md` |
-| Hierarchy | **UR = Project Milestone** on a shared product Project (`tracker.linear.product_project`); REQs = Issues in that Project with `milestone` = UR milestone. *(2026-07-31: supersedes Initiative + per-UR Project — Linear MCP has no Initiative create tools.)* |
-| Product container | Team + config — **not** one long-lived product Project for all URs |
-| Linear IDs | Linear mode uses Linear issue identifiers only (e.g. `ENG-123`). No parallel `REQ-NNN` allocation |
-| UR naming slug | Sequential `UR-NNN` still used as Project name / Initiative metadata slug only |
-| Path-units | Parent Issue + layer children as sub-issues (`parentId`) |
-| Deps | Native Linear relation type `blocks` (+ mirrored `**Depends on:**` line in body) |
-| Footprint | Structured `**Files:**` (and related header fields) in Issue description — no custom fields |
-| Claim | Human operator remains Linear **assignee**; agents claim via workflow status + heartbeat **comment** protocol |
-| Claim atomicity | Optimistic re-read before write; loser → concurrent-conflict / stop; resume allowed |
-| Linear unusable | Hard stop — never silent fallback to markdown |
-| Migration | One-shot when idle (`working/` empty); then Linear-only |
-| Non-ticket park | Decisions + calibration = team Docs; verify/close = Initiative; run notes = Issue comments (+ optional Project update) |
-| Runtime/git | Stay local: worktrees, merges, `state/*` locks, events, config.yml |
+| Decision          | Choice                                                                                                                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Architecture      | Tracker port docs: `agents/tracker/{port,markdown,linear}.md`                                                                                                                                                                                                 |
+| Hierarchy         | **UR = Project Milestone** on a shared product Project (`tracker.linear.product_project`); REQs = Issues in that Project with `milestone` = UR milestone. _(2026-07-31: supersedes Initiative + per-UR Project — Linear MCP has no Initiative create tools.)_ |
+| Product container | Team + config — **not** one long-lived product Project for all URs                                                                                                                                                                                            |
+| Linear IDs        | Linear mode uses Linear issue identifiers only (e.g. `ENG-123`). No parallel `REQ-NNN` allocation                                                                                                                                                             |
+| UR naming slug    | Sequential `UR-NNN` still used as Project name / Initiative metadata slug only                                                                                                                                                                                |
+| Path-units        | Parent Issue + layer children as sub-issues (`parentId`)                                                                                                                                                                                                      |
+| Deps              | Native Linear relation type `blocks` (+ mirrored `**Depends on:**` line in body)                                                                                                                                                                              |
+| Footprint         | Structured `**Files:**` (and related header fields) in Issue description — no custom fields                                                                                                                                                                   |
+| Claim             | Human operator remains Linear **assignee**; agents claim via workflow status + heartbeat **comment** protocol                                                                                                                                                 |
+| Claim atomicity   | Optimistic re-read before write; loser → concurrent-conflict / stop; resume allowed                                                                                                                                                                           |
+| Linear unusable   | Hard stop — never silent fallback to markdown                                                                                                                                                                                                                 |
+| Migration         | One-shot when idle (`working/` empty); then Linear-only                                                                                                                                                                                                       |
+| Non-ticket park   | Decisions + calibration = team Docs; verify/close = Initiative; run notes = Issue comments (+ optional Project update)                                                                                                                                        |
+| Runtime/git       | Stay local: worktrees, merges, `state/*` locks, events, config.yml                                                                                                                                                                                            |
 
 ## 5. Architecture
 
@@ -75,10 +75,10 @@ Phase agents keep product logic (TDD, review, decomposition). They do not re-imp
 
 ### 5.3 Bash vs agent steps
 
-| Backend | Work-item ops | Runtime |
-|---------|---------------|---------|
-| **markdown** | Existing `lib/*.sh` + file paths, documented in `markdown.md` | worktrees, git, events, state locks — unchanged |
-| **linear** | Agent steps invoking Linear skill/MCP, documented in `linear.md`. No Linear-aware bash required for v1 | same local runtime/git |
+| Backend      | Work-item ops                                                                                          | Runtime                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| **markdown** | Existing `lib/*.sh` + file paths, documented in `markdown.md`                                          | worktrees, git, events, state locks — unchanged |
+| **linear**   | Agent steps invoking Linear skill/MCP, documented in `linear.md`. No Linear-aware bash required for v1 | same local runtime/git                          |
 
 Shared **rules** (when to claim, what “deps satisfied” means, footprint overlap) live in `port.md`. Shared **shell** only for the file store.
 
@@ -86,34 +86,34 @@ Shared **rules** (when to claim, what “deps satisfied” means, footprint over
 
 Coarse lifecycle (~12–25 ops). Names freeze intent; exact set may grow slightly when templates land:
 
-| Op | Intent |
-|----|--------|
+| Op                         | Intent                                                          |
+| -------------------------- | --------------------------------------------------------------- |
 | `ensure_product_container` | Team/product labeling ready; no single product Project required |
-| `create_ur` | Record intake brief |
-| `read_ur` | Load brief (+ ideate if present) |
-| `list_urs` | Enumerate URs for prompts/status |
-| `append_ideate` | Write ideate onto UR |
-| `append_clarifications` | Question phase Q&A |
-| `create_req` | Create one REQ in backlog |
-| `update_req` | Edit REQ body/fields |
-| `read_req` | Load full REQ |
-| `list_reqs_for_ur` | All REQs for a UR (any status) |
-| `list_claimable_reqs` | Backlog, deps ok, footprint ok, unclaimed — pick order |
-| `claim_req` | Optimistic claim + in-progress |
-| `heartbeat_req` | Refresh liveness |
-| `set_req_status` | stopped / in-progress / etc. |
-| `set_blocked_by` | Deps graph |
-| `set_files` | Footprint list |
-| `archive_req` | Done + closure proof / outputs |
-| `unblock_req` | Return to backlog, clear claim |
-| `append_decision` | Standing decisions memory |
-| `write_verify_report` | Verify output for a UR |
-| `write_close_report` | Close output for a UR |
-| `append_run_note` | Ledger-ish / cost note for a REQ or run |
-| `read_active_milestone` | Milestone cursor |
-| `set_active_milestone` | Advance / set milestone |
-| `list_milestone_reqs` | REQs for active milestone |
-| `write_gate_state` | Deploy-gate coordination (local lock still allowed) |
+| `create_ur`                | Record intake brief                                             |
+| `read_ur`                  | Load brief (+ ideate if present)                                |
+| `list_urs`                 | Enumerate URs for prompts/status                                |
+| `append_ideate`            | Write ideate onto UR                                            |
+| `append_clarifications`    | Question phase Q&A                                              |
+| `create_req`               | Create one REQ in backlog                                       |
+| `update_req`               | Edit REQ body/fields                                            |
+| `read_req`                 | Load full REQ                                                   |
+| `list_reqs_for_ur`         | All REQs for a UR (any status)                                  |
+| `list_claimable_reqs`      | Backlog, deps ok, footprint ok, unclaimed — pick order          |
+| `claim_req`                | Optimistic claim + in-progress                                  |
+| `heartbeat_req`            | Refresh liveness                                                |
+| `set_req_status`           | stopped / in-progress / etc.                                    |
+| `set_blocked_by`           | Deps graph                                                      |
+| `set_files`                | Footprint list                                                  |
+| `archive_req`              | Done + closure proof / outputs                                  |
+| `unblock_req`              | Return to backlog, clear claim                                  |
+| `append_decision`          | Standing decisions memory                                       |
+| `write_verify_report`      | Verify output for a UR                                          |
+| `write_close_report`       | Close output for a UR                                           |
+| `append_run_note`          | Ledger-ish / cost note for a REQ or run                         |
+| `read_active_milestone`    | Milestone cursor                                                |
+| `set_active_milestone`     | Advance / set milestone                                         |
+| `list_milestone_reqs`      | REQs for active milestone                                       |
+| `write_gate_state`         | Deploy-gate coordination (local lock still allowed)             |
 
 Markdown may implement several ops by composing existing scripts. Linear maps each to skill/MCP sequences.
 
@@ -143,21 +143,21 @@ Team (config)
 
 ### 6.2 Naming
 
-| Entity | Naming |
-|--------|--------|
-| Product Project | `tracker.linear.product_project` (default `do-work`) — shared; not one Project per UR |
-| UR Milestone (human-facing) | `ur_milestone_name_pattern` (default `{ur_id}: {title}`); body has `**UR-id:** UR-NNN` |
-| Issue | Linear identifier only (`ENG-123`). Titles short and actionable; body holds do-work schema |
+| Entity                      | Naming                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| Product Project             | `tracker.linear.product_project` (default `do-work`) — shared; not one Project per UR      |
+| UR Milestone (human-facing) | `ur_milestone_name_pattern` (default `{ur_id}: {title}`); body has `**UR-id:** UR-NNN`     |
+| Issue                       | Linear identifier only (`ENG-123`). Titles short and actionable; body holds do-work schema |
 
 ### 6.3 List / scope
 
-| Need | How |
-|------|-----|
-| `list_reqs_for_ur` | `list_issues` filtered by **product Project** + **UR milestone** |
-| `list_claimable_reqs` | Same project filter + status + deps + footprint + unclaimed |
-| `status` for a UR | Issues for that milestone + claim comments |
-| `read_ur` | UR milestone description (and comments if needed) |
-| Product-wide backlog | All issues in product Project (optionally all milestones) |
+| Need                  | How                                                              |
+| --------------------- | ---------------------------------------------------------------- |
+| `list_reqs_for_ur`    | `list_issues` filtered by **product Project** + **UR milestone** |
+| `list_claimable_reqs` | Same project filter + status + deps + footprint + unclaimed      |
+| `status` for a UR     | Issues for that milestone + claim comments                       |
+| `read_ur`             | UR milestone description (and comments if needed)                |
+| Product-wide backlog  | All issues in product Project (optionally all milestones)        |
 
 ### 6.4 Intake create sequence (Linear)
 
@@ -184,26 +184,26 @@ No `.do-work/archive/REQ-…` path required. Worktree branch naming may use `req
 
 ```yaml
 tracker:
-  backend: markdown          # markdown | linear
+  backend: markdown # markdown | linear
   linear:
-    team_id: ""              # required when backend=linear (or resolve via team_key)
-    team_key: ""             # optional alternate resolve
-    default_assignee_id: ""  # human operator; set on issue create when configured
-    project_name_pattern: "do-work/{ur_id}"
-    initiative_title_pattern: "{ur_id}: {title}"
+    team_id: '' # required when backend=linear (or resolve via team_key)
+    team_key: '' # optional alternate resolve
+    default_assignee_id: '' # human operator; set on issue create when configured
+    project_name_pattern: 'do-work/{ur_id}'
+    initiative_title_pattern: '{ur_id}: {title}'
     status_map:
-      backlog: "Todo"
-      in_progress: "In Progress"
-      stopped: "Canceled"    # override if team has a dedicated Stopped state
-      done: "Done"
+      backlog: 'Todo'
+      in_progress: 'In Progress'
+      stopped: 'Canceled' # override if team has a dedicated Stopped state
+      done: 'Done'
     labels:
-      layer_prefix: "Layer/"
-      path_unit: "path-unit"
-      size_prefix: "Size/"
-    agent_claim_marker: "<!-- do-work-claim -->"
-    heartbeat_max_age_seconds: null  # null → use parallel.stale_threshold_seconds
-    decisions_doc_title: "do-work/decisions"
-    calibration_doc_title: "do-work/calibration"
+      layer_prefix: 'Layer/'
+      path_unit: 'path-unit'
+      size_prefix: 'Size/'
+    agent_claim_marker: '<!-- do-work-claim -->'
+    heartbeat_max_age_seconds: null # null → use parallel.stale_threshold_seconds
+    decisions_doc_title: 'do-work/decisions'
+    calibration_doc_title: 'do-work/calibration'
 ```
 
 **Validation when `backend: linear`:** hard fail if team cannot be resolved or Linear MCP tools are undiscoverable. Message must tell the operator how to connect Linear (skill setup), not invent data.
@@ -214,15 +214,15 @@ tracker:
 
 Human always owns **assignee** (config `default_assignee_id` on create; agents do not steal assignee for claim).
 
-| Concept | Rule |
-|---------|------|
-| Unclaimed | Workflow state maps to backlog **and** no active claim comment (or last claim is `released` / unblocked) |
-| Claim | Re-read issue; if another agent has active claim and fresh heartbeat → fail; else set state → in_progress; post comment with `agent_claim_marker`, `agent_id`, `claimed_at`, `heartbeat`, optional `session`, `status: active` |
-| Heartbeat | New claim-protocol comment (or append) with updated `heartbeat` ISO timestamp; consumers take the latest active claim block |
-| Stale | Latest active heartbeat older than `heartbeat_max_age_seconds` or `parallel.stale_threshold_seconds` |
-| Unblock | State → backlog; claim comment `status: released` |
-| Resume | stopped → in_progress; refresh heartbeat; assignee unchanged |
-| Concurrent conflict | Same stopper semantics as markdown multi-agent mode |
+| Concept             | Rule                                                                                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unclaimed           | Workflow state maps to backlog **and** no active claim comment (or last claim is `released` / unblocked)                                                                                                                       |
+| Claim               | Re-read issue; if another agent has active claim and fresh heartbeat → fail; else set state → in_progress; post comment with `agent_claim_marker`, `agent_id`, `claimed_at`, `heartbeat`, optional `session`, `status: active` |
+| Heartbeat           | New claim-protocol comment (or append) with updated `heartbeat` ISO timestamp; consumers take the latest active claim block                                                                                                    |
+| Stale               | Latest active heartbeat older than `heartbeat_max_age_seconds` or `parallel.stale_threshold_seconds`                                                                                                                           |
+| Unblock             | State → backlog; claim comment `status: released`                                                                                                                                                                              |
+| Resume              | stopped → in_progress; refresh heartbeat; assignee unchanged                                                                                                                                                                   |
+| Concurrent conflict | Same stopper semantics as markdown multi-agent mode                                                                                                                                                                            |
 
 **Atomicity story:** MCP has no filesystem atomic rename. Good enough = re-read + comment protocol + timestamp. Document as intentional.
 
@@ -230,6 +230,7 @@ Human always owns **assignee** (config `default_assignee_id` on create; agents d
 
 ```markdown
 <!-- do-work-claim -->
+
 agent_id: hostname.pid
 claimed_at: 2026-07-31T12:00:00Z
 heartbeat: 2026-07-31T12:05:00Z
@@ -245,6 +246,7 @@ Machine-stable sections in Initiative description:
 
 ```markdown
 <!-- do-work-ur -->
+
 **UR-id:** UR-007
 **Class:** feature
 **Created:** YYYY-MM-DD
@@ -252,6 +254,7 @@ Machine-stable sections in Initiative description:
 **Project-id:** {linear-project-uuid}
 
 ## Brief
+
 {verbatim intake}
 
 ## Clarifications
@@ -273,11 +276,12 @@ Prefer description appends; fall back to Initiative comments if size limits requ
 
 ```markdown
 <!-- do-work-req -->
+
 **UR:** UR-007
 **Layer:** agents | none | …
 **Parent:** ENG-100 | none
-**Entry point:** …          # path-unit parents only
-**Terminal state:** …       # path-unit parents only
+**Entry point:** … # path-unit parents only
+**Terminal state:** … # path-unit parents only
 **Files:** path1 path2
 **Depends on:** ENG-101 ENG-102
 **Size:** S|M|L
@@ -289,14 +293,17 @@ Prefer description appends; fall back to Initiative comments if size limits requ
 ## Task
 
 ## Acceptance Criteria
+
 - [ ] …
 
 ## Verification Steps
+
 1. …
 
 ## Integration
 
 ## Manual checks (advisory)
+
 - [ ] …
 
 ## Outputs
@@ -310,15 +317,15 @@ Prefer description appends; fall back to Initiative comments if size limits requ
 
 ## 10. Non-ticket artifact homes
 
-| Artifact | Linear home | Format | Writers / readers |
-|----------|-------------|--------|-------------------|
-| Decisions | Team Doc `do-work/decisions` (create-if-missing) | One line per decision (same as today) | capture write; capture/ideate/question/worker read |
-| Run / cost notes | Comment on Issue after attempt; optional Project update for run rollup | YAML fenced block (ledger fields) | run |
-| Verify report | Initiative `## Verify` + Initiative comment | Full report markdown | verify, go |
-| Close report | Initiative `## Closure` + comment | Per path-unit results | close |
-| Calibration | Team Doc `do-work/calibration` | Full calibration body | retro write; capture read |
-| Milestone cursor | Project description `<!-- do-work-milestone -->` | active M + checklist | capture, run |
-| Gate locks | **Local** `state/gate-owner.md`, `final-suite-*.md` | unchanged | run |
+| Artifact         | Linear home                                                            | Format                                | Writers / readers                                  |
+| ---------------- | ---------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------- |
+| Decisions        | Team Doc `do-work/decisions` (create-if-missing)                       | One line per decision (same as today) | capture write; capture/ideate/question/worker read |
+| Run / cost notes | Comment on Issue after attempt; optional Project update for run rollup | YAML fenced block (ledger fields)     | run                                                |
+| Verify report    | Initiative `## Verify` + Initiative comment                            | Full report markdown                  | verify, go                                         |
+| Close report     | Initiative `## Closure` + comment                                      | Per path-unit results                 | close                                              |
+| Calibration      | Team Doc `do-work/calibration`                                         | Full calibration body                 | retro write; capture read                          |
+| Milestone cursor | Project description `<!-- do-work-milestone -->`                       | active M + checklist                  | capture, run                                       |
+| Gate locks       | **Local** `state/gate-owner.md`, `final-suite-*.md`                    | unchanged                             | run                                                |
 
 ## 11. Milestone mode (Linear)
 
@@ -346,20 +353,20 @@ Surface via `/do-work upgrade` conformance/migrate path or an explicit migrate s
 **Must load port and branch on backend:**  
 intake, capture, ideate, question, audit, verify, run, run-worker, review, status, close, unblock, resume, start, go, upgrade, retro, log, help (docs pointers).
 
-**lib/*.sh:** remain markdown-backend implementations. Linear reimplements pick/claim/deps/footprint/heartbeat/archive-integrity **semantics** in `linear.md` via MCP. No requirement for Linear-aware bash in v1.
+**lib/\*.sh:** remain markdown-backend implementations. Linear reimplements pick/claim/deps/footprint/heartbeat/archive-integrity **semantics** in `linear.md` via MCP. No requirement for Linear-aware bash in v1.
 
 **SKILL.md + config.md:** document `tracker.*`, load path, hard-stop rules, commit convention for Linear ids.
 
 ## 14. Error handling
 
-| Failure | Behavior |
-|---------|----------|
-| Linear MCP missing / unauthenticated | Hard stop with setup instructions from Linear skill |
-| Team id unresolved | Hard stop; do not guess |
-| Claim race lost | Stop with concurrent-conflict; `/do-work resume` allowed |
-| Relation tool missing | Prefer GraphQL/fallback documented in `linear.md`; if unavailable, description-only deps + one-time warning |
-| Template parse failure | Stop REQ; do not invent fields |
-| Budget reached | Same boundary as today; costs from Linear run notes |
+| Failure                              | Behavior                                                                                                    |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Linear MCP missing / unauthenticated | Hard stop with setup instructions from Linear skill                                                         |
+| Team id unresolved                   | Hard stop; do not guess                                                                                     |
+| Claim race lost                      | Stop with concurrent-conflict; `/do-work resume` allowed                                                    |
+| Relation tool missing                | Prefer GraphQL/fallback documented in `linear.md`; if unavailable, description-only deps + one-time warning |
+| Template parse failure               | Stop REQ; do not invent fields                                                                              |
+| Budget reached                       | Same boundary as today; costs from Linear run notes                                                         |
 
 ## 15. Testing and proof
 
@@ -373,15 +380,15 @@ intake, capture, ideate, question, audit, verify, run, run-worker, review, statu
 
 Suggested dependency order (single plan, multi-PR REQs):
 
-1. Config schema + load path + `port.md` stub ops + `markdown.md` mapping existing behavior  
-2. **Linear MCP capability spike** — `agents/tracker/linear.md` skeleton + live matrix (rediscover tools; hard-stop copy; `status_map` validation notes) **before** wiring full CRUD  
-3. Initiative/Issue templates + `linear.md` CRUD for UR/REQ (only after spike cells for hierarchy/relations/Docs are known)  
-4. Claim/heartbeat/unblock/resume + status  
-5. Capture/ideate/question/verify against port  
-6. Run loop pick/claim/deps/footprint/archive on Linear  
-7. Close, decisions doc, run notes, calibration  
-8. Milestone mode on Linear  
-9. Migration one-shot + upgrade wiring  
+1. Config schema + load path + `port.md` stub ops + `markdown.md` mapping existing behavior
+2. **Linear MCP capability spike** — `agents/tracker/linear.md` skeleton + live matrix (rediscover tools; hard-stop copy; `status_map` validation notes) **before** wiring full CRUD
+3. Initiative/Issue templates + `linear.md` CRUD for UR/REQ (only after spike cells for hierarchy/relations/Docs are known)
+4. Claim/heartbeat/unblock/resume + status
+5. Capture/ideate/question/verify against port
+6. Run loop pick/claim/deps/footprint/archive on Linear
+7. Close, decisions doc, run notes, calibration
+8. Milestone mode on Linear
+9. Migration one-shot + upgrade wiring
 10. Docs (SKILL.md, getting-started, troubleshooting)
 
 ## 17. Open risks
@@ -394,7 +401,7 @@ Suggested dependency order (single plan, multi-PR REQs):
 
 ## 18. References
 
-- `.scratch/do-work-multi-tracker/map.md` and issues 01–10  
-- `docs/superpowers/specs/2026-05-21-do-work-parallel-coordination-design.md`  
-- `agents/config.md`, `SKILL.md`  
-- Linear skill: MCP-first, rediscover tools live  
+- `.scratch/do-work-multi-tracker/map.md` and issues 01–10
+- `docs/superpowers/specs/2026-05-21-do-work-parallel-coordination-design.md`
+- `agents/config.md`, `SKILL.md`
+- Linear skill: MCP-first, rediscover tools live

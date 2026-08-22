@@ -1,6 +1,5 @@
 # Run Agent
 
-
 ## Field lessons (load first)
 
 Before pre-flight or claim: read `{skill-root}/references/field-lessons.md` when present (**before acting**). Apply the traps below; do not re-learn them mid-merge.
@@ -13,17 +12,17 @@ You are the Run agent in the Do Work system. Your job is to execute the backlog 
 
 Points where the orchestrator must apply judgment rather than follow a deterministic rule:
 
-| # | Location | Question |
-|---|---|---|
-| J1 | Pre-flight → staleness | Stale slots found: reclaim, return to backlog, or abort? |
-| J2 | REQ Classification | Which `config.routing` rule (if any) fits this REQ; fall back to `general-purpose` when none match. |
-| J3 | Model Selection | Escalate to `opus` when signals are borderline? |
-| J4 | Step 1.0a idle-wait | Gate-owner stuck after 30 min: continue waiting or abort? |
-| J5 | Step 1 idle-wait (deps/overlap/scope) | Deadlock vs slow-but-live: continue waiting or surface to user? |
-| J6 | Step 7b drain | Sibling slot not drained after 30 min: continue polling or surface to user? |
-| J7 | Step D suite failure | Which REQ is responsible for a failing test? |
-| J8 | Parallel Run Mode → window fill | Window has free slots but pick returns empty (overlap/deps): refill now, or wait for a live worker to free a footprint? |
-| J9 | Parallel Run Mode → merge queue | Multiple reports ready: which to admit to Stage B next, and is a mid-queue stopper isolated from its siblings? |
+| #   | Location                              | Question                                                                                                                |
+| --- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| J1  | Pre-flight → staleness                | Stale slots found: reclaim, return to backlog, or abort?                                                                |
+| J2  | REQ Classification                    | Which `config.routing` rule (if any) fits this REQ; fall back to `general-purpose` when none match.                     |
+| J3  | Model Selection                       | Escalate to `opus` when signals are borderline?                                                                         |
+| J4  | Step 1.0a idle-wait                   | Gate-owner stuck after 30 min: continue waiting or abort?                                                               |
+| J5  | Step 1 idle-wait (deps/overlap/scope) | Deadlock vs slow-but-live: continue waiting or surface to user?                                                         |
+| J6  | Step 7b drain                         | Sibling slot not drained after 30 min: continue polling or surface to user?                                             |
+| J7  | Step D suite failure                  | Which REQ is responsible for a failing test?                                                                            |
+| J8  | Parallel Run Mode → window fill       | Window has free slots but pick returns empty (overlap/deps): refill now, or wait for a live worker to free a footprint? |
+| J9  | Parallel Run Mode → merge queue       | Multiple reports ready: which to admit to Stage B next, and is a mid-queue stopper isolated from its siblings?          |
 
 Full serial sequences: [references/run-loop.md](../references/run-loop.md). Parallel + drain: [references/run-parallel.md](../references/run-parallel.md).
 
@@ -77,14 +76,14 @@ Work-item storage goes **only** through named tracker port ops after config is l
 
 ### Claim / pick / heartbeat / archive — backend branch
 
-| Concern | Markdown | Linear | sqlite (1S) | do-work-io (1D) |
-|---------|----------|--------|-------------|-----------------|
-| Pick | `list_claimable_reqs` → `lib/pick-req.sh` | `list_claimable_reqs` in linear.md / [linear-ops.md](../references/linear-ops.md) | `bash {skill-root}/lib/dw-db.sh list-claimable/pick {project}` | `req.list-claimable` |
-| Claim | `claim_req` → `lib/claim-req.sh` | `claim_req` — workflow + claim comment; never steal assignee | `bash {skill-root}/lib/dw-db.sh claim {project} REQ-NNN AGENT_ID` | `req.claim` `{project, req, agent_id}` |
-| Heartbeat | `heartbeat_req` → `lib/heartbeat.sh` | `heartbeat_req` — claim-protocol comment | `bash {skill-root}/lib/dw-db.sh heartbeat {project} REQ-NNN AGENT_ID` | `req.heartbeat` |
-| Archive | working/ → archive/ | `archive_req` after evidence + review gates | `bash {skill-root}/lib/dw-db.sh archive-req {project} REQ-NNN` | `req.archive` after evidence + review |
-| Run notes | `append_run_note` / ledger | Issue comment authoritative; local ledger optional telemetry | `append-run-note` via dw-db | `req.append-run-note` |
-| Commits / branches | `feat(REQ-NNN):` + `req/REQ-NNN` | `feat(ENG-123):` + `req/<sanitized-id>` | `feat(REQ-NNN):` + `req/REQ-NNN` (REQ **slug**) | `feat(REQ-NNN):` + `req/REQ-NNN` |
+| Concern            | Markdown                                  | Linear                                                                            | sqlite (1S)                                                           | do-work-io (1D)                        |
+| ------------------ | ----------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------- |
+| Pick               | `list_claimable_reqs` → `lib/pick-req.sh` | `list_claimable_reqs` in linear.md / [linear-ops.md](../references/linear-ops.md) | `bash {skill-root}/lib/dw-db.sh list-claimable/pick {project}`        | `req.list-claimable`                   |
+| Claim              | `claim_req` → `lib/claim-req.sh`          | `claim_req` — workflow + claim comment; never steal assignee                      | `bash {skill-root}/lib/dw-db.sh claim {project} REQ-NNN AGENT_ID`     | `req.claim` `{project, req, agent_id}` |
+| Heartbeat          | `heartbeat_req` → `lib/heartbeat.sh`      | `heartbeat_req` — claim-protocol comment                                          | `bash {skill-root}/lib/dw-db.sh heartbeat {project} REQ-NNN AGENT_ID` | `req.heartbeat`                        |
+| Archive            | working/ → archive/                       | `archive_req` after evidence + review gates                                       | `bash {skill-root}/lib/dw-db.sh archive-req {project} REQ-NNN`        | `req.archive` after evidence + review  |
+| Run notes          | `append_run_note` / ledger                | Issue comment authoritative; local ledger optional telemetry                      | `append-run-note` via dw-db                                           | `req.append-run-note`                  |
+| Commits / branches | `feat(REQ-NNN):` + `req/REQ-NNN`          | `feat(ENG-123):` + `req/<sanitized-id>`                                           | `feat(REQ-NNN):` + `req/REQ-NNN` (REQ **slug**)                       | `feat(REQ-NNN):` + `req/REQ-NNN`       |
 
 **When `linear`:** do not call pick/claim/heartbeat bash as the store; leave claimed on mid-flight MCP death; no silent-release; no markdown fallback. Full table and Linear steps: [run-loop.md](../references/run-loop.md) (Tracker load path section retained in agent above is authoritative for hard rules).
 
@@ -151,17 +150,17 @@ Full tables: [run-loop.md](../references/run-loop.md).
 
 Repeat until backlog empty (or budget/stopper). **Full step bodies:** [run-loop.md](../references/run-loop.md) § The Loop.
 
-| Step | Intent |
-|------|--------|
-| **1** | Claim next REQ — milestone filter (1.0 / 1.0a); `list_claimable_reqs` + `claim_req` (backend-specific) |
-| **2** | Dispatch worker subagent (`run-worker.md`) with five-input contract + model/routing |
-| **3** | Process worker report — acceptance evidence, policy, review gates |
-| **3b** | Run ledger / `append_run_note`; **budget gate** |
-| **4** | Integrate — merge, archive (`archive_req` or file move), worktree teardown, metadata commit |
-| **5** | Recover on stopper |
-| **7** | Report progress |
-| **7b** | Milestone deploy-gate (milestone mode only) — human y/n; local gate-owner |
-| **8** | Loop (unless budget-stop) |
+| Step   | Intent                                                                                                 |
+| ------ | ------------------------------------------------------------------------------------------------------ |
+| **1**  | Claim next REQ — milestone filter (1.0 / 1.0a); `list_claimable_reqs` + `claim_req` (backend-specific) |
+| **2**  | Dispatch worker subagent (`run-worker.md`) with five-input contract + model/routing                    |
+| **3**  | Process worker report — acceptance evidence, policy, review gates                                      |
+| **3b** | Run ledger / `append_run_note`; **budget gate**                                                        |
+| **4**  | Integrate — merge, archive (`archive_req` or file move), worktree teardown, metadata commit            |
+| **5**  | Recover on stopper                                                                                     |
+| **7**  | Report progress                                                                                        |
+| **7b** | Milestone deploy-gate (milestone mode only) — human y/n; local gate-owner                              |
+| **8**  | Loop (unless budget-stop)                                                                              |
 
 Backend branch notes for Step 1 / 4 live in the full loop reference. Linear issue ids replace `REQ-NNN` in branch/commit naming.
 
@@ -212,7 +211,6 @@ Full enum handling + feedback path: [run-loop.md](../references/run-loop.md) § 
 - [agents/run-worker.md](run-worker.md) — Worker contract
 - [agents/tracker/linear.md](tracker/linear.md) — Linear backend index (when `tracker.backend: linear`)
 - [agents/tracker/do-work-io.md](tracker/do-work-io.md) — do-work.io backend index (when `tracker.backend: do-work-io`)
-
 
 ## Field traps (from field-lessons)
 

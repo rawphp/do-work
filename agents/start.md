@@ -34,6 +34,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -41,12 +42,12 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 ### Start store — backend branch (ORI-9)
 
-| Backend | Intake home | Ideate home | Capture home |
-|---------|-------------|-------------|--------------|
-| **linear** | **`create_ur`** → Issue Project Milestone; report Linear ids | **`append_ideate`** on that milestone; **`read_ur`** for brief/ideate | **`create_req`** Issues on product Project + Issue milestone; **`list_reqs_for_ur`** to list |
-| **markdown** | Local `user-requests/UR-NNN/input.md` | Local `ideate.md` | Local `REQ-*.md` backlog files |
-| **sqlite** | `create_ur` via dw-db | `append_ideate` via dw-db | `create_req` / `list-reqs` via dw-db — **no** live `REQ-*.md` / `user-requests/` |
-| **do-work-io** | **`create_ur`** (`ur.create`) via `agents/tracker/do-work-io.md`; report Issue slug | **`append_ideate`** (`ur.append-ideate`); **`read_ur`** (`ur.get`) | **`create_req`** / **`list_reqs_for_ur`** (`req.create` / `req.list`) — **no** live `REQ-*.md` / `user-requests/` |
+| Backend        | Intake home                                                                         | Ideate home                                                           | Capture home                                                                                                      |
+| -------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **linear**     | **`create_ur`** → Issue Project Milestone; report Linear ids                        | **`append_ideate`** on that milestone; **`read_ur`** for brief/ideate | **`create_req`** Issues on product Project + Issue milestone; **`list_reqs_for_ur`** to list                      |
+| **markdown**   | Local `user-requests/UR-NNN/input.md`                                               | Local `ideate.md`                                                     | Local `REQ-*.md` backlog files                                                                                    |
+| **sqlite**     | `create_ur` via dw-db                                                               | `append_ideate` via dw-db                                             | `create_req` / `list-reqs` via dw-db — **no** live `REQ-*.md` / `user-requests/`                                  |
+| **do-work-io** | **`create_ur`** (`ur.create`) via `agents/tracker/do-work-io.md`; report Issue slug | **`append_ideate`** (`ur.append-ideate`); **`read_ur`** (`ur.get`)    | **`create_req`** / **`list_reqs_for_ur`** (`req.create` / `req.list`) — **no** live `REQ-*.md` / `user-requests/` |
 
 When backend is **`linear`**, start **must not** require or create `.do-work/user-requests/` as the work-item store. Hard-stop if Linear MCP unusable — never silent markdown fallback.
 
@@ -66,6 +67,7 @@ Read and follow [intake.md](intake.md) in full.
 Note the Issue slug created (e.g. `UR-003`) — you will need it for the next steps. Under Linear, also keep the milestone id in context.
 
 **Number conflict guard:**
+
 - **Markdown:** Intake scans existing Issue folders (`user-requests/UR-*`) and uses max+1. Capture scans existing REQ files across backlog, working, and archive and uses max+1. Both use zero-padded 3-digit numbers. If the filesystem has gaps (e.g., UR-001, UR-003), the next number is max+1 (UR-004), not the gap fill (UR-002).
 - **Linear:** Issue slugs come from **`create_ur`** milestone scan; REQ ids are **Linear issue identifiers** allocated by Linear (no local `REQ-NNN`).
 
@@ -76,6 +78,7 @@ Unless the `--no-ideate` flag was specified:
 Read and follow [ideate.md](ideate.md) in full.
 
 Pass it:
+
 - **Markdown:** the Issue folder path from Step 1
 - **Linear:** the Issue slug (and milestone id if known) — not a local folder path
 
@@ -100,6 +103,7 @@ If `--no-ideate` was specified, skip this step entirely (no gate runs).
 Read and follow [capture.md](capture.md) in full.
 
 Pass it:
+
 - **Markdown:** the Issue folder path from Step 1
 - **Linear:** the Issue slug (+ milestone id); capture uses **`read_ur`** / **`create_req`** — no local `input.md` required
 - The `--no-layers` flag if it was set on the start invocation (capture reads it in its Step 2c)
@@ -179,7 +183,6 @@ In all cases, never leave partial state without reporting it. If an Issue was cr
 - Do not run Verify or Run — that is the Go agent's job
 - **Linear:** no dual-write to `user-requests/`; intake reports Linear ids; hard-stop if MCP unusable
 - **do-work-io:** no dual-write to `user-requests/` or Linear; intake reports Issue slug; hard-stop if MCP/PAT/project unusable
-
 
 ## Field traps (from field-lessons)
 

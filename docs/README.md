@@ -4,23 +4,23 @@ Task-based guides for people who install and run `/do-work` in a project. Works 
 
 ## Start here
 
-| If you want to… | Read |
-|-----------------|------|
+| If you want to…                                       | Read                                  |
+| ----------------------------------------------------- | ------------------------------------- |
 | Install the skill and run your first brief end-to-end | [Getting started](getting-started.md) |
-| Understand UR, REQ, `start` / `go`, and the gates | [Concepts](concepts.md) |
-| Look up a command or flag | [Commands](commands.md) |
-| Fix a failure symptom | [Troubleshooting](troubleshooting.md) |
+| Understand UR, REQ, `start` / `go`, and the gates     | [Concepts](concepts.md)               |
+| Look up a command or flag                             | [Commands](commands.md)               |
+| Fix a failure symptom                                 | [Troubleshooting](troubleshooting.md) |
 
 ## Deeper reference
 
-| Page | Audience |
-|------|----------|
+| Page                                              | Audience                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------- |
 | [Architecture analysis](architecture-analysis.md) | Owner / architect / operator: full architecture map + ranked improvements |
-| [How it works](HOW-IT-WORKS.md) | Operators who want phase-by-phase design detail |
-| [../README.md](../README.md) | Install one-liner, quick start, config overview |
-| [../agents/config.md](../agents/config.md) | Full `config.yml` schema |
-| [../SKILL.md](../SKILL.md) | Skill entrypoint and full behavioural reference |
-| [../CONTRIBUTING.md](../CONTRIBUTING.md) | Contributors changing the skill itself |
+| [How it works](HOW-IT-WORKS.md)                   | Operators who want phase-by-phase design detail                           |
+| [../README.md](../README.md)                      | Install one-liner, quick start, config overview                           |
+| [../agents/config.md](../agents/config.md)        | Full `config.yml` schema                                                  |
+| [../SKILL.md](../SKILL.md)                        | Skill entrypoint and full behavioural reference                           |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md)          | Contributors changing the skill itself                                    |
 
 ## Happy path (two commands)
 

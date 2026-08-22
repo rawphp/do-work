@@ -20,7 +20,7 @@ Fan out via **N concurrent `Agent`-tool dispatches in one turn** — the same wo
 
 ### P2. Window fill — claim-as-slot-frees (design §2)
 
-**Claim one REQ immediately before each dispatch — never a batch up front.** `pick-req.sh` reads `working/` directly to build its footprint-exclusion set, so a claim must be *visible in `working/`* before the next pick or two picked candidates could overlap each other.
+**Claim one REQ immediately before each dispatch — never a batch up front.** `pick-req.sh` reads `working/` directly to build its footprint-exclusion set, so a claim must be _visible in `working/`_ before the next pick or two picked candidates could overlap each other.
 
 **Fill loop** (run at start, and again on every refill):
 
@@ -50,16 +50,12 @@ Arrival order is correct because footprints are disjoint by construction (no two
 Each dequeued report runs **exactly the existing serial Steps 3–4, internals unchanged**, split into two stages:
 
 **Stage A — concurrent, read-only (safe N-wide).** May run across multiple queued reports in parallel; writes nothing to the base branch or `.do-work/` lifecycle state:
+
 1. Step 3 — acceptance-evidence gate (`check-acceptance-evidence.sh`)
 2. Step 3 — policy gate (`check-policy.sh`)
 3. Step 3a/3b — **independent review dispatch** (`review.md` as a fresh subagent; adversarial mode per Step 3b when `review.adversarial` + policy exit 2). Review reads only `(REQ, diff, evidence)` with no run context, so its dispatches may be fanned out concurrently — the same `Agent`-tool concurrency used for workers — keeping review latency off the critical path.
 
-**Stage B — serial, single-writer (one REQ at a time).** A report enters Stage B only after passing **every** Stage A gate. Run the existing Step 3b ledger + Step 4 substeps in order:
-4. Step 3b — ledger entry (`run-ledger.sh`)
-5. Step 4a — `git merge --no-ff req/REQ-NNN` from the **main working tree** (never a worktree)
-6. Step 4b — archive the REQ file (closure-proof + path-unit guards unchanged)
-7. Step 4c — tear down the worktree + `git branch -d`
-8. Step 4d — commit the metadata change
+**Stage B — serial, single-writer (one REQ at a time).** A report enters Stage B only after passing **every** Stage A gate. Run the existing Step 3b ledger + Step 4 substeps in order: 4. Step 3b — ledger entry (`run-ledger.sh`) 5. Step 4a — `git merge --no-ff req/REQ-NNN` from the **main working tree** (never a worktree) 6. Step 4b — archive the REQ file (closure-proof + path-unit guards unchanged) 7. Step 4c — tear down the worktree + `git branch -d` 8. Step 4d — commit the metadata change
 
 **Serialization invariant:** at most one Stage B sequence touches the main working tree and `.do-work/` at any instant — exactly as serial mode. This invariant is enforced by a **real, self-healing lock** (not prose-only). The lock is acquired before Step 4a and released after Step 4d (or immediately on any diversion to Recover). Only after an entry finishes Step 4d (or diverts to Recover) do you admit the next report to Stage B. After each Stage B completion the freed slot triggers a P2 refill.
 
@@ -70,6 +66,7 @@ lib/stage-b-lock.sh with-lock <command> [args...]
 ```
 
 Runs `<command>` while holding an exclusive lock. The lock uses `python3`'s `fcntl.flock(LOCK_EX)`, which:
+
 - Is portable across macOS and Linux (no hard `flock(1)` dependency)
 - Auto-releases when the holding process exits (kernel guarantee — no stale locks)
 - Is held in the lock file `$STATE_DIR/stage-b.lock` (runtime-only, gitignored)
@@ -90,6 +87,7 @@ If acquisition fails because another Stage B holds the lock, the wrapper blocks 
 **Git's index lock is the structural backstop.** Even if the lock were bypassed (e.g., by manual intervention or a bug), git's `.git/index.lock` provides a loud, recoverable failure mode. Any accidental double-admission that reaches `git merge` will fail at the index lock, and the existing 5-retry path (Step 4a conflict handling) will recover. This is not the primary enforcement — the lock is — but it guarantees that a concurrency bug cannot cause silent corruption.
 
 **Why the final-suite lockfile is the wrong model here.** The final-suite committed lockfile (Step C, ~lines 120–148) solves a **cross-orchestrator** race: two orchestrators both passing the drain check and racing to run the suite. That pattern needs a committed lockfile because the lock must be visible to sibling processes (different machines or different terminal sessions). Stage B is **intra-orchestrator** — a single orchestrator's own merge queue. A process-scoped lock (flock) is the right primitive: it auto-releases on crash, avoiding the stale-lock failure mode that a committed lockfile would introduce for intra-process use. The final-suite lockfile would be the wrong model for Stage B because:
+
 1. It requires explicit release → stale-lock risk if the orchestrator crashes mid-Stage-B
 2. It's designed for cross-orchestrator visibility, which Stage B doesn't need
 3. A process-scoped flock is simpler and safer for single-writer, intra-process serialization
@@ -105,7 +103,7 @@ If acquisition fails because another Stage B holds the lock, the wrapper blocks 
 - A worker returning `status: stopped` / `failed`, or a Stage A gate failure on its report, is handled **exactly** as serial Step 5 (Recover) and `## Stopping Rules`: the REQ stays in `working/` with `**Status:** stopped` + `**Reason:**`; the orchestrator surfaces the stopper. The difference under parallelism: **do not halt the loop** — record the stopper, **free that window slot**, and (if backlog remains) claim a refill (P2). The other workers and any queued ready reports proceed untouched.
 - **Stoppers are queued per-REQ and surfaced in arrival order**, one decision at a time. When `next_steps.enabled` is true **and** standalone, each stopper surfaces via `AskUserQuestion` (Show details / Retry / Skip) as in serial mode. When the gate is closed (delegate mode or `next_steps.enabled=false`), each stopper prints its `details` and the loop continues — no auto-retry. The per-REQ retry counter and ambiguous-criteria feedback (`## Stopping Rules`) apply per REQ, unchanged.
 - **No new stopper reasons.** The `## Stopping Rules` enum is complete; `concurrent-conflict` (P3 5-retry exhaustion) is already in it.
-- **Drain accounting.** A stopped REQ left in `working/` is, for the empty-backlog drain check (`## When the Backlog is Empty` Step B), a slot owned by *this* `AGENT_ID` — `mine`, tolerated, not a blocker. The single-session orchestrator finishes its loop when the backlog is empty **and** its window has no live workers, then runs the final-suite path (P5).
+- **Drain accounting.** A stopped REQ left in `working/` is, for the empty-backlog drain check (`## When the Backlog is Empty` Step B), a slot owned by _this_ `AGENT_ID` — `mine`, tolerated, not a blocker. The single-session orchestrator finishes its loop when the backlog is empty **and** its window has no live workers, then runs the final-suite path (P5).
 
 ### P5. Coexistence with multi-terminal orchestrators (design §6)
 
@@ -139,10 +137,10 @@ Before running the suite, classify the live state by reading ownership stamps (p
    - In milestone mode (`{project}/.do-work/state/active-milestone.md` exists), glob `{project}/.do-work/REQ-M<active>-*.md` instead.
 2. **Working slots:** glob `{project}/.do-work/working/REQ-*.md` (milestone mode: `working/REQ-M<active>-*.md`). For each slot file, read its `<!-- claimed-start --> … <!-- claimed-end -->` block and classify by `**Claimed by:**`:
 
-   | Classification | Condition |
-   |---|---|
-   | `mine` | Stamp's `**Claimed by:**` equals local `AGENT_ID`. Tolerated — at most one, the just-archived REQ's transient state. Not a blocker. |
-   | `other` | Stamp's `**Claimed by:**` differs from local `AGENT_ID`. A sibling is still in flight — drain check **fails**. |
+   | Classification      | Condition                                                                                                                             |
+   | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+   | `mine`              | Stamp's `**Claimed by:**` equals local `AGENT_ID`. Tolerated — at most one, the just-archived REQ's transient state. Not a blocker.   |
+   | `other`             | Stamp's `**Claimed by:**` differs from local `AGENT_ID`. A sibling is still in flight — drain check **fails**.                        |
    | `other` (defensive) | No stamp present (legacy / malformed slot). Treat as `other` — the local agent must not run the suite without checking with siblings. |
 
 3. **Drain check passes** iff backlog glob is empty AND no slot is classified `other`. Proceed to Step C.
@@ -153,6 +151,7 @@ Before running the suite, classify the live state by reading ownership stamps (p
 Two orchestrators can both pass the drain check at near-the-same instant (each just archived its own REQ, neither sees the other's slot). The lockfile is the tiebreaker.
 
 Lockfile path:
+
 - Non-milestone mode: `{project}/.do-work/state/final-suite-running.md`
 - Milestone mode: `{project}/.do-work/state/final-suite-M<active>-running.md`
 
@@ -176,7 +175,7 @@ Acquisition sequence (first-to-commit wins):
    - **Commit succeeds:** this orchestrator holds the lock. Proceed to Step D.
    - **Commit fails** (e.g. sibling won the race, working tree shows their lockfile already committed, or merge conflict on the lockfile): treat as lost race. Discard local lockfile changes (`git checkout -- <lockfile>` then `rm -f <lockfile>` if still present), then proceed to Step E.
 
-The lockfile is intentionally committed *before* running the suite so other orchestrators can observe the lock even if the suite hangs.
+The lockfile is intentionally committed _before_ running the suite so other orchestrators can observe the lock even if the suite hangs.
 
 ### Step D — Run the suite (lock-holder only)
 
@@ -233,7 +232,6 @@ If `config.next_steps.enabled` is `true` **and** this agent is running standalon
 If `config.next_steps.enabled` is `false`, missing, or this agent is running as a delegate inside go: skip the AskUserQuestion and stop.
 
 ---
-
 
 ## Field traps (parallel — from field-lessons)
 

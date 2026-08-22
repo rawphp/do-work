@@ -10,11 +10,11 @@ You are powered by the Creativity Engine's three most relevant modes: Explorer, 
 
 You will be given an Issue reference (slug still `UR-NNN`):
 
-| Backend | Invocation |
-|---------|------------|
-| **markdown** | Path to an Issue folder, e.g. `{project}/.do-work/user-requests/UR-001/`
-| **linear** | Issue slug (e.g. `UR-001`) and/or Linear **Issue Project Milestone** id — **not** a required local folder |
-| **do-work-io** | Issue slug (e.g. `UR-001`) — **not** a required local folder |
+| Backend        | Invocation                                                                                                |
+| -------------- | --------------------------------------------------------------------------------------------------------- |
+| **markdown**   | Path to an Issue folder, e.g. `{project}/.do-work/user-requests/UR-001/`                                  |
+| **linear**     | Issue slug (e.g. `UR-001`) and/or Linear **Issue Project Milestone** id — **not** a required local folder |
+| **do-work-io** | Issue slug (e.g. `UR-001`) — **not** a required local folder                                              |
 
 You may also be invoked by the Start agent as part of the default pipeline (ideate runs unless `--no-ideate` is passed).
 
@@ -36,6 +36,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -43,12 +44,12 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 ### Ideate store — backend branch (ORI-9)
 
-| Concern | Markdown | Linear (`linear.md`) | sqlite (1S) | do-work-io (1D) |
-|---------|----------|----------------------|-------------|-----------------|
-| Load brief | `UR-NNN/input.md` (+ optional `assets/`) | Port op **`read_ur`** — UR **Project Milestone** §9.1 (`## Brief` + clarifications if any). No local `input.md` required. | `dw-db get-ur` — no local `input.md` required | Port op **`read_ur`** (`ur.get`) — no local `input.md` required |
-| Persist observations | Write `{project}/.do-work/user-requests/UR-NNN/ideate.md` | Port op **`append_ideate`** — write/append under `## Ideate` on the **Issue milestone** description. **No** local `ideate.md` as the work-item store. | `bash {skill-root}/lib/dw-db.sh append-ideate {project} UR-NNN --body TEXT` — **No** local `ideate.md` as store | Port op **`append_ideate`** (`ur.append-ideate`) — **No** local `ideate.md` as store |
-| Open gaps (Continue gate) | `open_gaps:` in `input.md` frontmatter (or `## Notes — Open Gaps`) | Append / replace machine-readable open-gaps on the **Issue milestone** body (prefer a fenced block or `open_gaps:` under a `## Notes` / frontmatter-equivalent section that does **not** overwrite `## Brief`). Use `read_ur` then milestone update sequence from linear.md (`save_milestone` / discovered update via the same surface as `append_ideate`). | `dw-db write-open-gaps` replace kind | Artifact update via `do-work-io.md` (`ur.append-clarifications` / same surface as `append_ideate`) — never overwrite the intake brief |
-| Hard-stop | n/a for local files | If Linear MCP / milestone tools unusable → **hard-stop**. Never write local `user-requests/.../ideate.md` as substitute. | dw-db/sqlite unusable → **hard-stop**. Never write local `ideate.md` as substitute. | MCP/PAT/project unusable → **hard-stop**. Never write local `ideate.md` as substitute. |
+| Concern                   | Markdown                                                           | Linear (`linear.md`)                                                                                                                                                                                                                                                                                                                                        | sqlite (1S)                                                                                                     | do-work-io (1D)                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Load brief                | `UR-NNN/input.md` (+ optional `assets/`)                           | Port op **`read_ur`** — UR **Project Milestone** §9.1 (`## Brief` + clarifications if any). No local `input.md` required.                                                                                                                                                                                                                                   | `dw-db get-ur` — no local `input.md` required                                                                   | Port op **`read_ur`** (`ur.get`) — no local `input.md` required                                                                       |
+| Persist observations      | Write `{project}/.do-work/user-requests/UR-NNN/ideate.md`          | Port op **`append_ideate`** — write/append under `## Ideate` on the **Issue milestone** description. **No** local `ideate.md` as the work-item store.                                                                                                                                                                                                       | `bash {skill-root}/lib/dw-db.sh append-ideate {project} UR-NNN --body TEXT` — **No** local `ideate.md` as store | Port op **`append_ideate`** (`ur.append-ideate`) — **No** local `ideate.md` as store                                                  |
+| Open gaps (Continue gate) | `open_gaps:` in `input.md` frontmatter (or `## Notes — Open Gaps`) | Append / replace machine-readable open-gaps on the **Issue milestone** body (prefer a fenced block or `open_gaps:` under a `## Notes` / frontmatter-equivalent section that does **not** overwrite `## Brief`). Use `read_ur` then milestone update sequence from linear.md (`save_milestone` / discovered update via the same surface as `append_ideate`). | `dw-db write-open-gaps` replace kind                                                                            | Artifact update via `do-work-io.md` (`ur.append-clarifications` / same surface as `append_ideate`) — never overwrite the intake brief |
+| Hard-stop                 | n/a for local files                                                | If Linear MCP / milestone tools unusable → **hard-stop**. Never write local `user-requests/.../ideate.md` as substitute.                                                                                                                                                                                                                                    | dw-db/sqlite unusable → **hard-stop**. Never write local `ideate.md` as substitute.                             | MCP/PAT/project unusable → **hard-stop**. Never write local `ideate.md` as substitute.                                                |
 
 **When effective backend is `linear`:** Linear is the sole store. Do **not** dual-write `user-requests/UR-NNN/ideate.md` or require that path to exist. **When `markdown`:** keep the local paths in the steps below.
 
@@ -70,11 +71,11 @@ Scan the project folder for existing code, REQs in the archive, and any document
 
 **Decisions (constraints — backend branch, REQ-297):**
 
-| Backend | How to load standing decisions |
-|---------|--------------------------------|
-| **markdown** | Read `{project}/.do-work/decisions.md` if it exists |
-| **linear** | **Read decisions** helper in `agents/tracker/linear.md` — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty. Do **not** read local `decisions.md` as the store |
-| **do-work-io** | Port ops in `agents/tracker/do-work-io.md` (`decision.append` / list). Do **not** read local `decisions.md` as the store |
+| Backend        | How to load standing decisions                                                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown**   | Read `{project}/.do-work/decisions.md` if it exists                                                                                                                                                           |
+| **linear**     | **Read decisions** helper in `agents/tracker/linear.md` — Team Doc `tracker.linear.decisions_doc_title` (default `do-work/decisions`); missing Doc → empty. Do **not** read local `decisions.md` as the store |
+| **do-work-io** | Port ops in `agents/tracker/do-work-io.md` (`decision.append` / list). Do **not** read local `decisions.md` as the store                                                                                      |
 
 Each line uses the same one-line grammar as SKILL.md § Decisions Memory: `YYYY-MM-DD | Issue/REQ ref | decision | rationale`. Lines are standing decisions from prior work. Use them to ground Connector observations (reuse, overlap) and to flag when the brief contradicts a recorded decision. If the store is empty/absent (no decision recorded yet), continue without it — never create it on the read path.
 
@@ -139,11 +140,11 @@ Use this format exactly for the ideate body (Explorer / Challenger / Connector /
 
 **Persist via backend branch (ORI-9) — Linear first when `backend: linear`:**
 
-| Backend | How to store |
-|---------|--------------|
-| **linear** | Call port op **`append_ideate`** (`agents/tracker/linear.md`) with the body above. Target is the **Issue Project Milestone** `## Ideate` section. Prefer section append; never overwrite `## Brief`. **Do not** write `{project}/.do-work/user-requests/UR-NNN/ideate.md`. If MCP/update tools fail → hard-stop. |
-| **do-work-io** | Call port op **`append_ideate`** (`agents/tracker/do-work-io.md` → `ur.append-ideate`) with the body above. Prefer append; never overwrite the intake brief. **Do not** write `{project}/.do-work/user-requests/UR-NNN/ideate.md`. If MCP fails → hard-stop. |
-| **markdown** | Write observations to `{project}/.do-work/user-requests/UR-NNN/ideate.md` (create/overwrite that file as today). |
+| Backend        | How to store                                                                                                                                                                                                                                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **linear**     | Call port op **`append_ideate`** (`agents/tracker/linear.md`) with the body above. Target is the **Issue Project Milestone** `## Ideate` section. Prefer section append; never overwrite `## Brief`. **Do not** write `{project}/.do-work/user-requests/UR-NNN/ideate.md`. If MCP/update tools fail → hard-stop. |
+| **do-work-io** | Call port op **`append_ideate`** (`agents/tracker/do-work-io.md` → `ur.append-ideate`) with the body above. Prefer append; never overwrite the intake brief. **Do not** write `{project}/.do-work/user-requests/UR-NNN/ideate.md`. If MCP fails → hard-stop.                                                     |
+| **markdown**   | Write observations to `{project}/.do-work/user-requests/UR-NNN/ideate.md` (create/overwrite that file as today).                                                                                                                                                                                                 |
 
 ### 5. Report and prompt — interactive gate
 
@@ -167,6 +168,7 @@ Compile the gaps from the Explorer "Assumptions & Perspectives" and Challenger "
 Question: `How would you like to proceed?`
 
 Options:
+
 1. **"Grill me"** — Run interactive Q&A on the surfaced gaps before capture
 2. **"Continue"** — Proceed to capture as-is, gaps recorded
 3. **"Stop"** — Halt — let me revise the brief, then re-run

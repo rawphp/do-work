@@ -32,16 +32,16 @@ fingerprints, and git metadata of the local repo. (See §6 Privacy/scope.)
 The schema is fixed by `lib/run-ledger.sh` (the writer). Retro consumes these
 fields; everything else in the file is ignored.
 
-| Field | Source line in writer | Used for |
-|---|---|---|
-| `req` | `req: $REQ_ID` | Join key back to the REQ file (shape, Files, ACs). |
-| `ur` | `ur: ${UR_ID}` | Group runs by UR for per-Issue aggregates. |
-| `model` | `model: "$MODEL"` | Escalation analysis (`sonnet` vs `opus`). |
-| `result` | `result: "$RESULT"` | Stop-reason classification (`done`, `verification-failing`, `blocked`, `ambiguous-criteria`, …). |
-| `review_outcome` | `review_outcome: "$REVIEW"` | Pair with `result` to separate "done but review-flagged" from clean done. |
-| `proof_status` | `proof_status: "$PROOF_STATUS"` | `proven` vs `unproven` rate per REQ shape. |
-| `changed_files` | `write_list "changed_files"` | Footprint actual — compared against the REQ's declared `**Files:**`. |
-| `started_at` / `ended_at` | timestamps | Recency weighting (recent runs weighted over old ones — see §2d). |
+| Field                     | Source line in writer           | Used for                                                                                         |
+| ------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `req`                     | `req: $REQ_ID`                  | Join key back to the REQ file (shape, Files, ACs).                                               |
+| `ur`                      | `ur: ${UR_ID}`                  | Group runs by UR for per-Issue aggregates.                                                       |
+| `model`                   | `model: "$MODEL"`               | Escalation analysis (`sonnet` vs `opus`).                                                        |
+| `result`                  | `result: "$RESULT"`             | Stop-reason classification (`done`, `verification-failing`, `blocked`, `ambiguous-criteria`, …). |
+| `review_outcome`          | `review_outcome: "$REVIEW"`     | Pair with `result` to separate "done but review-flagged" from clean done.                        |
+| `proof_status`            | `proof_status: "$PROOF_STATUS"` | `proven` vs `unproven` rate per REQ shape.                                                       |
+| `changed_files`           | `write_list "changed_files"`    | Footprint actual — compared against the REQ's declared `**Files:**`.                             |
+| `started_at` / `ended_at` | timestamps                      | Recency weighting (recent runs weighted over old ones — see §2d).                                |
 
 **Retry counts.** The ledger writer does not emit a dedicated retry field. Each
 worker attempt that produces a ledger row is one run; a REQ that was retried
@@ -63,18 +63,18 @@ Fingerprints are the stable dedup keys defined by `lib/file-feedback.sh`
 (`<event-type>:<slug>:<n>:<hash>`). Retro mines occurrences of these event
 types. The set is exactly the events the system already emits:
 
-| Fingerprint event | Class (per file-feedback.sh) | What recurrence ≥2× tells capture |
-|---|---|---|
-| `footprint-miss` | system | Declared Files routinely understate reality for a REQ shape. |
-| `verify-fail` | project | A REQ shape ships but fails runtime verification. |
-| `ambiguous-criteria` | project | A REQ shape is under-specified at capture time. |
-| `stale-slot` | system | Workers stall on a REQ shape (often oversized REQs). |
-| `concurrent-conflict` | system | Two REQs touch overlapping files — footprint declarations collide. |
+| Fingerprint event     | Class (per file-feedback.sh) | What recurrence ≥2× tells capture                                  |
+| --------------------- | ---------------------------- | ------------------------------------------------------------------ |
+| `footprint-miss`      | system                       | Declared Files routinely understate reality for a REQ shape.       |
+| `verify-fail`         | project                      | A REQ shape ships but fails runtime verification.                  |
+| `ambiguous-criteria`  | project                      | A REQ shape is under-specified at capture time.                    |
+| `stale-slot`          | system                       | Workers stall on a REQ shape (often oversized REQs).               |
+| `concurrent-conflict` | system                       | Two REQs touch overlapping files — footprint declarations collide. |
 
 **Fingerprint source.** When `feedback.enabled` is true, fingerprints exist as
 GitHub issues (filed by `file-feedback.sh`). Reading GitHub would violate the
 local-only scope (§6) and require network/`gh`. Therefore retro does **not**
-read GitHub. Instead, fingerprint *occurrences* are derived locally:
+read GitHub. Instead, fingerprint _occurrences_ are derived locally:
 
 - `footprint-miss` — derived from the declared-vs-actual delta in §1a (a miss
   is any row where `changed_files ⊄ declared Files`). This is the authoritative
@@ -84,8 +84,8 @@ read GitHub. Instead, fingerprint *occurrences* are derived locally:
 - `stale-slot` / `concurrent-conflict` — derived from ledger rows where
   `result` records the stall/conflict, when present.
 
-This keeps retro dependency-free and offline. The fingerprint *taxonomy* from
-`file-feedback.sh` is reused as the vocabulary; the *occurrences* are recomputed
+This keeps retro dependency-free and offline. The fingerprint _taxonomy_ from
+`file-feedback.sh` is reused as the vocabulary; the _occurrences_ are recomputed
 from the ledger so retro works on every project regardless of feedback config.
 
 ---
@@ -114,7 +114,7 @@ interpretation). Definitions below are the contract REQ-217 implements.
 - **Escalation rate** = `escalated REQs / total REQs that ran`.
 - **Triggers** = the rollup correlates escalation against the §2a shape key and
   against retry count, emitting which shape buckets escalate most. The rollup
-  reports the correlation as counts; *interpreting* it into a calibration rule
+  reports the correlation as counts; _interpreting_ it into a calibration rule
   ("`>4`-AC REQs escalate 60% of the time") is the agent's job (§5).
 
 ### 2c. Footprint under/over-prediction stats
@@ -144,8 +144,8 @@ Per REQ (joining ledger `changed_files` to the REQ's declared `**Files:**`):
 If `.do-work/runs/` is absent or empty, the rollup prints a single sentinel line
 `runs=0` and exits 0 (mirroring `coverage-rollup.sh`, which exits 0 on no rows).
 The agent renders "no run history yet" and writes **no** calibration file. This
-satisfies REQ-215 AC: *"A project with no ledger entries gets a clean report,
-not an error."*
+satisfies REQ-215 AC: _"A project with no ledger entries gets a clean report,
+not an error."_
 
 ---
 
@@ -224,14 +224,14 @@ top_recurrences: footprint-miss:lib/≤2AC/1file (10), stop:agents/>4AC/>3file (
 
 **Validation against §3c spec (field-by-field):**
 
-| Spec element (§3c) | Example satisfies it? |
-|---|---|
-| `# Calibration — <project name>` header | `# Calibration — do-work` ✓ |
-| Advisory + "regenerated in full" notice | both notice lines present ✓ |
-| `## Capture guidance` section | present ✓ |
-| Each bullet: one line, imperative, names shape/file + signal | 4 bullets, all conform ✓ |
-| ≤30 guidance lines / ≤8 bullets (§3b) | 4 bullets ✓ (within bound) |
-| `retro-meta` comment with `generated_at`, `runs_analyzed`, `window`, `top_recurrences` | all four present ✓ |
+| Spec element (§3c)                                                                     | Example satisfies it?       |
+| -------------------------------------------------------------------------------------- | --------------------------- |
+| `# Calibration — <project name>` header                                                | `# Calibration — do-work` ✓ |
+| Advisory + "regenerated in full" notice                                                | both notice lines present ✓ |
+| `## Capture guidance` section                                                          | present ✓                   |
+| Each bullet: one line, imperative, names shape/file + signal                           | 4 bullets, all conform ✓    |
+| ≤30 guidance lines / ≤8 bullets (§3b)                                                  | 4 bullets ✓ (within bound)  |
+| `retro-meta` comment with `generated_at`, `runs_analyzed`, `window`, `top_recurrences` | all four present ✓          |
 
 This satisfies REQ-216 Verification Step 2 (worked example validates against its
 own format spec, handoff spec → example).
@@ -253,7 +253,7 @@ to blindly follow." Calibration is wired identically:
   scope `**Files:**`, and split acceptance criteria, but they never block
   decomposition and are not hard requirements. If the file is absent (no retro
   has run yet), continue without it."
-- **Non-blocking guarantee:** like ideate, calibration is *informs, never blocks*.
+- **Non-blocking guarantee:** like ideate, calibration is _informs, never blocks_.
   No capture branch may fail or halt because calibration is missing, stale, or
   contradicts the brief. The brief always wins. This is the REQ-218 change.
 
@@ -261,8 +261,8 @@ to blindly follow." Calibration is wired identically:
 
 The rollup computes escalation stats (§2b), and the calibration example shows
 them surfacing as a capture-facing rule ("size down or start on opus"). That is
-the **only** consumer wired now: model-selection influence flows *through capture's
-sizing decisions and the REQ's `**Size:**`/`**Files:**`*, not through a direct
+the **only** consumer wired now: model-selection influence flows _through capture's
+sizing decisions and the REQ's `**Size:**`/`**Files:**`_, not through a direct
 runtime hook into the orchestrator's model picker.
 
 Auto-tuning the orchestrator's model selection from live escalation stats is
@@ -271,7 +271,7 @@ Auto-tuning the orchestrator's model selection from live escalation stats is
 1. It couples retro to the run loop's hot path; this design keeps retro a cold,
    offline, capture-time advisor.
 2. R13 (backlog intelligence) already proposes `**Size:**` as the primary
-   model-escalation input — escalation calibration should feed *that* lever, not
+   model-escalation input — escalation calibration should feed _that_ lever, not
    a second parallel one, to avoid two competing model-selection signals.
 3. The advisory-only path is safe to ship without changing execution semantics.
 
@@ -292,16 +292,16 @@ is exhaustive — every output below is owned by exactly one side.
 Emits machine-readable lines (one fact per line, `coverage-rollup.sh` style) to
 stdout. No prose, no ranking-by-judgment, no file writes.
 
-| Output | Definition |
-|---|---|
-| `runs=N` | total ledger rows analyzed (`runs=0` sentinel on empty — §2e). |
-| `stop <shape-key> <reason>=<count>` | stop-reason frequency by shape (§2a). |
-| `stop_rate <shape-key>=<ratio>` | non-done ratio per shape (§2a). |
-| `escalation_rate=<ratio>` | sonnet→opus escalation rate (§2b). |
-| `escalation <shape-key>=<count>` | escalations per shape (§2b triggers). |
-| `footprint under=<r> over=<r> exact=<r>` | declared-vs-actual rates (§2c). |
-| `footprint_missed <glob>=<count>` | top-N most-missed file globs (§2c). |
-| `recurrence <event>:<shape> weighted=<w> raw=<n>` | ranked recurrences (§2d). |
+| Output                                            | Definition                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| `runs=N`                                          | total ledger rows analyzed (`runs=0` sentinel on empty — §2e). |
+| `stop <shape-key> <reason>=<count>`               | stop-reason frequency by shape (§2a).                          |
+| `stop_rate <shape-key>=<ratio>`                   | non-done ratio per shape (§2a).                                |
+| `escalation_rate=<ratio>`                         | sonnet→opus escalation rate (§2b).                             |
+| `escalation <shape-key>=<count>`                  | escalations per shape (§2b triggers).                          |
+| `footprint under=<r> over=<r> exact=<r>`          | declared-vs-actual rates (§2c).                                |
+| `footprint_missed <glob>=<count>`                 | top-N most-missed file globs (§2c).                            |
+| `recurrence <event>:<shape> weighted=<w> raw=<n>` | ranked recurrences (§2d).                                      |
 
 These are exactly the facts a `retro-rollup.test.sh` can assert against fixture
 `RUN-NNN.yml` files — pure functions of the input, no clock except the
@@ -310,16 +310,16 @@ injectable "now").
 
 ### 5b. `agents/retro.md` outputs (judgment — REQ-217 builds)
 
-| Output | Why it is judgment |
-|---|---|
-| The rendered `/do-work retro` report (prose sections). | Choosing what to surface and how to phrase it. |
-| Selecting the **top 8** guidance bullets from candidate rules. | Ranking relevance/actionability beyond raw weight. |
-| Translating a rate into an imperative capture rule. | "stop_rate=0.4 on >4-AC shape" → "Split REQs with >4 ACs". |
-| Writing/overwriting `.do-work/state/calibration.md` (truncate-write, ≤30 lines). | Enforcing the bound and regeneration rule (§3b). |
-| Rendering the clean "no run history yet" report on `runs=0`. | Empty-state UX, no file written (§2e). |
+| Output                                                                           | Why it is judgment                                         |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| The rendered `/do-work retro` report (prose sections).                           | Choosing what to surface and how to phrase it.             |
+| Selecting the **top 8** guidance bullets from candidate rules.                   | Ranking relevance/actionability beyond raw weight.         |
+| Translating a rate into an imperative capture rule.                              | "stop_rate=0.4 on >4-AC shape" → "Split REQs with >4 ACs". |
+| Writing/overwriting `.do-work/state/calibration.md` (truncate-write, ≤30 lines). | Enforcing the bound and regeneration rule (§3b).           |
+| Rendering the clean "no run history yet" report on `runs=0`.                     | Empty-state UX, no file written (§2e).                     |
 
-**One-line contract:** the script says *what happened* (counts, rates, deltas);
-the agent says *what to do about it* (bounded capture guidance) and renders it.
+**One-line contract:** the script says _what happened_ (counts, rates, deltas);
+the agent says _what to do about it_ (bounded capture guidance) and renders it.
 
 ---
 
@@ -346,10 +346,10 @@ credentials and no side effects beyond one gitignored state file.
 
 ## Implementation handoff
 
-| REQ | Builds | Touches |
-|---|---|---|
+| REQ     | Builds                                                           | Touches                                                              |
+| ------- | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
 | REQ-217 | rollup script (deterministic, §5a) + retro agent (judgment, §5b) | `lib/retro-rollup.sh`, `lib/retro-rollup.test.sh`, `agents/retro.md` |
-| REQ-218 | `/do-work retro` routing + capture injection (§4a) | `SKILL.md` (subcommand routing), `agents/capture.md` (Step 1 read) |
+| REQ-218 | `/do-work retro` routing + capture injection (§4a)               | `SKILL.md` (subcommand routing), `agents/capture.md` (Step 1 read)   |
 
 Both children depend on this document's decisions and must not re-litigate the
 script/agent split (§5), the size bound/regeneration rule (§3b), the deferral of

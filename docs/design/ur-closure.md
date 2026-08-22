@@ -34,14 +34,14 @@ The closure agent is **denied** all pipeline context: no worker return reports, 
 
 ## Decision 2 — Walk mechanics per entry-point type
 
-**Decision.** The closure agent classifies each path-unit's `**Entry point:**` into a **walk kind** and executes the matching probe in the merged app (base branch, post-integration — never inside a worktree). Each probe produces an *observed state* compared against the path-unit's `**Terminal state:**`.
+**Decision.** The closure agent classifies each path-unit's `**Entry point:**` into a **walk kind** and executes the matching probe in the merged app (base branch, post-integration — never inside a worktree). Each probe produces an _observed state_ compared against the path-unit's `**Terminal state:**`.
 
-| Entry-point kind | Detection signal in `**Entry point:**` | Walk action | Observed-state source |
-|---|---|---|---|
-| Web route / page | path like `/route`, "page", "screen", "UI", "renders" | Navigate with Playwright (`browser_navigate`), snapshot DOM, assert terminal-state markers present | rendered DOM + console errors |
-| API endpoint | "endpoint", `GET/POST/PUT/DELETE`, "API", a URL with a verb | `curl` the endpoint (method + representative payload), capture status + body | HTTP status + JSON/body shape |
-| CLI command | "run `cmd`", "command", "invokes", a shell invocation | Invoke the command via `Bash` with representative args, capture exit code + stdout/stderr | exit code + output |
-| Library export | "export", "function", "module", "import", "calls `fn()`" | Call the export through the project's test harness (`test.suite_command` scoped to a targeted call, or an inline harness snippet) | return value / assertion result |
+| Entry-point kind | Detection signal in `**Entry point:**`                      | Walk action                                                                                                                       | Observed-state source           |
+| ---------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Web route / page | path like `/route`, "page", "screen", "UI", "renders"       | Navigate with Playwright (`browser_navigate`), snapshot DOM, assert terminal-state markers present                                | rendered DOM + console errors   |
+| API endpoint     | "endpoint", `GET/POST/PUT/DELETE`, "API", a URL with a verb | `curl` the endpoint (method + representative payload), capture status + body                                                      | HTTP status + JSON/body shape   |
+| CLI command      | "run `cmd`", "command", "invokes", a shell invocation       | Invoke the command via `Bash` with representative args, capture exit code + stdout/stderr                                         | exit code + output              |
+| Library export   | "export", "function", "module", "import", "calls `fn()`"    | Call the export through the project's test harness (`test.suite_command` scoped to a targeted call, or an inline harness snippet) | return value / assertion result |
 
 **Rationale.** A path-unit's terminal state is only meaningfully observed through the surface the user actually touches. Tests assert internal contracts; a walk exercises the real entry point. Detection is keyword-driven off the already-structured `**Entry point:**` field (defined in SKILL.md's REQ Header Schema) so the agent does not invent surfaces — it routes the surface capture already recorded. The merged-app constraint is load-bearing: walking a worktree would re-prove isolation, not integration.
 
@@ -49,7 +49,7 @@ The closure agent is **denied** all pipeline context: no worker return reports, 
 
 ## Decision 3 — Degraded mode (the ideate requirement)
 
-**Decision.** When an entry point is **not automatable** — a human workflow step, or a slash command / skill that runs in a *different harness* than the one executing the closure agent (do-work closing itself is the canonical case) — the agent does not silently skip and does not auto-fail. It records a degraded verdict of one of two kinds:
+**Decision.** When an entry point is **not automatable** — a human workflow step, or a slash command / skill that runs in a _different harness_ than the one executing the closure agent (do-work closing itself is the canonical case) — the agent does not silently skip and does not auto-fail. It records a degraded verdict of one of two kinds:
 
 - **`degraded:evidence-by-test`** — the integrated test suite covers this path-unit's behaviour. The agent runs `test.suite_command` and cites the specific passing test(s) as the closure evidence. Used when a real automated proof exists, just not at the live entry-point surface.
 - **`degraded:human-confirmed`** — no automatable surface and no covering test. The agent emits one explicit `AskUserQuestion` prompt describing the path-unit, the entry point, and what "reached terminal state" would look like, and records the human's confirm/deny as evidence. Never assumed; always an explicit prompt.
@@ -58,16 +58,16 @@ A degraded verdict is a **first-class outcome**, not a failure. It is surfaced i
 
 **Degraded-mode routing table** (the minimum coverage the children must implement):
 
-| Entry-point kind | Automatable in closure harness? | Verdict path |
-|---|---|---|
-| Web route / page | Yes (Playwright) | live walk → `closed` / `not-reached` / `terminal-mismatch` |
-| API endpoint | Yes (curl) | live walk → `closed` / `not-reached` / `terminal-mismatch` |
-| CLI command | Yes (Bash) | live walk → `closed` / `not-reached` / `terminal-mismatch` |
-| Library export | Yes (test harness) | live walk → `closed` / `not-reached` / `terminal-mismatch` |
-| Slash command / skill (different harness) | No | `degraded:evidence-by-test` if a covering suite test exists, else `degraded:human-confirmed` |
-| Human workflow step | No | `degraded:human-confirmed` (explicit prompt) |
+| Entry-point kind                          | Automatable in closure harness? | Verdict path                                                                                 |
+| ----------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| Web route / page                          | Yes (Playwright)                | live walk → `closed` / `not-reached` / `terminal-mismatch`                                   |
+| API endpoint                              | Yes (curl)                      | live walk → `closed` / `not-reached` / `terminal-mismatch`                                   |
+| CLI command                               | Yes (Bash)                      | live walk → `closed` / `not-reached` / `terminal-mismatch`                                   |
+| Library export                            | Yes (test harness)              | live walk → `closed` / `not-reached` / `terminal-mismatch`                                   |
+| Slash command / skill (different harness) | No                              | `degraded:evidence-by-test` if a covering suite test exists, else `degraded:human-confirmed` |
+| Human workflow step                       | No                              | `degraded:human-confirmed` (explicit prompt)                                                 |
 
-**Rationale.** ideate flagged that do-work itself — and any CLI tool or skill — has no automatable live surface from inside the closure run. A naive design either skips these (silently lowering the bar) or fails them (penalising correct work). Degraded mode names the gap explicitly and demands the strongest *available* evidence: a real test run, or an explicit human attestation. This preserves the evidence-not-assertion invariant for the un-walkable case while keeping the verdict auditable.
+**Rationale.** ideate flagged that do-work itself — and any CLI tool or skill — has no automatable live surface from inside the closure run. A naive design either skips these (silently lowering the bar) or fails them (penalising correct work). Degraded mode names the gap explicitly and demands the strongest _available_ evidence: a real test run, or an explicit human attestation. This preserves the evidence-not-assertion invariant for the un-walkable case while keeping the verdict auditable.
 
 ---
 
@@ -77,27 +77,27 @@ A degraded verdict is a **first-class outcome**, not a failure. It is surfaced i
 
 **Front matter (required fields):**
 
-| Field | Type | Meaning |
-|---|---|---|
-| `ur` | `UR-NNN` | the Issue being closed |
-| `closed_at` | ISO-8601 timestamp | when the walk completed |
-| `branch` | string | the merged branch walked (e.g. `main`) |
-| `path_units` | int | count of path-unit REQs found |
-| `verdict_summary` | map | counts keyed by verdict (`closed`, `not-reached`, `terminal-mismatch`, `degraded:evidence-by-test`, `degraded:human-confirmed`) |
-| `overall` | enum | `closed` (all path-units closed or degraded-with-evidence) / `gaps` (≥1 not-reached or terminal-mismatch) / `no-path-units` |
+| Field             | Type               | Meaning                                                                                                                         |
+| ----------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ur`              | `UR-NNN`           | the Issue being closed                                                                                                          |
+| `closed_at`       | ISO-8601 timestamp | when the walk completed                                                                                                         |
+| `branch`          | string             | the merged branch walked (e.g. `main`)                                                                                          |
+| `path_units`      | int                | count of path-unit REQs found                                                                                                   |
+| `verdict_summary` | map                | counts keyed by verdict (`closed`, `not-reached`, `terminal-mismatch`, `degraded:evidence-by-test`, `degraded:human-confirmed`) |
+| `overall`         | enum               | `closed` (all path-units closed or degraded-with-evidence) / `gaps` (≥1 not-reached or terminal-mismatch) / `no-path-units`     |
 
 **Per-path-unit verdict row (required fields, one per path-unit REQ):**
 
-| Field | Type | Meaning |
-|---|---|---|
-| `req` | `REQ-NNN` | the path-unit REQ id |
-| `entry_point` | string | verbatim copy of the REQ's `**Entry point:**` |
-| `terminal_state` | string | verbatim copy of the REQ's `**Terminal state:**` |
-| `walk_kind` | enum | `web` / `api` / `cli` / `library` / `slash-command` / `human` (Decision 2/3) |
-| `action_taken` | string | the exact probe run (e.g. the curl line, the navigate target, the test name) |
-| `observed_state` | string | what the probe actually observed |
-| `verdict` | enum | `closed` / `not-reached` / `terminal-mismatch` / `degraded:evidence-by-test` / `degraded:human-confirmed` |
-| `evidence_ref` | string | pointer to the proof: command output snippet, screenshot path, test name + suite result, or the human-confirm prompt id |
+| Field            | Type      | Meaning                                                                                                                 |
+| ---------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `req`            | `REQ-NNN` | the path-unit REQ id                                                                                                    |
+| `entry_point`    | string    | verbatim copy of the REQ's `**Entry point:**`                                                                           |
+| `terminal_state` | string    | verbatim copy of the REQ's `**Terminal state:**`                                                                        |
+| `walk_kind`      | enum      | `web` / `api` / `cli` / `library` / `slash-command` / `human` (Decision 2/3)                                            |
+| `action_taken`   | string    | the exact probe run (e.g. the curl line, the navigate target, the test name)                                            |
+| `observed_state` | string    | what the probe actually observed                                                                                        |
+| `verdict`        | enum      | `closed` / `not-reached` / `terminal-mismatch` / `degraded:evidence-by-test` / `degraded:human-confirmed`               |
+| `evidence_ref`   | string    | pointer to the proof: command output snippet, screenshot path, test name + suite result, or the human-confirm prompt id |
 
 **Verdict semantics:**
 
@@ -125,6 +125,7 @@ overall: gaps
 # Closure report — UR-042
 
 ## REQ-051 — closed
+
 - req: REQ-051
 - entry_point: "GET /api/invoices/:id returns the invoice as JSON"
 - terminal_state: "200 with {id, total, status:'paid'} for a paid invoice"
@@ -135,6 +136,7 @@ overall: gaps
 - evidence_ref: "curl-output:closure-evidence/req-051.txt"
 
 ## REQ-052 — terminal-mismatch
+
 - req: REQ-052
 - entry_point: "User visits /invoices and sees the paid badge on row 9"
 - terminal_state: "Row 9 shows a green 'Paid' badge"
@@ -147,7 +149,7 @@ overall: gaps
 
 **Validation of the example against the schema (field-by-field):** both rows carry every required per-path-unit field (`req`, `entry_point`, `terminal_state`, `walk_kind`, `action_taken`, `observed_state`, `verdict`, `evidence_ref`); the front matter carries every required field; `verdict_summary` counts (1 closed, 1 terminal-mismatch) match the two rows; `overall: gaps` is correct because one row is `terminal-mismatch`. The example demonstrates the headline value: REQ-052 passed per-REQ proof in isolation but the integrated UI does not show the badge — exactly the drift no existing gate catches.
 
-**Rationale.** The schema separates *what was claimed* (`entry_point`, `terminal_state`, copied verbatim from the REQ) from *what was observed* (`action_taken`, `observed_state`, `verdict`, `evidence_ref`). That separation is what makes the report adversarial rather than a restatement of the run's optimism. Every verdict carries a concrete `evidence_ref` so closure is auditable, matching the evidence-not-assertion invariant.
+**Rationale.** The schema separates _what was claimed_ (`entry_point`, `terminal_state`, copied verbatim from the REQ) from _what was observed_ (`action_taken`, `observed_state`, `verdict`, `evidence_ref`). That separation is what makes the report adversarial rather than a restatement of the run's optimism. Every verdict carries a concrete `evidence_ref` so closure is auditable, matching the evidence-not-assertion invariant.
 
 ---
 
@@ -177,11 +179,11 @@ overall: gaps
 
 ## Implementation children — files each will touch
 
-| Child REQ | Layer | Files | Scope |
-|---|---|---|---|
-| REQ-211 | agents | `agents/close.md` (new) | The closure agent: cold dispatch (Decision 1), walk mechanics + degraded routing (Decisions 2–3), writes `closure.md` per the schema (Decision 4), surfaces gaps without fixing (Decision 5). Loads config via config.md. |
-| REQ-212 | commands | `SKILL.md` | New `### close [UR-NNN]` subcommand section mirroring the `status` block; add `close` to the Quick Reference. Wire the go offer note if it lives in SKILL.md routing; the go-side change itself is `agents/go.md`. |
-| REQ-213 | agents | `lib/coverage-rollup.sh` (+ `lib/tests/coverage-rollup.test.sh`) | Add the additive end-to-end closure column read from `UR-NNN/closure.md`; extend the test to cover the `closure=none` / `closed=N gaps=N` / `no-path-units` cases. |
+| Child REQ | Layer    | Files                                                            | Scope                                                                                                                                                                                                                     |
+| --------- | -------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REQ-211   | agents   | `agents/close.md` (new)                                          | The closure agent: cold dispatch (Decision 1), walk mechanics + degraded routing (Decisions 2–3), writes `closure.md` per the schema (Decision 4), surfaces gaps without fixing (Decision 5). Loads config via config.md. |
+| REQ-212   | commands | `SKILL.md`                                                       | New `### close [UR-NNN]` subcommand section mirroring the `status` block; add `close` to the Quick Reference. Wire the go offer note if it lives in SKILL.md routing; the go-side change itself is `agents/go.md`.        |
+| REQ-213   | agents   | `lib/coverage-rollup.sh` (+ `lib/tests/coverage-rollup.test.sh`) | Add the additive end-to-end closure column read from `UR-NNN/closure.md`; extend the test to cover the `closure=none` / `closed=N gaps=N` / `no-path-units` cases.                                                        |
 
 **go wiring note for REQ-211/212:** the post-run closure offer (Decision 5) is an edit to `agents/go.md` Step 4/6 area. Whichever child owns the go edit must keep it ungated by `next_steps.enabled` (R9) and gated only on go being top-level (it always is).
 

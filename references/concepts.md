@@ -61,6 +61,7 @@ do-work offers parallelism two complementary ways. **Multi-terminal mode** (belo
 
 ```markdown
 <!-- claimed-start -->
+
 **Claimed by:** hostname.pid
 **Claimed at:** 2026-05-21T11:42:08Z
 **Heartbeat:** 2026-05-21T11:42:08Z
@@ -87,11 +88,11 @@ Workers always run in isolated git worktrees at `{project}/.worktrees/req-NNN` o
 
 ### Recovery Commands
 
-| Situation | Command |
-|---|---|
-| REQ is stuck / worker died / heartbeat stale | `/do-work unblock REQ-NNN` — strips claim, returns REQ to backlog |
-| REQ stopped (concurrent-conflict / transient error) | `/do-work resume REQ-NNN` — refreshes heartbeat, re-dispatches worker |
-| Deadlock or unclear state | `/do-work status [UR-NNN]` — renders live situation room, deadlock banner |
+| Situation                                           | Command                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------- |
+| REQ is stuck / worker died / heartbeat stale        | `/do-work unblock REQ-NNN` — strips claim, returns REQ to backlog         |
+| REQ stopped (concurrent-conflict / transient error) | `/do-work resume REQ-NNN` — refreshes heartbeat, re-dispatches worker     |
+| Deadlock or unclear state                           | `/do-work status [UR-NNN]` — renders live situation room, deadlock banner |
 
 See `agents/status.md`, `agents/unblock.md`, `agents/resume.md` for agent-level instructions.
 
@@ -122,7 +123,7 @@ All coordination state lives under `.do-work/state/`:
 do-work uses project-declared layers to gap-check feature briefs. Declare your project's layers once in `.do-work/config.yml`:
 
 ```yaml
-layers: [frontend, backend]   # web app
+layers: [frontend, backend] # web app
 # layers: [commands, core, output]            # CLI tool
 # layers: [public_api, internal]              # library / SDK
 # layers: [agents, commands, templates]       # do-work itself
@@ -178,22 +179,22 @@ YYYY-MM-DD | Issue/REQ ref | decision | rationale
 
 Every REQ file carries a structured header immediately below the title. The canonical field list is:
 
-| Field | Required | Description |
-|---|---|---|
-| `**UR:**` | yes | Parent UR identifier (e.g. `UR-030`) |
-| `**Status:**` | yes | `backlog` / `in-progress` / `stopped` / `done` |
-| `**Created:**` | yes | ISO date (YYYY-MM-DD) |
-| `**Layer:**` | yes | Declared project layer, or `none` for bug-fix/refactor/test-only REQs |
-| `**Entry point:**` | optional | How a user, caller, command, or system reaches this path-unit. Required to be non-empty for top-level path-unit REQs. |
-| `**Terminal state:**` | optional | The observable end state that proves this path-unit is complete. Required to be non-empty for top-level path-unit REQs. |
-| `**Parent:**` | optional | Parent path-unit REQ id for child layer-tasks. Empty or absent on top-level path-units and legacy REQs. |
-| `**Closure proof:**` | optional | Evidence reference proving verification passed, such as `checkpoint:.do-work/runs/RUN-001.yml#REQ-123` or `commit:abc123 tests:passed`; empty until proven. |
-| `**Suite:**` | optional | Written by the run orchestrator during advisory-check consolidation when the worker's own test/build suite could not be provisioned; the only value is `not-run`. Consumed by `lib/derive-status.sh`, which derives such a REQ `unproven` regardless of an otherwise-passing closure proof. Absent on normal REQs. |
-| `**Criteria approved:**` | optional | Acceptance-criteria provenance: `agent-drafted` when capture generated it, or `human <approver> <YYYY-MM-DD>` when a human previously reviewed it. This field does not block run. |
-| `**Priority:**` | optional | Backlog urgency `1`–`3` (3 = most urgent), derived by capture from dependency-graph depth. Read by `lib/pick-req.sh` to order claimable candidates (Priority desc, then REQ number asc). Absent or out-of-range sorts as `2`, so legacy REQs are unaffected. |
-| `**Size:**` | optional | Effort estimate `S` / `M` / `L`, derived by capture from file count, layer span, and criteria count. `Size: L` is a primary opus-escalation signal in `agents/run.md` Model Selection. Absent falls back to the lexical heuristics. |
-| `**Files:**` | yes | Space-separated list of primary output files — used by `lib/check-footprint.sh` for overlap detection |
-| `**Depends on:**` | optional | REQ ids this REQ must not start before, separated by commas and/or whitespace (e.g. `REQ-144, REQ-145` or `REQ-144 REQ-145`) — tokenized by `lib/pick-req.sh` / `lib/check-deps.sh` and checked against `archive/` |
+| Field                    | Required | Description                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `**UR:**`                | yes      | Parent UR identifier (e.g. `UR-030`)                                                                                                                                                                                                                                                                               |
+| `**Status:**`            | yes      | `backlog` / `in-progress` / `stopped` / `done`                                                                                                                                                                                                                                                                     |
+| `**Created:**`           | yes      | ISO date (YYYY-MM-DD)                                                                                                                                                                                                                                                                                              |
+| `**Layer:**`             | yes      | Declared project layer, or `none` for bug-fix/refactor/test-only REQs                                                                                                                                                                                                                                              |
+| `**Entry point:**`       | optional | How a user, caller, command, or system reaches this path-unit. Required to be non-empty for top-level path-unit REQs.                                                                                                                                                                                              |
+| `**Terminal state:**`    | optional | The observable end state that proves this path-unit is complete. Required to be non-empty for top-level path-unit REQs.                                                                                                                                                                                            |
+| `**Parent:**`            | optional | Parent path-unit REQ id for child layer-tasks. Empty or absent on top-level path-units and legacy REQs.                                                                                                                                                                                                            |
+| `**Closure proof:**`     | optional | Evidence reference proving verification passed, such as `checkpoint:.do-work/runs/RUN-001.yml#REQ-123` or `commit:abc123 tests:passed`; empty until proven.                                                                                                                                                        |
+| `**Suite:**`             | optional | Written by the run orchestrator during advisory-check consolidation when the worker's own test/build suite could not be provisioned; the only value is `not-run`. Consumed by `lib/derive-status.sh`, which derives such a REQ `unproven` regardless of an otherwise-passing closure proof. Absent on normal REQs. |
+| `**Criteria approved:**` | optional | Acceptance-criteria provenance: `agent-drafted` when capture generated it, or `human <approver> <YYYY-MM-DD>` when a human previously reviewed it. This field does not block run.                                                                                                                                  |
+| `**Priority:**`          | optional | Backlog urgency `1`–`3` (3 = most urgent), derived by capture from dependency-graph depth. Read by `lib/pick-req.sh` to order claimable candidates (Priority desc, then REQ number asc). Absent or out-of-range sorts as `2`, so legacy REQs are unaffected.                                                       |
+| `**Size:**`              | optional | Effort estimate `S` / `M` / `L`, derived by capture from file count, layer span, and criteria count. `Size: L` is a primary opus-escalation signal in `agents/run.md` Model Selection. Absent falls back to the lexical heuristics.                                                                                |
+| `**Files:**`             | yes      | Space-separated list of primary output files — used by `lib/check-footprint.sh` for overlap detection                                                                                                                                                                                                              |
+| `**Depends on:**`        | optional | REQ ids this REQ must not start before, separated by commas and/or whitespace (e.g. `REQ-144, REQ-145` or `REQ-144 REQ-145`) — tokenized by `lib/pick-req.sh` / `lib/check-deps.sh` and checked against `archive/`                                                                                                 |
 
 A **path-unit** is a REQ whose `**Entry point:**` and `**Terminal state:**` are both non-empty. Path-units describe a vertical, reachable slice of intent. Child layer-tasks point back to a path-unit with `**Parent:**`; legacy REQs without these fields remain valid because the migration is additive.
 
@@ -227,6 +228,7 @@ When a REQ is claimed by a worker, a claim block is inserted between the title a
 
 ```markdown
 <!-- claimed-start -->
+
 **Claimed by:** hostname.pid
 **Claimed at:** 2026-05-21T11:42:08Z
 **Heartbeat:** 2026-05-21T11:42:08Z
@@ -271,17 +273,16 @@ checkpoints:
   - step: 1
     total: 3
     type: test
-    command: "npm test -- --filter settings"
+    command: 'npm test -- --filter settings'
     status: passed
   - step: 2
     total: 3
     type: runtime
-    command: "curl http://localhost:3000/settings"
+    command: 'curl http://localhost:3000/settings'
     status: failed
-    handoff: "route -> render"
+    handoff: 'route -> render'
 last_good_step: 1
 failed_step: 2
 ```
 
 On failure, the log must answer: which step failed, at which handoff, and what the last good step was. On success, the full passed checkpoint log becomes the natural target for `**Closure proof:**`.
-

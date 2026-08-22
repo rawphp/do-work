@@ -95,4 +95,3 @@ Enhance the `do-work` skill so it closes the remaining governance gaps and can b
 10. Report outcome
 
     Summarize changed files, new behavior, and test results. Call out any gaps intentionally left for a later implementation pass.
-

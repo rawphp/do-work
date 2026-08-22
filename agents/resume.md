@@ -35,6 +35,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -42,11 +43,11 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 **Branch on effective backend** after load path:
 
-| Backend | Work-item resume |
-|---------|------------------|
-| **`markdown`** | Steps **1–6** below (working/ stamp + `heartbeat.sh`) |
-| **`linear`** | Steps **L1–L5** — linear.md **Resume** (compose **`set_req_status`** + **`heartbeat_req`**). Id is a **Linear issue id**. Assignee and claim ownership preserved. |
-| **`sqlite`** | **1S** — `get-req` / `set-status in_progress` / `heartbeat` by **REQ slug** via `lib/dw-db.sh` only. Do not glob `working/REQ`. |
+| Backend          | Work-item resume                                                                                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`markdown`**   | Steps **1–6** below (working/ stamp + `heartbeat.sh`)                                                                                                                                     |
+| **`linear`**     | Steps **L1–L5** — linear.md **Resume** (compose **`set_req_status`** + **`heartbeat_req`**). Id is a **Linear issue id**. Assignee and claim ownership preserved.                         |
+| **`sqlite`**     | **1S** — `get-req` / `set-status in_progress` / `heartbeat` by **REQ slug** via `lib/dw-db.sh` only. Do not glob `working/REQ`.                                                           |
 | **`do-work-io`** | **1D** — compose **`set_req_status`** (`in_progress`) + **`heartbeat_req`** via `agents/tracker/do-work-io.md` by **REQ-NNN slug**. Claim ownership preserved. Do not glob `working/REQ`. |
 
 Invocation under Linear may be `/do-work resume ENG-123`. Under sqlite / do-work-io: `/do-work resume REQ-NNN` (slug). Worktree/branch isolation stays **local** regardless of backend.
@@ -156,7 +157,7 @@ bash {skill-root}/lib/heartbeat.sh "$REQ_PATH"
 
 If `heartbeat.sh` exits non-zero (missing claim stamp, malformed file), report the failure and stop. Do not dispatch a worker against a REQ with no live heartbeat.
 
-**Refresh the `**Session:**` line.** Resume preserves the original claim ownership, but the *session* now handling the REQ is this one — the extension's REQ→session resume lookup must point at the live session. Use the shared stamp primitive (insert / replace / leave-untouched; never free-hand edit the claim block):
+**Refresh the `**Session:**` line.** Resume preserves the original claim ownership, but the _session_ now handling the REQ is this one — the extension's REQ→session resume lookup must point at the live session. Use the shared stamp primitive (insert / replace / leave-untouched; never free-hand edit the claim block):
 
 ```bash
 bash {skill-root}/lib/stamp-session.sh "$REQ_PATH"
@@ -183,11 +184,11 @@ Announce before dispatch:
 
 Parse the worker's structured YAML return report exactly as described in [run.md](run.md) **Step 3: Process the worker report**. Branch on `status`:
 
-| `status` | Action |
-|---|---|
-| `done` | Capture `commit` hash and `outputs`. Print the same completion line [run.md](run.md) Step 7 emits. Resume is a single-REQ operation — stop, do not loop back to the backlog. |
+| `status`  | Action                                                                                                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `done`    | Capture `commit` hash and `outputs`. Print the same completion line [run.md](run.md) Step 7 emits. Resume is a single-REQ operation — stop, do not loop back to the backlog.       |
 | `stopped` | Surface the new stopper to the user using the same **Stopping Rules** path defined in [run.md](run.md). Do not auto-resume again — that would loop indefinitely on a real blocker. |
-| `failed` | Treat as `stopped` with `reason: unknown-error` per [run.md](run.md) Step 3. |
+| `failed`  | Treat as `stopped` with `reason: unknown-error` per [run.md](run.md) Step 3.                                                                                                       |
 
 If the report is missing or unparseable, surface the raw output and stop.
 

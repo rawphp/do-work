@@ -21,6 +21,7 @@ The spec says capture's brief classification "uses the same heuristic `run.md` a
 The "open question" in the spec about whether to extract `agents/classify.md` is therefore decided here: **inline in capture.md** for v1. Extraction can come later if a third caller appears.
 
 The spec's other open questions:
+
 - `agents/layers.md` extraction — **inline in capture.md for v1**, same reasoning.
 - REQ template location — confirmed inline in `capture.md` Step 4 (no separate template file exists today). Updates happen there.
 - `--grill` removal cycle — **hard cut** as the spec defaults.
@@ -30,6 +31,7 @@ The spec's other open questions:
 ## File structure
 
 Files modified:
+
 - `agents/config.md` — schema gains `layers:`, `next_steps_acknowledged_partials:` is NOT added (deferred follow-up).
 - `agents/intake.md` — switches `input.md` from prose to YAML frontmatter + body.
 - `agents/ideate.md` — appends interactive 3-option gate at end.
@@ -48,6 +50,7 @@ Files created: none. (Helpers stay inline.)
 ## Task 1: Add `layers:` to config schema
 
 **Files:**
+
 - Modify: `agents/config.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -96,6 +99,7 @@ git commit -m "feat(do-work): add layers field to config schema"
 ## Task 2: Switch intake.md to write YAML frontmatter
 
 **Files:**
+
 - Modify: `agents/intake.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -106,7 +110,7 @@ After this task, `intake.md` writes `input.md` with YAML frontmatter (`ur`, `rec
 
 Find the existing template block in `agents/intake.md` (lines 64-73). Replace it with:
 
-```markdown
+````markdown
 Use this format exactly:
 
 ```markdown
@@ -122,7 +126,9 @@ status: intake
 
 [The user's message, verbatim. Do not summarise, rephrase, or interpret it.]
 ```
-```
+````
+
+````
 
 (Note: nested code fence — the agent file uses indented or escaped fences, follow whatever existing convention is in `intake.md`. Read it first.)
 
@@ -137,7 +143,7 @@ Replace the verification numbered list (lines 79-83) with:
 4. Confirm `received:` matches today's date
 5. Confirm `ur:` matches the UR number you assigned
 6. Confirm the `## Request` section in the body contains the user's original message (not a summary or paraphrase)
-```
+````
 
 - [ ] **Step 4: Update intake's existing-UR-status check**
 
@@ -168,6 +174,7 @@ git commit -m "feat(do-work): intake writes UR with YAML frontmatter"
 ## Task 3: Add legacy-UR detection helper text to verify.md
 
 **Files:**
+
 - Modify: `agents/verify.md`
 
 This task pre-positions verify to recognise legacy URs (no frontmatter) so subsequent verify-check tasks can short-circuit cleanly.
@@ -182,6 +189,7 @@ Find Step 1 in `agents/verify.md` (lines 24-28 today). After "Read every file in
 
 ```markdown
 **Legacy UR detection.** Read the first 10 lines of `input.md`. If they do not begin with a `---` line followed by a YAML frontmatter block ending in `---`, this UR predates the gap-aware capture refactor. Mark it as legacy. Verify will:
+
 - Run all pre-existing checks (coverage scoring, ideate observation tracking, vague-criteria scan).
 - **Skip** the new layer-coverage check, integration-block check, and partial-confidence check (Steps 4b-4d below). Legacy URs continue to behave exactly as they did before this refactor.
 
@@ -209,6 +217,7 @@ git commit -m "feat(do-work): verify recognises legacy URs without frontmatter"
 ## Task 4: Add `layer:` field to REQ template in capture.md
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -234,6 +243,7 @@ Immediately after the template block (before "### Writing effective Verification
 
 ```markdown
 **The `**Layer:**` field is required.** Its value must be one of:
+
 - A layer name from `do-work/config.yml`'s `layers:` list, OR
 - The literal `none` for bug-fix REQs, pure refactor REQs (no new surface), or test-only REQs.
 
@@ -263,6 +273,7 @@ git commit -m "feat(do-work): add Layer field to REQ template"
 ## Task 5: Add `## Integration` section to REQ template
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -322,6 +333,7 @@ git commit -m "feat(do-work): add Integration section to REQ template"
 ## Task 6: Add brief classification heuristic to capture.md
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -337,13 +349,13 @@ Find Step 2 ("Determine the next REQ number") in `agents/capture.md`. Immediatel
 
 Classify the brief into one of three classes. Read `input.md`'s body and apply these signals top-to-bottom; first match wins:
 
-| Signal in brief | Class |
-|---|---|
-| Words "bug", "fix", "broken", "regression", "crash", "error in", "doesn't work", "stops working", combined with a reference to existing behaviour | `bug-fix` |
-| Words "refactor", "rename", "tidy", "cleanup", "extract", "move to", with no new user-facing behaviour described | `other` (refactor) |
-| Words "document", "docs", "readme", "changelog", with no code change described | `other` (docs) |
-| Words "config", "setting", "env var", "tweak X to Y", with no new code paths | `other` (config) |
-| Anything else, including any brief describing user-facing behaviour, screens, endpoints, commands, or new functionality | `feature` |
+| Signal in brief                                                                                                                                   | Class              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| Words "bug", "fix", "broken", "regression", "crash", "error in", "doesn't work", "stops working", combined with a reference to existing behaviour | `bug-fix`          |
+| Words "refactor", "rename", "tidy", "cleanup", "extract", "move to", with no new user-facing behaviour described                                  | `other` (refactor) |
+| Words "document", "docs", "readme", "changelog", with no code change described                                                                    | `other` (docs)     |
+| Words "config", "setting", "env var", "tweak X to Y", with no new code paths                                                                      | `other` (config)   |
+| Anything else, including any brief describing user-facing behaviour, screens, endpoints, commands, or new functionality                           | `feature`          |
 
 Record the chosen class. Capture's downstream behaviour:
 
@@ -379,6 +391,7 @@ git commit -m "feat(do-work): add brief classification heuristic to capture"
 ## Task 7: Capture reads declared layers from config; fail-closed on empty
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -396,30 +409,31 @@ Pull `layers:` from the config loaded in Step 0. Also note whether the invocatio
 
 Decision table:
 
-| Class | `layers:` | `--no-layers` flag | Action |
-|---|---|---|---|
-| `bug-fix` | any | any | Proceed. `layers_in_scope: []` will be recorded in UR frontmatter; no layer-coverage prompt fires. |
-| `feature` | non-empty | not passed | Proceed. `layers_in_scope` = the configured `layers:` list. |
-| `feature` | non-empty | passed | Proceed. `layers_in_scope: []` recorded in UR frontmatter (deliberate user opt-out for this UR only); no layer-coverage prompt fires. |
-| `feature` | empty or missing | not passed | **Halt.** Output the error below. Do not write any REQs. |
-| `feature` | empty or missing | passed | Proceed. `layers_in_scope: []` recorded in UR frontmatter. |
-| `other` (effective `feature`) | empty or missing | not passed | **Halt** as above. |
+| Class                         | `layers:`        | `--no-layers` flag | Action                                                                                                                                |
+| ----------------------------- | ---------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `bug-fix`                     | any              | any                | Proceed. `layers_in_scope: []` will be recorded in UR frontmatter; no layer-coverage prompt fires.                                    |
+| `feature`                     | non-empty        | not passed         | Proceed. `layers_in_scope` = the configured `layers:` list.                                                                           |
+| `feature`                     | non-empty        | passed             | Proceed. `layers_in_scope: []` recorded in UR frontmatter (deliberate user opt-out for this UR only); no layer-coverage prompt fires. |
+| `feature`                     | empty or missing | not passed         | **Halt.** Output the error below. Do not write any REQs.                                                                              |
+| `feature`                     | empty or missing | passed             | Proceed. `layers_in_scope: []` recorded in UR frontmatter.                                                                            |
+| `other` (effective `feature`) | empty or missing | not passed         | **Halt** as above.                                                                                                                    |
 
 **Halt error message:**
-
 ```
+
 Capture halted: project has not declared layers in do-work/config.yml.
 
 This is a feature-class brief, and gap-aware capture requires either:
-  (1) declare your project's layers in do-work/config.yml, e.g.
-      layers: [frontend, backend]
-      and re-run capture, OR
-  (2) pass --no-layers on the start or go invocation to skip
-      layer-coverage checks for this UR only.
+(1) declare your project's layers in do-work/config.yml, e.g.
+layers: [frontend, backend]
+and re-run capture, OR
+(2) pass --no-layers on the start or go invocation to skip
+layer-coverage checks for this UR only.
 
 Layer-coverage checks prevent features from silently shipping with
 the frontend or wiring missed. Disable them per-UR with --no-layers
 when they don't apply (e.g. internal CLI scripts).
+
 ```
 
 Hold `layers_in_scope` (the per-UR list) in context for downstream steps.
@@ -446,6 +460,7 @@ git commit -m "feat(do-work): capture reads layers from config, fails closed whe
 ## Task 8: Capture assigns `layer:` when writing REQs
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -480,26 +495,27 @@ Find the `## Example` block immediately after the rules. Replace with:
 
 ```markdown
 **Example** (project with `layers: [frontend, backend]`):
-
 ```
+
 Brief: "Contact form with name, email, message. Submissions emailed to sales@example.com and stored in DB. Show success message."
 
-R1:  Form UI (name, email, message fields)              [frontend]
-R2a: Form validation — client side                       [frontend]
-R2b: Form validation — server side                       [backend]
-R3:  Store submissions in database                       [backend]
-R4:  Email submissions to sales@example.com              [backend]
-R5:  Show success message after submission               [frontend]
+R1: Form UI (name, email, message fields) [frontend]
+R2a: Form validation — client side [frontend]
+R2b: Form validation — server side [backend]
+R3: Store submissions in database [backend]
+R4: Email submissions to sales@example.com [backend]
+R5: Show success message after submission [frontend]
 
 All declared layers covered: frontend (R1, R2a, R5), backend (R2b, R3, R4). ✓
 
 Planned REQs:
-  REQ-001 form-ui              → R1   layer: frontend
-  REQ-002 client-validation    → R2a  layer: frontend
-  REQ-003 server-validation    → R2b  layer: backend
-  REQ-004 store-submissions    → R3   layer: backend
-  REQ-005 email-submissions    → R4   layer: backend
-  REQ-006 success-message      → R5   layer: frontend
+REQ-001 form-ui → R1 layer: frontend
+REQ-002 client-validation → R2a layer: frontend
+REQ-003 server-validation → R2b layer: backend
+REQ-004 store-submissions → R3 layer: backend
+REQ-005 email-submissions → R4 layer: backend
+REQ-006 success-message → R5 layer: frontend
+
 ```
 
 For projects with `layers: [agents, commands, templates]` (do-work itself), tags would be `agents`, `commands`, `templates`, or `none` — same machinery, different vocabulary.
@@ -544,6 +560,7 @@ git commit -m "feat(do-work): capture assigns layer per REQ from declared layers
 ## Task 9: Add layer-coverage prompt pass to capture (Step 4c)
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -560,18 +577,20 @@ Find Step 4b ("Check acceptance criteria quality") in capture.md. Insert this ne
 This pass runs only for `feature`-class briefs (or `other` briefs the user opted up to feature-style). Bug-fix briefs skip this entire step.
 
 Build the coverage matrix:
+
 1. For each layer in `layers_in_scope`, scan all REQs just written in Step 4 and count how many have `**Layer:** <name>` matching it.
 2. List the layers with zero coverage.
 
 If `layers_in_scope` is empty (`--no-layers` was passed, or this is a bug-fix), this step is a no-op. Skip it.
 
 For each uncovered layer, present this prompt via `AskUserQuestion`:
-
 ```
+
 Project declares layer "{layer}", but no REQ covers it.
 Brief: "{one-sentence summary of input.md's first paragraph}"
 
 Is "{layer}" needed for this UR?
+
 ```
 
 Options:
@@ -609,6 +628,7 @@ git commit -m "feat(do-work): capture prompts for uncovered layers"
 ## Task 10: Add integration question pass to capture (Step 5)
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -659,14 +679,16 @@ For each qualifying REQ in scope, fill the `## Integration` block by answering t
 6. **Partial:** Write what's known. For each partial sub-question, ask the user via `AskUserQuestion` with up to 3 candidate answers from the codebase exploration plus a "Tell me directly" option. Replace the partial answer with the user's choice. Re-rate; if all three are now high, the REQ is high overall.
 
 7. **Low:** Write a placeholder block listing what was checked, then ask the user directly via `AskUserQuestion`:
-   ```
-   Cannot answer integration sub-questions from codebase exploration.
-   Checked: <files/dirs that were read>
-   Found: <what was found, or "nothing relevant">
+```
 
-   How would you like to proceed?
-   ```
-   Options: (1) "I'll answer inline" — collect three free-text answers, (2) "Mark this REQ low confidence and continue", (3) "Skip this REQ — I'll fill it in manually later".
+Cannot answer integration sub-questions from codebase exploration.
+Checked: <files/dirs that were read>
+Found: <what was found, or "nothing relevant">
+
+How would you like to proceed?
+
+```
+Options: (1) "I'll answer inline" — collect three free-text answers, (2) "Mark this REQ low confidence and continue", (3) "Skip this REQ — I'll fill it in manually later".
 
 8. Record the per-REQ aggregate confidence (`high` / `partial` / `low`) in working state. The frontmatter `reqs:` list (Step 7 below) will carry this as `integration_confidence: <value>`.
 
@@ -696,6 +718,7 @@ git commit -m "feat(do-work): capture runs integration question pass with file v
 ## Task 11: Add Step 6 (Write capture summary block to UR)
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -706,7 +729,7 @@ A new Step 6 (between Integration question pass and Commit) writes a `## Capture
 
 After Step 5 (Integration question pass), insert:
 
-```markdown
+````markdown
 ### 6. Write capture summary to UR body
 
 Prepend (or replace, on re-run — see Step 7 idempotency rules) a summary block to `input.md`'s body, immediately after the YAML frontmatter close (`---`) and before the `## Request` heading.
@@ -716,18 +739,19 @@ Format:
 ```markdown
 ## Capture summary (YYYY-MM-DD)
 
-| Item | Value |
-|---|---|
-| Classification | <bug-fix | feature | other-as-feature | other-as-bug-fix> |
+| Item            | Value                                                                   |
+| --------------- | ----------------------------------------------------------------------- |
+| Classification  | <bug-fix                                                                | feature | other-as-feature | other-as-bug-fix> |
 | Layers in scope | <comma-separated list, or "(none — --no-layers)" or "(none — bug-fix)"> |
-| Layer decisions | <comma-separated "<layer>: no" entries, or "(none — all covered)"> |
-| REQs generated | <count> |
+| Layer decisions | <comma-separated "<layer>: no" entries, or "(none — all covered)">      |
+| REQs generated  | <count>                                                                 |
 
-| REQ | Layer | Integration confidence |
-|---|---|---|
-| REQ-NNN | <layer> | <high | partial | low | n/a> |
-| ...        |        |        |
+| REQ     | Layer   | Integration confidence |
+| ------- | ------- | ---------------------- |
+| REQ-NNN | <layer> | <high                  | partial | low | n/a> |
+| ...     |         |                        |
 ```
+````
 
 `integration_confidence: n/a` for any REQ with `**Layer:** none` (bug-fix or pure-refactor REQs that don't run the integration pass).
 
@@ -735,29 +759,32 @@ Format:
 
 ```markdown
 <!-- capture-summary-start -->
+
 ## Capture summary (YYYY-MM-DD)
 
 | Item | Value |
-|---|---|
-| ... | ... |
+| ---- | ----- |
+| ...  | ...   |
 
 | REQ | Layer | Integration confidence |
-|---|---|---|
-| ... | ... | ... |
+| --- | ----- | ---------------------- |
+| ... | ...   | ...                    |
+
 <!-- capture-summary-end -->
 ```
 
 On re-run: if both fence comments are present, replace everything from `<!-- capture-summary-start -->` through `<!-- capture-summary-end -->` (inclusive). If only one fence is present (corrupted state), repair by inserting the missing fence at the closest plausible boundary. If neither fence is present (first capture run, or legacy edited state), insert a fresh fenced block immediately after the YAML frontmatter close and before the `## Request` heading. The verbatim brief in `## Request` must never be modified.
 
 **Frontmatter is canonical.** This summary block is a regeneratable view. The authoritative state lives in the YAML frontmatter (Step 7). Edits made by hand to this block will be overwritten on the next capture run.
-```
+
+````
 
 - [ ] **Step 3: Verify**
 
 ```bash
 grep -n "### 6. Write capture summary" agents/capture.md
 grep -n "Frontmatter is canonical" agents/capture.md
-```
+````
 
 Expected: present.
 
@@ -773,6 +800,7 @@ git commit -m "feat(do-work): capture writes summary block to UR body"
 ## Task 12: Add Step 6b (Write/update UR frontmatter)
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -781,7 +809,7 @@ A new Step 6b updates `input.md`'s YAML frontmatter to record everything capture
 
 - [ ] **Step 2: Insert Step 6b after Step 6**
 
-```markdown
+````markdown
 ### 6b. Write UR frontmatter
 
 Update `input.md`'s YAML frontmatter (the block between the first two `---` lines) to record capture's decisions. The frontmatter must end up looking like:
@@ -790,16 +818,17 @@ Update `input.md`'s YAML frontmatter (the block between the first two `---` line
 ---
 ur: UR-NNN
 received: YYYY-MM-DD
-status: captured                # was: intake
+status: captured # was: intake
 classification: <bug-fix | feature | other-as-feature | other-as-bug-fix>
 layers_in_scope: [<comma-separated layers, or empty list>]
-layer_decisions: {}             # populated only when the user said "no" to a layer
+layer_decisions: {} # populated only when the user said "no" to a layer
 reqs:
   - { id: REQ-NNN, layer: <layer or none>, integration_confidence: <high | partial | low | n/a> }
   - ...
-acknowledged_partials: []       # REQ ids the user has reviewed and waved through
+acknowledged_partials: [] # REQ ids the user has reviewed and waved through
 ---
 ```
+````
 
 **Field rules:**
 
@@ -822,7 +851,8 @@ acknowledged_partials: []       # REQ ids the user has reviewed and waved throug
 A re-run that produces no new REQs and no new layer decisions is otherwise a no-op except for refreshing the summary block timestamp (Step 6).
 
 **Side effect of re-deriving `layers_in_scope`:** adding new layers to `do-work/config.yml` months later will trigger layer-coverage prompts on any UR that gets re-captured under the new config — even URs that pre-date the new layer. This is by design (current config is treated as authoritative), but worth knowing before broadening the layer list. The user resolves these by recording `layer_decisions: { newlayer: no }` for old URs that don't need the new layer.
-```
+
+````
 
 - [ ] **Step 3: Verify**
 
@@ -830,7 +860,7 @@ A re-run that produces no new REQs and no new layer decisions is otherwise a no-
 grep -n "### 6b. Write UR frontmatter" agents/capture.md
 grep -n "Idempotency on re-run" agents/capture.md
 grep -n "acknowledged_partials" agents/capture.md
-```
+````
 
 Expected: all present.
 
@@ -846,6 +876,7 @@ git commit -m "feat(do-work): capture writes canonical state to UR frontmatter"
 ## Task 13: Update capture's commit and reporting steps
 
 **Files:**
+
 - Modify: `agents/capture.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -856,7 +887,7 @@ Step 7 (Commit) stages the updated `input.md` in addition to REQ files. Step 8 (
 
 Find the renamed Step 7 in capture.md. Replace the `git add` line that targets only REQ files. New body:
 
-```markdown
+````markdown
 ### 7. Commit the backlog
 
 Stage and commit the newly created REQ files, the updated UR `input.md`, and the ideate.md file if it exists.
@@ -875,9 +906,11 @@ git add {project}/do-work/user-requests/UR-NNN/ideate.md 2>/dev/null || true
 
 git commit -m "chore(UR-NNN): capture decomposition + state"
 ```
+````
 
 Replace `UR-NNN` with the actual UR identifier. The commit includes new REQ files, the updated `input.md` (frontmatter + summary block), and any newly written `## Integration` blocks within REQs.
-```
+
+````
 
 - [ ] **Step 3: Edit Step 8 (Report and prompt)**
 
@@ -886,7 +919,8 @@ Find the renamed Step 8. Replace the report block to include capture's headline 
 ```markdown
 After writing all REQ files and frontmatter, output the completion report:
 
-```
+````
+
 Capture complete for UR-NNN
 
 Classification: <classification>
@@ -894,10 +928,11 @@ Layers in scope: <list, or "(none)">
 Layer decisions: <"<layer>: no" entries, or "(none — all covered)">
 
 REQs written:
-  REQ-NNN-slug.md — Short title — layer: <layer> — integration: <confidence>
-  ...
+REQ-NNN-slug.md — Short title — layer: <layer> — integration: <confidence>
+...
 
 Total: N tasks in backlog
+
 ```
 
 The user reads this to confirm capture's decisions match the brief. Detail-level review can use the `## Capture summary` block in `input.md`.
@@ -927,6 +962,7 @@ git commit -m "feat(do-work): capture commits frontmatter and reports decisions"
 ## Task 14: Add the ideate interactive gate
 
 **Files:**
+
 - Modify: `agents/ideate.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -941,16 +977,18 @@ Replace the entire `### 5. Report and prompt` section (lines 102-125) with:
 ### 5. Report and prompt — interactive gate
 
 Output the completion report:
-
 ```
+
 Ideate complete for UR-NNN.
 
 Written: {project}/do-work/user-requests/UR-NNN/ideate.md
 
 Gaps surfaced:
+
 - [gap 1, one line]
 - [gap 2, one line]
 - ...
+
 ```
 
 Compile the gaps from the Explorer "Assumptions & Perspectives" and Challenger "Risks & Edge Cases" sections of the just-written ideate.md — pick the top 3-5, one line each.
@@ -999,6 +1037,7 @@ git commit -m "feat(do-work): ideate ends with mandatory interactive gate"
 ## Task 15: Wire ideate's Stop signal in start.md
 
 **Files:**
+
 - Modify: `agents/start.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1050,6 +1089,7 @@ git commit -m "feat(do-work): start honors ideate gate outcomes"
 ## Task 16: Remove `--grill` flag from start.md
 
 **Files:**
+
 - Modify: `agents/start.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1058,7 +1098,7 @@ git commit -m "feat(do-work): start honors ideate gate outcomes"
 
 - [ ] **Step 2: Delete Step 1b (Run Question — opt-in — requires `--grill`)**
 
-Find `### 1b. Run Question (opt-in — requires \`--grill\`)` in `agents/start.md` (lines 39-49). Delete the entire section, including its heading and body.
+Find `### 1b. Run Question (opt-in — requires \`--grill\`)`in`agents/start.md` (lines 39-49). Delete the entire section, including its heading and body.
 
 - [ ] **Step 3: Update the "When Invoked" flag list**
 
@@ -1099,6 +1139,7 @@ git commit -m "feat(do-work): remove --grill flag, replaced by ideate gate"
 ## Task 17: start.md accepts `--no-layers` and threads it to capture
 
 **Files:**
+
 - Modify: `agents/start.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1115,6 +1156,7 @@ Find `### 3. Run Capture` in start.md. Update the body so capture is invoked wit
 Read and follow [capture.md](capture.md) in full.
 
 Pass it:
+
 - The UR folder path from Step 1
 - The `--no-layers` flag if it was set on the start invocation (capture reads it in its Step 2c)
 
@@ -1141,6 +1183,7 @@ git commit -m "feat(do-work): start passes --no-layers through to capture"
 ## Task 18: go.md accepts `--no-layers` and threads it through
 
 **Files:**
+
 - Modify: `agents/go.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1158,7 +1201,7 @@ grep -n "auto-fix\|--force\|capture\|verify" agents/go.md
 Locate the "When Invoked" or "Optional flags" section. Add:
 
 ```markdown
-   - `--no-layers` (skip layer-coverage check for this invocation only — passed through to any capture re-runs triggered by --auto-fix)
+- `--no-layers` (skip layer-coverage check for this invocation only — passed through to any capture re-runs triggered by --auto-fix)
 ```
 
 - [ ] **Step 4: Edit go.md to thread `--no-layers` through**
@@ -1185,6 +1228,7 @@ git commit -m "feat(do-work): go threads --no-layers to capture re-runs"
 ## Task 19: Verify reads UR frontmatter (Step 1 update)
 
 **Files:**
+
 - Modify: `agents/verify.md`
 
 This finalises the legacy detection seeded in Task 3 by adding the actual frontmatter parse for non-legacy URs.
@@ -1232,6 +1276,7 @@ git commit -m "feat(do-work): verify parses UR frontmatter for non-legacy URs"
 ## Task 20: Verify check 4b — layer-coverage
 
 **Files:**
+
 - Modify: `agents/verify.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1244,6 +1289,7 @@ A new Step 4b in verify.md performs the layer-coverage check using parsed frontm
 ### 4b. Layer-coverage check
 
 This check is skipped for:
+
 - Legacy URs (no frontmatter — flagged in Step 1).
 - URs with empty `layers_in_scope` (bug-fix briefs, or `--no-layers` invocations).
 
@@ -1278,6 +1324,7 @@ git commit -m "feat(do-work): verify check 4b for layer coverage"
 ## Task 21: Verify check 4c — Integration block
 
 **Files:**
+
 - Modify: `agents/verify.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1290,6 +1337,7 @@ A new Step 4c in verify.md verifies that every non-`none`-layer REQ in a feature
 ### 4c. Integration block check
 
 This check is skipped for:
+
 - Legacy URs.
 - URs whose `classification` is `bug-fix` or `other-as-bug-fix`.
 
@@ -1325,6 +1373,7 @@ git commit -m "feat(do-work): verify check 4c for integration block"
 ## Task 22: Verify check 4d — partial-confidence
 
 **Files:**
+
 - Modify: `agents/verify.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1372,6 +1421,7 @@ git commit -m "feat(do-work): verify check 4d for partial integration confidence
 ## Task 23: Update verify auto-fix to handle new gap types
 
 **Files:**
+
 - Modify: `agents/verify.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1403,6 +1453,7 @@ The two residual cases this rule actually covers:
 - **(b)** An Integration block re-run for an existing REQ still cannot reach "high" confidence after re-exploring the codebase (the agent's references either don't exist or remain vague). Record whatever was found, surface the residual gap, stop.
 
 Cases that do **not** reach the bail-out rule:
+
 - User said "No" to a layer-coverage prompt — `layer_decisions[<layer>]: no` is recorded; verify's check 4b reads it and doesn't flag the gap on next run.
 - Partial-confidence is never auto-fixed in the first place (per the bullet above); it's surfaced directly to the user, no bail-out needed.
 ```
@@ -1426,6 +1477,7 @@ git commit -m "feat(do-work): verify auto-fix handles new gap types"
 ## Task 24: Update SKILL.md
 
 **Files:**
+
 - Modify: `SKILL.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1454,17 +1506,18 @@ Update the go rows similarly to add `--no-layers`:
 
 After the "Milestone Mode" section (around line 95) and before "Commit Convention", insert:
 
-```markdown
+````markdown
 ## Layers
 
 do-work uses project-declared layers to gap-check feature briefs. Declare your project's layers once in `do-work/config.yml`:
 
 ```yaml
-layers: [frontend, backend]   # web app
+layers: [frontend, backend] # web app
 # layers: [commands, core, output]            # CLI tool
 # layers: [public_api, internal]              # library / SDK
 # layers: [agents, commands, templates]       # do-work itself
 ```
+````
 
 Capture and verify use this list to enforce that REQs cover every declared layer for `feature`-class briefs (or surface explicit "no" decisions). Empty `layers:` opts out — feature briefs will halt until layers are declared or `--no-layers` is passed.
 
@@ -1477,7 +1530,8 @@ Feature REQs that add new surface (anything callable or visible from outside the
 - **Service dependencies** — What existing services or modules does this extend?
 
 Capture inspects the codebase to draft answers and verifies each cited file/symbol exists before claiming high confidence. Verify enforces the Integration block on every non-`none` feature REQ.
-```
+
+````
 
 - [ ] **Step 4: Verify**
 
@@ -1485,7 +1539,7 @@ Capture inspects the codebase to draft answers and verifies each cited file/symb
 grep -n "no-layers" SKILL.md
 grep -n "## Layers" SKILL.md
 grep -n "grill" SKILL.md  # should be empty
-```
+````
 
 Expected: `--no-layers` appears in Quick Reference; `## Layers` section exists; no `grill` references.
 
@@ -1501,6 +1555,7 @@ git commit -m "docs(do-work): document layers, --no-layers, drop --grill"
 ## Task 25: Update CHANGELOG.md
 
 **Files:**
+
 - Modify: `CHANGELOG.md`
 
 - [ ] **Step 1: Read CHANGELOG.md**
@@ -1517,6 +1572,7 @@ Prepend (under the appropriate version heading or at the top of unreleased chang
 ## Gap-aware capture (2026-04-29)
 
 **Added**
+
 - `layers:` config field — declare a project's layers (`[frontend, backend]`, `[commands, core, output]`, etc.). Used by capture and verify to enforce gap-aware coverage.
 - `**Layer:**` field on every REQ — names which declared layer the REQ belongs to, or `none` for bug-fix / pure-refactor.
 - Required `## Integration` section on feature REQs that add new surface — answers reachability / data deps / service deps with concrete file/symbol references.
@@ -1526,14 +1582,17 @@ Prepend (under the appropriate version heading or at the top of unreleased chang
 - Ideate ends with a mandatory interactive gate (Grill / Continue / Stop).
 
 **Changed**
+
 - Capture classifies briefs as `bug-fix` / `feature` / `other` and gates layer-coverage and integration passes accordingly.
 - Verify reads UR frontmatter; new checks for layer coverage, Integration block, partial-confidence.
 - Verify `--auto-fix` re-runs capture's relevant pass for layer / integration gaps.
 
 **Removed**
+
 - `--grill` flag on start. Users choose Grill at the ideate gate after seeing surfaced gaps.
 
 **Compatibility**
+
 - Existing URs without YAML frontmatter are treated as legacy. Verify skips all new checks for them; they continue to work as before.
 - Existing REQs without a `**Layer:**` field are similarly exempt. No migration script.
 ```
@@ -1558,6 +1617,7 @@ git commit -m "docs(do-work): changelog entry for gap-aware capture"
 ## Task 25b: Update README.md
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Define expected end-state**
@@ -1591,7 +1651,7 @@ Replace the numbered list and footer line with:
 2. **Ideate** — Surfaces assumptions, risks, and connections; ends with an interactive gate (Grill / Continue / Stop)
 3. **Capture** — Classifies the brief (bug-fix vs feature), assigns each REQ to one of the project's declared layers, prompts on uncovered layers, and writes an `## Integration` block on every new-surface REQ with codebase-verified file references
 4. **Verify** — Scores REQ coverage against the original brief, plus three structural checks: layer coverage, Integration block presence, and partial-confidence acknowledgement
-5. **Audit** *(always-on)* — Interrogates every REQ's acceptance criteria, auto-fixes vague spots, reports what changed
+5. **Audit** _(always-on)_ — Interrogates every REQ's acceptance criteria, auto-fixes vague spots, reports what changed
 6. **Run** — Executes each REQ with TDD: failing test first, implement, verify, commit
 
 `start` = intake + ideate (with gate) + capture. `go` = verify + audit + run.
@@ -1631,9 +1691,10 @@ Immediately after the Configuration section (before "Build in Public (Log)"), in
 
 Feature briefs frequently produce REQs that miss the frontend, miss the wiring, or both. do-work's gap-aware capture prevents this by enforcing two structural checks.
 
-**Declared layers.** Each project declares its layers in `do-work/config.yml` — `[frontend, backend]` for a web app, `[commands, core, output]` for a CLI, whatever fits your stack. Capture tags each REQ with one of the declared layers (or `none` for bug-fixes / pure refactors). If a brief looks full-stack but capture didn't write a REQ for a declared layer, you're prompted: *"Project has layer X, no REQ covers it. Needed?"* Yes generates the missing REQ; No records the decision so verify doesn't keep flagging it.
+**Declared layers.** Each project declares its layers in `do-work/config.yml` — `[frontend, backend]` for a web app, `[commands, core, output]` for a CLI, whatever fits your stack. Capture tags each REQ with one of the declared layers (or `none` for bug-fixes / pure refactors). If a brief looks full-stack but capture didn't write a REQ for a declared layer, you're prompted: _"Project has layer X, no REQ covers it. Needed?"_ Yes generates the missing REQ; No records the decision so verify doesn't keep flagging it.
 
 **Integration block.** Every feature REQ that adds new surface (a new page, route, command, endpoint, etc.) must have an `## Integration` section answering three questions, with concrete file references:
+
 - **Reachability** — How does the user/caller reach this?
 - **Data dependencies** — What existing data does it read or write?
 - **Service dependencies** — What existing services or modules does it extend?
@@ -1666,6 +1727,7 @@ git commit -m "docs(do-work): update README for gap-aware capture"
 ## Task 26: Declare do-work's own layers (dogfood, part 1)
 
 **Files:**
+
 - Create: `do-work/config.yml` (in dogfood project — i.e. the do-work skill repo's own do-work directory, if any. If not present, skip this task and note in handoff.)
 
 - [ ] **Step 1: Check whether do-work has its own do-work directory**
@@ -1689,7 +1751,7 @@ Create `do-work/config.yml`:
 ```yaml
 # do-work configuration
 project:
-  name: "do-work"
+  name: 'do-work'
 
 # Declare your project's layers, e.g. [frontend, backend] for a web app.
 # do-work itself is a Markdown-and-prompts CLI framework — the layers
@@ -1701,15 +1763,15 @@ log:
   platforms: []
   drafts_per_platform: 2
   batch_size: 2
-  audience: ""
-  voice: ""
+  audience: ''
+  voice: ''
   max_chars:
     x: 280
     blog: 500
     linkedin: 1300
 
 test:
-  suite_command: ""
+  suite_command: ''
 
 next_steps:
   enabled: false
@@ -1736,6 +1798,7 @@ git commit -m "chore(do-work): dogfood — declare do-work's own layers"
 ## Task 27: Smoke-test the new pipeline against a synthetic UR (dogfood, part 2)
 
 **Files:**
+
 - Create (temporary): `do-work/user-requests/UR-dogfood-001/input.md` plus any REQ files generated. **Cleanup is the default** at the end of this task.
 
 **This task is a smoke test, not assertive verification.** It exercises the new pipeline end-to-end and surfaces structural issues (e.g. agent files contain wrong cross-references, frontmatter doesn't get written, summary block format is wrong). It does NOT verify semantic correctness — whether capture's chosen layer for a REQ is right, whether the integration-block answers genuinely match the brief, whether confidence ratings are honest. That kind of validation only comes from running the pipeline against a genuine UR after this lands. Treat Task 27 as the final structural check before declaring the refactor functional, not as the regression suite.
@@ -1769,6 +1832,7 @@ This step requires invoking the (newly refactored) capture agent. In a working s
 > "Run capture for `do-work/user-requests/UR-dogfood-001/`"
 
 Capture should:
+
 - Classify as `feature`.
 - Read `layers: [agents, commands, templates]` from config.
 - Produce REQs covering the relevant layers (likely `agents` for the new file, `commands` for SKILL.md doc, `templates` if any).
@@ -1794,6 +1858,7 @@ grep -l "## Integration" do-work/REQ-*.md
 ```
 
 Expected:
+
 - frontmatter has `classification:`, `layers_in_scope:`, `reqs:`.
 - Summary block present.
 - At least 1 REQ file with a Layer field.
@@ -1808,6 +1873,7 @@ Verify should produce a report that includes coverage, the three new checks (lay
 - [ ] **Step 6: Verify the verify output**
 
 The verify report should include:
+
 - Coverage section with REQs mapped to brief requirements.
 - A "Layers" subsection (or equivalent) showing which declared layers are covered.
 - An Integration block check confirming each new-surface REQ has the section.
@@ -1852,6 +1918,7 @@ The cleanup in Step 7 makes this safe — every smoke test run starts from a cle
 ## Task 28: Final integration check
 
 **Files:**
+
 - None (verification only)
 
 - [ ] **Step 1: Spot-check that the spec's success criteria are met**
@@ -1884,7 +1951,7 @@ No commit needed.
 
 ## Self-review notes
 
-*Filled in after writing the plan body.*
+_Filled in after writing the plan body._
 
 **Spec coverage check:** Walked the spec's design sections — every section maps to one or more tasks above:
 
@@ -1909,6 +1976,7 @@ No commit needed.
 **Placeholder scan:** No `TBD`, `TODO`, `implement later`, or `Similar to Task N` appears in the steps. Each step contains the actual content needed.
 
 **Type/name consistency check:**
+
 - `layers_in_scope` (UR frontmatter), `layer:` (REQ frontmatter), `layers:` (config) — three distinct names, used consistently throughout the plan.
 - `layer_decisions` (UR frontmatter), `acknowledged_partials` (UR frontmatter), `integration_confidence` (per-REQ in UR frontmatter `reqs:` list) — used consistently.
 - Step numbering in capture.md after the refactor: 0, 1, 1b (milestone), 2, 2b (classify), 2c (read layers), 3, 3b (R-mapping), 4, 4b (criteria quality), 4c (layer-coverage prompt), 5 (integration question), 6 (capture summary), 6b (frontmatter), 7 (commit), 8 (report). Internally consistent.

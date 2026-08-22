@@ -31,6 +31,7 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 4. For work-item storage, call **only** named port ops from that backend file — never raw `.do-work/REQ-*` paths or raw Linear tools outside the backend doc.
 
 **Hard rules:**
+
 - **No silent fallback** from `linear`, `sqlite`, or `do-work-io` to `markdown`. If backend is `linear`, `sqlite`, or `do-work-io`, do not substitute Issue/REQ markdown as the store.
 - If backend resolves to **`linear`** but `agents/tracker/linear.md` is **missing or unreadable**, **hard-stop** with setup instructions (restore the Linear backend doc / connect Linear skill). Never fall through to markdown paths.
 - If backend resolves to **`do-work-io`** but `agents/tracker/do-work-io.md` is missing/unreadable, or MCP/PAT/project is unusable → **hard-stop**. Never fall through to markdown, Linear, or sqlite.
@@ -52,11 +53,11 @@ Work-item storage (Issues, REQs, decisions, verify/close reports, run notes) goe
 
 ### Verify report home — backend branch (REQ-296 / REQ-297)
 
-| Backend | Where the verify report lives |
-|---------|-------------------------------|
-| **markdown** | Console-primary (Step 5c). No fixed durable path required (`markdown.md` `write_verify_report`). |
-| **linear** | Port op **`write_verify_report`** — Initiative description **`## Verify`** + Initiative comment with the full report (`agents/tracker/linear.md`). Fixed home; do not invent alternate sections or local files as the store. Description size spill → section pointer + Initiative comment only (§10). If description **and** Initiative comment both fail → hard-stop; never invent Issue comments or alternate Docs. |
-| **do-work-io** | Port op **`write_verify_report`** (`ur.write-verify-report` in `agents/tracker/do-work-io.md`). Do not invent a local `user-requests/` path as the store. If MCP fails → hard-stop. |
+| Backend        | Where the verify report lives                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown**   | Console-primary (Step 5c). No fixed durable path required (`markdown.md` `write_verify_report`).                                                                                                                                                                                                                                                                                                                       |
+| **linear**     | Port op **`write_verify_report`** — Initiative description **`## Verify`** + Initiative comment with the full report (`agents/tracker/linear.md`). Fixed home; do not invent alternate sections or local files as the store. Description size spill → section pointer + Initiative comment only (§10). If description **and** Initiative comment both fail → hard-stop; never invent Issue comments or alternate Docs. |
+| **do-work-io** | Port op **`write_verify_report`** (`ur.write-verify-report` in `agents/tracker/do-work-io.md`). Do not invent a local `user-requests/` path as the store. If MCP fails → hard-stop.                                                                                                                                                                                                                                    |
 
 After producing the report in Step 5c, when backend is **linear** or **do-work-io**, call **`write_verify_report`** with the full report body for this Issue. Still print the report to the console for the operator. Scoring arithmetic remains `lib/score-coverage.sh` (local).
 
@@ -64,16 +65,17 @@ After producing the report in Step 5c, when backend is **linear** or **do-work-i
 
 **Backend branch (REQ-297):**
 
-| Backend | Brief / REQs |
-|---------|--------------|
-| **markdown** | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present. Backlog REQs from `.do-work/` as today. |
-| **sqlite** | **1S:** `get-ur` + `list-reqs --ur UR-NNN` via dw-db; write report with `write-verify`. Coverage arithmetic still uses shared `lib/score-coverage.sh`. **No** live `REQ-*.md` / `user-requests/` store. |
-| **linear** | **`read_ur`** for brief (Initiative `## Brief` + sections). **`list_reqs_for_ur`** for Issues in Project `do-work/{UR-id}`. Optional local assets only if the operator keeps them on disk — not a dual work-item store. |
+| Backend        | Brief / REQs                                                                                                                                                                                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **markdown**   | Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present. Backlog REQs from `.do-work/` as today.                                                                                                                |
+| **sqlite**     | **1S:** `get-ur` + `list-reqs --ur UR-NNN` via dw-db; write report with `write-verify`. Coverage arithmetic still uses shared `lib/score-coverage.sh`. **No** live `REQ-*.md` / `user-requests/` store.                                                                 |
+| **linear**     | **`read_ur`** for brief (Initiative `## Brief` + sections). **`list_reqs_for_ur`** for Issues in Project `do-work/{UR-id}`. Optional local assets only if the operator keeps them on disk — not a dual work-item store.                                                 |
 | **do-work-io** | **1D:** **`read_ur`** (`ur.get`) + **`list_reqs_for_ur`** (`req.list`) via `agents/tracker/do-work-io.md`; write report with **`write_verify_report`**. Coverage arithmetic still uses shared `lib/score-coverage.sh`. **No** live `REQ-*.md` / `user-requests/` store. |
 
 **Markdown path (default):** Read `{project}/.do-work/user-requests/UR-NNN/input.md` in full. Read every file in `UR-NNN/assets/` if present.
 
 **Legacy UR detection.** Read the first 10 lines of `input.md`. If they do not begin with a `---` line followed by a YAML frontmatter block ending in `---`, this Issue predates the gap-aware capture refactor. Mark it as legacy. Verify will:
+
 - Run all pre-existing checks (coverage scoring, ideate observation tracking, vague-criteria scan).
 - **Skip** the new layer-coverage check, integration-block check, and partial-confidence check (Steps 4b-4d below). Legacy Issues continue to behave exactly as they did before this refactor.
 
@@ -143,6 +145,7 @@ Also check for:
 ### 4b. Layer-coverage check
 
 This check is skipped for:
+
 - Legacy Issues (no frontmatter — flagged in Step 1).
 - Issues with empty `layers_in_scope` (bug-fix briefs, or `--no-layers` invocations).
 
@@ -161,6 +164,7 @@ For all other Issues:
 ### 4c. Integration block check
 
 This check is skipped for:
+
 - Legacy Issues.
 - Issues whose `classification` is `bug-fix` or `other-as-bug-fix`.
 
@@ -239,12 +243,12 @@ For every UR (legacy and non-legacy), scan each REQ in the Issue's REQ set (back
 
 **Indicator categories (single source of truth: `agents/capture.md` `### Writing effective Verification Steps` — do not maintain a separate copy; cite and apply the same four categories):**
 
-| Category | Example indicator phrases |
-|---|---|
-| **Human judgment** | "user confirms", "manually check", "looks correct", "[HUMAN]", "verify visually", "confirm the badge" |
-| **Physical device** | "on-device", "on the phone", "on iOS", "on Android", "on the watch" |
-| **Unprovisionable environment** | "in production", "requires login", "against the live API", "on-device build" |
-| **Explicit human-action phrasing** | "Ask the user to...", "Have someone...", "Check with the team..." |
+| Category                           | Example indicator phrases                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Human judgment**                 | "user confirms", "manually check", "looks correct", "[HUMAN]", "verify visually", "confirm the badge" |
+| **Physical device**                | "on-device", "on the phone", "on iOS", "on Android", "on the watch"                                   |
+| **Unprovisionable environment**    | "in production", "requires login", "against the live API", "on-device build"                          |
+| **Explicit human-action phrasing** | "Ask the user to...", "Have someone...", "Check with the team..."                                     |
 
 **Scan procedure:**
 
@@ -256,6 +260,7 @@ For every UR (legacy and non-legacy), scan each REQ in the Issue's REQ set (back
 **Scoring:** non-executable step hits are reported in the Issues section of the verify report. They lower confidence the same way other REQ-quality issues do (each counts as a gap; deduction formula is the same as vague-criteria hits — -5 per hit, capped at -20 total).
 
 **Auto-fix:** when invoked with `--auto-fix`:
+
 1. Move the offending step out of `## Verification Steps` and append it to `## Manual checks (advisory)` as a checklist item: `- [ ] [original step text] — Observable outcome: [infer from step context or leave blank for manual fill]`.
 2. Renumber any remaining `## Verification Steps` entries so numbering stays contiguous.
 3. Create `## Manual checks (advisory)` if absent, using the section header from `agents/capture.md`'s REQ template.
@@ -269,17 +274,17 @@ Report each auto-fix action in the verify report as: `[AUTO-FIXED] REQ-NNN step 
 
 From Steps 2b–4g you have already counted each category. Your job is to produce the manifest; the arithmetic belongs to the script. Assemble these counts:
 
-| Manifest field | Source | Script flag |
-|---|---|---|
-| full requirements | Step 3 (fully covered) | `--full` |
-| partial requirements | Step 3 (partially covered) | `--partial` |
-| missing requirements | Step 3 (no REQ) | `--missing` |
-| unaddressed ideate flags | Step 2b | `--ideate-flags` |
-| layer-coverage gaps | Step 4b | `--layer-gaps` |
-| integration-block gaps | Step 4c | `--integration-gaps` |
-| partial-confidence gaps | Step 4d | `--partial-conf-gaps` |
-| dangling deps | Step 4e | `--dangling-deps` |
-| path-unit closure gaps | Step 4f | `--path-unit-gaps` |
+| Manifest field           | Source                     | Script flag           |
+| ------------------------ | -------------------------- | --------------------- |
+| full requirements        | Step 3 (fully covered)     | `--full`              |
+| partial requirements     | Step 3 (partially covered) | `--partial`           |
+| missing requirements     | Step 3 (no REQ)            | `--missing`           |
+| unaddressed ideate flags | Step 2b                    | `--ideate-flags`      |
+| layer-coverage gaps      | Step 4b                    | `--layer-gaps`        |
+| integration-block gaps   | Step 4c                    | `--integration-gaps`  |
+| partial-confidence gaps  | Step 4d                    | `--partial-conf-gaps` |
+| dangling deps            | Step 4e                    | `--dangling-deps`     |
+| path-unit closure gaps   | Step 4f                    | `--path-unit-gaps`    |
 
 Non-executable step hits (Step 4g) are reported as named Issues on individual REQs (in the Issues section of the report); they do not have a dedicated `score-coverage.sh` flag — their effect on confidence flows through the Issues count. Skipped checks contribute zero — omit the flag (it defaults to 0). For legacy/bug-fix Issues, the layer/integration/partial-confidence categories are skipped, so leave those flags off.
 
@@ -348,11 +353,13 @@ If `config.next_steps.enabled` is `true` **and** this agent is running standalon
 **Use the `AskUserQuestion` tool** (do NOT just print the options as text) with options that depend on whether the score clears the gate. The gate is `config.verify.threshold` (the threshold loaded in Step 0; default 90 if unset).
 
 **Score >= `config.verify.threshold`:**
+
 1. **"Run the loop"** — Proceed to run agent
 2. **"Review REQs"** — Inspect backlog before running
 3. **"Skip"** — End the interaction
 
 **Score < `config.verify.threshold`:**
+
 1. **"Auto-fix gaps"** — Re-run verify with --auto-fix
 2. **"Re-run Capture"** — Go back to capture to fill gaps
 3. **"Skip"** — End the interaction
@@ -388,6 +395,7 @@ The two residual cases this rule actually covers:
 - **(b)** An Integration block re-run for an existing REQ still cannot reach "high" confidence after re-exploring the codebase (the agent's references either don't exist or remain vague). Record whatever was found, surface the residual gap, stop.
 
 Cases that do **not** reach the bail-out rule:
+
 - User said "No" to a layer-coverage prompt — `layer_decisions[<layer>]: no` is recorded; verify's check 4b reads it and doesn't flag the gap on next run.
 - Partial-confidence is never auto-fixed in the first place (per the bullet above); it's surfaced directly to the user, no bail-out needed.
 
