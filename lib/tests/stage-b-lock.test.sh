@@ -128,14 +128,15 @@ if ! kill -0 "$HOLDER_PID" 2>/dev/null; then
   fail "$CURRENT_CASE: holder process died unexpectedly"
 fi
 
-# Kill the holder's entire process group to ensure cleanup
-# This kills the script AND any children (python3 holding the lock)
-kill -9 -"$HOLDER_PID" 2>/dev/null || true
+# Kill the wrapper and the python process holding flock.
+# Do not pkill -f "stage-b-lock": Linux procps matches this test script
+# (`stage-b-lock.test.sh`) and SIGKILLs the suite with no FAIL lines.
+# The lock file path is in python's argv (`python3 - $LOCK_FILE …`) and
+# is not a substring of this test's argv.
+kill -9 "$HOLDER_PID" 2>/dev/null || true
+pkill -9 -P "$HOLDER_PID" 2>/dev/null || true
+pkill -9 -f "$LOCK_FILE" 2>/dev/null || true
 sleep 0.3
-
-# Also ensure any strays are gone
-pkill -9 -f "stage-b-lock" 2>/dev/null || true
-sleep 0.2
 
 # New holder should acquire immediately (lock auto-released)
 # We run it in background and wait with timeout
