@@ -10,7 +10,8 @@ description: >
   verify/review/archive gates — not a generic todo list.
   Triggers on: "do-work", "intake", "capture", "verify", "run the loop",
   "backlog", "user request", "Issue", "REQ-", "UR-", "question", "audit",
-  "linear backlog", "tracker.backend", "migrate to Linear", "sqlite board".
+  "code-review", "linear backlog", "tracker.backend", "migrate to Linear",
+  "sqlite board".
 ---
 
 # do-work
@@ -28,6 +29,7 @@ Most days you only need these:
 | `/do-work start [brief]`   | Record a brief and build the REQ backlog (ideate on by default; auto-installs).                            |
 | `/do-work go [UR-NNN]`     | Verify coverage, then audit + run when confidence ≥ threshold (default 90%). Issue slug is still `UR-NNN`. |
 | `/do-work status [UR-NNN]` | Live situation room: in-flight, backlog, recent done, coverage.                                            |
+| `/do-work code-review`     | Report-only multi-persona review of the current branch vs origin/main.                                     |
 | `/do-work board`           | Regenerate static HTML board from work.db (sqlite only).                                                   |
 | `/do-work`                 | Help + suggested next steps for this project.                                                              |
 
@@ -56,6 +58,7 @@ Flags for start/go (`--no-ideate`, `--force`, `--auto-fix`, …) are in the full
 | `/do-work run [UR-NNN]`                   | Executes backlog: TDD loop, evidence validation, post-build review gate, archive/ledger. Optional `UR-NNN` scopes the run to that Issue's REQs only.                                                                                                                                          |
 | `/do-work run [UR-NNN] --parallel N`      | Single-session parallel mode: one terminal dispatches up to N concurrent workers (default 1 = serial, capped at 10), serializing merge/archive through a queue. Defaults from `parallel.max_workers`.                                                                                         |
 | `/do-work run [UR-NNN] --budget <amount>` | Caps cumulative estimated model spend for the run; overrides `cost.budget` for this invocation. When estimated spend reaches the budget, the loop finishes the in-flight REQ's integration then stops at the next REQ boundary with a budget-stop report. Empty budget = unlimited (default). |
+| `/do-work code-review [PR or base:<ref> or UR-NNN]` | Report-only multi-persona review of the current branch vs `origin/main` (else `main`). Optional PR URL/number, `base:<ref>`, or `UR-NNN` (that Issue's commits when identifiable). Never pushes or applies fixes. Distinct from internal `/do-work review`. |
 | `/do-work review`                         | Internal post-build gate used by run after worker evidence validation and before archive completion; not directly invocable — see agents/review.md.                                                                                                                                           |
 | `/do-work status [UR-NNN]`                | Renders live situation room: REQs, claimers, heartbeats, deadlock warnings, and coverage rollup. Optional UR-NNN scopes the report.                                                                                                                                                           |
 | `/do-work board`                          | Regenerate static HTML board from work.db (sqlite only).                                                                                                                                                                                                                                      |
@@ -86,6 +89,7 @@ Detailed instructions for each phase live in separate files. Read the referenced
 - [agents/run.md](agents/run.md) — Orchestrator: dispatches a worker subagent per REQ; deep sequences: [references/run-loop.md](references/run-loop.md), [references/run-parallel.md](references/run-parallel.md)
 - [agents/run-worker.md](agents/run-worker.md) — Worker: TDD-and-commits a single REQ in a fresh subagent session
 - [agents/review.md](agents/review.md) — Post-build gate: reviews scope, acceptance evidence, tests, secrets, docs, and regression risk before archive
+- [agents/code-review.md](agents/code-review.md) — Report-only multi-persona review of the current branch (or PR / Issue commits); distinct from the internal archive gate
 - [agents/status.md](agents/status.md) — Read-only situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup
 - [agents/board.md](agents/board.md) — Static HTML board snapshot from work.db (`/do-work board`, sqlite only)
 - [agents/close.md](agents/close.md) — Validates the integrated result of an Issue against its verbatim brief; walks path-unit entry points in the merged app; writes `UR-NNN/closure.md`

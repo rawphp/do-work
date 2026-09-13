@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+**`/do-work code-review` (report-only)**
+
+**Added**
+
+- `/do-work code-review` — invocable, report-only multi-persona review of the current branch vs `origin/main` (else `main`). Optional PR URL/number, `base:<ref>`, or `UR-NNN` (that Issue's commits when identifiable from git log / REQ subjects). Nine CE-style personas under `references/code-review/personas/`; orchestrator is `agents/code-review.md`. Distinct from internal `/do-work review` (per-REQ archive gate in `agents/review.md`), which stays not directly invocable. Never pushes or applies fixes. **Consumer impact:** operators can run `/do-work code-review` before a PR; the archive gate used by `/do-work run` is unchanged.
+
 **Default install remote (rawphp/do-work)**
 
 **Changed**
