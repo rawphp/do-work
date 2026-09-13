@@ -116,6 +116,7 @@ Flags:
 | `/do-work run --budget <amount>`      | Caps estimated model spend for the run; stops at the next REQ boundary when reached.                                    |
 | `/do-work status [UR-NNN]`            | Live situation room: REQs, claimers, heartbeats, deadlock warnings, coverage rollup.                                    |
 | `/do-work close UR-NNN`               | Validates the integrated result of an Issue against its verbatim brief; writes a closure report.                        |
+| `/do-work code-review`                | Report-only multi-persona review of the current branch vs origin/main. Distinct from internal `/do-work review`.        |
 | `/do-work unblock REQ-NNN`            | Forces a stuck REQ out of `working/` back to the backlog.                                                               |
 | `/do-work resume REQ-NNN`             | Re-dispatches a fresh worker for a stopped REQ.                                                                         |
 | `/do-work retro`                      | Mines the run ledger into a learning report + capture calibration guidance.                                             |

@@ -75,6 +75,16 @@ else
   fail "missing persona file(s):$MISSING"
 fi
 
+# --- operator docs list the command ---
+CURRENT_CASE="docs-list-code-review"
+CASES=$((CASES + 1))
+assert_file "$REPO_ROOT/docs/commands.md"
+BEFORE=$FAILED
+assert_contains "/do-work code-review" "$REPO_ROOT/docs/commands.md" "$CURRENT_CASE"
+if [ "$FAILED" -eq "$BEFORE" ]; then
+  echo "ok: $CURRENT_CASE"
+fi
+
 # --- archive gate was not replaced ---
 CURRENT_CASE="archive-gate-kept"
 CASES=$((CASES + 1))
