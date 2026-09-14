@@ -27,6 +27,7 @@ Invoke with no subcommand for help plus suggested next steps:
 | Stuck REQ → backlog                      | `/do-work unblock REQ-NNN` |
 | Re-dispatch stopped REQ                  | `/do-work resume REQ-NNN`  |
 | Validate integrated UR paths             | `/do-work close UR-NNN`    |
+| Review the branch (multi-persona)        | `/do-work code-review`     |
 | Learn from run history                   | `/do-work retro`           |
 | Draft social posts                       | `/do-work log`             |
 
@@ -189,6 +190,12 @@ Validates the integrated result of an Issue against the verbatim brief: walks pa
 
 Requires an Issue id. `go` may offer close after a clean drain when path-unit REQs exist and no `closure.md` yet. Closure gaps do not block the log step.
 
+### `/do-work code-review [PR or base:<ref> or UR-NNN]`
+
+Report-only multi-persona review of the current branch vs `origin/main` (else `main`). Nine workers: correctness (always), plus project-standards, testing, maintainability, security, performance, api-contract, reliability, and adversarial when the diff warrants them.
+
+Optional: PR URL/number (scope only, does not check out), `base:<ref>`, or `UR-NNN` (that Issue's commits when identifiable). Never pushes or applies fixes. Distinct from internal `/do-work review` (the per-REQ archive gate used by `run`).
+
 ---
 
 ## Learn and publish drafts
@@ -234,6 +241,7 @@ Same surface as README / SKILL quick reference:
 | `/do-work run --budget <amount>`      | Spend cap for the run                     |
 | `/do-work status [UR-NNN]`            | Situation room                            |
 | `/do-work close UR-NNN`               | Integrated Issue closure report           |
+| `/do-work code-review`                | Multi-persona branch review (report-only) |
 | `/do-work unblock REQ-NNN`            | Stuck REQ → backlog                       |
 | `/do-work resume REQ-NNN`             | Re-dispatch stopped REQ                   |
 | `/do-work retro`                      | Ledger → calibration report               |

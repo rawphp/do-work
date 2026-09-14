@@ -256,6 +256,21 @@ By default the orchestrator runs **serially** — one REQ at a time. The optiona
 
 ---
 
+### code-review [PR|base:<ref>|UR-NNN]
+
+Report-only multi-persona review of the current branch vs `origin/main` (else `main`). Distinct from internal `/do-work review` (the per-REQ archive gate in `agents/review.md`). Never pushes, never applies fixes, never uses a blocking question tool.
+
+1. Detect `{project}`.
+2. Parse optional args (any mix, order-independent):
+   - PR URL or number — review that PR's head vs its base (scope only; do not check out).
+   - `base:<ref>` — override the default review base.
+   - `UR-NNN` — review that Issue's commits when identifiable from git log / REQ subjects; use the Issue brief for intent.
+3. `.do-work/` is **not** required for a default branch review. When `UR-NNN` is present, Load Config and the tracker port first; missing/unusable active backend is a hard-stop (same as other phase agents).
+4. Read [agents/code-review.md](../agents/code-review.md) in full.
+5. Follow the code-review agent instructions exactly. Report-only: print roster, actionable findings, residuals, testing gaps, and verdict, then stop.
+
+---
+
 ### status [UR-NNN]
 
 Render a read-only live situation room: all in-flight REQs, their claimers, heartbeat ages, any deadlock warnings, and a Coverage section showing intended/proven/unproven REQs.
