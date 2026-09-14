@@ -114,7 +114,7 @@ worktree:
 tracker:
   backend: markdown # markdown | linear | sqlite | do-work-io — unset/empty/missing key also means markdown
   dowork:
-    base_url: '' # e.g. https://api.do-work.test
+    base_url: '' # e.g. https://api.do-work.io
     token_env: DOWORK_IO_PAT # process env var holding the Sanctum PAT (never commit the token)
     project: '' # project slug (identity key; name is display-only)
     mcp_profile: dowork.control # dowork.read | dowork.control | dowork.admin

@@ -440,14 +440,14 @@ Optional remote work-item store when `tracker.backend: do-work-io` in `.do-work/
 - Set `tracker.backend: do-work-io`
 - Mint a **control** PAT in the web UI (email must be verified)
 - Export `DOWORK_IO_PAT` (or the env name in `tracker.dowork.token_env`) in the agent’s environment — never commit it, and **do not paste the token into chat**
-- Set `tracker.dowork.base_url` (e.g. `https://api.do-work.test`) and `tracker.dowork.project` (slug)
+- Set `tracker.dowork.base_url` (e.g. `https://api.do-work.io`) and `tracker.dowork.project` (slug)
 - Point MCP at `{base_url}/mcp/dowork.control` with `Authorization: Bearer $DOWORK_IO_PAT`
 
 ```yaml
 tracker:
   backend: do-work-io
   dowork:
-    base_url: '' # e.g. https://api.do-work.test (origin, no /mcp path)
+    base_url: '' # e.g. https://api.do-work.io (origin, no /mcp path)
     token_env: DOWORK_IO_PAT # process env var holding the Sanctum PAT
     project: '' # project slug (identity key)
     mcp_profile: dowork.control # dowork.read | dowork.control | dowork.admin

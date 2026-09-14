@@ -167,7 +167,7 @@ Minimal config:
 tracker:
   backend: do-work-io
   dowork:
-    base_url: '' # e.g. https://api.do-work.test
+    base_url: '' # e.g. https://api.do-work.io
     token_env: DOWORK_IO_PAT # env var name — never paste the PAT into chat
     project: '' # project slug
     mcp_profile: dowork.control

@@ -741,17 +741,17 @@ Format:
 ```markdown
 ## Capture summary (YYYY-MM-DD)
 
-| Item            | Value                                                                   |
+| Item | Value |
 | --------------- | ----------------------------------------------------------------------- | ------- | ---------------- | ----------------- |
-| Classification  | <bug-fix                                                                | feature | other-as-feature | other-as-bug-fix> |
+| Classification | <bug-fix | feature | other-as-feature | other-as-bug-fix> |
 | Layers in scope | <comma-separated list, or "(none — --no-layers)" or "(none — bug-fix)"> |
-| Layer decisions | <comma-separated "<layer>: no" entries, or "(none — all covered)">      |
-| REQs generated  | <count>                                                                 |
+| Layer decisions | <comma-separated "<layer>: no" entries, or "(none — all covered)"> |
+| REQs generated | <count> |
 
-| REQ     | Layer   | Integration confidence |
+| REQ | Layer | Integration confidence |
 | ------- | ------- | ---------------------- | ------- | --- | ---- |
-| REQ-NNN | <layer> | <high                  | partial | low | n/a> |
-| ...     |         |                        |
+| REQ-NNN | <layer> | <high | partial | low | n/a> |
+| ... | | |
 ```
 
 `integration_confidence: n/a` for any REQ with `**Layer:** none` (bug-fix or pure-refactor REQs that don't run the integration pass).

@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 **Default install remote (rawphp/do-work)**
 
 **Changed**
+
 - `install.sh` default `DO_WORK_REPO_URL` is now `https://github.com/rawphp/do-work.git` (was `https://github.com/agent-native/do-work.git`). README one-liners, clone examples, and getting-started/troubleshooting install notes match. **Consumer impact:** bare `curl …/install.sh | bash` or clone without override pulls from `rawphp/do-work`. Operators still on the old org should set `DO_WORK_REPO_URL` explicitly or re-point the hub clone remote. Existing hub checkouts keep their current remote until reinstall/update.
 
 **Product noun: Issue (wire still `ur.*` / `UR-NNN`)**
